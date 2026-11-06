@@ -1,0 +1,6 @@
+* text=auto
+*.md text eol=lf
+
+# Preserve the user plan and its original snapshot byte-for-byte.
+docs/user-plan.md -text
+docs/research/user-plan.original.md -text
