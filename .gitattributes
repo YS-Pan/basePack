@@ -1,6 +1,6 @@
 * text=auto
 *.md text eol=lf
 
-# Preserve the user plan and its original snapshot byte-for-byte.
-docs/user-plan.md -text
-docs/research/user-plan.original.md -text
+# Preserve the project charter and the original user-plan snapshot byte-for-byte.
+devDoc/project-charter.md -text
+devDoc/work/20261106-rebuild/research/user-plan.original.md -text
