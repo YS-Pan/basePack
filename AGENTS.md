@@ -2,7 +2,7 @@
 
 ## 项目与入口
 
-- 本项目重建 basePack：项目局部记忆、计算资源协调、分层 agent 协作。先完成可用的记忆闭环，再逐步扩展。
+- 本项目重建 basePack：项目局部记忆、计算资源协调、分层 agent 协作与文件结构建议。记忆工具先完成可用闭环，独立工具按其工作计划交付。
 - 用户的新指令优先；项目战略以项目纲领为准。执行计划中的接口、目录和数字预算是工程建议。
 - 涉及目标与取舍时读 [项目纲领](devDoc/project-charter.md)；纲领仅记录用户明确表达的意图，修改正文前须获得用户同意。[原始快照](devDoc/work/20261106-rebuild/research/user-plan.original.md) 保留原文。
 - 了解现行实现时读 [实现概览](devDoc/current/overview.md)；继续重建时读 [工作进度](devDoc/work/20261106-rebuild/progress.md)。
@@ -10,6 +10,7 @@
 - 核实旧项目或共享设施时按主题读 [调研依据](devDoc/work/20261106-rebuild/research/sources.md) 和 [近期历史](devDoc/work/20261106-rebuild/legacy-history.md)，按需深入原证。
 - 目标仓库为 [YS-Pan/basePack](https://github.com/YS-Pan/basePack)；发布前按产品状态编写面向使用者的 README 和使用文档。
 - 新建、调整或归档开发文档时读 [文档维护约定](devDoc/documentation.md)。
+- 推荐、设计或整理项目文件结构时使用 [project-layouts](skills/project-layouts/SKILL.md)。
 
 ## 实施
 

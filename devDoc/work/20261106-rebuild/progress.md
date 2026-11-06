@@ -4,20 +4,21 @@
 
 ## 当前阶段
 
-重建大阶段进行中，产品实施待启动。P0 的 Git 仓库和忽略规则已具备；已完成一次 [只读环境核验](../../current/environment.md)，运行接入、底座选型与产品骨架待完成。P0–P8 是同一大阶段内部的步骤，任务与验收见 [AI 执行计划](agent-plan.md)。
+重建大阶段进行中，文件结构 skill 初版已建立，记忆及其它运行工具待实施。P0 的 Git 仓库和忽略规则已具备；已完成一次 [只读环境核验](../../current/environment.md)，运行接入、底座选型与产品骨架待完成。P0–P8 是运行工具的实施步骤，文件结构工具按 [专项计划](file-organization-plan.md) 独立推进。
 
 ## 已完成
 
 - 已形成项目纲领、[简短实施计划](plan.md)、[旧项目近期历史](legacy-history.md) 和 [精选调研](research/sources.md)。
 - 开发文档已集中到 `devDoc/`；README 的介绍与入口已合入根目录 AGENTS.md，重建材料集中在本目录。组织变化见 [变更记录](../../change_log/major/20261106_232701_organize-dev-docs.md)。
 - 文档维护规则、术语、现行结构与环境说明已补齐，交接与调研结论索引已完善；实际结果和检查见 [文档整理结果](result.md)。
+- 已建立 [project-layouts skill](../../../skills/project-layouts/SKILL.md)，支持开发文档与实验分包两类布局；来源和初版验证见 [专项调研](research/file-layouts.md)。[纲领建议稿](charter-file-layout-proposal.md) 供用户自行填写，正文保持原文。
 
 ## 阻碍与待核
 
 - 本次 HTCondor 状态与队列查询因缺少配置源退出，尚未进入旧调查记录的认证阶段；接手先核配置来源，再验证查询与提交，详见 [环境说明](../../current/environment.md)。
 - 检索底座、包名和动作接口待 P0 确定。旧项目的任务状态与验收结论继续作为历史依据。
 - `devDoc` 少轮读取已纳入 [P1/P3/P4 自用与验收](agent-plan.md#devdoc-自用与读取轮数)；预期由本 work 的记忆闭环一并缓解，实际往返、信息完整性与合计用量尚未验证。
-- 用户已确定将当前 `devDoc` 结构作为记忆系统可推荐的方案之一，已形成 [实施计划](devdoc-layout-plan.md)；推荐 prompt、示例和适用效果待 P1/P3/P4 落实。
+- 文件结构建议已改为独立 skill，记忆工具可按需引用；真实大项目迁移、未来布局和记忆检索效果按实际任务继续验证。
 
 ## 下一步
 
