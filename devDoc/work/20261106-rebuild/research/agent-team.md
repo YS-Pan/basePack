@@ -4,7 +4,7 @@
 
 ## 筛选结果
 
-按 star、独立使用反馈和公开实测分别核查，优先采用可追溯材料。star 是关注度，社区案例是个体经验，兼容性测试与最终任务效果也分别处理；未发现同时证明“三层更优且更省 Codex 订阅”的成熟通用方案。
+按 star、独立使用反馈和公开实测分别核查，优先采用可追溯材料。star 是关注度，社区案例是个体经验，兼容性测试与最终任务效果也分别处理。协作效果以 [性能定义](../../../terminology.md) 中的任务能力与成果质量为准；第三方用量和耗时保留为代价记录，是否节省用量不作为采用或验收条件。
 
 star 为 2026-11-07 00:51:44 北京时间的 GitHub REST 快照，OpenHands 为同次调查稍早查询；每行链接到元数据来源。旧 GSD 已归档，后继仓库单独计数。
 
@@ -26,7 +26,7 @@ star 为 2026-11-07 00:51:44 北京时间的 GitHub REST 快照，OpenHands 为�
 
 [官方 Codex 效率实验](https://github.com/prime-radiant-inc/superpowers-evals/blob/main/docs/experiments/2026-07-28-codex-efficiency-campaign.md) 保留 scorer、负结果和归因修正。其中跨四类语料观察到的九次 depth-2 派工，均是执行者另派 reviewer，同时控制者也为同一任务派 reviewer。由此借鉴的是明确复核负责人、消除重复，而非禁止协调者继续分层。其短等待反复超时的调查支持使用宿主事件/等待机制，具体工具与时长按当前接口处理。
 
-口碑有具体正评，也有成本异议：[HN 用户](https://news.ycombinator.com/item?id=48768209) 称新版减少独立任务的人工照看，但未明确 Codex；[Codex 用户讨论](https://www.reddit.com/r/codex/comments/1utg8yn/has_superpowers_made_codex_gpt56_slower_for_you/) 反映小任务也经历长计划和多轮审阅。均为个体经验，不据此认定普遍好评或省钱。
+口碑有具体正评，也有成本异议：[HN 用户](https://news.ycombinator.com/item?id=48768209) 称新版减少独立任务的人工照看，但未明确 Codex；[Codex 用户讨论](https://www.reddit.com/r/codex/comments/1utg8yn/has_superpowers_made_codex_gpt56_slower_for_you/) 反映小任务也经历长计划和多轮审阅。均为个体经验，不能替代任务能力与成果质量的对照；额外开销本身不否定性能提升。
 
 ### GSD / GSD Core
 
@@ -62,4 +62,4 @@ Codex 的调用边界参照 [官方 subagents](https://learn.chatgpt.com/docs/ag
 - 结果正确区分周五文字演示、未完成的现场 CPU 图片链路、下周二最早可测试与完整验收日期待定；没有将开发者成功缓存或文字小样本当作完整交付。原始 fixture 与报告留在本机忽略目录 `.work/agent-team-smoke/`。
 - 本次开始时用户已有的纲领修改未纳入本次提交；纲领 SHA-256 与开始时一致。本版没有安装第三方代码、配置全局 skill 入口或新增模型 API。
 
-以上是两个小场景的行为检查，未测试超大材料容量、不同模型的路由、断线恢复或团队总成本。P7 的真实广读对照仍需结合记忆工作开展，尚不作收益承诺。
+以上是两个小场景的行为检查，未测试超大材料容量、不同模型的路由、断线恢复或团队总成本。P7 的真实广读对照仍需结合记忆工作开展，重点验证任务能力与成果质量是否提升，并单独记录代价。
