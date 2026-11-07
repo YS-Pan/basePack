@@ -16,6 +16,8 @@ htmlcov/
 .memory/
 /.cache/
 /.work/
+# Machine-local Codex discovery link; source stays in skills/project-layouts.
+/.agents/skills/project-layouts/
 /models/
 /weights/
 *.db

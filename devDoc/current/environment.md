@@ -37,4 +37,16 @@
 
 ## 文件结构 skill 的本机入口
 
-2026-11-07：仓库的 [skills/project-layouts](../../skills/project-layouts/SKILL.md) 是维护源。本机 `~/.codex/skills/project-layouts` 已建立指向该目录的 junction，技能元数据和参考文件可通过发现入口读取；源仓库移动后应重新绑定该本机入口。skill 本身不依赖此机器路径，也不需要安装 Python 包或加载模型。
+2026-11-07：仓库的 [skills/project-layouts](../../skills/project-layouts/SKILL.md) 是维护源。本机发现入口为项目内 `.agents/skills/project-layouts`，通过 junction 指向维护源，仅在本项目及子目录中发现；原用户级 `~/.codex/skills/project-layouts` 联接已移除。[Codex 官方作用域说明](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) 区分项目级与用户级入口。
+
+该本机联接由 `.gitignore` 排除，不重复保存源码。仓库换路径或新检出时，如需在技能列表中自动发现，可从仓库根目录首次建立项目级入口：
+
+```powershell
+$layoutSource = (Resolve-Path -LiteralPath 'skills/project-layouts').Path
+New-Item -ItemType Directory -Force -Path '.agents/skills' | Out-Null
+New-Item -ItemType Junction -Path '.agents/skills/project-layouts' -Target $layoutSource | Out-Null
+```
+
+AGENTS.md 仍直接引用仓库维护源；skill 本身不依赖本机绝对路径，也不需要安装 Python 包或加载模型。
+
+本机实际 `skills/list` 核对：本项目返回 `scope=repo`、`enabled=true`，项目外用户目录未发现该 skill，两处均无发现错误。四份源码文件的 SHA-256 在调整前后相同；原始发现结果留在忽略目录 `.work/project-layouts-scope/`。
