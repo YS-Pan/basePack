@@ -35,7 +35,7 @@
 
 使用目录存在性检查、`Get-Command`、Python 标准库读取解释器信息，并对三条 Condor 命令、GPU 元数据查询及 Launcher 列表各执行一次只读查询；外部查询设 8 秒超时，均提前返回。未安装依赖、设置环境变量、加载模型、修改服务或提交计算任务。
 
-模型可加载性、GPU 推理、实际队列和资源准入、项目安装及产品测试尚未验证。P0 接手先核配置来源，再验证资源接口；公共代码通过配置或探测定位共享资产，本页机器路径仅记录观测。
+模型可加载性、GPU 推理、实际队列和资源准入、项目安装及产品测试尚未验证。下一阶段由资源专项 R0 核配置来源，分别验证 embedding 与 Condor 接入，再按各链结果推进；公共代码通过配置定位共享资产，本页机器路径仅记录观测。
 
 2026-11-07 安装布局规划期间只读检查：当前系统 Python 的 sysconfig purelib 为 `C:\Program Files\Python313\Lib\site-packages`；find_spec 可定位 basic_memory，未发现 basepack/context_memory。旧安装器仍复制 `.context-memory/app`，详细依据与新部署目标见 [路径布局计划](../tasks/20261106-rebuild/deployment-layout-plan.md#从旧方案到本方案)。本次未安装包、写入 AgentTools 配置或运行模型。
 

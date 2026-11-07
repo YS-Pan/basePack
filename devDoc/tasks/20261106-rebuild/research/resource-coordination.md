@@ -37,6 +37,7 @@
 2. [qwen_worker.py](<D:/project/20261024 doc system/20261102 context/src/context_memory/qwen_worker.py>) 23–25 定义启动 free 13 GiB、自身 allocator 上限 12 GiB、整卡保留 3 GiB；vl_worker 17、39、49、50、89 直接继承。这不是 VL 2B 与其他任务并行时的预算，应改成允许输入/批次下的 embedding 自身峰值预算。
 3. qwen_bridge 255 强制 CUDA_VISIBLE_DEVICES=0，qwen_worker 29 监测物理 GPU 0；提取时明确设备配置及物理/进程逻辑编号，不覆盖 Condor 给普通任务分配的设备。
 4. vl_service 114–117 的 force close 向整个服务发送 shutdown，且排在当前请求之后；它不等于取消单个共享请求。async to_thread 的客户端取消也未接到服务端。
+5. 本次计划重评补核：vl_service 135–144 的 watchdog 在单请求超过 600 秒或总寿命到期时调用 os._exit(3)；若原样提取为跨项目服务，会结束其他项目共用的实例，R1 必须将请求截止与服务寿命分开。89–93 直接从客户端 spawn 模型进程，也不能原样用于 Condor 作业内的共享服务冷启动。
 
 ## 已有验证与不能替代的验收
 
@@ -53,5 +54,7 @@
 Condor 可发布自定义 slot 属性并用于 requirements，request_gpus=1 用于其池内普通任务之间的设备分配；设备总显存门槛不能充当剩余预算。[自定义属性配方](https://htcondor.readthedocs.io/en/25.0/faq/admins/slot-attrs.html)、[GPU 资源声明](https://htcondor.readthedocs.io/en/25.0/man-pages/condor_submit.html)
 
 NVIDIA DEFAULT 模式允许多进程使用同卡；本方案不要求 MPS。Windows 下仍须实测设备模式、服务会话、路径权限与两工作负载并存；不把声明预算当硬隔离或保证 kernel 同时执行。[NVIDIA 计算模式](https://docs.nvidia.com/deploy/mps/when-to-use-mps.html)、[Condor 作业环境](https://htcondor.readthedocs.io/en/25.0/users-manual/env-of-job.html)
+
+本次另核官方文档：Windows Condor 默认以专用低权限账户执行，并回收作业派生进程；作业默认不继承提交环境，分配后的 CUDA_VISIBLE_DEVICES 也应保留。由此要求 R0 验证账户、文件和 endpoint 访问，并让共享服务由作业树之外的入口启动；这是新方案的实施约束，不是当前机器已通过的结论。[Windows 说明](https://htcondor.readthedocs.io/en/25.0/platform-specific/microsoft-windows.html)、[作业环境](https://htcondor.readthedocs.io/en/25.0/users-manual/env-of-job.html)
 
 当前新缺口收敛为：机器级服务作用域、建库统一接入、独立两机制的预算、普通任务薄入口、共享取消和真实并行验收。先按复用清单提取，保留这几项必要回归，不复制旧平台的业务授权、协议层和整套发布/审计树。
