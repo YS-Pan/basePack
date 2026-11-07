@@ -15,6 +15,7 @@
 - 已按用户要求重新筛查高星项目、独立口碑和公开实测，建立 [agent-team skill](../../../skills/agent-team/SKILL.md) 指令层初版，以纲领为目标，参考项目只提供机制。[专项记录](research/agent-team.md) 区分第三方证据、本机行为检查和待完成的 P7 对照。
 - 已按用户要求先读旧项目 [相关 Codex 聊天再核代码](research/resource-coordination.md)，确认多模态 runtime、批处理、项目局部热复用、超时与进程清理可提取；跨项目统一实例、共享取消、普通任务薄入口与真实并行仍待实现。
 - 已据用户“embedding 与其他 GPU 任务独立、可并行”的纠正重写 [资源协调计划](resource-coordination-plan.md)：提取旧能力，以固定显存预留衔接独立服务与 Condor，替代原模型 worker 入 Condor 和整卡轮流方案。本次完成阅读和计划修订，未运行测试/模型、修改机器配置或提交计算任务。
+- 已规划 [安装位置与项目配置布局](deployment-layout-plan.md)：代码统一进系统 Python，模型和共享服务状态在 AgentTools，Condor 独立安装；项目 basepack.toml 引用机器配置，项目数据放 .basepack。规划包含 AGENTS 读取入口、初始化模板与未来 GitHub 接入说明，尚未建立实际配置或安装包。
 
 ## 阻碍与待核
 
@@ -26,6 +27,6 @@
 
 ## 下一步
 
-1. 执行资源专项 R0：按已核复用清单提取最小 runtime/服务接口，替换旧整卡锁与门槛，实测 embedding 峰值预算；分别核通独立服务与当前 Condor 配置、认证和真实作业。
+1. 执行资源专项 R0：先交付系统 Python 包和项目/机器配置入口，再按复用清单提取最小 runtime/服务接口，替换旧整卡锁与门槛，实测 embedding 峰值预算；分别核通独立服务与当前 Condor 配置、认证和真实作业。
 2. R1/R2 分别交付跨项目独立 embedding 服务和普通重任务薄入口；R3 验证预算内真实并行，再完成生命周期回归与安装说明，实际结果更新 [现行说明](../../current/overview.md)。
 3. 资源工具之后继续记忆 P0–P5：底座比较、可安装记忆骨架、文字闭环及向量/图等；在本页记录实际检查与余项。

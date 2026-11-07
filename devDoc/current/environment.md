@@ -37,6 +37,8 @@
 
 模型可加载性、GPU 推理、实际队列和资源准入、项目安装及产品测试尚未验证。P0 接手先核配置来源，再验证资源接口；公共代码通过配置或探测定位共享资产，本页机器路径仅记录观测。
 
+2026-11-07 安装布局规划期间只读检查：当前系统 Python 的 sysconfig purelib 为 `C:\Program Files\Python313\Lib\site-packages`；find_spec 可定位 basic_memory，未发现 basepack/context_memory。旧安装器仍复制 `.context-memory/app`，详细依据与新部署目标见 [路径布局计划](../work/20261106-rebuild/deployment-layout-plan.md#从旧方案到本方案)。本次未安装包、写入 AgentTools 配置或运行模型。
+
 ## 项目 skill 的本机入口
 
 2026-11-07：以下两个 skill 使用项目级发现入口，通过 junction 指向仓库维护源，仅在本项目及子目录中自动发现；二者均无用户级注册，原 `~/.codex/skills/project-layouts` 联接已移除。[Codex 官方作用域说明](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) 区分项目级与用户级入口。
