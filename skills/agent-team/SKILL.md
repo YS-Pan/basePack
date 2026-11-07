@@ -1,48 +1,48 @@
 ---
 name: agent-team
-description: "按任务规模组织主 agent、协调 agent 和执行 agent 的分层协作。用于广泛阅读、跨材料综合、多步骤任务中需要分工、隔离上下文或减轻主 agent 日常调度的场景。"
+description: "Organize hierarchical agent teams for broad reading, synthesis across sources, or multi-step work that benefits from focused contexts and delegated coordination."
 ---
 
-# 分层 agent 协作
+# Agent teams
 
-通过分工处理超出单个 context 容量的材料，让各 agent 的上下文集中于职责和相关信息。主 agent 保留目标、关键决策与整体责任；协调层承担日常派工和整合。使用宿主已有的订阅 subagent 能力，无需模型 API 或额外编排服务。
+Expand task capacity and improve result quality by giving each agent a focused context. The main agent owns the goal, key decisions, and overall result; coordinators handle routine delegation and integration. Use the host's subscription-based subagent tools without adding a model API or orchestration service.
 
-## 选择组织方式
+## Choose the organization
 
-- 小任务直接完成。少量边界清楚的子任务可由主 agent 直接派发；多批阅读、依赖或整合会占用主 agent 较多精力时，委托协调 agent 自行组织执行者。
-- 人数、层级和职责随任务及阶段调整。并行处理已就绪且可以独立推进的工作；有依赖的部分顺序推进，必要时留出空闲容量。
-- 按任务难度选择宿主可用的模型和推理强度。广读、提取可用低成本模型；跨材料判断、复杂执行和关键取舍使用能力相称的模型。沿用用户的模型偏好，具体型号通过宿主参数或角色配置选择。
-- 以当前工具实际支持的派发、嵌套、上下文和模型设置为准。缺少完成所需的能力时直接报告限制；工具错误保留原始原因，不把写好的任务说明当作已执行。
+- Complete small tasks directly. The main agent may assign a few bounded subtasks itself. Delegate a branch to a coordinator when reading waves, dependencies, or integration would demand substantial routine management.
+- Adjust team size, depth, and roles as the task evolves. Run ready, independent work in parallel; sequence dependent work and leave spare capacity when useful.
+- Match available models and reasoning effort to difficulty. Lower-cost models may handle broad reading and extraction; use sufficient capability for complex execution, synthesis, and decisions. Honor user preferences and select concrete models through host parameters or role configuration.
+- Use the tools' actual delegation, nesting, context, and model controls. Report missing required capabilities and preserve original tool errors. Distinguish a prepared brief from a task that actually ran.
 
-## 一次委托
+## Delegate a complete brief
 
-把以下内容合成一份精简任务说明，一次交给下级；已有且有效的背景直接复用。
+Send the necessary goal and context in one concise brief. Reuse valid background already available to the recipient.
 
 ```text
-目标与完成条件：需要什么结果，如何判断完成。
-范围与背景：必要约束、已有结论、材料入口及可修改范围。
-协作边界：依赖、共享输出的负责人、可自行决定及继续拆分的范围。
-交付：上级可直接使用的结论、关键依据与定位、实际检查和未解决问题。
+Goal and completion: the required result and how to recognize completion.
+Scope and context: constraints, known findings, source locations, permitted edits.
+Coordination: dependencies, shared-output owners, decisions and further delegation allowed.
+Return: usable conclusions, key evidence and locations, actual checks, unresolved issues.
 ```
 
-让下级自行检索、广读和补齐相关材料，再交付精选结果；主 agent 不必为每次搜索和补读派工。新主题优先使用干净上下文，只传任务需要的背景；同一任务的后续工作可继续原 worker。宿主支持时，可用 `fork_turns=none` 创建干净起点；继承历史只在确实需要时使用。
+Let the recipient search, read broadly, and fill relevant gaps within scope before returning selected results. Start new topics with a clean context and the necessary background; continue the same worker for related follow-up work. Where supported, use `fork_turns=none` for a clean start and inherit history when the task needs it.
 
-## 协调与执行
+## Coordinate and execute
 
-1. **协调者管理自己的分支。** 把目标拆为可完成的工作，指定材料范围、依赖、输出和负责人；在授权范围内继续分层。主 agent 默认与协调者交接目标和成果，必要时仍可直接查看来源或介入下级。
-2. **分区阅读，定向共读。** 按问题或材料分工，保留覆盖范围和尚未读取的部分。跨分区的关系由协调者安排相关片段共同阅读或定向补查，避免仅凭摘要推断未见过的关系。
-3. **明确输出所有权。** 同一共享文件或产物由指定负责人整合；可以独立修改的部分再并行。重叠调查或独立复核有具体目的时显式安排，同一项复核由一个负责人调度。
-4. **下级完成内部工作循环。** 执行者自行阅读、执行和进行必要检查，达到本任务完成条件后返回；需要下一阶段时，由负责该阶段的协调者接续。遇到缺口，先在授权范围内解决；需要改变目标、关键取舍或扩大权限时向上级说明事实、影响和待决问题。
-5. **按事件收结果。** 有独立工作时继续推进；需要下级结果时使用宿主的 agent 等待或完成通知。协调者处理日常跟进，只在成果可用、关键变化或确需上级介入时向上汇报，减少主 agent 的状态查询和重复载入。
+1. **Own the branch.** The coordinator assigns bounded work with source scope, dependencies, outputs, and owners, delegating further within its authority. The main agent normally exchanges goals and results with the coordinator and may inspect sources or intervene when needed.
+2. **Split reading, then connect evidence.** Partition by question or materials and track coverage and unread areas. Bring relevant passages into one agent's context for claims that depend on relationships across partitions; arrange targeted follow-up reading where evidence is missing.
+3. **Assign output ownership.** Give shared files or artifacts one integration owner. Parallelize edits with independent ownership. Arrange overlapping investigation or independent review for a stated purpose, with one dispatcher for each review.
+4. **Finish bounded work.** Workers read, execute, and perform necessary checks, then return when their completion criteria are met. The responsible coordinator continues the next stage. Resolve gaps within authority; escalate facts, impact, and the decision needed when goals, key tradeoffs, or permissions must change.
+5. **Collect results through events.** Continue independent work while children run. When results are needed, use the host's agent wait or completion notifications. Coordinators handle routine follow-up and report usable results, significant changes, or issues requiring parent intervention.
 
-只在确有质量疑问、关键风险或任务要求时增加专项审阅；多项结果可批量处理，保持检查与问题相称。
+Add specialist review when uncertainty, material risk, or task requirements justify it. Batch related results and keep checks proportionate to the problem.
 
-## 汇总与完成
+## Integrate and complete
 
-向上级交付可直接使用的结果：结论及其适用条件、必要证据与来源定位、覆盖范围与缺口，以及实际改动和检查（如有）。保留影响决策的分歧和不确定性；原文链接用于追溯，关键前提随结论一起交付。
+Return conclusions with their conditions, necessary evidence and source locations, coverage and gaps, and actual changes and checks where relevant. Preserve decision-relevant disagreements and uncertainty. Include key premises with the conclusions; use links for tracing and deeper reading.
 
-协调者整合依赖和跨材料结论，确认自己承接的完成条件，再返回上级；未完成的范围明确列出。主 agent 根据精选结果做关键决策并对整体交付负责，可按需要深入原文。
+The coordinator reconciles dependencies and findings across sources, checks its completion criteria, and identifies unfinished scope before returning. The main agent makes key decisions from the selected evidence and owns the overall deliverable, reading original sources as needed.
 
-仅在跨轮次或中断续接确有需要时，把目标、已定结论、活动任务与句柄、未决问题和下一步写入项目已有的进度材料；项目状态留在对应项目。
+When work needs continuation across turns or interruptions, record the goal, established findings, active tasks and handles, open issues, and next steps in existing project progress materials. Keep task state in its owning project.
 
-评估效果时，先比较任务能力与成果质量：能否完成原本做不了的工作，以及正确性、完整性和判断质量是否提升。主 agent 的上下文和往返、团队总用量及耗时另行记录；允许增加用量换取更好的结果，节省用量不作为协作的成功条件。没有用量数据时如实留缺。
+Evaluate capability and result quality first: work that was previously infeasible, correctness, completeness, and judgment quality. Record main-agent context and round trips, total team usage, and elapsed time separately. Higher usage is acceptable for better results; usage savings are not a success criterion. Mark unavailable usage data as unknown.

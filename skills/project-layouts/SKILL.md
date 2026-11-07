@@ -1,32 +1,32 @@
 ---
 name: project-layouts
-description: "推荐、设计或按用户要求整理项目文件结构。用于开发文档布局、实验分包及两者组合，也可扩展其它推荐布局；仅修改正文或实现算法时无需使用。"
+description: "Recommend or reorganize project file layouts for development documentation, independent experiments, or both. Use for structure decisions and requested file moves; ordinary prose or algorithm edits alone are outside scope."
 ---
 
-# 项目文件结构
+# Project layouts
 
-根据材料用途、维护周期和工程边界选择布局，沿用目标项目已有效的约定。文件结构帮助人和 agent 找到材料，并为记忆系统提供线索；目录名称不能证明知识有效性或工作已验收。本 skill 可独立使用。
+Choose a layout by purpose, maintenance lifecycle, and execution or delivery boundaries. Preserve working project conventions. Treat directory names as navigation clues; verify knowledge and completion from the contents.
 
-## 选方案与取材
+## Choose a pattern
 
-| 当前问题 | 读取的参考 |
+| Current problem | Read |
 | --- | --- |
-| 开发依据、现行说明、阶段工作和历史混杂 | [开发文档布局](references/dev-docs.md) |
-| 多种独立尝试的源码、依赖、数据和运行结果交叉 | [实验分包布局](references/experiment-packages.md) |
-| 两类问题同时存在 | 同批读取两份参考，组合开发文档层与实验工程层 |
-| 其它场景 | 先按用途、生命周期和独立运行/交付边界提出最小方案；合适时新增参考方案 |
+| Long-term guidance, current implementation, active work, and history are mixed | [Development documentation](references/dev-docs.md) |
+| Independent approaches have tangled code, dependencies, data, or results | [Experiment units](references/experiment-packages.md) |
+| Both problems occur | Read both references together and combine the layers |
+| Another layout problem | Propose the smallest layout that fits its purpose, lifecycle, and independent execution or delivery boundaries; add a reference when useful |
 
-先结合任务和现有入口了解目录、版本控制边界与主要材料。已知需要的文件或章节同批读取，已有且有效的上下文直接复用；内容决定下一步时再补读。大库先看相关目录和简短索引，保留继续深入的位置。
+Use the task and existing entry points to locate relevant directories, version-control boundaries, and materials. Batch known reads and reuse valid context. For a large repository, start with relevant indexes and retain locations for deeper reading; follow up when the findings require it.
 
-## 形成建议或实施整理
+## Propose or reorganize
 
-1. 说明选择理由、保留的约定、各目录的职责、直接阅读/运行入口和需要澄清的边界。按实际内容建文件；小项目可合并说明。
-2. 请求仅限建议或计划时，交付适配后的目录树及迁移清单。已授权整理时，按原路径到新路径的映射执行该范围内的修改；授权删除、迁移和归档分别处理。
-3. 移动前核对源/目标、冲突、独立 Git 与未提交内容，以及活动运行和外部引用依赖的路径。保留原始材料与版本历史，关联附件一同处理；无法安全移动的部分说明具体原因，先完成不受影响的工作。
-4. 更新受影响的文档链接、命令、配置、导入、数据定位和忽略规则，按改动做路径检查或必要的轻量运行检查。报告实际变化、检查与余项；目录整齐不代表代码可运行或结果可复现。
+1. Explain the layout choice, retained conventions, directory responsibilities, direct reading or execution entry points, and unresolved boundaries. Create files for actual content; combine short documents where useful.
+2. For advice or planning, deliver an adapted tree and a source-to-destination mapping. For authorized reorganization, apply that mapping within scope. Treat deletion, migration, and archival according to their respective authorization.
+3. Before moving files, check source and destination paths, conflicts, nested repositories, uncommitted work, active processes, and external path dependencies. Preserve originals, version history, and related attachments. Complete unaffected work and explain any blocked moves.
+4. Repair affected links, commands, configuration, imports, data locations, and ignore rules. Run relevant path checks or lightweight execution checks, then report actual changes, checks, and remaining work. Verify usability and reproducibility from evidence rather than directory appearance.
 
-共享代码保持一个维护源，通过声明的依赖或目标项目选定的模块机制复用；环境、模型和大型产物按配置显式定位。整理结构本身不要求复制权重、重跑昂贵实验或删除历史结果。
+Keep one maintenance source for shared code and reuse it through declared dependencies or the project's module mechanism. Locate shared environments, models, and large artifacts through configuration. Keep shared assets and existing results in place unless their relocation, regeneration, or cleanup is part of the task.
 
-## 扩展方案
+## Extend the patterns
 
-新方案有具体适用场景后，在 `references/` 增加说明：适用条件、最小目录树、内容与版本边界、读取/运行入口、迁移注意点和依据。在上表增加一个选择条件即可。已有方案可以组合，语言生态和项目需求优先于示例目录名。
+When a new pattern has a concrete use, add a reference covering its trigger, minimal tree, content and version boundaries, reading or execution entry points, migration considerations, and sources. Add its selection condition to the table. Combine patterns as needed; project requirements and language conventions take precedence over example names.

@@ -35,18 +35,25 @@
 
 模型可加载性、GPU 推理、实际队列和资源准入、项目安装及产品测试尚未验证。P0 接手先核配置来源，再验证资源接口；公共代码通过配置或探测定位共享资产，本页机器路径仅记录观测。
 
-## 文件结构 skill 的本机入口
+## 项目 skill 的本机入口
 
-2026-11-07：仓库的 [skills/project-layouts](../../skills/project-layouts/SKILL.md) 是维护源。本机发现入口为项目内 `.agents/skills/project-layouts`，通过 junction 指向维护源，仅在本项目及子目录中发现；原用户级 `~/.codex/skills/project-layouts` 联接已移除。[Codex 官方作用域说明](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) 区分项目级与用户级入口。
+2026-11-07：以下两个 skill 使用项目级发现入口，通过 junction 指向仓库维护源，仅在本项目及子目录中自动发现；二者均无用户级注册，原 `~/.codex/skills/project-layouts` 联接已移除。[Codex 官方作用域说明](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) 区分项目级与用户级入口。
 
-该本机联接由 `.gitignore` 排除，不重复保存源码。仓库换路径或新检出时，如需在技能列表中自动发现，可从仓库根目录首次建立项目级入口：
+| Skill | 维护源 | 本机发现入口 |
+| --- | --- | --- |
+| `project-layouts` | [SKILL.md](../../skills/project-layouts/SKILL.md) | `.agents/skills/project-layouts` |
+| `agent-team` | [SKILL.md](../../skills/agent-team/SKILL.md) | `.agents/skills/agent-team` |
+
+本机联接由 `.gitignore` 排除，不重复保存源码。仓库换路径或新检出时，如需在技能列表中自动发现，可从仓库根目录首次建立项目级入口：
 
 ```powershell
-$layoutSource = (Resolve-Path -LiteralPath 'skills/project-layouts').Path
 New-Item -ItemType Directory -Force -Path '.agents/skills' | Out-Null
-New-Item -ItemType Junction -Path '.agents/skills/project-layouts' -Target $layoutSource | Out-Null
+foreach ($skillName in @('project-layouts', 'agent-team')) {
+    $skillSource = (Resolve-Path -LiteralPath "skills/$skillName").Path
+    New-Item -ItemType Junction -Path ".agents/skills/$skillName" -Target $skillSource | Out-Null
+}
 ```
 
 AGENTS.md 仍直接引用仓库维护源；skill 本身不依赖本机绝对路径，也不需要安装 Python 包或加载模型。
 
-本机实际 `skills/list` 核对：本项目返回 `scope=repo`、`enabled=true`，项目外用户目录未发现该 skill，两处均无发现错误。四份源码文件的 SHA-256 在调整前后相同；原始发现结果留在忽略目录 `.work/project-layouts-scope/`。
+此前 `project-layouts` 作用域调整的四份源码 SHA-256 保持不变，原始发现结果留在忽略目录 `.work/project-layouts-scope/`。本次英文版与 `agent-team` 注册后，实际 `skills/list` 在项目根目录及 `devDoc` 子目录均返回两个 skill 的 `scope=repo`、`enabled=true` 和英文元数据；项目外用户目录均未发现，三处均无发现错误。原始结果记录在 `.work/skills-english/`。
