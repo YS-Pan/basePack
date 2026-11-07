@@ -10,7 +10,7 @@
 - 核实旧项目或共享设施时按主题读 [调研依据](devDoc/tasks/20261106-rebuild/research/sources.md) 和 [近期历史](devDoc/tasks/20261106-rebuild/legacy-history.md)，按需深入原证。
 - 目标仓库为 [YS-Pan/basePack](https://github.com/YS-Pan/basePack)；发布前按产品状态编写面向使用者的 README 和使用文档。
 - 新建、调整或归档开发文档时读 [文档维护约定](devDoc/documentation.md)。
-- 推荐、设计或整理项目文件结构时使用 [project-layouts](skills/project-layouts/SKILL.md)。
+- 推荐、设计或整理项目文件结构时使用 [file-structure](skills/file-structure/SKILL.md)。
 - 广读、跨材料综合或多步骤任务需要分工时使用 [agent-team](skills/agent-team/SKILL.md)，按任务规模选择直接派工或协调层。
 
 ## 实施

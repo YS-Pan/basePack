@@ -12,7 +12,8 @@
 - 开发文档已集中到 `devDoc/`；README 的介绍与入口已合入根目录 AGENTS.md，重建材料集中在本目录。组织变化见 [变更记录](../../change_log/major/20261106_232701_organize-dev-docs.md)。
 - 文档维护规则、术语、现行结构与环境说明已补齐，交接与调研结论索引已完善；实际结果和检查见 [文档整理结果](result.md)。
 - 已按用户选定名称统一为 `devDoc/system/`、`devDoc/tasks/` 和项目根 `artifacts/`，同步文档引用、技能示例、本机脚本及 Git 边界，见 [变更记录](../../change_log/minor/20261107_144504_rename-documentation-directories.md)。
-- 已建立 [project-layouts skill](../../../skills/project-layouts/SKILL.md)，支持开发文档与实验分包两类布局；来源和初版验证见 [专项调研](research/file-layouts.md)。[纲领建议稿](charter-file-layout-proposal.md) 供用户自行填写，正文保持原文。
+- 已建立 [file-structure skill](../../../skills/file-structure/SKILL.md)，支持开发文档与实验分包两类布局；来源和初版验证见 [专项调研](research/file-layouts.md)。[纲领建议稿](charter-file-layout-proposal.md) 供用户自行填写，正文保持原文。
+- 已按用户要求将该技能改名为 `file-structure`，同步源码目录、元数据、文档引用与本机发现联接；纲领保持原样，见 [改名记录](../../change_log/minor/20261107_150816_rename-file-structure-skill.md)。
 - 已按用户要求重新筛查高星项目、独立口碑和公开实测，建立 [agent-team skill](../../../skills/agent-team/SKILL.md) 指令层初版，以纲领为目标，参考项目只提供机制。[专项记录](research/agent-team.md) 区分第三方证据、本机行为检查和待完成的 P7 对照。
 - 已按用户要求先读旧项目 [相关 Codex 聊天再核代码](research/resource-coordination.md)，确认多模态 runtime、批处理、项目局部热复用、超时与进程清理可提取；跨项目统一实例、共享取消、普通任务薄入口与真实并行仍待实现。
 - 已据用户“embedding 与其他 GPU 任务独立、可并行”的纠正重写 [资源协调计划](resource-coordination-plan.md)：提取旧能力，以固定显存预留衔接独立服务与 Condor，替代原模型 worker 入 Condor 和整卡轮流方案。本次完成阅读和计划修订，未运行测试/模型、修改机器配置或提交计算任务。

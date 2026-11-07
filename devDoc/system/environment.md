@@ -45,14 +45,14 @@
 
 | Skill | 维护源 | 本机发现入口 |
 | --- | --- | --- |
-| `project-layouts` | [SKILL.md](../../skills/project-layouts/SKILL.md) | `.agents/skills/project-layouts` |
+| `file-structure` | [SKILL.md](../../skills/file-structure/SKILL.md) | `.agents/skills/file-structure` |
 | `agent-team` | [SKILL.md](../../skills/agent-team/SKILL.md) | `.agents/skills/agent-team` |
 
 本机联接由 `.gitignore` 排除，不重复保存源码。仓库换路径或新检出时，如需在技能列表中自动发现，可从仓库根目录首次建立项目级入口：
 
 ```powershell
 New-Item -ItemType Directory -Force -Path '.agents/skills' | Out-Null
-foreach ($skillName in @('project-layouts', 'agent-team')) {
+foreach ($skillName in @('file-structure', 'agent-team')) {
     $skillSource = (Resolve-Path -LiteralPath "skills/$skillName").Path
     New-Item -ItemType Junction -Path ".agents/skills/$skillName" -Target $skillSource | Out-Null
 }
@@ -60,4 +60,6 @@ foreach ($skillName in @('project-layouts', 'agent-team')) {
 
 AGENTS.md 仍直接引用仓库维护源；skill 本身不依赖本机绝对路径，也不需要安装 Python 包或加载模型。
 
-此前 `project-layouts` 作用域调整的四份源码 SHA-256 保持不变，原始发现结果留在忽略目录 `artifacts/project-layouts-scope/`。本次英文版与 `agent-team` 注册后，实际 `skills/list` 在项目根目录及 `devDoc` 子目录均返回两个 skill 的 `scope=repo`、`enabled=true` 和英文元数据；项目外用户目录均未发现，三处均无发现错误。原始结果记录在 `artifacts/skills-english/`。
+改名前，`project-layouts` 作用域调整时四份源码 SHA-256 保持不变，原始发现结果留在忽略目录 `artifacts/project-layouts-scope/`。英文版与 `agent-team` 注册后，实际 `skills/list` 在项目根目录及 `devDoc` 子目录均返回两个 skill 的 `scope=repo`、`enabled=true` 和英文元数据；项目外用户目录均未发现，三处均无发现错误。原始结果记录在 `artifacts/skills-english/`，保留当时的名称与元数据。
+
+2026-11-07 改名复核：`skills/list` 强制刷新后，在项目根目录及 `devDoc` 子目录发现 `file-structure`，显示名为 `File Structure`，`scope=repo`、`enabled=true`；旧名 `project-layouts` 均未发现。`agent-team` 仍正常发现，项目外用户目录未发现这两个技能或旧名，三处均无发现错误。最新回执见本机忽略目录 `artifacts/file-structure-rename/`。

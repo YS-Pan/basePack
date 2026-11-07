@@ -1,9 +1,9 @@
 ---
-name: project-layouts
+name: file-structure
 description: "Recommend or reorganize project file layouts for development documentation, independent experiments, or both. Use for structure decisions and requested file moves; ordinary prose or algorithm edits alone are outside scope."
 ---
 
-# Project layouts
+# File structure
 
 Choose a layout by purpose, maintenance lifecycle, and execution or delivery boundaries. Preserve working project conventions. Treat directory names as navigation clues; verify knowledge and completion from the contents.
 

@@ -17,7 +17,7 @@ htmlcov/
 /.cache/
 /artifacts/
 # Machine-local Codex discovery links; sources stay in skills/.
-/.agents/skills/project-layouts/
+/.agents/skills/file-structure/
 /.agents/skills/agent-team/
 /models/
 /weights/

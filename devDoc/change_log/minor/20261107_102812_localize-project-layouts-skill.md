@@ -1,6 +1,6 @@
 # 2026-11-07 · 将文件结构 skill 改为项目级发现
 
-按用户希望局部生效的要求，移除本机 `~/.codex/skills/project-layouts` 用户级 junction，在本项目 `.agents/skills/project-layouts` 建立指向仓库维护源的 junction。四份 skill 源文件保持原样；本机联接由 `.gitignore` 排除，不重复入库。
+按用户希望局部生效的要求，移除本机 `~/.codex/skills/project-layouts` 用户级 junction，在本项目 `.agents/skills/file-structure` 建立指向仓库维护源的 junction。四份 skill 源文件保持原样；本机联接由 `.gitignore` 排除，不重复入库。
 
 [环境说明](../../system/environment.md#项目-skill-的本机入口) 已更新当前作用域和新检出时的项目级入口建立方法；AGENTS.md 继续直接引用仓库源文件。
 

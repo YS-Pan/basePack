@@ -2,7 +2,7 @@
 
 按用户选定名称，将 `devDoc/current/` 改为 `devDoc/system/`，`devDoc/work/` 改为 `devDoc/tasks/`，项目根 `.work/` 改为 `artifacts/`，明确系统说明、任务记录与本机验证材料的职责。
 
-同步更新 AGENTS、开发文档、历史变更记录、project-layouts 技能示例、本机验证脚本及测试样例的相关路径和名称。`artifacts/` 继续由 Git 忽略，原始计划快照的新路径继续使用 `-text` 字节保护。职责与维护规则见 [文档约定](../../documentation.md)，实际目录见 [系统结构](../../system/architecture.md)。
+同步更新 AGENTS、开发文档、历史变更记录、file-structure 技能示例、本机验证脚本及测试样例的相关路径和名称。`artifacts/` 继续由 Git 忽略，原始计划快照的新路径继续使用 `-text` 字节保护。职责与维护规则见 [文档约定](../../documentation.md)，实际目录见 [系统结构](../../system/architecture.md)。
 
 按用户追加要求，一并提交其当前的项目纲领修改；本次未编辑纲领正文。
 
