@@ -13,7 +13,8 @@
 - 文档维护规则、术语、现行结构与环境说明已补齐，交接与调研结论索引已完善；实际结果和检查见 [文档整理结果](result.md)。
 - 已建立 [project-layouts skill](../../../skills/project-layouts/SKILL.md)，支持开发文档与实验分包两类布局；来源和初版验证见 [专项调研](research/file-layouts.md)。[纲领建议稿](charter-file-layout-proposal.md) 供用户自行填写，正文保持原文。
 - 已按用户要求重新筛查高星项目、独立口碑和公开实测，建立 [agent-team skill](../../../skills/agent-team/SKILL.md) 指令层初版，以纲领为目标，参考项目只提供机制。[专项记录](research/agent-team.md) 区分第三方证据、本机行为检查和待完成的 P7 对照。
-- 已制定 [计算资源协调详细计划](resource-coordination-plan.md)：普通重任务入口、共享 embedding、GPU 单一准入、CPU/RAM/磁盘额度、超时与进程清理及两项目联合验收。本次只完成计划，未运行探针、修改机器配置或实现服务。
+- 已按用户要求先读旧项目 [相关 Codex 聊天再核代码](research/resource-coordination.md)，确认多模态 runtime、批处理、项目局部热复用、超时与进程清理可提取；跨项目统一实例、共享取消、普通任务薄入口与真实并行仍待实现。
+- 已据用户“embedding 与其他 GPU 任务独立、可并行”的纠正重写 [资源协调计划](resource-coordination-plan.md)：提取旧能力，以固定显存预留衔接独立服务与 Condor，替代原模型 worker 入 Condor 和整卡轮流方案。本次完成阅读和计划修订，未运行测试/模型、修改机器配置或提交计算任务。
 
 ## 阻碍与待核
 
@@ -25,6 +26,6 @@
 
 ## 下一步
 
-1. 执行资源专项 R0：确认 Condor 配置与认证，完成 CPU/GPU 真实提交、共享模型 worker 的账户/路径/加载探针与取消释放，确定旧锁迁移方式。
-2. 按 R1–R5 交付一次调用的普通重任务入口、资源准入、跨项目共享 embedding、联合争用验收和安装说明；实际结果再更新 [现行说明](../../current/overview.md)。
+1. 执行资源专项 R0：按已核复用清单提取最小 runtime/服务接口，替换旧整卡锁与门槛，实测 embedding 峰值预算；分别核通独立服务与当前 Condor 配置、认证和真实作业。
+2. R1/R2 分别交付跨项目独立 embedding 服务和普通重任务薄入口；R3 验证预算内真实并行，再完成生命周期回归与安装说明，实际结果更新 [现行说明](../../current/overview.md)。
 3. 资源工具之后继续记忆 P0–P5：底座比较、可安装记忆骨架、文字闭环及向量/图等；在本页记录实际检查与余项。
