@@ -1,6 +1,6 @@
 # 系统结构与边界
 
-本页描述当前仓库。产品运行流程和拟议接口见 [重建执行计划](../tasks/20261106-rebuild/agent-plan.md)，实现落地后再在此记录实际模块与数据流。
+本页描述当前仓库。产品运行流程和拟议接口分别见 [记忆任务](../tasks/20261106-memory-system/plan.md) 与 [资源协调任务](../tasks/20261107-resource-coordination/plan.md)，实现落地后再在此记录实际模块与数据流。
 
 ## 当前组成
 
@@ -13,7 +13,10 @@ devDoc/
   documentation.md         文档职责与维护规则
   terminology.md           项目概念边界
   system/                  系统实现、架构与环境说明
-  tasks/20261106-rebuild/   重建计划、进度、调研和结果
+  tasks/
+    20261106-rebuild/      重建总览、公共历史和 skill 工作
+    20261106-memory-system/  记忆系统计划与进度
+    20261107-resource-coordination/  资源协调计划、部署、调研与进度
   change_log/              按次记录的已发生变化
 artifacts/                 本机验证材料、辅助脚本、日志与输出，Git 忽略
 .gitattributes             文本格式与原文字节保护

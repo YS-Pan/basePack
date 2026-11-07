@@ -13,9 +13,9 @@
 | 图创建与关系发现 | 历史事故：大量分段提交不等于已建立可用的语义关系 | 新实现仍需用有依据的跨材料关系验证建图行为 | [旧项目近期历史](../legacy-history.md#从实验工作区到复杂的自用系统)、[建图专项原计划](<D:/project/20261024 doc system/docs/plans/20261105-graph-maintenance.md>) |
 | 检索、评分与交付 | 历史审计：资料召回、评分实际调用和必要证据交付可能脱节 | 核实真实订阅 agent 链路与最终结果，分别报告缺口 | [测试证据与限制](thread-survey.md#读取到的测试证据与限制)、[真实试用审计](<D:/project/20261024 doc system/docs/context/20261102-live-trial-review/report.md>) |
 | 主动性与总成本 | 证据限制：旧小样本、合成检索分数和安装回执未证明普遍净收益 | 在新项目按任务质量、未点名信息发现及全周期成本评估 | [测试证据与限制](thread-survey.md#读取到的测试证据与限制)、[历史总结的证据边界](../legacy-history.md#新项目继承与舍弃) |
-| 共享模型与资源协调 | 初步调查观察：已有模型、合作式 GPU 锁和 HTCondor；队列查询当时认证失败 | 原调查保留旧时点；按最新核验继续确认配置、接口和认证 | [初步设施调查](#agenttools-当前可复用部分)、[本次环境核验](../../../system/environment.md) |
-| 资源工具复用与并行 | 2026-11-07 先读相关聊天，再核源码：多模态 runtime、批处理、局部热复用和进程清理已存在；跨项目服务与并行预算待改造 | 用户明确 embedding 独立且可与普通 GPU 任务并行；旧整卡互斥策略不继承为新要求 | [专项核对](resource-coordination.md)、[详细计划](../resource-coordination-plan.md) |
-| 实施路线与待决项 | 工程建议：最短闭环、一次委托、分数排序、批量 I/O 与最小增量维护 | 底座、包名、动作接口和具体预算按实施核定；不是用户指定值 | [AI 执行计划](../agent-plan.md)、[本轮未决问题](#本轮归纳和未决问题) |
+| 共享模型与资源协调 | 初步调查观察：已有模型、合作式 GPU 锁和 HTCondor；队列查询当时认证失败 | 原调查保留旧时点；按最新核验继续确认配置、接口和认证 | [初步设施调查](../../20261107-resource-coordination/research/infrastructure.md#agenttools-当前可复用部分)、[本次环境核验](../../../system/environment.md) |
+| 资源工具复用与并行 | 2026-11-07 先读相关聊天，再核源码：多模态 runtime、批处理、局部热复用和进程清理已存在；跨项目服务与并行预算待改造 | 用户明确 embedding 独立且可与普通 GPU 任务并行；旧整卡互斥策略不继承为新要求 | [专项核对](../../20261107-resource-coordination/research/legacy-implementation.md)、[详细计划](../../20261107-resource-coordination/plan.md) |
+| 实施路线与待决项 | 工程建议：最短闭环、一次委托、分数排序、批量 I/O 与最小增量维护 | 记忆底座、动作接口和具体预算按对应任务核定；不是用户指定值 | [任务总览](../plan.md)、[本轮未决问题](#本轮归纳和未决问题) |
 
 ## 范围和阅读方式
 
@@ -58,24 +58,6 @@
 | [查找 context 目录超大原因](codex://threads/01a19f83-a7a4-77e1-b2ab-17893574b078) | 用户指定的基础设施来源，已完整翻页；模型集中、空 profile、HTCondor 和统一入口未实现 |
 | [查找模板中的 subagent 组织建议](codex://threads/01a156e8-e8c6-7bd0-9dbd-622ebf0f33f8) | 协调层的目的和灵活分工 |
 | [继续三层 subagent 协作](codex://threads/01a1156f-88a7-7852-b1e8-9c6eada278f1) | 分层管理与按依赖安排并行 |
-
-## AgentTools 当前可复用部分
-
-基础设施 subagent 本轮只读观察 `D:\AgentTools`：顶层有 `models/`、空 `profile/`、`state/`。模型目录保存五套固定版本，逻辑总量约 15.42 GB；并非所有依赖与调度代码均已集中于此。系统 Python 3.13.17 和 169 项依赖闭包是历史部署报告，当前实施前再核实际环境。
-
-五类现有模型为 BGE reranker、E5-large、文字 Qwen3-Embedding-4B、多模态 Qwen3-VL-Embedding-2B、MiniLM。各有版本锁。新项目优先复用所需的一套，不重复安装全部；权重及锁运行状态均不进仓库。
-
-已有 `state/locks/gpu-0.lock` 只服务于遵守同一 OS 文件锁协议的项目 Qwen bridge。锁文件存在不能证明正在占用；它不是全机资源管理器，不约束外部直接 CUDA 程序，也没有 FIFO 队列或统一 CPU/RAM 管理。AgentTools 没有已实现的 agent-run/MCP 统一入口。
-
-本轮 `condor_version` 返回 25.4.0，`condor_status -json` 成功看到本机空闲 slot，16 CPU、约 48 GB RAM、一张 RTX 4060 Ti。`condor_q -json` 返回 `AUTHENTICATE:1005`，当前队列不能核实；读取服务状态也被权限拒绝。旧聊天曾报告 job 14255 退出 0，这是历史提交成功，不能替代当前认证核验。
-
-指定聊天中的精确定位，下面时间已换为北京时间：
-
-- 11 月 4 日 09:40，turn `01a1a436-b689-70a0-9063-c06d3c5b62fe`：GPU 锁、CPU/内存/磁盘协调的实际边界。
-- 11 月 4 日 10:29，turn `01a1a464-1fe5-7030-8f0f-85b9d32d5060`：agent-run 未实现与 HTCondor 方案。
-- 11 月 4 日 10:57，turn `01a1a47d-b449-7131-afd5-b748ae00f857`：历史轻量提交测试。
-- 11 月 4 日 11:02，turn `01a1a482-17d5-7a73-afb2-5d99ad06ecfe`：官方 CLI 与 Python/MCP 接入判断。
-- 11 月 3 日 21:14–21:57 的相关用户消息：保留空 profile、复用 pip 缓存、模型集中；实施不应反向补建 packages/profile 管理层。
 
 ## 本轮归纳和未决问题
 

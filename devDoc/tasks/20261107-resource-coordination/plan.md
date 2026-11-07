@@ -1,6 +1,8 @@
 # 计算资源协调实施计划
 
-2026 年 11 月 7 日按现行纲领、部署布局及近期提交重新评估。下一阶段先做资源协调，独立于记忆系统交付；保留独立 embedding 服务与 HTCondor 两条链，以固定显存预留支持并行。目标依据为 [项目纲领](../../project-charter.md#资源协调系统)，用户要求见 [原规划聊天](codex://threads/01a1b435-4d35-7e31-943e-3ff66fc2cad6)，复用证据见 [旧实现专项核对](research/resource-coordination.md)，路径合同见 [部署计划](deployment-layout-plan.md)。状态统一记在 [工作进度](progress.md)，接口名和具体预算仍是工程建议。
+2026 年 11 月 7 日按现行纲领、部署布局及近期提交重新评估。下一阶段先做资源协调，独立于记忆系统交付；保留独立 embedding 服务与 HTCondor 两条链，以固定显存预留支持并行。目标依据为 [项目纲领](../../project-charter.md#资源协调系统)，用户要求见 [原规划聊天](codex://threads/01a1b435-4d35-7e31-943e-3ff66fc2cad6)，复用证据见 [旧实现专项核对](research/legacy-implementation.md)，路径合同见 [部署计划](deployment-layout-plan.md)。状态统一记在 [工作进度](progress.md)，接口名和具体预算仍是工程建议。
+
+本任务负责资源 R0–R5 及先行交付的公共包/配置和共享 embedding；[记忆任务](../20261106-memory-system/plan.md) 只引用这些接口，独立维护检索、索引、图和应用效果验收。跨工具顺序与发布条件见 [重建总览](../20261106-rebuild/plan.md)。
 
 ## 已有能力与实际缺口
 
@@ -61,7 +63,7 @@ Condor 队列、事件日志和历史维护普通作业状态；本地只保存�
 ### R0 复用准备与预算标定
 
 1. 先按 [路径布局计划](deployment-layout-plan.md#实施接续与完成条件) 建立系统 Python 的 basepack 包、配置模块、随包模板、init、config show 和按设施检查的 doctor；验证两个项目及子目录的显式配置解析。README 和项目接入说明随入口交付，记忆实现不作为依赖。
-2. 沿 [复用清单](research/resource-coordination.md#代码复用清单) 提取 runtime、预处理、批处理、传输和进程清理，以最小适配替换旧发布/owner/attempt 绑定；复用系统 Python 和固定模型，核设备映射与独立服务启动方式。替换 13/12/3 GiB 门槛、物理 GPU 0、整卡锁及合同中的强制锁字段。
+2. 沿 [复用清单](research/legacy-implementation.md#代码复用清单) 提取 runtime、预处理、批处理、传输和进程清理，以最小适配替换旧发布/owner/attempt 绑定；复用系统 Python 和固定模型，核设备映射与独立服务启动方式。替换 13/12/3 GiB 门槛、物理 GPU 0、整卡锁及合同中的强制锁字段。
 3. 先固定本版文本、图片与批次上限，再测加载/推理峰值，确定 E 与 S，同时记录 CPU/RAM 峰值与测量盲区；保留旧短图文回执作对照，不把 allocator reserved 当作整进程显存。
 4. 沿已有 Condor smoke 样例核配置、认证、中文/空格路径、真实 CPU/GPU 产物及取消释放。选定本机可用的执行账户与文件访问方式，实测该账户能读配置/输入、写结果并连接作业外的最小服务探针；显式传程序路径和所需环境，保留 Condor 分配的 GPU 可见性。Windows 作业默认低权限账户且不继承提交环境，具体适配由这些探针决定；先修已有部署，不先重装。[账户与文件访问](https://htcondor.readthedocs.io/en/25.0/platform-specific/microsoft-windows.html)、[作业环境](https://htcondor.readthedocs.io/en/25.0/users-manual/env-of-job.html)
 
