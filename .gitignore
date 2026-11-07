@@ -12,10 +12,10 @@ htmlcov/
 /build/
 /dist/
 
-# Project memory, local assets and temporary work
+# Project memory, local assets and development artifacts
 .memory/
 /.cache/
-/.work/
+/artifacts/
 # Machine-local Codex discovery links; sources stay in skills/.
 /.agents/skills/project-layouts/
 /.agents/skills/agent-team/

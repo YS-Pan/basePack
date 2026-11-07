@@ -1,6 +1,6 @@
-# 当前结构与系统边界
+# 系统结构与边界
 
-本页描述当前仓库。产品运行流程和拟议接口见 [重建执行计划](../work/20261106-rebuild/agent-plan.md)，实现落地后再在此记录实际模块与数据流。
+本页描述当前仓库。产品运行流程和拟议接口见 [重建执行计划](../tasks/20261106-rebuild/agent-plan.md)，实现落地后再在此记录实际模块与数据流。
 
 ## 当前组成
 
@@ -10,16 +10,17 @@ skills/project-layouts/    独立文件结构 skill 与按需参考
 skills/agent-team/         使用宿主 subagent 的分层协作 skill
 devDoc/
   project-charter.md        用户目标与长期要求
-  documentation.md          文档职责与维护规则
-  terminology.md            项目概念边界
-  current/                  现行仓库与环境说明
-  work/20261106-rebuild/     重建计划、进度、调研和结果
-  change_log/                按次记录的已发生变化
+  documentation.md         文档职责与维护规则
+  terminology.md           项目概念边界
+  system/                  系统实现、架构与环境说明
+  tasks/20261106-rebuild/   重建计划、进度、调研和结果
+  change_log/              按次记录的已发生变化
+artifacts/                 本机验证材料、辅助脚本、日志与输出，Git 忽略
 .gitattributes             文本格式与原文字节保护
 .gitignore                 本地数据、依赖和产物排除规则
 ```
 
-当前开发流程是：从 AGENTS 选择目标、现行说明或相关工作入口，按问题追溯证据；完成修改后更新受影响的说明、进度和变更记录。文档结构与检索、建图产品能力属于不同层次。
+当前开发流程是：从 AGENTS 选择目标、系统说明或相关任务入口，按问题追溯证据；完成修改后更新受影响的说明、进度和变更记录。文档结构与检索、建图产品能力属于不同层次。
 
 ## 所有权与边界
 

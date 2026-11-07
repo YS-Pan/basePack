@@ -6,7 +6,7 @@
 
 入口为 [project-layouts](../../../skills/project-layouts/SKILL.md)，共享部分负责选择、组合、增量整理及读取原则，按需进入两份参考：
 
-- [开发文档布局](../../../skills/project-layouts/references/dev-docs.md)：从本项目 devDoc 提炼长期依据、现行说明、活动工作、历史和逐次变更的职责。
+- [开发文档布局](../../../skills/project-layouts/references/dev-docs.md)：从本项目 devDoc 提炼长期依据、系统说明、活动工作、历史和逐次变更的职责。
 - [实验分包布局](../../../skills/project-layouts/references/experiment-packages.md)：从旧项目未完成的结构要求提炼独立实验工程、共享资源与一次运行的边界。
 
 两种方案可以组合，尊重既有命名、Git 和依赖机制。其它布局有实际场景后增加一份参考及选择条件，不预建模板库或重组框架。公开说明独立实验单元与可安装软件包的差别，避免每次运行都复制源码、环境或新建包。

@@ -2,6 +2,6 @@
 
 根据用户澄清，在 [项目术语](../../terminology.md) 中补充性能定义：任务能力水平与成果质量是主要效果，允许增加用量换取更好的性能；用量和耗时作为代价单独记录，节省用量不作为 agent 协作的成功条件。
 
-同步调整 [agent-team skill](../../../skills/agent-team/SKILL.md)、P7 验收、进度及 [调研解释](../../work/20261106-rebuild/research/agent-team.md)，保留第三方公开实测的质量、用量和耗时数据。此定义针对 agent 与团队的性能，记忆系统的具体成本要求仍以纲领为准。
+同步调整 [agent-team skill](../../../skills/agent-team/SKILL.md)、P7 验收、进度及 [调研解释](../../tasks/20261106-rebuild/research/agent-team.md)，保留第三方公开实测的质量、用量和耗时数据。此定义针对 agent 与团队的性能，记忆系统的具体成本要求仍以纲领为准。
 
 检查：skill 标准验证、UTF-8、本地链接与锚点、差异检查通过；纲领 SHA-256 与本次开始时一致，未将用户已有的纲领修改纳入提交。

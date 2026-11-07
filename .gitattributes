@@ -3,4 +3,4 @@
 
 # Preserve the project charter and the original user-plan snapshot byte-for-byte.
 devDoc/project-charter.md -text
-devDoc/work/20261106-rebuild/research/user-plan.original.md -text
+devDoc/tasks/20261106-rebuild/research/user-plan.original.md -text
