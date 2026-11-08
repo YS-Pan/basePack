@@ -16,7 +16,7 @@
 - 已按用户要求将该技能改名为 `file-structure`，同步源码目录、元数据、文档引用与本机发现联接；纲领保持原样，见 [改名记录](../../change_log/minor/20261107_150816_rename-file-structure-skill.md)。
 - 已按用户要求重新筛查高星项目、独立口碑和公开实测，建立 [agent-team skill](../../../skills/agent-team/SKILL.md) 指令层初版，以纲领为目标，参考项目只提供机制。[专项记录](research/agent-team.md) 区分第三方证据、本机行为检查和待完成的 P7 对照。
 - 已将记忆计划 P0–P5 拆入 `20261106-memory-system`，将资源计划、部署布局和专项调研迁入 `20261107-resource-coordination`；两任务各有 plan/progress，原综合执行计划的共性工作与 P7/P8 归入 [总览](plan.md)。
-- 资源 R0 已交付公共 Python 包、配置与项目接入入口，供记忆任务后续复用；资源后续实现及实测只维护在对应 [进度](../20261107-resource-coordination/progress.md)。产品 README 与使用说明已独立建立。
+- 资源 R0–R5 已完整交付共享embedding、Condor入口及公共包/配置，普通wheel源码外联合验收通过；供记忆任务后续复用的接口见 [结果](../20261107-resource-coordination/result.md)。产品README、使用/管理员说明与resources skill已建立，状态只维护在对应 [进度](../20261107-resource-coordination/progress.md)。
 
 ## 阻碍与待核
 
@@ -25,6 +25,6 @@
 
 ## 下一步
 
-1. 按 [资源任务进度](../20261107-resource-coordination/progress.md) 完成运行工具交付；运行结果只更新该任务及受影响系统说明。
+1. 资源工具按 [结果](../20261107-resource-coordination/result.md) 使用与维护；新需求按独立批次继续，远端发布按用户指令执行。
 2. 继续记忆建设时从 [记忆进度](../20261106-memory-system/progress.md) 接续，不再维护另一份记忆状态。
 3. 文件结构和分层协作在实际任务中继续验证；联合发布按 [总览 P8](plan.md#p8-联合交付与轻量发布) 执行。

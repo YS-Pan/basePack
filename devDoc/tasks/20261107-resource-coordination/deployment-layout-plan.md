@@ -1,6 +1,6 @@
 # 安装位置与项目配置布局计划
 
-2026 年 11 月 8 日更新。basePack 的记忆和资源协调共用系统 Python 包入口：本机开发用 editable 安装，稳定部署用普通 wheel。模型保留在 AgentTools，项目数据库留在各项目，HTCondor 独立安装。本页保留部署合同；公共配置、安装入口与随包模板已交付，资源运行验收状态见 [进度](progress.md)，实际操作见 [项目接入](../../../docs/setup-project.md)。
+2026 年 11 月 8 日更新。basePack 的记忆和资源协调共用系统 Python 包入口：本机开发用 editable 安装，稳定部署用普通 wheel。模型保留在 AgentTools，项目数据库留在各项目，HTCondor 独立安装。本页保留部署合同；资源R0–R5及公共入口已交付，普通wheel源码外验收见 [结果](result.md)，维护状态见 [进度](progress.md)，实际操作见 [项目接入](../../../docs/setup-project.md)。
 
 公共安装与配置骨架由 [本任务 R0](plan.md#r0-复用准备与预算标定) 先交付，本页是两项工具共用的部署合同；[记忆任务](../20261106-memory-system/plan.md) 引用它，记忆数据库和检索建设仍由该任务负责。
 

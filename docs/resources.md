@@ -66,6 +66,8 @@ python -m basepack --config '<project-config>' resources cancel '<cluster.proc>'
 
 `wait --timeout` 只是本次观察时限，到期返回 observation_expired，作业继续运行。任务的 queue_timeout/run_timeout 是作业时限；run 到期撤销并确认回收，原生 Condor 时限在客户端离开后仍生效，但有策略检查间隔。timeout 与 cleanup_confirmed 分别表示时限结果和资源回收确认；cleanup_error 保留撤销或确认失败的原始信息，不能把 timeout 当作已释放。
 
+`status --analyze` 返回原生匹配诊断。partitionable slot 当前资源不足时，Condor会模拟排空后分析，因此“可匹配”不等于当前有空闲配额；任务仍可处于queued。[Condor分析说明](https://htcondor.readthedocs.io/en/25.0/man-pages/condor_q.html#analyze)
+
 默认同机共享目录访问，不传输模型、环境或源码。需要 scratch 隔离时填写 transfer_inputs 和 transfer_outputs：输入路径相对 cwd，按原生 basename 语义进入 scratch；要保留层级可传整个目录，应用用其目录名访问。输出路径相对 scratch，显式列出嵌套输出目录可回传到 cwd；正常或应用失败退出时回传，取消时不保证。submit 字段须能用本机原生编码表示，文件清单拒绝逗号、控制字符和 `$(...)` 宏；应用参数通过 UTF-8 JSON 传递，不受 submit 编码限制。显式输出缺件可能导致 Condor hold。
 
 从项目 `.basepack/jobs/<submission-id>/` 的提交材料、stdout、stderr、事件日志和 worker.json 定位失败。worker 回执直接写共享项目目录，记录 launcher/应用 PID、实际 CUDA/线程环境和退出结果，不依赖取消时回传；关键应用回执也可写项目共享绝对路径。保留 job ID，可用 status --analyze 查看无匹配原因。

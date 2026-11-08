@@ -4,36 +4,31 @@
 
 ## 当前阶段
 
-[R0–R5 计划](plan.md) 正在实施。R0–R4 已完成，R5 正准备最终普通 wheel 源码外验收。记忆建设由 [独立任务](../20261106-memory-system/plan.md) 维护。
+**R0–R5 已完整交付并通过本机真实验收。** 稳定普通 wheel 已安装到系统 Python，机器级轻量 broker 独立运行，模型按请求加载；测试作业及模型进程已释放。最终结论、适用范围及原始证据入口见 [交付结果](result.md)，使用者从 [项目接入](../../../docs/setup-project.md) 开始。
 
-## 已完成
+本目录按用户指定保留为资源工具的维护入口；记忆检索、建图和数据库由 [独立任务](../20261106-memory-system/plan.md) 接续。
 
-- R0 公共入口：pyproject、basepack 包、唯一配置解析、随包模板、init/config show/按设施 doctor、README 与项目接入说明。系统 Python editable 新进程能加载临时代码修改；最小普通 wheel 安装到系统 site-packages，从源码外初始化两个中文/空格项目，含子目录配置、独立数据路径、随包模板及 core doctor。3 项配置回归通过，原始证据在 `artifacts/r0/`；普通用户 pip 回落用户站点的问题经管理员系统安装解决。
-- 当前 Condor 探针已实际执行 CPU/GPU 小作业，slot 低权限账户可读源码、权重和中文输入，返回嵌套输出并连通作业外 loopback；GPU 矩阵结果与 CPU 一致。取消探针已确认父/子 PID 消失。入口实现及完整验收仍在进行，详见后续回执。
-- R0 标定：固定 max_length=2048、文本 batch4、max_pixels=1048576；真实向量为 2048 维且 L2 有效。allocator 峰 7786 MiB，整卡基线约1009 MiB、采样峰8937 MiB，RSS 峰2054 MiB。采用 E=9216、S=2048、B=5116 MiB；物理16 CPU/48349 MiB 留给 Condor12 CPU/24576 MiB。初始 RAM32768 在桌面基线约20 GiB 后收紧。机器配置 `D:/AgentTools/basepack.toml`，派生片段 `C:/condor/config/60_basepack.conf`；peaceful 重启 startd 后实际发布容量与 hash `5dd7fc9014b383e0` 已核，证据 `artifacts/r0/published-budget-final.json`。
-- R1 共享 embedding 已通过：跨项目并发冷请求同 PID；加载期/在算取消、排队截止后另一项目继续；文本最大批次/图片有效；空闲卸载再载、worker 崩溃原请求失败后新请求重启、broker 崩溃回收 worker、显式停止均实测。代码与接口见 [模块说明](../../system/modules/resources.md)，证据 `artifacts/resource-acceptance/embedding/calibration.json`、`r1-real.json`；3 项服务竞态回归通过。
-- R2 已验证真实计算、UTF-8 参数数组保真、中文/空格字段、最终线程环境和 CUDA 可见性、slot 账户全局包加载、嵌套输出回传、应用 exit7 原错误、观察超时不取消、父子孙进程取消、run 执行到期及无客户端原生执行到期。实际提交单位为 memory MiB/disk KiB；原生3秒执行上限实测11秒移除，有检查延迟。证据 `artifacts/condor/r0-successful-probes.json`、`r2-receipt.json`、`r2-native-cleanup.json`。所有任务核预算版本与真实容量，GPU H 超 B 直接拒绝。
-- R2 收尾：最终24GiB预算下，缺少显式输出实际触发 held12，run 返回原始缺件诊断并撤销确认；CLI 应用 exit7 返回完整 JSON 与外部退出1。证据 `artifacts/condor/r2-held-receipt.json`、`r2-cli-failure-receipt.json`。整批8项回归通过。
-- R3 最新 warm-first 已取得真实 GPU 重叠：最大文本4×2048 token、1024²图文均有效，普通矩阵任务在 forward 窗口内产生正确进展，第二普通 GPU 排队且模型保持可用。CPU/RAM 声明准入及排队已验证初始预算，最终24GiB RAM 相关项重测中；原生排队时限已在无 run 强制情况下生效。联合证据持续写入 `artifacts/resource-acceptance/joint/`，完整结论待下列余项完成。
-- R3/R4 最终联合已完成：warm-first 14278/14280、heavy-first14284、最终RAM14288–14291、lifecycle14292 均有正确数值/向量、时间线及回收。两种启动顺序的最大文本 forward 内分别有3/2个普通矩阵正确进展点，整卡采样峰13298/13363 MiB；普通GPU彼此排队。无客户端原生排队截止实测52秒。作业内冷请求后取消，launcher/应用/孙进程消失，共享worker35956及另一项目继续；请求deadline/cancel均隔离。独立最大批次2.708秒，联合2.544/2.551秒，仅为带20ms间歇的合成矩阵样例。汇总 `artifacts/resource-acceptance/joint/summary.json`；全部测试作业清空，broker/worker已停，显存回966MiB。
-- R4 异常退出补验14293：应用创建睡眠孙进程后exit7，终态后外部进程快照确认应用/孙进程均不存在；`artifacts/condor/r4-abnormal-tree.json`。修复未执行即撤销作业的耗时：从原生事件终态读取，缺测返回None，原14277回归52秒。CUDA内存字段改名为进程device-view，WDDM差异不再冒称全卡free；提交响应不确定时保留原错误及partial输出，不重复提交。整批10项回归通过。
+## 已交付
 
-- 已先读旧项目相关聊天，再核代码、测试与历史回执，形成 [旧实现复用清单](research/legacy-implementation.md)。本地多模态 runtime、批处理、项目局部热复用和 owned 进程清理可提取，跨项目共享与真实并行仍待实现。
-- 已据用户要求修订为独立 embedding 服务与 Condor 普通重任务两条链，以固定显存预留衔接；明确公共入口先行、各链探针分别放行，以及请求隔离、作业外服务所有权、旧 watchdog 改造、预算发布和组合取消验收。
-- 已完成 [安装与项目配置布局](deployment-layout-plan.md)：系统 Python 包、机器共享配置、项目接入文件、局部数据/任务目录、随包模板与 agent 读取入口。配置、命令和安装包仍待交付。
-- 已有 [初次设施调查](research/infrastructure.md) 和 [系统环境快照](../../system/environment.md)，它们只提供各自时点的观测，不代表当前接入成功。
-- 已按用户要求由三名 subagent 分查 yadof 的 admin_tool、dev_doc 与实现/测试，主 agent 复读关键原证，形成 [Windows Condor 使用经验](research/yadof-condor.md)。补 R0/R2 的线程环境、字段引用、资源单位、slot、传输与超时探针，区分已解决事故、撤回方案及旧部署特例；本次未运行作业或修改机器配置。
-- 已据后续讨论维护 [部署合同](deployment-layout-plan.md#开发安装与正式部署)：开发机使用系统 Python editable 引用，稳定部署和发布验收普通安装 wheel；补重装/服务重启时机、源码账户访问及安装来源检查，项目配置保持统一。R0/R5 与 Condor R2/R4 的完成条件已同步，尚未实际安装或验证运行行为。
+| 批次 | 实际完成 |
+| --- | --- |
+| R0 | Python 包、统一配置、随包模板、init/config show/按设施 doctor；系统 editable 新进程与最小普通 wheel；现有模型/Condor、slot 账户、中文路径、CPU/GPU 真结果及预算标定 |
+| R1 | 作业外 broker 拥有单模型 worker，跨项目冷请求共实例，图文与批次有效；请求取消/截止隔离，空闲、worker/broker 崩溃与重启真实通过 |
+| R2 | run/submit/status/wait/cancel，分字段编码、UTF-8 参数数组、明确单位/回传；实际预算核对、原生/客户端时限、held/失败诊断及回收确认 |
+| R3 | 两种 GPU 启动顺序均有真实重叠进展；第二普通 GPU 排队，CPU/RAM 声明准入、并行/队列及超额拒绝通过 |
+| R4 | 作业内冷请求后取消作业，共享模型及另一项目继续；父子孙进程和异常退出回收、请求局部取消/截止、空闲/崩溃回归通过 |
+| R5 | 普通 wheel 安装到系统 site-packages；源码外两项目、移动项目、新检出、图文/Condor 调用及最终 GPU 并行通过；使用/管理员文档、示例及 resources skill 已交付 |
 
-## 待核与边界
+## 当前部署与检查
 
-- 剩余：R5 最终普通 wheel 换路径、两个源码外项目、项目移动及新检出接入。
-- Windows SSPI 在受限进程中失败、正常用户上下文通过；实测保留现有认证与 slot 账户配置。RAM 验证覆盖声明准入和排队，没有把全部声明额度实际分配；显存测量的采样盲区见管理员说明。
-- 记忆任务 P0/P1 复用本任务 R0 的包/配置入口，P2 接入 R1 的共享 embedding 客户端；本任务用合成请求验收，不等待记忆索引、建图或数据库实现。
+- 机器配置：`D:/AgentTools/basepack.toml`；Condor 派生片段：`C:/condor/config/60_basepack.conf`。实际父 slot 为12 CPU/24576 MiB，显存 T16380/E9216/S2048/B5116 MiB，预算版本 `5dd7fc9014b383e0`。CPU/RAM 变更经空队列 peaceful 重启 startd 后核实际值。
+- 系统 Python：`C:/Program Files/Python313/python.exe`；普通包：其 `Lib/site-packages/basepack`。独立 broker PID26696，由交互用户在作业树外启动，当前无模型 worker；不是登录自启服务，机器重启后按管理员说明启动。
+- 最终 wheel：`dist/basepack-0.1.0-py3-none-any.whl`，35350 B；运行源码版本 `9fc1d4d`。22份运行代码/模板/许可与源码、wheel、实际安装逐字节一致。
+- 普通 wheel 模式11项回归通过；resources skill静态校验通过。最终验收job14295退出0、回收确认，最大文本4×2048 token推理期间有50个普通GPU正确进展点，两个源码外项目共worker16464。
+- 无匹配诊断补验14298：实际queued，原生报告明确Disk条件0slot，取消后清理确认。CPU满配时better-analyze可模拟排空后称可匹配，其诊断范围已写入使用文档；补验结束队列为空，broker26696保持。
+- 原生执行3秒上限实测11秒移除，排队3秒上限实测52秒，存在策略周期；run另有客户端有界等待。WDDM CUDA free是device-view，全卡证据使用外部nvidia采样，均不参与动态抢占准入。
+- R5捕获的空查询解析回归已修复并重新构建、重装、完整重验；非空无效JSON仍报原错。详细证据集中在 `artifacts/r0/`、`artifacts/condor/`、`artifacts/resource-acceptance/`、`artifacts/r5/`。
 
-## 下一步
+## 后续边界
 
-1. 普通安装最终 wheel，从源码外验证两项目、移动项目和新检出接入；再实际并行验证wheel代码/模板/两链调用。
-2. 更新最终结果、环境及交付记录；保留稳定wheel安装，机器broker独立启动，测试作业清空。
-
-详细动作和完成条件在 [计划](plan.md) 维护，本页记录实际状态；预算修改、安装与服务重启均记录实际操作，不以探针成功替代完整联合验收。
+本轮无未完成交付项。资源预算是合作约束；RAM验证声明和排队，没有实际分配全部额度。首版仅本机Windows、单NVIDIA GPU及固定VL2B配置；没有实施记忆数据库、自动重试、多机调度或远端发布。后续按实际需求另开实施批次，模型/输入上限变更先排空、重标定并发布预算。
