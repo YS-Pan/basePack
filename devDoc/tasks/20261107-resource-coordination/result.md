@@ -1,14 +1,16 @@
 # 资源工具 R0–R5 交付结果
 
+路径追溯（2026-11-09）：下文保留当时的运行路径；选留原证现归根 `artifacts/runs/<原批次>/`，原 dist 包现归 `experiments/20261106-basepack/dist/`，位置映射见[布局迁移结果](../../archive/20261109-project-layout/result.md)。
+
 2026-11-08。R0–R5 已完成本机功能验收；运行源码版本 `9fc1d4d`，普通 wheel `basepack-0.1.0-py3-none-any.whl` 已安装到系统 Python。记忆检索、建图和数据库未纳入本轮。
 
 本页保留 0.1.0 的验收条件；当前 0.2.0 通用 Condor 节点与多作业共享结果见 [后续改造](native-condor.md)，现行状态以 [资源进度](progress.md) 为准。
 
 ## 交付与稳定部署
 
-- [公共入口与使用文档](../../../docs/setup-project.md)：init/config show/doctor，显式项目配置与唯一机器配置、随包模板；editable开发和普通wheel已分别实际安装验证。
-- [资源调用](../../../docs/resources.md)：共享图文embedding、批次、一次run和长任务接续；[管理员说明](../../../docs/administrator.md)负责broker账户、启动、预算发布及升级。
-- [模块边界](../../system/modules/resources.md)、[resources skill](../../../skills/resources/SKILL.md)与[小示例](../../../examples/)已交付。
+- [公共入口与使用文档](../../../experiments/20261106-basepack/docs/setup-project.md)：init/config show/doctor，显式项目配置与唯一机器配置、随包模板；editable开发和普通wheel已分别实际安装验证。
+- [资源调用](../../../experiments/20261106-basepack/docs/resources.md)：共享图文embedding、批次、一次run和长任务接续；[管理员说明](../../../experiments/20261106-basepack/docs/administrator.md)负责broker账户、启动、预算发布及升级。
+- [模块边界](../../system/modules/resources.md)、[resources skill](../../../experiments/20261106-basepack/skills/resources/SKILL.md)与[小示例](../../../experiments/20261106-basepack/examples)已交付。
 - 稳定包在 `C:/Program Files/Python313/Lib/site-packages/basepack`；机器配置 `D:/AgentTools/basepack.toml`。轻量broker26696在作业树外以交互账户运行，首请求再载模型，重启机器后需按管理员说明启动。
 
 最终wheel为35350 B，SHA256 `40f3426fb3990f8ba1de7bdc0f6d392464766e661b6818cc72058bba805a1019`；校验和在 `dist/SHA256SUMS.txt`。22份运行代码、模板和许可在源码/wheel/实际安装间逐字节一致。Git只保存源码、短文档、skill和小样例，验收输入、日志及wheel留忽略目录；未向远端发布。

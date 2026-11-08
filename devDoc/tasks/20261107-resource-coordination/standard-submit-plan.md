@@ -1,5 +1,7 @@
 # R7：标准提交接口与 Condor 站点策略解耦
 
+路径追溯（2026-11-09）：下文保留当时的运行路径；选留原证现归根 `artifacts/runs/<原批次>/`，原 dist 包现归 `experiments/20261106-basepack/dist/`，位置映射见[布局迁移结果](../../archive/20261109-project-layout/result.md)。
+
 2026-11-08，R7.0–R7.4 已完成：0.3.0 普通 wheel 与 schedd JOB_TRANSFORM 已部署，原生调度及联合 embedding 真实验收通过。实际结果见 [R7 回执](standard-submit-result.md)，执行状态统一维护在 [进度](progress.md)，原 R0–R5 计划保留在 [原计划](plan.md)。
 
 ## 目标与既定约束
@@ -98,4 +100,4 @@ R7.0确认合同后，Condor策略与客户端改造可分工并行，由主agen
 - [schedd提交转换与拒绝规则](https://htcondor.readthedocs.io/en/25.x/admin-manual/ap-policy-configuration.html)：服务器在提交时修改作业描述，规则按顺序应用。
 - [转换语言](https://htcondor.readthedocs.io/en/25.x/classads/transforms.html)与[离线工具](https://htcondor.readthedocs.io/en/25.x/man-pages/condor_transform_ads.html)：SET/EVALSET、原属性引用与检查。
 - [官方提交字段](https://htcondor.readthedocs.io/en/25.x/man-pages/htcondor-jdl.html)：request_gpus、gpus_minimum_memory及其设备筛选含义。
-- [当前模块](../../system/modules/resources.md)与[管理员说明](../../../docs/administrator.md)维护现行行为，[R6回执](native-condor.md)保留实施基线；实际JOB_TRANSFORM启用与验收证据见[R7回执](standard-submit-result.md)。
+- [当前模块](../../system/modules/resources.md)与[管理员说明](../../../experiments/20261106-basepack/docs/administrator.md)维护现行行为，[R6回执](native-condor.md)保留实施基线；实际JOB_TRANSFORM启用与验收证据见[R7回执](standard-submit-result.md)。

@@ -3,6 +3,7 @@
 ## 项目与入口
 
 - 本项目重建 basePack：项目局部记忆、计算资源协调、分层 agent 协作与文件结构建议。记忆工具先完成可用闭环，独立工具按其工作计划交付。
+- 当前唯一 active 路线为 [20261106-basepack](experiments/20261106-basepack/README.md)，源码、依赖、测试和产品文档在实验目录；根 devDoc 统一维护现行说明与任务。安装、构建和测试按路线入口执行。
 - 用户的新指令优先；项目战略以项目纲领为准。执行计划中的接口、目录和数字预算是工程建议。
 - 涉及目标与取舍时读 [项目纲领](devDoc/project-charter.md)；纲领仅记录用户明确表达的意图，修改正文前须获得用户同意。[原始快照](devDoc/tasks/20261106-rebuild/research/user-plan.original.md) 保留原文。
 - 了解系统实现时读 [实现概览](devDoc/system/overview.md)；跨工具建设顺序与公共交付见 [重建总览](devDoc/tasks/20261106-rebuild/plan.md) 和 [总进度](devDoc/tasks/20261106-rebuild/progress.md)。

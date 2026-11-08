@@ -1,6 +1,6 @@
 # 当前项目实验路线布局迁移计划
 
-2026-11-09（北京时间）。状态：按用户补充要求修订，尚未实施。采用 [experiment-packages](../../../skills/file-structure/references/experiment-packages.md) 的路线工程边界，结合[根开发文档布局](../../../skills/file-structure/references/dev-docs.md)与[维护约定](../../documentation.md)。此前[讨论](codex://threads/01a1bbb1-7c26-7193-9ac6-9900b51fb856)中的单套 devDoc、active 路线收敛和材料生命周期继续适用。
+2026-11-09（北京时间）。状态：已实施，实际检查与差异见 [结果](result.md)。采用 [experiment-packages](../../../skills/file-structure/references/experiment-packages.md) 的路线工程边界，结合[根开发文档布局](../../../skills/file-structure/references/dev-docs.md)与[维护约定](../../documentation.md)。此前[讨论](codex://threads/01a1bbb1-7c26-7193-9ac6-9900b51fb856)中的单套 devDoc、active 路线收敛和材料生命周期继续适用。
 
 ## 目标与范围
 
@@ -70,7 +70,7 @@ artifacts/runs/<run-id>/              选留的运行、评测和迁移原证
 | 边界 | 实施时必须处理 |
 | --- | --- |
 | 构建、安装与测试 | 开发安装目标从仓库根改为实验根；构建、pytest 配置、示例工作目录和发行路径全部明确。根不保留第二份 pyproject 或源码转发入口。包内 `src`、templates 和许可的相对结构保持，核 package-data 与 readme 实际包含 |
-| 根临时区与 Git 边界 | 将实验 pyproject 的 pytest 缓存指向根 tmp，例如 `../../tmp/pytest-cache/20261106-basepack`；basetemp、构建 TEMP/TMP、一次性环境均入根 tmp。补实验内 build/dist、环境、缓存和本机配置的忽略规则，保留版本化夹具及稳定配置 |
+| 根临时区与 Git 边界 | pytest 不使用持久缓存，basetemp、构建 TEMP/TMP、一次性环境和选留前的构建副产物均入根 tmp。补实验内 build/dist、环境、缓存和本机配置的忽略规则，保留版本化夹具及稳定配置 |
 | 源码与测试的路径假设 | 扫查 `__file__`、`parents[]`、cwd、PYTHONPATH、命令字符串和模板中的根假设，只修复真实依赖。`tests/test_condor_policy.py` 与 `examples/condor` 同迁，保留其父目录关系；其它代码不可通过旧根源码继续导入 |
 | 文档与维护入口 | 更新根 AGENTS/README、devDoc 的系统/环境/模块、任务计划/进度、用户文档、示例与技能中的相对链接、锚点、安装及运行命令。变更记录保留原意，涉及的阅读入口仍须可追溯 |
 | 技能发现与宿主配置 | `.agents/skills/resources` 从旧维护源重定向到 `E/skills/resources`，两项通用技能的联接保持；核项目根与实验子目录的实际发现和新检出重建方法。检查已知宿主/编辑器/任务入口是否绑定旧源码路径，修复有效调用方 |
@@ -106,4 +106,4 @@ artifacts/runs/<run-id>/              选留的运行、评测和迁移原证
 
 新路线复用资源能力时使用有明确版本/哈希和恢复来源的普通发行包或公开服务接口；共同代码需要抽取时只保留一个维护源并声明依赖。避免 sibling sys.path、跨路线 editable 或复制后双向修改。如果两条路线仍使用同一包名，分别验证安装，不在同一环境同时安装两份。兼容环境、模型和缓存可共享，路线依赖不得靠另一条路线的可变源码或数据库隐式成立。
 
-本次修订只交付计划与变更记录，实际迁移、安装和运行验收尚未执行；memsys 技术选型和实现由后续任务决定。
+目录迁移和相应验证已完成，本任务整体归档；memsys 技术选型和实现仍由后续任务决定。原缓存路径建议因本机 pytest 实际缺陷改为禁用缓存，验证条件与原错误在结果中留痕。

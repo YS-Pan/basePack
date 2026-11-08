@@ -1,5 +1,7 @@
 # 通用 Condor 节点与 GPU 共享
 
+路径追溯（2026-11-09）：下文保留当时的运行路径；选留原证现归根 `artifacts/runs/<原批次>/`，原 dist 包现归 `experiments/20261106-basepack/dist/`，位置映射见[布局迁移结果](../../archive/20261109-project-layout/result.md)。
+
 2026-11-08 后续批次，接续 [0.1.0 交付](result.md)。用户要求普通任务完全由 HTCondor 管理，basePack 作为普通提交客户端；背景总预留 9 GiB，剩余显存交给普通作业，单卡最多 4 项并行。本批不修改项目纲领。
 
 本页保留 R6 / 0.2.0 的部署与验收条件。后续 R7 已切换为标准提交字段与 schedd JOB_TRANSFORM，现行状态见 [进度](progress.md)，新条件见 [R7 回执](standard-submit-result.md)。
@@ -37,4 +39,4 @@ resources skill 静态校验通过；16份本轮 Markdown UTF-8 与117个本地�
 - [GPU 发现参数](https://htcondor.readthedocs.io/en/25.x/man-pages/condor_gpu_discovery.html)：`-repeat`、`-divide`；后者按整卡容量切分，不自动扣背景预留。
 - [作业资源申请](https://htcondor.readthedocs.io/en/25.x/man-pages/htcondor-jdl.html)：GPU 数量与设备属性筛选、自定义资源申请。
 
-部署与使用维护源为 [管理员说明](../../../docs/administrator.md)、[资源使用](../../../docs/resources.md) 与 [模块说明](../../system/modules/resources.md)。历史 R0–R5 保留当时配置和证据，本批结果不替代其原始回执。
+部署与使用维护源为 [管理员说明](../../../experiments/20261106-basepack/docs/administrator.md)、[资源使用](../../../experiments/20261106-basepack/docs/resources.md) 与 [模块说明](../../system/modules/resources.md)。历史 R0–R5 保留当时配置和证据，本批结果不替代其原始回执。

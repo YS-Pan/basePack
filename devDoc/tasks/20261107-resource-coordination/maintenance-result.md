@@ -1,6 +1,8 @@
 # R8 维护与 0.4.0 部署结果
 
-2026 年 11 月 8 日，按用户要求顺序完成 R8.0 → R8.1 → R8.2 → R8.3 → R8.4。当前状态只维护在 [进度](progress.md)，接口/路径与迁移合同见 [部署合同](deployment-layout-plan.md)。本轮没有修改项目纲领、机器容量、模型或 Condor 站点策略，没有推送远端。
+路径追溯（2026-11-09）：下文保留当时的运行路径；选留原证现归根 `artifacts/runs/<原批次>/`，原 dist 包现归 `experiments/20261106-basepack/dist/`，位置映射见[布局迁移结果](../../archive/20261109-project-layout/result.md)。
+
+2026 年 11 月 8 日，按用户要求顺序完成 R8.0 → R8.1 → R8.2 → R8.3 → R8.4。当前状态只维护在 [进度](progress.md)，接口/路径与迁移合同见 [部署合同](../../system/deployment.md)。本轮没有修改项目纲领、机器容量、模型或 Condor 站点策略，没有推送远端。
 
 ## 源码交付
 
@@ -50,6 +52,6 @@
 
 ## 边界与后续
 
-R8 无未完成验收项。旧 0.3.0 wheel 保留用于恢复；恢复步骤见 [管理员说明](../../../docs/administrator.md#升级与回滚)。完成历史 Condor ClassAd 保留原 BasePackPayload 绝对路径，迁址后的历史 status 不保证可用；通过备份、映射和日志回查，不将旧 payload 重新提交。
+R8 无未完成验收项。旧 0.3.0 wheel 保留用于恢复；恢复步骤见 [管理员说明](../../../experiments/20261106-basepack/docs/administrator.md#升级与回滚)。完成历史 Condor ClassAd 保留原 BasePackPayload 绝对路径，迁址后的历史 status 不保证可用；通过备份、映射和日志回查，不将旧 payload 重新提交。
 
 记忆数据库真实隔离和应用效果继续由 P1/P5 验收；本轮没有扩展记忆实现、通用后端或独立客户端发行版。远端推送和发布未执行。

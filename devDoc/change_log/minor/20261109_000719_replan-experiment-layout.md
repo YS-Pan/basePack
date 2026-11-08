@@ -1,6 +1,6 @@
 # 改按实验路线工程规划项目迁移
 
-按用户补充要求重写[结构迁移计划](../../tasks/20261109-project-layout/plan.md)：当前 basepack 整体进入 experiments/20261106-basepack，源码、声明、测试、产品文档、样例及 resources skill 随路线归组，根保留统一开发文档与通用技能，为 memsys 等后续大改准备边界。
+按用户补充要求重写[结构迁移计划](../../archive/20261109-project-layout/plan.md)：当前 basepack 整体进入 experiments/20261106-basepack，源码、声明、测试、产品文档、样例及 resources skill 随路线归组，根保留统一开发文档与通用技能，为 memsys 等后续大改准备边界。
 
 计划纳入内部路径、构建安装、缓存与忽略规则、技能联接及有效外部调用方的同步修复；实施验收增加源码回归和隔离 wheel 运行，防止误测系统已有安装。记录普通 wheel、机器配置和 Condor 配置的只读盘点及尚未核清的启动依赖，不因目录调整预设共享设施必须搬迁或重装。
 

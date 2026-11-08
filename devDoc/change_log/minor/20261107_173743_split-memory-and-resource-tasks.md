@@ -6,7 +6,7 @@
 | --- | --- |
 | 原综合执行计划中的记忆目标、接口、P0–P5 与自用验收 | [记忆系统计划](../../tasks/20261106-memory-system/plan.md) 和 [进度](../../tasks/20261106-memory-system/progress.md) |
 | resource-coordination-plan.md | [资源协调 plan.md](../../tasks/20261107-resource-coordination/plan.md) |
-| deployment-layout-plan.md | [资源任务的部署合同](../../tasks/20261107-resource-coordination/deployment-layout-plan.md)，记忆任务引用同一维护源 |
+| deployment-layout-plan.md | [资源任务的部署合同](../../system/deployment.md)，记忆任务引用同一维护源 |
 | research/resource-coordination.md | [旧实现专项核对](../../tasks/20261107-resource-coordination/research/legacy-implementation.md) |
 | research/sources.md 中初次 AgentTools 设施调查正文 | [设施调查](../../tasks/20261107-resource-coordination/research/infrastructure.md)，保留原时点观测 |
 | 原总进度中的资源事项、阻碍和下一步 | [资源任务进度](../../tasks/20261107-resource-coordination/progress.md) |

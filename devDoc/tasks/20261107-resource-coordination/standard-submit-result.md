@@ -1,12 +1,14 @@
 # R7：标准提交与站点策略交付
 
+路径追溯（2026-11-09）：下文保留当时的运行路径；选留原证现归根 `artifacts/runs/<原批次>/`，原 dist 包现归 `experiments/20261106-basepack/dist/`，位置映射见[布局迁移结果](../../archive/20261109-project-layout/result.md)。
+
 2026-11-08，R7 已完成本机部署、原生与普通客户端真实验收，接续 [R6](native-condor.md)，按 [R7 计划](standard-submit-plan.md) 执行。现行状态统一维护在 [进度](progress.md)。
 
 ## 实现与部署
 
 普通用户只填写官方 `request_gpus = 1` 与 `gpus_minimum_memory = 3000 MB`。basePack 0.3.0 将既有 `JobSpec.gpu_memory_mib` 转为上述标准字段；源码的提交、capacity 和 GPU 准入已移除内部资源名。capacity 从 `MachineResources` 发现有总量和剩余数量的额外资源，按原名与原生单位展示；CPU/RAM 仍按标准总容量提前准入。
 
-Condor 配置维护源是 [60_resources.conf](../../../examples/condor/60_resources.conf) 与 [70_job_transforms.conf](../../../examples/condor/70_job_transforms.conf)。本机安装在 `C:/condor/config/`，主配置已加载。60 保留 12 CPU / 24576 MiB RAM、同卡 4 个共享令牌和 7164 MiB 普通显存池，背景总预留 9216 MiB；额度只在这里定义。70 使用原生 `JOB_TRANSFORM` 生成内部 `RequestGPUMemoryMiB`，显式向原 `Requirements` 追加资源条件，保留 `RequireGPUs`、架构、系统和传输约束。既有 transform 与 submit requirement 名单按原生宏追加。
+Condor 配置维护源是 [60_resources.conf](../../../experiments/20261106-basepack/examples/condor/60_resources.conf) 与 [70_job_transforms.conf](../../../experiments/20261106-basepack/examples/condor/70_job_transforms.conf)。本机安装在 `C:/condor/config/`，主配置已加载。60 保留 12 CPU / 24576 MiB RAM、同卡 4 个共享令牌和 7164 MiB 普通显存池，背景总预留 9216 MiB；额度只在这里定义。70 使用原生 `JOB_TRANSFORM` 生成内部 `RequestGPUMemoryMiB`，显式向原 `Requirements` 追加资源条件，保留 `RequireGPUs`、架构、系统和传输约束。既有 transform 与 submit requirement 名单按原生宏追加。
 
 本站接受提交时可解析为正数的显存申报，按 MiB 向上取整记账；缺属性时预订整个池。显式零、负值、undefined、无法解析的动态表达式、超池以及多 GPU 请求由原生提交拒绝规则处理，错误仅要求用户理解官方参数。官方显存字段仍筛选设备容量；累计预订是本站约定，4 个名额不代表 4 张物理卡，也不提供显存硬隔离。
 
@@ -40,4 +42,4 @@ Condor 配置维护源是 [60_resources.conf](../../../examples/condor/60_resour
 
 14份本轮Markdown的UTF-8、代码围栏与107个本地链接目标检查通过，resources skill静态校验与Git差异格式检查通过。本轮分工为客户端/回归、原生验收脚本和使用文档三项，主agent负责配置、真实部署验收与整合；宿主未提供主上下文、团队token及精确往返统计，记为未知。
 
-使用流程见 [资源使用](../../../docs/resources.md)，站点映射、升级和回滚见 [管理员说明](../../../docs/administrator.md)。代码、使用/管理员说明、resources skill、配置样例和本回执已交付。R0–R6历史材料保留当时条件；不扩展到记忆数据库、多物理GPU、MPS或远端发布。
+使用流程见 [资源使用](../../../experiments/20261106-basepack/docs/resources.md)，站点映射、升级和回滚见 [管理员说明](../../../experiments/20261106-basepack/docs/administrator.md)。代码、使用/管理员说明、resources skill、配置样例和本回执已交付。R0–R6历史材料保留当时条件；不扩展到记忆数据库、多物理GPU、MPS或远端发布。

@@ -1,10 +1,12 @@
 # 公共包与资源协调维护计划
 
-更新：2026 年 11 月 8 日。本文维护 R9 复用优先路线，并保留已交付 R8 的设计与验收条件。阶段实施、部署及验收的实际状态只维护在 [进度](progress.md)，源码/实例布局及安装迁移合同见 [部署合同](deployment-layout-plan.md)。
+更新：2026 年 11 月 9 日。本文维护 R9 复用优先路线，并保留已交付 R8 的设计与验收条件。阶段实施、部署及验收的实际状态只维护在 [进度](progress.md)，源码/实例布局及安装迁移合同见 [部署合同](../../system/deployment.md)。
 
 目标以 [项目纲领](../../project-charter.md) 和本轮用户指令为准，共性选择标准见 [复用优先](../20261106-rebuild/plan.md#复用优先)。记忆 P0/P1 可使用现有公共能力并行推进，不等待 R9 完成。
 
 ## R9 复用优先的资源实现
+
+当前实现与后续 R9 改动统一在 [20261106-basepack 工程](../../../experiments/20261106-basepack/README.md)；源码、依赖声明、测试、样例和产品说明以实验根为入口，计划、进度与结果仍在根 devDoc 维护。临时验证进入根 tmp，需选留原证进入 artifacts/runs；本次布局迁移不替代 R9 的功能验证。
 
 ### 主线与行为取舍
 
@@ -118,8 +120,8 @@ jobs 的 client 保留生命周期编排，submit 集中 JobSpec、字段编码�
 
 ### R8.0 修复已复现缺陷
 
-- submit 使用局部规范化副本，保持调用者 JobSpec 不变；回归同一相对 cwd 的 spec 在两个项目复用，以及提交失败后对象未改变。[实现](../../../src/basepack/jobs/submit.py)
-- 在客户端锁内先拒绝重复活动 request_id，再登记状态；用假 RPC 验证第二个同 ID 明确失败，首请求的结果、取消和清理正常，不同 ID 并发不受影响。[实现](../../../src/basepack/embedding/client.py)
+- submit 使用局部规范化副本，保持调用者 JobSpec 不变；回归同一相对 cwd 的 spec 在两个项目复用，以及提交失败后对象未改变。[实现](../../../experiments/20261106-basepack/src/basepack/jobs/submit.py)
+- 在客户端锁内先拒绝重复活动 request_id，再登记状态；用假 RPC 验证第二个同 ID 明确失败，首请求的结果、取消和清理正常，不同 ID 并发不受影响。[实现](../../../experiments/20261106-basepack/src/basepack/embedding/client.py)
 
 两项状态缺陷使用内存替身保留回归，不以启动模型代替状态逻辑验证。
 

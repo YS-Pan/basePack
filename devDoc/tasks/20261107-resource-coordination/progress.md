@@ -1,8 +1,10 @@
 # 资源协调进度
 
-更新：2026 年 11 月 8 日（北京时间）。
+更新：2026 年 11 月 9 日（北京时间）。
 
 ## 当前阶段
+
+当前唯一 active 工程为 [20261106-basepack](../../../experiments/20261106-basepack/README.md)；开发安装、构建和产品说明从实验根进入，现行部署合同在 [system/deployment.md](../../system/deployment.md)。本次布局迁移的实际结果见 [迁移结果](../../archive/20261109-project-layout/result.md)，R9 功能状态保持待实施。
 
 当前稳定安装仍为 0.4.0 普通 wheel，R8 已完成的迁移、源码外功能和生命周期验收见 [结果](maintenance-result.md)。用户确认维持 Sentence Transformers＋LitServe＋Shawl；[R9 复用计划](plan.md#r9-复用优先的资源实现) 已明确职责、批处理和超时边界及 Windows 停机验证，尚未安装或替换服务。
 
@@ -44,13 +46,13 @@
 
 ## 0.4.0 当前交付
 
-- 系统 Python 为 `C:/Program Files/Python313/python.exe`，普通包在其 `Lib/site-packages/basepack`。wheel 为 `dist/basepack-0.4.0-py3-none-any.whl`，42319 字节，SHA256 `3322c8eebfcd0a12a4518639cf66e7a202fa76d6a47fa7b34be80cdecab15563`；30 份代码/模板/许可与源码、wheel、安装一致，旧源码入口已移除。
+- 系统 Python 为 `C:/Program Files/Python313/python.exe`，普通包在其 `Lib/site-packages/basepack`。R8 原交付 wheel 现位于 `experiments/20261106-basepack/dist/basepack-0.4.0-py3-none-any.whl`，42319 字节，SHA256 `3322c8eebfcd0a12a4518639cf66e7a202fa76d6a47fa7b34be80cdecab15563`；30 份代码/模板/许可与源码、wheel、安装一致，旧源码入口已移除。
 - 用旧安装停止并确认旧 broker 退出后一次安装。六份既有源码外试用配置显式迁到项目 schema 2/[jobs]，备份/映射保存在各项目 `.basepack/migration/`；新两项目、深层中文/空格配置、任意 cwd、移动、新检出及所有模板/轻量命令通过。
 - 作业 14335–14338 实得 CPU 499500、应用退出 7、GPU 256；真实图文向量为 2048 维且归一化，GPU 进展与实际 forward 重叠。请求取消/截止、作业取消、另一项目服务存活、日志、原生历史及进程回收均通过。
 - 真实已加载模型的 supervisor 崩溃回收、锁释放、冷恢复、正常停止和原配置 300 秒空闲整进程退出通过。2026-11-08 17:07 北京时间最终实查：supervisor 17804、无模型 worker，运行与磁盘部署指纹匹配，队列为空；12CPU/24576MiB RAM/4同卡名额/7164MiB普通池全部可用。服务仍非登录自启。
 - 机器 schema 1、模型及共享状态物理位置保持；机器 TOML 和 Condor 60/70 的 SHA256 与升级前相同，背景预留仍为 9216 MiB。本轮未重新标定额度或吞吐，历史额度证据继续见 R6/R7。
 
-回执集中在本机 `artifacts/r8/`。验收临时实例已收进本项目 `tmp/acceptance/`，需长期复核的原证另存 `artifacts/tmp-reorganization-20261108/evidence/`；原路径与迁移映射见 [R8 结果](maintenance-result.md)。旧 0.3.0 wheel 保留在 `dist/` 可供恢复，原交付条件见 [R7 结果](standard-submit-result.md)，不把旧 PID 或队列快照作为当前依据。
+回执现集中在本机 `artifacts/runs/r8/`。验收临时实例已收进本项目 `tmp/acceptance/`，需长期复核的原证现存 `artifacts/runs/tmp-reorganization-20261108/evidence/`；原回执保留当时路径，当前位置按 [迁移结果](../../archive/20261109-project-layout/result.md) 和 [R8 结果](maintenance-result.md) 回查。旧 0.3.0 wheel 现保留在 `experiments/20261106-basepack/dist/` 可供恢复，原交付条件见 [R7 结果](standard-submit-result.md)，不把旧 PID 或队列快照作为当前依据。
 
 ## 下一步与边界
 

@@ -63,7 +63,7 @@ gpus_minimum_memory = 3000 MB
 
 `gpus_minimum_memory` 的官方含义仍是设备显存容量下限，原有 `requirements` 和 `require_gpus` 筛选继续生效。本站点额外把它作为作业的显存预订量，由提交节点统一转换；其他 Condor 站点是否采用此约定由当地管理员决定。原生申报须在提交时解析为正数，官方单位 `MB` 表示 MiB、`GB` 表示 GiB，预订量向上取整到整 MiB。依赖执行节点 `TARGET` 的动态表达式不支持。
 
-本站申请 GPU 而省略显存时预订整个普通池，与其他 GPU 作业串行；显式 `undefined`、零、负值、不支持的表达式、超过全池或 `request_gpus > 1` 在提交时拒绝，错误使用官方参数名。资源暂时不足的有效申请排队。节点策略及背景预留由 [管理员](administrator.md#通用-htcondor-节点容量) 维护。
+本站申请 GPU 而省略显存时预订整个普通池，与其他 GPU 作业串行；显式 `undefined`、零、负值、不支持的表达式、超过全池或 `request_gpus > 1` 在提交时拒绝，错误使用官方参数名。资源暂时不足的有效申请排队。节点策略及背景预留由 [管理员](administrator.md#condor-容量与策略) 维护。
 
 可用 `environment` 传显式环境。入口按 cpus 提供常用框架线程变量，但 starter 仍可能注入其他线程限制；worker 继承其最终值并记录，应用并行参数由调用者自行设置。Windows 中文、空格、引号与空参数经 UTF-8 任务文件交给随包薄 worker，避免参数数组经过 submit 的有损转换。
 

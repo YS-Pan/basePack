@@ -1,5 +1,7 @@
 # 分层 agent skill：参考与验证
 
+路径追溯（2026-11-09）：下文保留当时的运行路径；选留原证现归根 `artifacts/runs/<原批次>/`，位置映射见[布局迁移结果](../../../archive/20261109-project-layout/result.md)。
+
 2026 年 11 月 7 日。目标来自 [项目纲领](../../../project-charter.md#ai-agent的组织体系)：扩大可处理的材料范围、集中各角色上下文，由协调层接走日常派工。外部项目只提供参考，不替代这些要求。[agent-team skill](../../../../skills/agent-team/SKILL.md) 独立编写，使用宿主订阅 subagent，无第三方框架依赖。
 
 ## 筛选结果

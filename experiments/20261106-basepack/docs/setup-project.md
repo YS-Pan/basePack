@@ -58,4 +58,4 @@ python -m basepack migrate --from-config '<absolute-old-config>'
 
 移动项目后用新配置绝对路径调用，Python 和机器配置绑定仍须有效；已保存作业材料中的绝对路径也需按新位置修复，Condor 历史 ClassAd 不会随目录移动。新检出通过 init 重建被忽略的配置和 instructions，AGENTS 与业务源码可正常提交；不复制其它项目的知识或任务状态。
 
-开发使用同一 Python 的 `python -m pip install -e <repo>`，源码位置须稳定且可供执行账户读取。普通部署构建 wheel 后安装到解释器管理的 site-packages，项目不保存包目录或 PYTHONPATH。依赖或安装元数据变化时重新安装，受影响的运行进程须按管理员流程重启。
+本路线开发安装使用 `python -m pip install -e '<repo>/experiments/20261106-basepack'`，源码位置须稳定且可供执行账户读取。普通部署构建 wheel 后安装到解释器管理的 site-packages，项目不保存包目录或 PYTHONPATH。依赖或安装元数据变化时重新安装，受影响的运行进程须按管理员流程重启。具体开发、构建和根 tmp 验证命令见 [路线 README](../README.md)。

@@ -1,6 +1,6 @@
 # 机器部署与维护
 
-本页按 0.4.0 接口说明单机 Windows、单张 NVIDIA GPU 的部署。复用 Python 3.13、固定 Qwen3-VL-Embedding-2B 权重与 HTCondor；模型目录含 model.lock.json 和 model/。机器配置使用 schema 1，维护路径与 embedding 设置；Condor 维护普通容量和站点策略。本机实际安装及验收状态见 [资源进度](../devDoc/tasks/20261107-resource-coordination/progress.md)。
+本页属于当前 active 路线 [20261106-basepack](../README.md)，按 0.4.0 接口说明单机 Windows、单张 NVIDIA GPU 的部署。复用 Python 3.13、固定 Qwen3-VL-Embedding-2B 权重与 HTCondor；模型目录含 model.lock.json 和 model/。机器配置使用 schema 1，维护路径与 embedding 设置；Condor 维护普通容量和站点策略。本机实际安装及验收状态见 [资源进度](../../../devDoc/tasks/20261107-resource-coordination/progress.md)。
 
 ## 安装与执行账户
 
@@ -13,13 +13,13 @@ python -s -c "import basepack; print(basepack.__file__)"
 
 包、配置、输入和模型须对服务及 Condor 执行账户可读，项目产物目录须可写。用真实小作业验证 slot 账户能加载包、写结果和连接共享服务；doctor 只读检查不能代替该验证。embedding 依赖及固定版本见 [pyproject.toml](../pyproject.toml) 的 extra，CUDA PyTorch 须适配驱动；已有环境直接复用。机器模板通过 `from basepack.project.init import template` 读取，项目接入见 [说明](setup-project.md)。
 
-开发 editable 与普通 wheel 在同一解释器中只保留一种有效安装；项目只绑定 Python 和机器配置，不保存包副本或 PYTHONPATH。服务账户与作业账户可不同，权限按文件和 loopback 实际访问核定。本机服务由交互用户启动，普通作业使用 Condor slot 账户。
+源码构建与开发安装的目标是 `<repo>/experiments/20261106-basepack`，交付和回滚 wheel 留在该路线 `dist/`；命令见 [路线入口](../README.md)。开发 editable 与普通 wheel 在同一解释器中只保留一种有效安装；项目只绑定 Python 和机器配置，不保存包副本或 PYTHONPATH。服务账户与作业账户可不同，权限按文件和 loopback 实际访问核定。本机服务由交互用户启动，普通作业使用 Condor slot 账户。
 
 CondorClient 只使用机器配置的 bin_dir/config_file，向原生命令显式传 CONDOR_CONFIG。受限 sandbox 的 Windows SSPI 认证可能失败；保留原错误，在正常用户上下文复核，不因此改认证政策。
 
 ## Condor 容量与策略
 
-普通作业容量和调度由 Condor 管理，运行时无需调用 basePack。本站入口为 `C:/condor/condor_config`，加载两份配置，样例是维护源：
+普通作业容量和调度由 Condor 管理，运行时无需调用 basePack。本站入口为 `C:/condor/condor_config`，加载两份配置，本路线的 `examples/condor/` 样例是维护源，机器上部署的配置仍由管理员维护：
 
 | 配置 | 职责 |
 | --- | --- |
@@ -34,7 +34,7 @@ basePack 和原生用户都提交官方 `request_gpus = 1`、`gpus_minimum_memor
 
 `jobs capacity` 显示父 slot 总量与剩余量，额外 MachineResources 仅在两种数值均发布时按原名、原生单位显示。客户端只检查 CPU/RAM 总量；GPU 拒绝、排队和终态由 Condor 决定。申报量不提供显存硬隔离，也不承诺吞吐提升；应用须限制线程和框架实际峰值，保留 Condor 的 CUDA_VISIBLE_DEVICES。
 
-改变 CPU、slot 定义、GPU 名额或资源总量时，暂停新提交、排空作业并平稳重启 startd，再核实际发布容量；reconfig 不会重建已有 slot。只改变提交规则时按影响重载 schedd。本站配置机制及历史实测见 [R6 结果](../devDoc/tasks/20261107-resource-coordination/native-condor.md) 和 [R7 结果](../devDoc/tasks/20261107-resource-coordination/standard-submit-result.md)。
+改变 CPU、slot 定义、GPU 名额或资源总量时，暂停新提交、排空作业并平稳重启 startd，再核实际发布容量；reconfig 不会重建已有 slot。只改变提交规则时按影响重载 schedd。本站配置机制及历史实测见 [R6 结果](../../../devDoc/tasks/20261107-resource-coordination/native-condor.md) 和 [R7 结果](../../../devDoc/tasks/20261107-resource-coordination/standard-submit-result.md)。
 
 embedding 分配器额度由机器 `[embedding].gpu_memory_mib` 维护，独立于 Condor。模型或推理设置改变且可能影响峰值时，重新测量背景用量再调整普通池。PyTorch allocated/reserved/peak 是本进程指标；WDDM 下 CUDA free 不代表全卡其它进程占用，全卡峰值须使用外部 nvidia-smi 时间采样。动态 free 不参与准入。
 

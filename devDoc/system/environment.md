@@ -1,10 +1,12 @@
 # 开发环境核验
 
-## 当前临时目录约定
+## 当前开发入口与临时目录
 
-一次性验证默认使用 `--basetemp tmp/<task>/pytest`；构建需要设置 TEMP/TMP 时，也指向 `tmp/<task>/` 下按需创建的目录。目录寿命与长期证据归属见 [文档维护约定](../documentation.md)。
+当前唯一 active 路线位于 `experiments/20261106-basepack/`；安装、构建与测试目标均为该实验工程，具体命令见 [路线 README](../../experiments/20261106-basepack/README.md)。从仓库根运行 pytest 时，显式指定实验的 pyproject、tests 和根 `tmp/<task>/pytest` 作为 basetemp。pytest 不保留持久缓存；构建 TEMP/TMP 和隔离验证环境也进入根 tmp。目录寿命见 [文档维护约定](../documentation.md)。
 
-下文保留各轮实测时的路径。2026-11-08 临时材料整理的迁移映射位于 `artifacts/tmp-reorganization-20261108/moves.json`；回执中的原绝对路径用于追溯当时条件，当前位置按映射查找，`tmp/` 内材料按可清除处理。
+2026-11-09 布局迁移仅改变开发维护位置。只读外部核查确认系统 Python 仍普通安装 basepack 0.4.0，运行包在 site-packages，无 basepack editable 映射；机器配置、模型、共享状态及 Condor 安装保留原位置。当前源码与新 wheel 的实际验证结果由本次整理结果记录，旧批次数据仍按原条件阅读。
+
+选留证据现统一位于根 `artifacts/runs/`。前次临时材料整理的映射为 `artifacts/runs/tmp-reorganization-20261108/moves.json`，本次位置映射为 `artifacts/runs/20261109-project-layout/moves.json`；原始回执及下文历史路径保留当时含义，结合两轮映射回查长期副本，tmp 内容按可清除处理。
 
 ## 2026-11-08 R8 部署核验
 
@@ -67,25 +69,30 @@
 
 模型可加载性、GPU 推理、实际队列和资源准入、项目安装及产品测试尚未验证。下一阶段由资源专项 R0 核配置来源，分别验证 embedding 与 Condor 接入，再按各链结果推进；公共代码通过配置定位共享资产，本页机器路径仅记录观测。
 
-2026-11-07 安装布局规划期间只读检查：当前系统 Python 的 sysconfig purelib 为 `C:\Program Files\Python313\Lib\site-packages`；find_spec 可定位 basic_memory，未发现 basepack/context_memory。旧安装器仍复制 `.context-memory/app`，详细依据与新部署目标见 [路径布局计划](../tasks/20261107-resource-coordination/deployment-layout-plan.md#从旧方案到本方案)。本次未安装包、写入 AgentTools 配置或运行模型。
+2026-11-07 安装布局规划期间只读检查：当前系统 Python 的 sysconfig purelib 为 `C:\Program Files\Python313\Lib\site-packages`；find_spec 可定位 basic_memory，未发现 basepack/context_memory。旧安装器仍复制 `.context-memory/app`，详细依据与新部署目标见 [路径布局计划](deployment.md#从旧方案到本方案)。本次未安装包、写入 AgentTools 配置或运行模型。
 
 ## 项目 skill 的本机入口
 
-2026-11-07 建立前两项，2026-11-08 新增 resources：以下 skill 使用项目级发现入口，通过 junction 指向仓库维护源，不作用户级注册。原 `~/.codex/skills/project-layouts` 联接已移除。[Codex 官方作用域说明](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) 区分项目级与用户级入口；下文11月7日的刷新回执只覆盖当时两项，resources本次核联接与skill静态校验。
+以下技能使用根 `.agents/skills/` 的项目级发现入口，junction 指向唯一维护源。2026-11-09 将 resources 的目标切至 active 实验内，其余两项保持根维护源。新检出时按下例建立联接；历史发现回执保留当时作用域和名称。[Codex 官方作用域说明](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) 区分项目级与用户级入口。
 
 | Skill | 维护源 | 本机发现入口 |
 | --- | --- | --- |
 | `file-structure` | [SKILL.md](../../skills/file-structure/SKILL.md) | `.agents/skills/file-structure` |
 | `agent-team` | [SKILL.md](../../skills/agent-team/SKILL.md) | `.agents/skills/agent-team` |
-| `resources` | [SKILL.md](../../skills/resources/SKILL.md) | `.agents/skills/resources` |
+| `resources` | [SKILL.md](../../experiments/20261106-basepack/skills/resources/SKILL.md) | `.agents/skills/resources` |
 
 本机联接由 `.gitignore` 排除，不重复保存源码。仓库换路径或新检出时，如需在技能列表中自动发现，可从仓库根目录首次建立项目级入口：
 
 ```powershell
 New-Item -ItemType Directory -Force -Path '.agents/skills' | Out-Null
-foreach ($skillName in @('file-structure', 'agent-team')) {
-    $skillSource = (Resolve-Path -LiteralPath "skills/$skillName").Path
-    New-Item -ItemType Junction -Path ".agents/skills/$skillName" -Target $skillSource | Out-Null
+$skillSources = @{
+    'file-structure' = 'skills/file-structure'
+    'agent-team' = 'skills/agent-team'
+    'resources' = 'experiments/20261106-basepack/skills/resources'
+}
+foreach ($entry in $skillSources.GetEnumerator()) {
+    $skillSource = (Resolve-Path -LiteralPath $entry.Value).Path
+    New-Item -ItemType Junction -Path ".agents/skills/$($entry.Key)" -Target $skillSource | Out-Null
 }
 ```
 

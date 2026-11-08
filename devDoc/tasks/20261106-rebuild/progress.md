@@ -4,6 +4,8 @@
 
 ## 当前阶段
 
+当前唯一 active 路线为 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，源码、构建声明、测试、产品文档、示例及 resources skill 在该实验工程内维护；根目录保留统一 devDoc 和两项通用技能。本次布局迁移的实际检查与接续见 [迁移结果](../../archive/20261109-project-layout/result.md)，不改变 R9 和记忆功能的完成状态。
+
 资源 R8 已交付 0.4.0；本轮按用户要求维护“更多复用、少写代码、允许适度行为变化”的计划，资源 R9 待实施，记忆仍未实现。分步实施与验收状态只维护在 [资源进度](../20261107-resource-coordination/progress.md) 和 [记忆进度](../20261106-memory-system/progress.md)，共性取舍见 [复用优先](plan.md#复用优先)。
 
 ## 已完成
@@ -22,7 +24,7 @@
 - R8 的源码归组、实例目录、接口整理与统一迁移已经交付，详细结果从 [资源进度](../20261107-resource-coordination/progress.md) 读取；R8 设计与验收保留为历史依据。
 - 已完成现成库/软件的联网调查，并维护 [R9 复用路线](../20261107-resource-coordination/plan.md#r9-复用优先的资源实现) 与记忆 P0 的底座比较；本轮仅更新文档，未安装候选或改变运行实现。
 - 已补充 [后续维护的简化](plan.md#后续维护的简化)：原生环境与接口、上游补丁替代、旧接口/迁移退役、数据导出和可复用的小型回归；资源与记忆计划给出实际交付及按需复查条件，不增加当前实施前置。
-- 已按用户要求将一次性测试和临时材料的默认位置设为项目根 `tmp/`，按任务结束后随时可清除处理；`artifacts/` 保留有长期复核需要的材料。规则见 [文档维护约定](../../documentation.md)，现有材料迁移映射位于 `artifacts/tmp-reorganization-20261108/moves.json`。
+- 已按用户要求将一次性测试和临时材料的默认位置设为项目根 `tmp/`，按任务结束后随时可清除处理；`artifacts/` 保留有长期复核需要的材料。规则见 [文档维护约定](../../documentation.md)，前次材料迁移映射现位于 `artifacts/runs/tmp-reorganization-20261108/moves.json`；此次路径变动与旧路径回查见 [迁移结果](../../archive/20261109-project-layout/result.md)。
 
 ## 阻碍与待核
 

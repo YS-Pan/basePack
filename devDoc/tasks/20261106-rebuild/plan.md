@@ -1,6 +1,6 @@
 # basePack 重建总览
 
-2026 年 11 月 8 日更新。本目录维护跨工具取舍、公共历史、skill 工作及联合发布条件；当前阶段从 [总进度](progress.md) 及各任务进度读取。本轮将用户明确的复用优先方向落实到现有计划，尚未替换实现或部署。
+2026 年 11 月 9 日更新。本目录维护跨工具取舍、公共历史、skill 工作及联合发布条件；当前阶段从 [总进度](progress.md) 及各任务进度读取。当前唯一 active 路线为 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，R9 和记忆 P0–P5 接续该工程入口；现行部署与路径合同维护在根 system，功能替换尚未实施。
 
 战略以 [项目纲领](../../project-charter.md) 为准；公共调查见 [调研索引](research/sources.md) 与 [近期历史](legacy-history.md)，本目录状态见 [总进度](progress.md)。旧项目只取思想、事故样例和经核实的薄接口，不迁入其数据库、任务状态或业务授权。
 
@@ -13,7 +13,7 @@
 | 文件结构建议 | [专项计划](file-organization-plan.md)、[skill](../../../skills/file-structure/SKILL.md) | 独立使用，记忆可按需引用 |
 | 分层协作 | [P7 完成条件](#p7-分层-agent-组织)、[研究与初版检查](research/agent-team.md) | 使用宿主订阅 subagent，按真实任务继续验证 |
 
-资源 R9 与记忆 P0/P1 可并行；现有公共能力足以支持文字闭环，P2 再接入经验证的共享 embedding 接口。各任务顺序与完成条件在所属计划维护；公共配置和文件归属见 [部署合同](../20261107-resource-coordination/deployment-layout-plan.md)。
+资源 R9 与记忆 P0/P1 可并行；现有公共能力足以支持文字闭环，P2 再接入经验证的共享 embedding 接口。各任务顺序与完成条件在所属计划维护；公共配置和文件归属见 [部署合同](../../system/deployment.md)。
 
 ## 复用优先
 

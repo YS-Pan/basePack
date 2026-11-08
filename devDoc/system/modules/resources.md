@@ -1,10 +1,12 @@
 # 资源工具
 
-公共配置由 [project/config.py](../../../src/basepack/project/config.py) 解析。项目 schema 2 使用 `[jobs]`，机器保持 schema 1；ProjectConfig 只加载公共绑定，各功能按需读取自身配置，MachineConfig.path 是机器配置位置的唯一来源。实例文件统一在 `.basepack/`，[migrate](../../../src/basepack/project/migrate.py) 显式升级旧配置并保存项目内备份/映射，公共加载器直接拒绝旧项目格式。产品调用见 [资源使用](../../../docs/resources.md)，机器维护见 [管理员说明](../../../docs/administrator.md)。本模块不维护记忆索引、图或数据库。
+本页描述 active 路线 `experiments/20261106-basepack/` 的 0.4.0 实现；资源 R9 仍是后续计划，布局迁移未替换服务或模型实现。源码、测试、产品说明、示例和 resources skill 在该路线内维护，部署边界见 [合同](../deployment.md)。
+
+公共配置由 [project/config.py](../../../experiments/20261106-basepack/src/basepack/project/config.py) 解析。项目 schema 2 使用 `[jobs]`，机器保持 schema 1；ProjectConfig 只加载公共绑定，各功能按需读取自身配置，MachineConfig.path 是机器配置位置的唯一来源。实例文件统一在 `.basepack/`，[migrate](../../../experiments/20261106-basepack/src/basepack/project/migrate.py) 显式升级旧配置并保存项目内备份/映射，公共加载器直接拒绝旧项目格式。产品调用见 [资源使用](../../../experiments/20261106-basepack/docs/resources.md)，机器维护见 [管理员说明](../../../experiments/20261106-basepack/docs/administrator.md)。本模块不维护记忆索引、图或数据库。
 
 ## 独立 embedding
 
-[embedding](../../../src/basepack/embedding/) 的 qwen3_vl 模型实现接收模型/推理设置，完成严格图文预处理、归一化和内部批处理；不依赖 HTTP 或登记。identity 维护 embedding_identity：权重 revision/文件身份、FP16、指令、图像缩放及 pooling 合同决定向量语义；max_length、batch_size、线程、空闲时限与部署路径不改变此标识。
+[embedding](../../../experiments/20261106-basepack/src/basepack/embedding) 的 qwen3_vl 模型实现接收模型/推理设置，完成严格图文预处理、归一化和内部批处理；不依赖 HTTP 或登记。identity 维护 embedding_identity：权重 revision/文件身份、FP16、指令、图像缩放及 pooling 合同决定向量语义；max_length、batch_size、线程、空闲时限与部署路径不改变此标识。
 
 机器级 supervisor 必须在 Condor 作业树之外启动。registry 维护登记、锁和 deployment_fingerprint；transport 仅处理 JSON/HTTP、协议版本和原始远程错误。创建锁保证一个启动者；supervisor 按需创建并拥有一个模型 worker。登记物理路径仍为 broker.json/broker.lock，机器共享目录只保存 endpoint、锁与 stderr。EmbeddingClient 明确接收 MachineConfig，公开请求、取消和关闭；管理 status/stop 在 admin，CLI `embedding --machine-config <file> serve|status|stop` 无需项目配置。
 
@@ -14,11 +16,11 @@ worker 在线程接入层处理状态、取消与截止，单线程模型循环�
 
 ## 普通重任务
 
-[jobs](../../../src/basepack/jobs/) 公开 JobSpec 与 CondorClient。client 编排 run/submit/status/wait/cancel，submit 集中字段编码、局部参数规范化与提交材料，_processes 只观察本机进程树。payload 只保存一份 spec，UTF-8 worker 从中读取 executable/arguments；任务参数和日志留在项目 `[jobs].jobs_dir`。队列、事件和历史由 Condor 维护，响应不确定时按唯一提交标识查询，不重复提交。
+[jobs](../../../experiments/20261106-basepack/src/basepack/jobs) 公开 JobSpec 与 CondorClient。client 编排 run/submit/status/wait/cancel，submit 集中字段编码、局部参数规范化与提交材料，_processes 只观察本机进程树。payload 只保存一份 spec，UTF-8 worker 从中读取 executable/arguments；任务参数和日志留在项目 `[jobs].jobs_dir`。队列、事件和历史由 Condor 维护，响应不确定时按唯一提交标识查询，不重复提交。
 
 普通作业容量与策略由 HTCondor 维护，basePack 是标准提交客户端。`capacity` 读取实际父 slot 的总量和剩余量：标准 CPU/RAM/GPU 对应 `cpus/memory_mib/gpus`，其余 `MachineResources` 仅在总量和剩余数量均有发布时按原名、原生单位展示。客户端只按 `TotalSlotCpus/TotalSlotMemory` 判断 CPU/RAM 能否容纳，GPU 与内部额度的拒绝和排队交给 Condor；当前剩余不足不触发客户端拒绝。项目 TOML 不镜像普通额度，也没有专属预算发布或 hash 匹配。
 
-GPU JobSpec 的 `gpu_memory_mib` 只生成官方 `request_gpus = 1` 与 `gpus_minimum_memory = <峰值> MB`。提交 schedd 的原生 JOB_TRANSFORM 按站点配置生成内部显存申请并追加资源匹配门槛，保留原 Requirements、RequireGPUs 和硬件筛选含义；资源名和数值不进入客户端实现。CPU 作业不做 GPU 转换。本站省略原生显存声明时预订全池，非法、超池和多 GPU 申请由提交规则拒绝，用户错误引用官方参数名。规则对所有标准提交端一致，配置见 [管理员说明](../../../docs/administrator.md)。
+GPU JobSpec 的 `gpu_memory_mib` 只生成官方 `request_gpus = 1` 与 `gpus_minimum_memory = <峰值> MB`。提交 schedd 的原生 JOB_TRANSFORM 按站点配置生成内部显存申请并追加资源匹配门槛，保留原 Requirements、RequireGPUs 和硬件筛选含义；资源名和数值不进入客户端实现。CPU 作业不做 GPU 转换。本站省略原生显存声明时预订全池，非法、超池和多 GPU 申请由提交规则拒绝，用户错误引用官方参数名。规则对所有标准提交端一致，配置见 [管理员说明](../../../experiments/20261106-basepack/docs/administrator.md)。
 
 背景与普通作业共享物理 GPU，通过管理员固定预留协调；本机 GPU 数量代表同卡共享令牌，应用按声明限制实际峰值。GPU 共享和资源记账不提供显存硬隔离，也不承诺更高吞吐；部署及真实联合验收状态见下方进度入口。
 
@@ -30,4 +32,4 @@ run 执行有界等待，排队/执行时限同时写入 Condor 原生策略；�
 
 ## 证据
 
-实际设施、预算和功能验收统一记录在 [资源进度](../../tasks/20261107-resource-coordination/progress.md)。本机详细 JSON、时间线和日志位于忽略目录 `artifacts/`，测试覆盖请求取消竞态、实例启动竞态及字段/进程处理缺陷，不替代真实 GPU/Condor 验收。
+实际设施、预算和功能验收统一记录在 [资源进度](../../tasks/20261107-resource-coordination/progress.md)。本机详细 JSON、时间线和日志按批次选留在根忽略目录 `artifacts/runs/`，测试覆盖请求取消竞态、实例启动竞态及字段/进程处理缺陷，不替代真实 GPU/Condor 验收。
