@@ -70,13 +70,13 @@ embedding 自身的分配器额度由机器 TOML 的 `[embedding].gpu_memory_mib
 先在所有 Condor 作业树之外启动轻量 broker，模型在首个请求时加载：
 
 ```powershell
-python -m basepack.embedding.broker --machine-config '<absolute-machine-config>'
+python -m basepack embedding --machine-config '<absolute-machine-config>' serve
 ```
 
 这是前台进程；作为本机长期入口时可由任务计划或服务管理器启动，选择已验证账户。不要从 Condor payload 启动 broker。作业内客户端只连现有 broker，再由 broker 启动其自有模型进程；普通作业取消后共享模型继续服务其他项目。
 
-机器 state_dir 保存 broker/worker endpoint、实例锁及 stderr。实例身份含固定模型、预处理、设备和代码版本，不含项目路径。多项目冷请求共用同一实例。worker 空闲到 idle_seconds 后卸载，broker 保留，下次请求按预留预算再启动；单请求取消/截止不退出共享服务。
+机器 state_dir 保存 broker/worker endpoint、实例锁及 stderr。embedding_identity 表示固定模型、FP16、指令、图像缩放和 pooling 的向量语义；纯运行限制、设备、路径与代码由 deployment_fingerprint 检查同代安装。进程启动时固定实际部署身份，协议版本单独标识 RPC 合同。多项目冷请求共用同一实例。worker 空闲到 idle_seconds 后卸载，broker 保留，下次请求按预留预算再启动；单请求取消/截止不退出共享服务。
 
-升级或改模型、输入上限、自身额度前，暂停新请求与提交，排空相关工作，运行 `embedding stop`，确认 broker/worker 已退出，再切换包/配置并重新标定；若背景峰值变化，按上节调整 Condor 容量，最后启动 broker。推理和 status 拒绝代码/配置身份不一致的旧实例；stop 按机器 marker 独立清理旧 broker，仍推荐先停再升级。服务异常时保留 stderr 和 PID，核旧进程已退出后再显式启动，不自动重试推理或重复加载。
+升级或改模型、输入上限、自身额度前，暂停新请求与提交，排空相关工作，运行 `embedding stop`，确认 broker/worker 已退出，再切换包/配置并重新标定；若背景峰值变化，按上节调整 Condor 容量，最后启动 broker。推理拒绝部署指纹不一致的旧实例；管理员 status 报告运行身份与磁盘目标差异，stop 按机器 marker 独立清理旧实例，仍推荐先停再升级。服务异常时保留 stderr 和 PID，核旧进程已退出后再显式启动，不自动重试推理或重复加载。
 
-`embedding status` 查询共享状态，`embedding stop` 是独立管理员动作；返回 stopping 只代表已请求，worker 在当前 forward 完成后退出，确认 PID 消失后才视为释放。普通客户端 close/cancel 只影响本请求。普通任务进程树由 Condor 回收；broker 持有模型 worker 的独立进程所有权，broker 异常退出时也回收其模型进程。
+`embedding --machine-config <file> status` 查询共享状态，`embedding --machine-config <file> stop` 是独立管理员动作；返回 stopping 只代表已请求，worker 在当前 forward 完成后退出，确认 PID 消失后才视为释放。普通客户端 close/cancel 只影响本请求。普通任务进程树由 Condor 回收；broker 持有模型 worker 的独立进程所有权，broker 异常退出时也回收其模型进程。

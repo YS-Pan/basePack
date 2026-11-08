@@ -17,22 +17,26 @@ def register_commands(subparsers):
     embed.add_argument("--tokens-only", action="store_true")
     embed.add_argument("--output", type=Path)
     service = subparsers.add_parser("embedding", help="administer the independent machine service")
+    service.add_argument("--machine-config", required=True, type=Path)
     actions = service.add_subparsers(dest="embedding_action", required=True)
     actions.add_parser("status")
     actions.add_parser("stop")
-    actions.add_parser("broker", help="run the machine launcher in the foreground outside Condor")
+    actions.add_parser("serve", help="run the machine launcher in the foreground outside Condor")
 
 
-def dispatch(args, config):
-    client = EmbeddingClient(config)
+def dispatch(args, config=None):
     if args.command == "embedding":
+        from basepack.project.config import load_machine_config
+        from .admin import status, stop
+        machine = load_machine_config(args.machine_config)
         if args.embedding_action == "status":
-            return client.status()
+            return status(machine), 0
         if args.embedding_action == "stop":
-            return client.stop_service()
-        from .broker import serve
-        serve(config.machine)
-        return {"stopped": True}
+            return stop(machine), 0
+        from .supervisor import serve
+        serve(machine)
+        return {"stopped": True}, 0
+    client = EmbeddingClient(config.machine)
     if args.inputs:
         inputs = json.loads(args.inputs.read_text(encoding="utf-8"))
     elif args.image:
@@ -44,6 +48,6 @@ def dispatch(args, config):
     result = client.embed(inputs, timeout=args.timeout, request_id=args.request_id, tokens_only=args.tokens_only)
     if args.output:
         args.output.write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
-        return {"pid": result["pid"], "model_identity": result["model_identity"],
-                "count": len(result["inputs"]), "output": str(args.output.resolve())}
-    return result
+        return {"pid": result["pid"], "embedding_identity": result["embedding_identity"],
+                "count": len(result["inputs"]), "output": str(args.output.resolve())}, 0
+    return result, 0

@@ -1,4 +1,4 @@
-"""One broker-owned model process with request-local cancellation and deadlines."""
+"""One supervisor-owned model process with request-local cancellation and deadlines."""
 from __future__ import annotations
 
 import argparse
@@ -11,7 +11,8 @@ import time
 import traceback
 
 from basepack.project.config import load_machine_config
-from .transport import atomic_json, instance_key, make_server, marker_path
+from .registry import atomic_json, deployment_fingerprint, embedding_settings, marker_path
+from .transport import PROTOCOL_VERSION, make_server
 
 
 @dataclass
@@ -24,8 +25,10 @@ class Request:
 
 def serve(machine, *, runtime_factory=None):
     if runtime_factory is None:
-        from .runtime import Runtime
-        runtime_factory = Runtime
+        from .qwen3_vl import Qwen3VLEmbedder
+        runtime_factory = Qwen3VLEmbedder
+    options = embedding_settings(machine)
+    fingerprint = deployment_fingerprint(machine)
     pending = queue.Queue()
     requests, mutex = {}, threading.Lock()
     cancellations = {}
@@ -40,7 +43,8 @@ def serve(machine, *, runtime_factory=None):
                 return {"stopping": stopping.is_set(), "pid": os.getpid()}
         if action == "status":
             return {"pid": os.getpid(), "queue_size": pending.qsize(),
-                    "current_request": state["current_request"], "loaded": state["loaded"]}
+                    "current_request": state["current_request"], "loaded": state["loaded"],
+                    "deployment_fingerprint": fingerprint, "protocol_version": PROTOCOL_VERSION}
         if action == "stop":
             stopping.set()
             return {"pid": os.getpid(), "stopping": True}
@@ -88,7 +92,7 @@ def serve(machine, *, runtime_factory=None):
     auth = secrets.token_hex(32)
     server = make_server(auth, dispatch)
     marker = {"pid": os.getpid(), "port": server.server_address[1], "auth": auth,
-              "service_key": instance_key(machine), "created_at": time.time()}
+              "deployment_fingerprint": fingerprint, "protocol_version": PROTOCOL_VERSION, "created_at": time.time()}
     path = marker_path(machine, "worker")
     atomic_json(path, marker)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -100,7 +104,7 @@ def serve(machine, *, runtime_factory=None):
                 request = pending.get(timeout=0.5)
             except queue.Empty:
                 with mutex:
-                    if not requests and time.monotonic() - state["last_active"] >= machine.raw["embedding"]["idle_seconds"]:
+                    if not requests and time.monotonic() - state["last_active"] >= options["idle_seconds"]:
                         stopping.set()
                         break
                 continue
@@ -110,7 +114,7 @@ def serve(machine, *, runtime_factory=None):
                 if request.cancelled.is_set() or time.time() >= payload["deadline"]:
                     continue
                 if runtime is None:
-                    runtime = runtime_factory(machine)
+                    runtime = runtime_factory(options)
                     state["loaded"] = runtime.loaded
                 if request.cancelled.is_set() or time.time() >= payload["deadline"]:
                     continue

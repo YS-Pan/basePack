@@ -13,7 +13,9 @@ import pytest
 from basepack.project.config import load_machine_config
 from basepack.embedding import worker
 from basepack.embedding.client import EmbeddingClient
-from basepack.embedding.transport import EmbeddingError, marker_path, read_marker, rpc
+from basepack.embedding.registry import marker_path, read_marker
+from basepack.embedding.transport import EmbeddingError, rpc
+from basepack.embedding.admin import status, stop
 
 
 @pytest.fixture
@@ -98,7 +100,7 @@ def test_cancel_and_deadline_leave_another_request_and_the_model_alive(machine):
 def test_concurrent_cold_ensure_and_status_share_one_worker(machine):
     """Real lightweight broker/worker processes, without importing Torch."""
     with (machine.path.parent / "broker.log").open("wb") as log:
-        broker = subprocess.Popen([sys.executable, "-m", "basepack.embedding.broker",
+        broker = subprocess.Popen([sys.executable, "-m", "basepack.embedding.supervisor",
             "--machine-config", str(machine.path)], stdout=log, stderr=log,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
         try:
@@ -120,7 +122,7 @@ def test_concurrent_cold_ensure_and_status_share_one_worker(machine):
                 assert rpc(marker, "status", timeout=5)["worker_starts"] == 1
             # A killed worker cannot leave a stale registration that prevents a new cold start.
             previous = first.result()
-            from basepack.embedding.owned import process_alive
+            from basepack.embedding.process_owner import process_alive
             import signal
             os.kill(previous["pid"], signal.SIGTERM if os.name == "nt" else signal.SIGKILL)
             replacement = rpc(marker, "ensure", {"deadline": time.time() + 10}, timeout=10)
@@ -130,8 +132,9 @@ def test_concurrent_cold_ensure_and_status_share_one_worker(machine):
             machine.raw["embedding"]["max_length"] = 1024
             client = EmbeddingClient(machine)
             with pytest.raises(RuntimeError, match="different code/configuration"):
-                client.status()
-            assert client.stop_service()["stopping"]
+                client._supervisor()
+            assert not status(machine)["deployment_matches"]
+            assert stop(machine)["stopping"]
             assert broker.wait(timeout=10) == 0
         finally:
             if broker.poll() is None:
@@ -142,7 +145,7 @@ def test_concurrent_cold_ensure_and_status_share_one_worker(machine):
 def test_client_cancel_covers_cold_endpoint_startup(machine, monkeypatch):
     entered, release = threading.Event(), threading.Event()
     client = EmbeddingClient(machine)
-    monkeypatch.setattr(client, "_broker", lambda: {})
+    monkeypatch.setattr(client, "_supervisor", lambda: {})
 
     def exchange(_, action, *args, **kwargs):
         assert action == "ensure"  # Cancelled input must never be sent to the worker.

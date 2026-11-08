@@ -1,13 +1,13 @@
 # 资源使用
 
-先读项目 `basepack.toml`，用其中 runtime.python 启动工具，每次显式传配置绝对路径。以下 `python` 均指该解释器。机器已完成 [首次部署](administrator.md)；新项目先按 [项目接入](setup-project.md) 初始化。
+先读项目 `.basepack/instructions.md` 和实际配置，用其中 runtime.python 启动工具，每次显式传配置绝对路径。以下 `python` 均指该解释器。机器已完成 [首次部署](administrator.md)；新项目先按 [项目接入](setup-project.md) 初始化。
 
 ## 共享 embedding
 
 ```powershell
-python -m basepack --config '<project-config>' embed --text '待编码文本' --output '<project>/vectors.json'
-python -m basepack --config '<project-config>' embed --image '<absolute-image>' --caption '图片说明' --output '<project>/image-vector.json'
-python -m basepack --config '<project-config>' embedding status
+python -m basepack --config '<project-config>' embed --text '待编码文本' --output '<project>/.basepack/vectors.json'
+python -m basepack --config '<project-config>' embed --image '<absolute-image>' --caption '图片说明' --output '<project>/.basepack/image-vector.json'
+python -m basepack embedding --machine-config '<machine-config>' status
 ```
 
 多条输入可重复 `--text`，或用 `--inputs inputs.json` 传 UTF-8 JSON 数组，元素为字符串或 `{"text":"...","image":"<absolute-local-image>"}`。返回向量、模型/预处理身份、共享 PID 与输入回执。建库型批量输入和查询型单条输入使用同一客户端，不另起模型。
@@ -22,7 +22,7 @@ Python 可并发调用并只取消自己的请求：
 from basepack.project.config import load_project_config
 from basepack.embedding.client import EmbeddingClient
 
-client = EmbeddingClient(load_project_config("<absolute-project-config>"))
+client = EmbeddingClient(load_project_config("<absolute-project-config>").machine)
 result = client.embed(["text"], timeout=120, request_id="my-request")
 # 另一执行线程可调用 client.cancel("my-request")。
 client.close()  # 只取消该客户端仍活动的请求。

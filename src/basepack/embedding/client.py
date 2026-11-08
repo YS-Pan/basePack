@@ -4,21 +4,22 @@ from __future__ import annotations
 import threading
 import time
 import uuid
-import json
 
-from .transport import EmbeddingError, marker_path, read_marker, rpc
+from basepack.project.config import MachineConfig
+from .registry import marker_path, read_marker
+from .transport import EmbeddingError, rpc
 
 
 class EmbeddingClient:
-    def __init__(self, config):
-        self.machine = config.machine if hasattr(config, "machine") else config
+    def __init__(self, machine: MachineConfig):
+        self.machine = machine
         self._active = {}
         self._lock = threading.Lock()
 
-    def _broker(self):
+    def _supervisor(self):
         if not marker_path(self.machine, "broker").exists():
-            raise RuntimeError("embedding broker is not running; start python -m basepack.embedding.broker "
-                               f"--machine-config {self.machine.path} outside the Condor job tree")
+            raise RuntimeError("embedding supervisor is not running; start python -m basepack embedding "
+                               f"--machine-config {self.machine.path} serve outside the Condor job tree")
         return read_marker(self.machine, "broker")
 
     def embed(self, inputs, *, timeout=600, request_id=None, tokens_only=False):
@@ -32,7 +33,7 @@ class EmbeddingClient:
                 raise ValueError("duplicate active embedding request_id")
             self._active[request_id] = state
         try:
-            worker = rpc(self._broker(), "ensure", {"deadline": deadline}, timeout=timeout)
+            worker = rpc(self._supervisor(), "ensure", {"deadline": deadline}, timeout=timeout)
             with self._lock:
                 state["worker"] = worker
             if state["cancelled"].is_set():
@@ -62,14 +63,6 @@ class EmbeddingClient:
         with self._lock:
             requests = list(self._active)
         return [self.cancel(request_id) for request_id in requests]
-
-    def status(self):
-        return rpc(self._broker(), "status", timeout=5)
-
-    def stop_service(self):
-        """An explicit administrative action, independent of close/cancel."""
-        marker = json.loads(marker_path(self.machine, "broker").read_text(encoding="utf-8"))
-        return rpc(marker, "stop", timeout=5)
 
     def __enter__(self):
         return self

@@ -13,7 +13,7 @@ def test_duplicate_active_id_preserves_first_request(monkeypatch, cancel):
     client = EmbeddingClient(object())
     worker = {"endpoint": "fixture"}
     entered, release, cancelled = threading.Event(), threading.Event(), threading.Event()
-    monkeypatch.setattr(client, "_broker", lambda: {})
+    monkeypatch.setattr(client, "_supervisor", lambda: {})
 
     def exchange(marker, action, payload, **_):
         if action == "ensure":

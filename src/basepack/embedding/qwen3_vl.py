@@ -13,10 +13,8 @@ import os
 from pathlib import Path
 import time
 
-from .transport import model_identity, settings
+from .identity import DTYPE, INSTRUCTION, MIN_PIXELS, embedding_identity
 
-INSTRUCTION = "Represent the user's input."
-MIN_PIXELS = 4096
 MAX_IMAGE_BYTES = 32 * 1024 * 1024
 MAX_SOURCE_PIXELS = 40_000_000
 MAX_TEXT_BYTES = 64 * 1024
@@ -37,8 +35,8 @@ def normalize_input(value):
     return value
 
 
-class Runtime:
-    def __init__(self, machine):
+class Qwen3VLEmbedder:
+    def __init__(self, options: dict):
         import torch
         import torch.nn.functional as functional
         from PIL import Image
@@ -48,17 +46,17 @@ class Runtime:
 
         self.torch, self.functional, self.Image = torch, functional, Image
         self.vision_process = process_vision_info
-        self.options = settings(machine)
+        self.options = options
         self.device = torch.device(self.options["device"])
         if self.device.type != "cuda" or not torch.cuda.is_available():
             raise RuntimeError("embedding requires the configured CUDA device")
         torch.set_num_threads(self.options["cpu_threads"])
         torch.cuda.set_device(self.device)
         self.before = self.snapshot()
-        budget = machine.raw["embedding"]["gpu_memory_mib"] * 1024 * 1024
+        budget = self.options["gpu_memory_mib"] * 1024 * 1024
         torch.cuda.set_per_process_memory_fraction(budget / self.before["cuda_total_bytes"], self.device)
         torch.cuda.reset_peak_memory_stats(self.device)
-        root = machine.path_value("embedding", "model_root")
+        root = Path(self.options["model_root"])
         manifest = json.loads((root / "model.lock.json").read_text(encoding="utf-8"))
         if manifest["model"] != "Qwen/Qwen3-VL-Embedding-2B":
             raise ValueError("this runtime supports Qwen/Qwen3-VL-Embedding-2B")
@@ -86,13 +84,13 @@ class Runtime:
         self.processor = Qwen3VLProcessor.from_pretrained(root / "model", padding_side="right",
             local_files_only=True, trust_remote_code=False)
         self.model = Qwen3VLForEmbedding.from_pretrained(root / "model", local_files_only=True,
-            trust_remote_code=False, use_safetensors=True, dtype=torch.float16,
+            trust_remote_code=False, use_safetensors=True, dtype=getattr(torch, DTYPE),
             device_map={"": str(self.device)}, low_cpu_mem_usage=True, attn_implementation="sdpa")
         self.model.eval()
         self.model.config.use_cache = False
         torch.cuda.synchronize(self.device)
-        self.identity = model_identity(machine)
-        self.loaded = {"pid": os.getpid(), "model_identity": self.identity,
+        self.identity = embedding_identity(self.options)
+        self.loaded = {"pid": os.getpid(), "embedding_identity": self.identity,
             "model_load_seconds": time.perf_counter() - started, "load_count": 1,
             "actual_devices": sorted({str(p.device) for p in self.model.parameters()}),
             "actual_dtypes": sorted({str(p.dtype) for p in self.model.parameters() if p.is_floating_point()}),
@@ -109,7 +107,6 @@ class Runtime:
             "cuda_memory_scope": "torch.cuda.mem_get_info; WDDM can expose a process-local view"}
 
     def prepare(self, value):
-        value = normalize_input(value)
         content, receipt = [], None
         if "image" in value:
             path = Path(value["image"])
@@ -193,7 +190,7 @@ class Runtime:
             batch_vectors, batch_receipts = self.encode_batch(values[start:start + batch_size], tokens_only=tokens_only)
             vectors.extend(batch_vectors)
             receipts.extend(batch_receipts)
-        return {"pid": os.getpid(), "model_identity": self.identity, "inputs": receipts,
+        return {"pid": os.getpid(), "embedding_identity": self.identity, "inputs": receipts,
                 "vectors": vectors, "loaded": self.loaded}
 
     def close(self):

@@ -4,13 +4,13 @@
 
 ## 独立 embedding
 
-[embedding](../../../src/basepack/embedding/) 从旧 VL runtime 提取固定模型、严格图文预处理、归一化和内部批处理，使用本地权重及已有系统 Python。模型语义身份包含固定权重清单、FP16、预处理版本与输入上限；设备与代码身份进一步决定运行实例。
+[embedding](../../../src/basepack/embedding/) 的 qwen3_vl 模型实现接收模型/推理设置，完成严格图文预处理、归一化和内部批处理；不依赖 HTTP 或登记。identity 维护 embedding_identity：权重 revision/文件身份、FP16、指令、图像缩放及 pooling 合同决定向量语义；max_length、batch_size、线程、空闲时限与部署路径不改变此标识。
 
-机器级 broker 必须在 Condor 作业树之外启动。创建锁保证一个 broker；broker 按需创建并拥有一个模型 worker，机器共享目录保存 endpoint、锁与 stderr，不保存项目资料或向量。项目客户端只连接，多个项目的批量/查询请求进入同一内存队列。正常关闭客户端只取消自身请求。
+机器级 supervisor 必须在 Condor 作业树之外启动。registry 维护登记、锁和 deployment_fingerprint；transport 仅处理 JSON/HTTP、协议版本和原始远程错误。创建锁保证一个启动者；supervisor 按需创建并拥有一个模型 worker。登记物理路径仍为 broker.json/broker.lock，机器共享目录只保存 endpoint、锁与 stderr。EmbeddingClient 明确接收 MachineConfig，公开请求、取消和关闭；管理 status/stop 在 admin，机器 CLI 无需项目配置。
 
-worker 在线程接入层处理状态、取消与截止，单线程模型循环执行 forward。截止覆盖排队、加载与推理等待；在算 forward 可完成，但结果丢弃，后续内部批次不再执行。空闲边界卸载；broker 崩溃由 Windows Job Object 回收其 worker。异常原始类型、信息与 traceback 返回调用方，不自动重试推理。
+worker 在线程接入层处理状态、取消与截止，单线程模型循环执行 forward。截止覆盖排队、加载与推理等待；在算 forward 可完成，但结果丢弃，后续内部批次不再执行。空闲边界整进程退出；supervisor 崩溃由 WorkerProcessOwner 的 Windows Job Object 回收其 worker。异常原始类型、信息与 traceback 返回调用方，不自动重试推理。
 
-机器 TOML 的 `[embedding].gpu_memory_mib` 是模型分配器额度，也参与实例身份；独立 embedding 不依赖 Condor。修改运行代码或机器模型配置前，先用旧安装停止并确认旧服务退出；实例代码身份不一致时直接拒绝旧 endpoint。模型进程启动/失败与普通作业的生命周期独立。
+机器 TOML 的 `[embedding].gpu_memory_mib` 是模型分配器额度，也参与部署指纹；独立 embedding 不依赖 Condor。唯一显式服务文件清单和运行配置决定同代保护，进程启动时固定实际身份；管理员 status 可报告运行/磁盘目标差异，stop 使用旧 marker 的 endpoint/凭据停止旧实例。协议版本与语义身份均不替代部署校验，客户端仍受同代安装约束。模型进程启动/失败与普通作业的生命周期独立。
 
 ## 普通重任务
 

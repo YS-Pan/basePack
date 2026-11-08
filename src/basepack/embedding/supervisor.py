@@ -11,15 +11,17 @@ import threading
 import time
 
 from basepack.project.config import load_machine_config
-from .owned import OwnedJob, process_alive
-from .transport import (atomic_json, directory, instance_key, make_server, marker_path,
-                        read_marker, registry_lock, rpc)
+from .process_owner import WorkerProcessOwner, process_alive
+from .registry import (atomic_json, deployment_fingerprint, service_state_dir, marker_path,
+                       read_marker, registry_lock)
+from .transport import PROTOCOL_VERSION, make_server, rpc
 
 
 def serve(machine):
     if "_CONDOR_JOB_AD" in os.environ or "_CONDOR_SCRATCH_DIR" in os.environ:
-        raise RuntimeError("start the embedding broker outside the Condor job process tree")
-    home = directory(machine)
+        raise RuntimeError("start the embedding supervisor outside the Condor job process tree")
+    home = service_state_dir(machine)
+    fingerprint = deployment_fingerprint(machine)
     home.mkdir(parents=True, exist_ok=True)
     child = None
     mutex = threading.Lock()
@@ -37,13 +39,16 @@ def serve(machine):
             if time.time() >= deadline:
                 raise TimeoutError(f"embedding worker endpoint startup expired; pid={child.pid}; stderr: {home / 'worker.stderr.log'}")
             time.sleep(0.05)
-        return read_marker(machine, "worker")
+        marker = read_marker(machine, "worker")
+        if marker["deployment_fingerprint"] != fingerprint:
+            raise RuntimeError("embedding worker uses different code/configuration from its supervisor")
+        return marker
 
     def ensure(deadline):
         nonlocal child, starts, owned, worker_marker
         with mutex:
             if stopping.is_set():
-                raise RuntimeError("embedding broker is stopping")
+                raise RuntimeError("embedding supervisor is stopping")
             if child is not None and child.poll() is None:
                 if worker_marker is None:
                     worker_marker = await_endpoint(deadline)
@@ -75,7 +80,7 @@ def serve(machine):
                     creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
             starts += 1
             try:
-                owned = OwnedJob(child)
+                owned = WorkerProcessOwner(child)
             except OSError:
                 child.terminate()
                 child.wait()
@@ -97,19 +102,19 @@ def serve(machine):
                         # The worker may finish its idle shutdown between poll and RPC.
                         child.wait(timeout=1)
                         live = False
-            return {"broker_pid": os.getpid(), "worker_pid": child.pid if live else None,
-                    "worker_starts": starts, "service_key": instance_key(machine),
+            return {"supervisor_pid": os.getpid(), "worker_pid": child.pid if live else None,
+                    "worker_starts": starts, "deployment_fingerprint": fingerprint, "protocol_version": PROTOCOL_VERSION,
                     "worker": worker}
         if action == "stop":
             stopping.set()
-            return {"broker_pid": os.getpid(), "stopping": True}
-        raise ValueError(f"unknown broker action: {action}")
+            return {"supervisor_pid": os.getpid(), "stopping": True}
+        raise ValueError(f"unknown supervisor action: {action}")
 
     with registry_lock(home / "broker.lock"):
         auth = secrets.token_hex(32)
         server = make_server(auth, dispatch)
         marker = {"pid": os.getpid(), "port": server.server_address[1], "auth": auth,
-                  "service_key": instance_key(machine), "created_at": time.time()}
+                  "deployment_fingerprint": fingerprint, "protocol_version": PROTOCOL_VERSION, "created_at": time.time()}
         atomic_json(broker_path, marker)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         try:

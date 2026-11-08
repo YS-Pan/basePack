@@ -1,4 +1,4 @@
-"""Broker ownership of its model process, adapted from the old Qwen bridge."""
+"""Supervisor ownership of its model process, adapted from the old Qwen bridge."""
 import ctypes
 from ctypes import wintypes
 import os
@@ -29,7 +29,7 @@ def process_alive(pid):
         api.CloseHandle(handle)
 
 
-class OwnedJob:
+class WorkerProcessOwner:
     def __init__(self, process):
         self.handle = None
         if os.name != "nt":

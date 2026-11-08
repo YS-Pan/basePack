@@ -21,9 +21,13 @@ def main():
     from .resources.cli import register_commands as resource_commands
     resource_commands(sub)
     args = parser.parse_args()
+    exit_code = 0
     if args.command == "init":
         from .project.init import init_project
         result = {"project_config": str(init_project(args.project_root, args.machine_config, args.config_name))}
+    elif args.command == "embedding":
+        from .embedding.cli import dispatch
+        result, exit_code = dispatch(args)
     else:
         if not args.config:
             parser.error("--config is required for this action")
@@ -34,9 +38,9 @@ def main():
         elif args.command == "doctor":
             from .project.doctor import doctor
             result = doctor(config, args.facility)
-        elif args.command in ("embed", "embedding"):
+        elif args.command == "embed":
             from .embedding.cli import dispatch
-            result = dispatch(args, config)
+            result, exit_code = dispatch(args, config)
         elif args.command == "resources":
             from .resources.cli import handle
             result = handle(args, config)
@@ -46,7 +50,7 @@ def main():
             return 0 if result.get("success") and result.get("cleanup_confirmed") else 1
         if args.resource_action == "cancel":
             return 0 if result["cleanup_confirmed"] else 1
-    return 0
+    return exit_code
 
 
 if __name__ == "__main__":
