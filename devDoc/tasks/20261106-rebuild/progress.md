@@ -30,6 +30,6 @@
 
 ## 下一步
 
-1. 从 [资源 R9](../20261107-resource-coordination/plan.md#r9-复用优先的资源实现) 做模型与服务的最小验证，再按净删代码选择唯一路线；当前使用仍以 0.4.0 产品文档为准。
+1. 从 [资源 R9](../20261107-resource-coordination/plan.md#r9-复用优先的资源实现) 验证并落地用户确认的 Sentence Transformers＋LitServe＋Shawl；当前使用仍以 0.4.0 产品文档为准。
 2. 并行推进记忆 P0/P1，优先现成 CLI/MCP 与短 skill；P2 再核最终公开 embedding 接口，具体状态从 [记忆进度](../20261106-memory-system/progress.md) 接续。
 3. 文件结构和分层协作在实际任务中继续验证；联合发布按 [总览 P8](plan.md#p8-联合交付与轻量发布) 执行。
