@@ -28,7 +28,7 @@ R0–R7 已完成本机部署和真实验收，稳定安装仍为 0.3.0。R8 按
 | R8.0 | 源码完成 | JobSpec 局部规范化副本；锁内拒绝重复活动 request_id；全套 27 项回归通过 |
 | R8.1 | 源码完成 | project/ 唯一源码/模板、按需功能配置、.basepack/ 配置与指令；全套 34 项通过，构建包模板核验通过 |
 | R8.2 | 源码完成 | supervisor/模型/所有权及 transport/registry/identity/admin 拆分；全套 51 项通过，机器 CLI 轻量检查通过 |
-| R8.3 | 源码完成 | jobs/CondorClient、schema 2/[jobs]、submit/_processes 与单份 spec payload；全套 71 项通过 |
+| R8.3 | 源码完成 | jobs/CondorClient、schema 2/[jobs]、submit/_processes 与单份 spec payload；全套 74 项通过 |
 | R8.4 | 待实施 | 一次性配置/API 迁移、普通 wheel 源码外功能验收和交付说明 |
 
 R8.0 使用内存替身验证跨项目复用、失败不变性及重复 ID 的结果/取消/清理隔离；未启动模型或改变稳定安装。主 agent 全套检查：`PYTHONPATH=src python -m pytest -q --basetemp artifacts/r80-root-pytest`，27 passed。
@@ -46,6 +46,6 @@ R8.0 使用内存替身验证跨项目复用、失败不变性及重复 ID 的�
 
 R8.2 的 22 项 embedding 回归覆盖语义/运行身份、协议、旧 marker 管理、请求隔离、冷启动、空闲退出及 Windows supervisor 崩溃后 worker 回收与重启。机器 CLI 不加载项目配置或模型依赖；当时源码全套 51 passed（`artifacts/r82-root-pytest`），尚未部署。
 
-R8.3 项目 schema 2/[jobs] 已切换；wait 只观察，run 管理交互时限，原生 Condor 时限保留。37 项 jobs 回归覆盖 spec 不变性、单份 payload、复杂 argv/空参数、应用失败、标准字段、资源预检、提交不确定、空查询和取消回收；全套 71 passed（`artifacts/r83-root-pytest`）。
+R8.3 项目 schema 2/[jobs] 已切换；wait 只观察，run 管理交互时限，原生 Condor 时限保留。40 项 jobs 回归覆盖 spec 不变性、单份 payload、复杂 argv/空参数、应用失败、标准字段、资源预检、提交不确定、空查询和取消回收；全套 74 passed（`artifacts/r83-root-final-pytest`）。
 
 下一步 R8.4：普通 wheel、显式迁移、核实际调用者/队列，停止旧安装的服务后一次部署并做源码外真实验收。稳定安装仍为 0.3.0；站点容量、模型和机器 schema 保持当前合同，远端推送与发布不在本次范围。
