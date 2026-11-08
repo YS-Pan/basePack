@@ -18,6 +18,8 @@ worker 在线程接入层处理状态、取消与截止，单线程模型循环�
 
 机器 TOML 是资源预留的唯一来源，budget-config 生成 Condor 片段。所有提交核实际父 slot 的预算版本、显存预算及 CPU/RAM 总量；GPU 还要求声明 H 不超 B，requirements 固定本机和预算版本，request_gpus=1 使普通 GPU 任务彼此排队。embedding 的 E 始终保留，两链共享显存靠预算协作，不依赖整卡排他锁。
 
+自身 PyTorch allocator 指标与 CUDA device-view 指标分开命名；WDDM 下 CUDA free 不能代表全卡其他进程占用。外部 nvidia-smi 时间线才用于本版全卡峰值证据，动态 free 不参与准入。
+
 Windows submit 的字段分别编码，文件采用本机原生编码。实际探针表明 Condor 参数转换会丢失空参数，因此随包薄 worker 从 UTF-8 JSON 读取应用参数数组，再用系统进程 API 启动应用。worker 继承最终 starter 环境并保留 GPU 可见性，stdout/stderr 由 Condor 接管；它和应用后代均属于原生作业树。
 
 run 执行有界等待，排队/执行时限同时写入 Condor 原生策略；wait 的时限只结束观察。取消结果分别报告终态与 cleanup_confirmed，确认包含原生历史及已知本任务进程消失；撤销或确认失败保留原错误。完成退出码和显式回传产物只是机械检查，调用者仍核业务结果。

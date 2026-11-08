@@ -1,6 +1,7 @@
 """One submit, native queue/history state, bounded observation and confirmed cleanup."""
 
 from dataclasses import asdict, dataclass, field
+from datetime import datetime
 import hashlib
 import json
 import locale
@@ -94,7 +95,7 @@ class ResourceClient:
         return result
 
     def _ads(self, command, *args):
-        return json.loads(self._call(command, *args, "-json").stdout or "[]")
+        return json.loads(self._call(command, *args, "-json").stdout)
 
     def _ad(self, job_id):
         if not re.fullmatch(r"\d+\.\d+", job_id):
@@ -195,30 +196,33 @@ class ResourceClient:
             ad = matches[0]
             job_id = f'{ad["ClusterId"]}.{ad["ProcId"]}'
             metadata["submit_response_error"] = str(error)
+            if isinstance(error, subprocess.TimeoutExpired):
+                metadata["submit_response_error"] += f"\nstdout: {error.stdout!r}\nstderr: {error.stderr!r}"
         else:
             job_id = re.search(r"\d+\.\d+", result.stdout).group()
-        metadata["job_id"] = job_id
-        (folder / "submission.json").write_text(json.dumps({"job_id": job_id, "submission_id": token,
-                                                             "payload": str(payload)}, indent=2), encoding="utf-8")
+        submitted = {"job_id": job_id, "submission_id": token, "job_dir": str(folder), "payload": str(payload)}
+        if "submit_response_error" in metadata:
+            submitted["submit_response_error"] = metadata["submit_response_error"]
+        (folder / "submission.json").write_text(json.dumps(submitted, indent=2), encoding="utf-8")
         self._call("condor_reschedule")
-        return {"job_id": job_id, "submission_id": token, "job_dir": str(folder), "payload": str(payload)}
+        return submitted
 
     def status(self, job_id: str, *, analyze=False) -> dict:
         ad, history = self._ad(job_id)
         number = ad["JobStatus"]
         state = {1: "queued", 2: "running", 3: "removed", 4: "completed", 5: "held", 6: "transferring", 7: "suspended"}[number]
-        finished = ad.get("CompletionDate") or (ad.get("EnteredCurrentStatus") if history else None)
+        finished = _terminal_time(ad, self.encoding) if history else None
         started = ad.get("JobCurrentStartExecutingDate")
-        end = finished or time.time()
+        end = finished if history else time.time()
         result = {
             "job_id": job_id, "state": state, "terminal": history,
             "exit_code": ad.get("ExitCode"), "exit_signal": ad.get("ExitSignal"),
             "reason": ad.get("HoldReason") or ad.get("RemoveReason"),
             "submitted": ad["QDate"], "started": started,
             "finished": finished, "remote_host": ad.get("RemoteHost", ad.get("LastRemoteHost")),
-            "elapsed_seconds": max(0, end - ad["QDate"]),
-            "queued_seconds": max(0, (started or end) - ad["QDate"]),
-            "running_seconds": max(0, end - started) if started else 0,
+            "elapsed_seconds": max(0, end - ad["QDate"]) if end is not None else None,
+            "queued_seconds": max(0, (started or end) - ad["QDate"]) if started or end is not None else None,
+            "running_seconds": max(0, end - started) if started and end is not None else (None if started else 0),
             "stdout": ad.get("Out"), "stderr": ad.get("Err"), "event_log": ad.get("UserLog"),
         }
         if history and number == 4:
@@ -242,7 +246,6 @@ class ResourceClient:
         while True:
             ad, history = self._ad(job_id)
             payload_path = ad.get("BasePackPayload")
-            worker_gone = True
             if payload_path:
                 payload = json.loads(Path(payload_path).read_text(encoding="utf-8"))
                 receipt = Path(payload["worker_receipt"])
@@ -324,6 +327,22 @@ def _descendants(roots: set[int], parents: dict[int, int]) -> set[int]:
         if children <= found:
             return found
         found.update(children)
+
+
+def _terminal_time(ad: dict, encoding: str) -> int | None:
+    if ad.get("CompletionDate"):
+        return ad["CompletionDate"]
+    # Removed jobs can retain QDate as EnteredCurrentStatus. The native abort event
+    # records the removal time; process-family cleanup is confirmed separately.
+    log = Path(ad["UserLog"])
+    if not log.exists():
+        return None
+    timestamp = None
+    for match in re.finditer(r"^(?:005|009) \((\d+)\.(\d+)\.\d+\) (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)",
+                             log.read_text(encoding=encoding), re.MULTILINE):
+        if (int(match[1]), int(match[2])) == (ad["ClusterId"], ad["ProcId"]):
+            timestamp = int(datetime.fromisoformat(match[3]).timestamp())
+    return timestamp
 
 
 def _process_parents() -> dict[int, int]:

@@ -56,7 +56,7 @@ class Runtime:
         torch.cuda.set_device(self.device)
         self.before = self.snapshot()
         budget = machine.raw["budget"]["embedding_gpu_mib"] * 1024 * 1024
-        torch.cuda.set_per_process_memory_fraction(budget / self.before["whole_card_total_bytes"], self.device)
+        torch.cuda.set_per_process_memory_fraction(budget / self.before["cuda_total_bytes"], self.device)
         torch.cuda.reset_peak_memory_stats(self.device)
         root = machine.path_value("embedding", "model_root")
         manifest = json.loads((root / "model.lock.json").read_text(encoding="utf-8"))
@@ -105,7 +105,8 @@ class Runtime:
             "reserved_bytes": torch.cuda.memory_reserved(self.device),
             "peak_allocated_bytes": torch.cuda.max_memory_allocated(self.device),
             "peak_reserved_bytes": torch.cuda.max_memory_reserved(self.device),
-            "whole_card_free_bytes": free, "whole_card_total_bytes": total}
+            "cuda_free_bytes": free, "cuda_total_bytes": total,
+            "cuda_memory_scope": "torch.cuda.mem_get_info; WDDM can expose a process-local view"}
 
     def prepare(self, value):
         value = normalize_input(value)

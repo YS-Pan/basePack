@@ -4,6 +4,8 @@
 
 pytest 使用 `--basetemp artifacts/<batch>/pytest`，避免受限 Windows 临时目录 ACL。Condor 的 SSPI 查询在受限进程中会失败，同一显式配置命令在正常用户上下文通过；后续真实 Condor 验证用正常上下文，具体功能结果记录在资源任务。
 
+2026-11-08 R0–R4：复用 torch2.10.0+cu128、torchvision0.25.0+cu128、transformers5.22.1、qwen-vl-utils0.0.14、既有VL2B权重与Condor25.4.0。实际slot账户condor-slot1_1可加载系统包、访问权重/项目并连接作业外broker；普通任务不继承提交环境，保留Condor设备UUID。机器配置 `D:/AgentTools/basepack.toml` 派生 `C:/condor/config/60_basepack.conf`，执行端现为12CPU/24576MiB、单GPU普通预算5116MiB，hash5dd7fc9014b383e0。NUM_CPUS/MEMORY变更仅reconfig不足，实测peaceful重启startd才更新既有父slot。测量与功能证据见资源进度。
+
 观测时间：2026-11-06 23:34:19（北京时间，UTC 15:34:19）。这是当前开发进程的一次只读快照；仓库尚无依赖声明，最低兼容版本尚未确定。
 
 ## 实测入口与结果
@@ -45,12 +47,13 @@ pytest 使用 `--basetemp artifacts/<batch>/pytest`，避免受限 Windows 临�
 
 ## 项目 skill 的本机入口
 
-2026-11-07：以下两个 skill 使用项目级发现入口，通过 junction 指向仓库维护源，仅在本项目及子目录中自动发现；二者均无用户级注册，原 `~/.codex/skills/project-layouts` 联接已移除。[Codex 官方作用域说明](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) 区分项目级与用户级入口。
+2026-11-07 建立前两项，2026-11-08 新增 resources：以下 skill 使用项目级发现入口，通过 junction 指向仓库维护源，不作用户级注册。原 `~/.codex/skills/project-layouts` 联接已移除。[Codex 官方作用域说明](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) 区分项目级与用户级入口；下文11月7日的刷新回执只覆盖当时两项，resources本次核联接与skill静态校验。
 
 | Skill | 维护源 | 本机发现入口 |
 | --- | --- | --- |
 | `file-structure` | [SKILL.md](../../skills/file-structure/SKILL.md) | `.agents/skills/file-structure` |
 | `agent-team` | [SKILL.md](../../skills/agent-team/SKILL.md) | `.agents/skills/agent-team` |
+| `resources` | [SKILL.md](../../skills/resources/SKILL.md) | `.agents/skills/resources` |
 
 本机联接由 `.gitignore` 排除，不重复保存源码。仓库换路径或新检出时，如需在技能列表中自动发现，可从仓库根目录首次建立项目级入口：
 

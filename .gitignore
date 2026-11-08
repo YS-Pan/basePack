@@ -21,6 +21,7 @@ htmlcov/
 # Machine-local Codex discovery links; sources stay in skills/.
 /.agents/skills/file-structure/
 /.agents/skills/agent-team/
+/.agents/skills/resources/
 /models/
 /weights/
 *.db

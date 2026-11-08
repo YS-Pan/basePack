@@ -16,6 +16,8 @@
 
 2026-11-08 本机最大输入标定样例：T=16380 MiB，文本 batch4×2048 token 与 1024² 图片加文字共2048 token 的 allocator 峰约7786 MiB，整卡基线约1009 MiB、采样峰8937 MiB，进程 RSS 峰约2054 MiB。采用 E=9216 MiB、S=2048 MiB、B=5116 MiB。16 CPU/48349 MiB 的机器为 Condor 留 12 CPU/24576 MiB；初始 32768 MiB 在观察到桌面基线约20 GiB 后收紧。这是该模型、上限与机器的实测配置，采样整卡增量和 allocator reserved 都不等于精确进程显存。RAM 验收检查声明准入及排队，不把声明额度全部实际分配。
 
+回执中的 allocated/reserved/peak 是本进程 PyTorch allocator 指标；cuda_free_bytes/cuda_total_bytes 来自 CUDA，在 WDDM 下可能只反映进程视图。联合实测中 CUDA 报 free15233 MiB、同时 nvidia-smi 报全卡 free10607 MiB，因此全卡占用以外部 nvidia-smi 时间采样诊断，不能用 CUDA free 作两链准入依据。
+
 从项目入口生成派生配置：
 
 ```powershell
