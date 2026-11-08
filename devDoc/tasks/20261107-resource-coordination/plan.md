@@ -1,6 +1,6 @@
 # 计算资源协调实施计划
 
-当前下一步为 [R7：标准提交接口与Condor站点策略解耦](standard-submit-plan.md)，按本轮讨论将内部资源映射移到schedd JOB_TRANSFORM，客户端只使用官方提交字段。该方案待实施，现行部署仍为0.2.0；状态见 [进度](progress.md)。
+R0–R7 已完成，现行部署为 0.3.0，结果见 [R7 回执](standard-submit-result.md)。当前新增 [R8：项目局部文件统一目录](deployment-layout-plan.md#r8-项目局部文件统一目录)，计划将接入配置、详细操作指令及各类项目局部数据集中到 `.basepack/`；本批待实施，状态见 [进度](progress.md)。
 
 R0–R5 的原实施与验收保留如下。2026-11-08 用户要求普通容量直接由通用 HTCondor 节点维护、背景总预留 9 GiB、单 GPU 最多 4 个普通作业共享；该后续批次的设计、依据和验收见 [通用节点改造](native-condor.md)，状态见 [进度](progress.md)。
 
@@ -29,7 +29,7 @@ Windows Condor 接入另参考 [yadof 使用经验](research/yadof-condor.md)：
 
 embedding 自己管理实例、请求队列和批次，不提交为 Condor 作业，也不因普通重任务到来而默认卸载。普通 GPU 重任务先由 Condor 彼此串行；它们与 embedding 在显存预算容许时并行。首版先支持当前单机 Windows、一张 GPU，不引入多机或多个普通 GPU 作业的显存切分。
 
-共享服务沿用已有客户端、传输和 runtime；把 endpoint/实例注册移到机器共享运行目录，实例键由固定模型、版本、精度、预处理和设备等运行配置决定，不含项目路径。保留实例创建锁，取消跨两条链的整卡排他锁。项目资料、索引、向量和结果留在项目内，机器共享目录只保存必要运行配置与状态。具体目录与 agent 读取入口按 [安装与路径布局计划](deployment-layout-plan.md)：代码进系统 Python，项目 basepack.toml 引用机器配置，数据进项目 .basepack，模型与 Condor 外置。
+共享服务沿用已有客户端、传输和 runtime；把 endpoint/实例注册移到机器共享运行目录，实例键由固定模型、版本、精度、预处理和设备等运行配置决定，不含项目路径。保留实例创建锁，取消跨两条链的整卡排他锁。项目资料、索引、向量和结果留在项目内，机器共享目录只保存必要运行配置与状态。具体目录与 agent 读取入口按 [安装与路径布局计划](deployment-layout-plan.md)：代码进系统 Python，模型与 Condor 外置；R8 将项目配置统一到 `.basepack/config.toml`，详细入口与数据同属 `.basepack/`。以下 R0–R5 保留当时实施条件。
 
 共享服务的生命周期独立于任何普通作业。Windows Condor 会回收作业派生的进程，因此作业内的 embedding 客户端只连接共享服务；冷启动也交给作业树之外的机器级启动入口。R0 选定最小可行启动方式与运行账户，R4 验证取消作业后共享实例仍存活；不能直接沿用旧客户端的 spawn 方式。[Windows 作业生命周期](https://htcondor.readthedocs.io/en/25.0/platform-specific/microsoft-windows.html)
 
