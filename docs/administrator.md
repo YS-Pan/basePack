@@ -1,6 +1,6 @@
 # 机器部署与维护
 
-0.2.0 支持单机 Windows、单张 NVIDIA GPU。复用现有 Python 3.13、固定 Qwen3-VL-Embedding-2B 权重与 HTCondor；模型目录含 model.lock.json 与 model/。机器 TOML 维护路径及 embedding 设置，HTCondor 节点配置维护普通作业容量。随包机器模板由 `from basepack.setup import template` 读取，见 [项目接入](setup-project.md)。
+0.3.0 的部署范围为单机 Windows、单张 NVIDIA GPU。复用现有 Python 3.13、固定 Qwen3-VL-Embedding-2B 权重与 HTCondor；模型目录含 model.lock.json 与 model/。机器 TOML 维护路径及 embedding 设置，HTCondor 维护普通容量和提交策略。随包机器模板由 `from basepack.setup import template` 读取，见 [项目接入](setup-project.md)。实际部署与验收状态统一见 [资源进度](../devDoc/tasks/20261107-resource-coordination/progress.md)。
 
 ## 包与执行账户
 
@@ -12,32 +12,24 @@
 
 ## 通用 HTCondor 节点容量
 
-普通作业的 CPU、RAM、GPU 共享数与显存额度直接维护在 HTCondor 已加载的节点配置中。本机入口为 `C:/condor/condor_config`，资源片段为 `C:/condor/config/60_resources.conf`。basePack 只提交普通作业，不生成节点配置，也不要求专属属性或预算版本。
+普通作业的容量和站点策略只由 Condor 管理，运行时无需调用或导入 basePack。本机入口为 `C:/condor/condor_config`，加载以下两份配置；完整规则以样例文件为维护源：
 
-本机目标按用户指定为背景程序合计保留 9 GiB，剩余 `16380 - 9216 = 7164 MiB` 交给普通 GPU 作业，最多 4 个普通 GPU 作业共享同卡；背景包括 embedding 与桌面，不再重复扣除原先的 2 GiB。CPU/RAM 仍给 Condor 12 CPU/24576 MiB。实际部署与验收状态见 [资源进度](../devDoc/tasks/20261107-resource-coordination/progress.md)。其他机器先为常驻程序留足余量，再配置自己的容量。
+| 配置 | 维护职责 |
+| --- | --- |
+| [60_resources.conf](../examples/condor/60_resources.conf) | 执行节点 CPU/RAM、同卡共享名额、内部显存资源及 START 条件 |
+| [70_job_transforms.conf](../examples/condor/70_job_transforms.conf) | 提交节点 schedd 的原生 JOB_TRANSFORM 和提交拒绝规则 |
 
-本机核心配置示例如下：
+本机安装位置分别是 `C:/condor/config/60_resources.conf` 与 `C:/condor/config/70_job_transforms.conf`。保留管理员已有的 `JOB_TRANSFORM_NAMES`、`SUBMIT_REQUIREMENT_NAMES` 及原有匹配策略，按样例追加本站规则。额度只在 60 配置定义，70 引用该值；不要在提交端镜像额度。
 
-```ini
-NUM_CPUS = 12
-MEMORY = 24576
-RESERVED_MEMORY = 0
-use feature : GPUs
-GPU_DISCOVERY_EXTRA = -extra -repeat 4
-MACHINE_RESOURCE_GPUMemoryMiB = 7164
-if defined MACHINE_RESOURCE_NAMES
-  MACHINE_RESOURCE_NAMES = $(MACHINE_RESOURCE_NAMES), GPUMemoryMiB
-endif
-NUM_SLOTS = 1
-NUM_SLOTS_TYPE_1 = 1
-SLOT_TYPE_1 = 100%
-SLOT_TYPE_1_PARTITIONABLE = TRUE
-START = ($(START)) && (((TARGET.RequestGPUs ?: 0) <= 0) || ((TARGET.RequestGPUMemoryMiB ?: 0) > 0))
-```
+本机按用户指定为背景程序合计保留 9 GiB，剩余 `16380 - 9216 = 7164 MiB` 交给普通 GPU 作业，最多 4 个普通 GPU 作业共享同卡；背景包括 embedding 与桌面，不再重复扣除原先的 2 GiB。CPU/RAM 仍给 Condor 12 CPU/24576 MiB。4 个共享名额代表同一物理设备的令牌，不是 4 张卡。其他机器先为常驻程序留足余量，再配置自己的容量。
 
-若已有 `MACHINE_RESOURCE_NAMES`，将 `GPUMemoryMiB` 加入名单。`GPUMemoryMiB` 是管理员定义的通用消耗资源，单位约定为 MiB；它使用 HTCondor 原生的 [自定义资源机制](https://htcondor.readthedocs.io/en/25.x/admin-manual/ep-policy-configuration.html#dividing-system-resources-in-multi-core-machines)。`-repeat` 允许多个作业分到同一物理 GPU，显存申请总和由该资源记账；`-divide` 分的是整卡广告容量，不会先扣背景预留。[GPU 发现参数](https://htcondor.readthedocs.io/en/25.x/man-pages/condor_gpu_discovery.html)
+`GPUMemoryMiB` 是本站管理员定义的消耗资源，单位约定为 MiB，使用 HTCondor 原生 [自定义资源机制](https://htcondor.readthedocs.io/en/25.x/admin-manual/ep-policy-configuration.html#dividing-system-resources-in-multi-core-machines)。若已有 `MACHINE_RESOURCE_NAMES`，将该资源加入名单。`GPU_DISCOVERY_EXTRA` 的 `-repeat` 允许多个作业分到同一物理 GPU；`-divide` 分的是整卡广告容量，不会先扣背景预留。[GPU 发现参数](https://htcondor.readthedocs.io/en/25.x/man-pages/condor_gpu_discovery.html)
 
-GPU 作业同时填写 `request_gpus = 1` 和 `request_GPUMemoryMiB = <峰值>`；CPU 作业可不填显存。保留原有 START 条件，并要求申请 GPU 的作业声明正的 `RequestGPUMemoryMiB`。缺声明的 GPU 作业没有匹配节点，适配器外的 `condor_submit` 也遵守同一规则。资源记账按申报量工作，应用仍须限制实际峰值；它不提供显存硬隔离，也不承诺多作业吞吐一定提高。
+普通用户和 basePack 只提交官方 `request_gpus = 1` 与 `gpus_minimum_memory = <峰值> MB`。schedd 从标准作业属性 `GPUsMinMemory` 生成内部 `RequestGPUMemoryMiB`，并向原 `Requirements` 追加显存资源门槛。原 `RequireGPUs`、架构、系统和文件传输条件保留；CPU 作业不做 GPU 转换。内部资源改名只需同步调整 60/70 的资源定义、START、内部 Request 与匹配条件，客户端不需要修改。
+
+本站把 `gpus_minimum_memory` 额外作为显存预订量，接收提交时可解析的正数，`MB` 为 MiB、`GB` 为 GiB；内部整数资源用 `ceiling` 向上取整，避免小正数零记账。省略属性时预订整池、与其他 GPU 作业串行；显式 `undefined`、零、负值、依赖执行节点 `TARGET` 的动态表达式、超过整个普通池或申请多于 1 个 GPU，在提交阶段用官方参数名说明原因并拒绝。有效申请仅因剩余资源不足时排队。提交拒绝表达式在 `JOB`（作业）与 `SCHEDD`（schedd）命名空间求值。转换对本 schedd 的新提交作业统一生效，不按客户端身份区分，也不重写已有队列。[原生提交转换与拒绝规则](https://htcondor.readthedocs.io/en/25.x/admin-manual/ap-policy-configuration.html)
+
+官方 `gpus_minimum_memory` 仍是设备容量下限，`GlobalMemoryMb` 与 `RequireGPUs` 的设备筛选含义保持不变；累计预订来自本站规则。[官方提交字段](https://htcondor.readthedocs.io/en/25.x/man-pages/htcondor-jdl.html) 资源按申报量记账，应用仍须限制实际峰值；没有显存硬隔离或吞吐提升承诺。
 
 修改 CPU、slot 定义、GPU 共享数或消耗资源总量后，暂停新提交并排空作业，平稳重启 startd，再核实际发布容量。`reconfig` 不能重建已有 slot：
 
@@ -49,11 +41,22 @@ $env:CONDOR_CONFIG = '<native-condor-config>'
 python -m basepack --config '<project-config>' resources capacity
 ```
 
-父 slot 的 `TotalSlot*` 是总容量，`Cpus/Memory/GPUMemoryMiB` 是当前剩余量。单任务超过总容量可立即拒绝；总量容得下而剩余不足时交给 Condor 排队。保留本机需要的 START/SUSPEND/PREEMPT 与 starter 线程策略，核最终应用环境；父 slot 可以创建多个动态 slot。
+父 slot 的 `TotalSlot*` 是总容量，`Cpus/Memory/GPUMemoryMiB` 是当前剩余量。`resources capacity` 保留标准 `cpus/memory_mib/gpus` 键；其余 `MachineResources` 仅在总量与剩余数量均发布时按原名、原生单位展示，Windows 未发布数值的 `Swap` 会省略。basePack 只按标准 CPU/RAM 总容量提前准入；GPU 与站点额度由 Condor 决定。保留本机需要的 START/SUSPEND/PREEMPT 与 starter 线程策略，核最终应用环境；父 slot 可以创建多个动态 slot。
 
 embedding 自身的分配器额度由机器 TOML 的 `[embedding].gpu_memory_mib` 维护，独立服务不依赖 Condor。修改模型、输入上限或自身额度时重新标定背景峰值，随后调整节点供普通作业使用的容量。已有最大输入标定见 [资源结果](../devDoc/tasks/20261107-resource-coordination/result.md)；回执的 allocated/reserved/peak 是本进程 PyTorch 指标，WDDM 下 CUDA free 不代表全卡其他进程占用，全卡峰值使用外部 nvidia-smi 时间采样。动态 free 不参与准入。
 
-## 从 0.1.0 升级
+## 从 0.2.0 切换到标准提交
+
+1. 准备 0.3.0 普通 wheel 和候选 60/70 配置。暂停所有提交端的新作业与 embedding 请求，用正常认证上下文核队列并排空；备份 0.2.0 wheel、现行 Condor 配置和机器 TOML，备份放配置加载目录之外。
+2. 用旧安装执行 `embedding stop`，确认 broker/worker 已退出。升级所有项目使用的普通 wheel，核安装来源及执行账户可读性。
+3. 成对部署 60/70 并用 `condor_reconfig` 重载。容量与 slot 定义未变时无需重建 slot；若变更了这些定义，按上节排空并平稳重启 startd。核实际容量、已加载的转换和提交拒绝规则。
+4. 在普通作业树之外启动 broker，用原生 Condor 和 basePack 分别核标准字段转换、正确结果、排队与取消归还，再核 embedding 继续服务，确认后恢复提交。
+
+新规则只读取官方显存字段。旧 0.2.0 客户端仅发送内部申请，会被当成未申报而预订整池，切换期间不能混用。回滚同样暂停并排空、停止服务，成对恢复旧 wheel 与旧 Condor 配置（移除新增的 70），重载并核旧合同，再恢复 broker 和提交；不要只回滚一侧。
+
+`condor_submit -dry-run` 只核客户端解析，不执行服务器转换。验收须保存新作业的实际 ClassAd，核内部申请与追加条件同时存在，并核事件、业务结果和资源归还。小矩阵仅证明调度记账，不代表实际分配全部申报显存或测得吞吐性能。
+
+## 0.1.0 到 0.2.0 的历史迁移
 
 1. 暂停新请求和作业提交，排空普通作业。用旧安装执行 `embedding stop`，确认 broker/worker 已退出。
 2. 将机器 TOML 的 `[budget].embedding_gpu_mib` 迁为 `[embedding].gpu_memory_mib`，本机保留值为 `9216`；删除旧 `[budget]` 节及普通预算字段。

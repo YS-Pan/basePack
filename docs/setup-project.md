@@ -1,6 +1,6 @@
 # 项目接入
 
-机器管理员先按 [管理员说明](administrator.md) 选择共享 Python、普通安装 basePack wheel、配置通用 HTCondor 节点容量，并准备独立 embedding 的机器配置与作业外 broker。复用现有模型和 HTCondor；只运行普通任务时无需启动 embedding。机器模板来自安装包：
+机器管理员先按 [管理员说明](administrator.md) 选择共享 Python、普通安装 basePack wheel、配置 HTCondor 节点容量与提交策略，并准备独立 embedding 的机器配置与作业外 broker。复用现有模型和 HTCondor；只运行普通任务时无需启动 embedding。机器模板来自安装包：
 
 ```powershell
 python -c "from basepack.setup import template; print(template('machine.toml'))"

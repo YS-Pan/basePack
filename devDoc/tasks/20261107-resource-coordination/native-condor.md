@@ -2,7 +2,7 @@
 
 2026-11-08 后续批次，接续 [0.1.0 交付](result.md)。用户要求普通任务完全由 HTCondor 管理，basePack 作为普通提交客户端；背景总预留 9 GiB，剩余显存交给普通作业，单卡最多 4 项并行。本批不修改项目纲领。
 
-本页记录R6已部署状态；后续消除提交端对内部资源名依赖的 [R7计划](standard-submit-plan.md) 待实施，JOB_TRANSFORM尚未启用。
+本页保留 R6 / 0.2.0 的部署与验收条件。后续 R7 已切换为标准提交字段与 schedd JOB_TRANSFORM，现行状态见 [进度](progress.md)，新条件见 [R7 回执](standard-submit-result.md)。
 
 ## 职责与实现
 

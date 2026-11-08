@@ -100,17 +100,19 @@ class ResourceClient:
         local = [slot for slot in slots if slot["Machine"].lower() == machine.lower()]
         if not local:
             raise LookupError(f"Condor has no partitionable slot for {machine}")
-        resources = {"cpus": "Cpus", "memory_mib": "Memory", "gpus": "GPUs",
-                     "gpu_memory_mib": "GPUMemoryMiB"}
-        return {"machine": machine, "slots": [
-            {"name": slot["Name"],
-             "total": {key: slot["TotalSlot" + attribute] if key in ("cpus", "memory_mib")
-                       else slot.get("TotalSlot" + attribute, 0)
-                       for key, attribute in resources.items()},
-             "available": {key: slot[attribute] if key in ("cpus", "memory_mib")
-                           else slot.get(attribute, 0)
-                           for key, attribute in resources.items()}}
-            for slot in local]}
+        result = []
+        for slot in local:
+            resources = {"cpus": "Cpus", "memory_mib": "Memory", "gpus": "GPUs"}
+            resources.update({name: name for name in re.split(r"[\s,]+", slot["MachineResources"])
+                              if name and name.lower() not in ("cpus", "memory", "gpus")
+                              and name in slot and "TotalSlot" + name in slot})
+            result.append({
+                "name": slot["Name"],
+                "total": {key: slot.get("TotalSlot" + attribute, 0) if key == "gpus"
+                          else slot["TotalSlot" + attribute] for key, attribute in resources.items()},
+                "available": {key: slot.get(attribute, 0) if key == "gpus"
+                              else slot[attribute] for key, attribute in resources.items()}})
+        return {"machine": machine, "slots": result}
 
     def _admission(self, spec):
         for key in ("cpus", "memory_mib", "disk_mib", "queue_timeout", "run_timeout"):
@@ -122,8 +124,6 @@ class ResourceClient:
         if shutil.disk_usage(cwd).free < spec.disk_mib * 1024**2:
             raise ValueError(f"Insufficient project output disk space at {cwd}")
         requested = {"cpus": spec.cpus, "memory_mib": spec.memory_mib}
-        if spec.gpu_memory_mib:
-            requested.update(gpus=1, gpu_memory_mib=spec.gpu_memory_mib)
         capacity = self.capacity()
         if not any(all(slot["total"][key] >= amount for key, amount in requested.items())
                    for slot in capacity["slots"]):
@@ -170,7 +170,7 @@ class ResourceClient:
             f"should_transfer_files = {'YES' if transfer else 'NO'}",
         ]
         if spec.gpu_memory_mib:
-            lines.append(f"request_GPUMemoryMiB = {spec.gpu_memory_mib}")
+            lines.append(f"gpus_minimum_memory = {spec.gpu_memory_mib} MB")
         if transfer:
             inputs = [str(payload), *[str((cwd / path).resolve()) for path in spec.transfer_inputs]]
             for output in spec.transfer_outputs:

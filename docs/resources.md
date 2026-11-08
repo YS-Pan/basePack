@@ -50,11 +50,20 @@ python -m basepack --config '<project-config>' resources capacity
 python -m basepack --config '<project-config>' resources run --spec '<project>/job.json'
 ```
 
-`capacity` 只读查询本机父 slot 的总容量与当前剩余量，来源是 HTCondor 实际发布的资源。`run` 返回 job ID、终态、应用退出码及 stdout/stderr/event log 定位；应用失败、超时或未确认回收时 CLI 退出 1，原始应用退出码保留在 JSON。检查实际产物内容，应用退出 0 只说明正常退出。单任务 CPU/RAM/GPU 超节点总容量立即拒绝；单任务可容纳而剩余额度不足时交给 Condor 排队。轻任务可直接运行，无需全部接入。
+`capacity` 只读查询本机父 slot 的总容量与当前剩余量，来源是 HTCondor 实际发布的资源。`cpus`、`memory_mib`、`gpus` 为标准键；`MachineResources` 中其余资源在总量和剩余数量均有发布时，按原名和原生单位展示。本机 `gpus` 表示同卡共享名额。客户端按标准总容量核 CPU/RAM，GPU 申请由 Condor 站点策略判断，当前资源不足时排队。`run` 返回 job ID、终态、应用退出码及 stdout/stderr/event log 定位；应用失败、超时或未确认回收时 CLI 退出 1，原始应用退出码保留在 JSON。检查实际产物内容，应用退出 0 只说明正常退出。轻任务可直接运行，无需全部接入。
 
-`memory_mib`、`disk_mib`、`gpu_memory_mib` 均用 MiB；disk 是执行 scratch 需求，提交前也查项目输出盘容量。GPU 任务增加正的 `gpu_memory_mib`，声明整个应用进程树的峰值，含 CUDA context、框架缓存和 workspace，并自行限制预分配。适配器将它转换为原生 `request_gpus = 1` 与 `request_GPUMemoryMiB = <峰值>`。节点可允许多个作业共享同卡，Condor 按显存申请量之和及其他剩余资源准入；不满足时排队。声明额度不等于驱动硬隔离，也不保证多作业加速。保留 Condor 分配的 CUDA_VISIBLE_DEVICES。
+`memory_mib`、`disk_mib`、`gpu_memory_mib` 均用 MiB；disk 是执行 scratch 需求，提交前也查项目输出盘容量。GPU 任务增加正的 `gpu_memory_mib`，声明整个应用进程树的峰值，含 CUDA context、框架缓存和 workspace，并自行限制预分配。适配器只将它转换为官方 `request_gpus = 1` 与 `gpus_minimum_memory = <峰值> MB`。Condor 按本站点策略预订显存，并在名额和显存均足够时安排同卡共享。声明额度不等于驱动硬隔离，也不保证多作业加速。保留 Condor 分配的 CUDA_VISIBLE_DEVICES。
 
-各项目共用同一套通用节点配置；直接使用 `condor_submit` 也填写上述 GPU 和显存申请。`GPUMemoryMiB` 是节点定义的通用消耗资源；官方 `gpus_minimum_memory` 只筛选 GPU 的广告容量，不能替代显存总额记账。节点配置及背景预留由 [管理员](administrator.md#通用-htcondor-节点容量) 维护。
+原生 Condor 用户无需安装 basePack，也使用相同官方字段，例如向自己的 submit 文件添加：
+
+```ini
+request_gpus = 1
+gpus_minimum_memory = 3000 MB
+```
+
+`gpus_minimum_memory` 的官方含义仍是设备显存容量下限，原有 `requirements` 和 `require_gpus` 筛选继续生效。本站点额外把它作为作业的显存预订量，由提交节点统一转换；其他 Condor 站点是否采用此约定由当地管理员决定。原生申报须在提交时解析为正数，官方单位 `MB` 表示 MiB、`GB` 表示 GiB，预订量向上取整到整 MiB。依赖执行节点 `TARGET` 的动态表达式不支持。
+
+本站申请 GPU 而省略显存时预订整个普通池，与其他 GPU 作业串行；显式 `undefined`、零、负值、不支持的表达式、超过全池或 `request_gpus > 1` 在提交时拒绝，错误使用官方参数名。资源暂时不足的有效申请排队。节点策略及背景预留由 [管理员](administrator.md#通用-htcondor-节点容量) 维护。
 
 可用 `environment` 传显式环境。入口按 cpus 提供常用框架线程变量，但 starter 仍可能注入其他线程限制；worker 继承其最终值并记录，应用并行参数由调用者自行设置。Windows 中文、空格、引号与空参数经 UTF-8 任务文件交给随包薄 worker，避免参数数组经过 submit 的有损转换。
 

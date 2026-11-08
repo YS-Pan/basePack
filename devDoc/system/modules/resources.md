@@ -16,9 +16,11 @@ worker 在线程接入层处理状态、取消与截止，单线程模型循环�
 
 [resources](../../../src/basepack/resources/) 提供 JobSpec 与 run/submit/status/wait/cancel。任务参数和日志留在项目 jobs_dir；队列、事件和历史由 Condor 维护。每次提交使用唯一标识，响应不确定时按标识查询原生队列/历史，不重复提交。
 
-普通作业容量由通用 HTCondor 节点配置维护，basePack 是普通提交客户端。`capacity` 读取本机实际父 slot 的总容量与剩余资源；准入按 `TotalSlot*` 判断单任务能否容纳，当前不足交给原生队列。GPU 作业将声明峰值转换为 `request_GPUMemoryMiB`，同时申请一个 GPU；节点用重复 GPU 分配令牌允许同卡共享，用通用自定义资源 `GPUMemoryMiB` 对显存申请量之和记账。节点 START 要求所有 GPU 作业申报显存，直接使用原生客户端也遵守该规则。项目 TOML 不镜像普通额度，不存在专属预算发布或 hash 匹配。
+普通作业容量与策略由 HTCondor 维护，basePack 是标准提交客户端。`capacity` 读取实际父 slot 的总量和剩余量：标准 CPU/RAM/GPU 对应 `cpus/memory_mib/gpus`，其余 `MachineResources` 仅在总量和剩余数量均有发布时按原名、原生单位展示。客户端只按 `TotalSlotCpus/TotalSlotMemory` 判断 CPU/RAM 能否容纳，GPU 与内部额度的拒绝和排队交给 Condor；当前剩余不足不触发客户端拒绝。项目 TOML 不镜像普通额度，也没有专属预算发布或 hash 匹配。
 
-背景与普通作业共享物理 GPU，通过管理员固定预留协调；应用按声明限制实际峰值。GPU 共享和资源记账不提供显存硬隔离，也不承诺更高吞吐；本机配置与真实联合验收见下方进度入口。
+GPU JobSpec 的 `gpu_memory_mib` 只生成官方 `request_gpus = 1` 与 `gpus_minimum_memory = <峰值> MB`。提交 schedd 的原生 JOB_TRANSFORM 按站点配置生成内部显存申请并追加资源匹配门槛，保留原 Requirements、RequireGPUs 和硬件筛选含义；资源名和数值不进入客户端实现。CPU 作业不做 GPU 转换。本站省略原生显存声明时预订全池，非法、超池和多 GPU 申请由提交规则拒绝，用户错误引用官方参数名。规则对所有标准提交端一致，配置见 [管理员说明](../../../docs/administrator.md)。
+
+背景与普通作业共享物理 GPU，通过管理员固定预留协调；本机 GPU 数量代表同卡共享令牌，应用按声明限制实际峰值。GPU 共享和资源记账不提供显存硬隔离，也不承诺更高吞吐；部署及真实联合验收状态见下方进度入口。
 
 自身 PyTorch allocator 指标与 CUDA device-view 指标分开命名；WDDM 下 CUDA free 不能代表全卡其他进程占用。外部 nvidia-smi 时间线才用于本版全卡峰值证据，动态 free 不参与准入。
 

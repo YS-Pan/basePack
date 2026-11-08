@@ -1,6 +1,6 @@
 # R7：标准提交接口与 Condor 站点策略解耦
 
-2026-11-08，待实施。本轮只编制计划；当前部署仍为 [R6 / 0.2.0](native-condor.md)，尚未启用 JOB_TRANSFORM。执行状态统一维护在 [进度](progress.md)，原 R0–R5 计划保留在 [原计划](plan.md)。
+2026-11-08，R7.0–R7.4 已完成：0.3.0 普通 wheel 与 schedd JOB_TRANSFORM 已部署，原生调度及联合 embedding 真实验收通过。实际结果见 [R7 回执](standard-submit-result.md)，执行状态统一维护在 [进度](progress.md)，原 R0–R5 计划保留在 [原计划](plan.md)。
 
 ## 目标与既定约束
 
@@ -28,7 +28,7 @@ gpus_minimum_memory = 3000 MB
 
 官方 `gpus_minimum_memory` 仍表示设备容量下限；本站点额外将其作为作业的显存预订量。这是机器使用约定，不宣称该字段原生提供显存累计配额。原 `GlobalMemoryMb`、`RequireGPUs` 和其他匹配条件保留原义。
 
-以下为本计划建议采用的站点策略，其中未申报时占满池、非法值拒绝等细节尚未部署，并非此前已验收的行为：
+以下为本计划确定的站点策略，实施结果与检查范围以 [R7 回执](standard-submit-result.md) 为准；不追溯改变 R0–R6 的历史条件：
 
 | 输入 | 处理 |
 | --- | --- |
@@ -98,4 +98,4 @@ R7.0确认合同后，Condor策略与客户端改造可分工并行，由主agen
 - [schedd提交转换与拒绝规则](https://htcondor.readthedocs.io/en/25.x/admin-manual/ap-policy-configuration.html)：服务器在提交时修改作业描述，规则按顺序应用。
 - [转换语言](https://htcondor.readthedocs.io/en/25.x/classads/transforms.html)与[离线工具](https://htcondor.readthedocs.io/en/25.x/man-pages/condor_transform_ads.html)：SET/EVALSET、原属性引用与检查。
 - [官方提交字段](https://htcondor.readthedocs.io/en/25.x/man-pages/htcondor-jdl.html)：request_gpus、gpus_minimum_memory及其设备筛选含义。
-- [当前模块](../../system/modules/resources.md)、[管理员说明](../../../docs/administrator.md)和[R6回执](native-condor.md)是实施基线；本计划不代表JOB_TRANSFORM已启用。
+- [当前模块](../../system/modules/resources.md)与[管理员说明](../../../docs/administrator.md)维护现行行为，[R6回执](native-condor.md)保留实施基线；实际JOB_TRANSFORM启用与验收证据见[R7回执](standard-submit-result.md)。
