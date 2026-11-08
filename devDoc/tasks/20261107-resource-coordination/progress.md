@@ -4,41 +4,44 @@
 
 ## 当前阶段
 
-**R0–R7 已完成本机部署及真实验收。** 当前普通 wheel 为0.3.0，用户与basePack只提交官方GPU字段，由schedd原生JOB_TRANSFORM统一生成站点内部显存申请；普通容量仍由通用Condor节点维护。独立embedding按请求加载。现行结果见 [标准提交交付](standard-submit-result.md)，R6与R0–R5条件分别保留在 [通用节点改造](native-condor.md) 和 [历史交付](result.md)，使用者从 [项目接入](../../../docs/setup-project.md) 开始。
+R0–R7 已完成本机部署和真实验收，最后交付为 0.3.0。R8 已按本轮讨论整理为 [维护计划](plan.md)，配置/源码/实例位置以 [部署合同](deployment-layout-plan.md) 为目标；以下所有 R8 实现、改名、迁移和验收均待进行。本轮只维护文档，现行命令和导入仍按 0.3.0 [使用说明](../../../docs/setup-project.md)。
 
-[R7计划](standard-submit-plan.md) 的R7.0–R7.4均已完成。背景9GiB、7164MiB普通池与4个同卡作业上限保持；未申报显存预订整池、非法值/超池/多GPU提交拒绝、原筛选保留及CPU独立运行均已验收。
-
-本目录按用户指定保留为资源工具的维护入口；记忆检索、建图和数据库由 [独立任务](../20261106-memory-system/plan.md) 接续。
-
-新增 [R8 项目局部文件统一目录](deployment-layout-plan.md#r8-项目局部文件统一目录)：已按用户澄清更新计划，源码侧将配置、初始化、诊断及模板集中到 `src/basepack/project/`，业务侧使用 `.basepack/config.toml`、详细操作指令及局部数据统一收拢；源码归组、实现、模板、现有项目迁移和普通 wheel 验收均待进行。当前 0.3.0 仍使用原源码位置、默认写根 `basepack.toml`，现行使用说明继续适用。
+记忆检索、建图和数据库尚未交付，由 [独立任务](../20261106-memory-system/plan.md) 接续。记忆 P0 的底座比较与资料准备可以并行，不等待全部作业改名。
 
 ## 已交付
 
-| 批次 | 实际完成 |
+| 批次 | 完成范围与证据 |
 | --- | --- |
-| R0 | Python 包、统一配置、随包模板、init/config show/按设施 doctor；系统 editable 新进程与最小普通 wheel；现有模型/Condor、slot 账户、中文路径、CPU/GPU 真结果及预算标定 |
-| R1 | 作业外 broker 拥有单模型 worker，跨项目冷请求共实例，图文与批次有效；请求取消/截止隔离，空闲、worker/broker 崩溃与重启真实通过 |
-| R2 | run/submit/status/wait/cancel，分字段编码、UTF-8 参数数组、明确单位/回传；实际预算核对、原生/客户端时限、held/失败诊断及回收确认 |
-| R3 | 两种 GPU 启动顺序均有真实重叠进展；第二普通 GPU 排队，CPU/RAM 声明准入、并行/队列及超额拒绝通过 |
-| R4 | 作业内冷请求后取消作业，共享模型及另一项目继续；父子孙进程和异常退出回收、请求局部取消/截止、空闲/崩溃回归通过 |
-| R5 | 普通 wheel 安装到系统 site-packages；源码外两项目、移动项目、新检出、图文/Condor 调用及最终 GPU 并行通过；使用/管理员文档、示例及 resources skill 已交付 |
-| R6 | 普通容量迁至通用Condor配置；4个同卡GPU名额与7164MiB申报额度原生记账，容量查询、排队、GPU声明要求与CPU独立运行实测通过；0.2.0普通wheel及最大embedding联合验收 |
-| R7 | 标准GPU提交与schedd站点映射解耦；通用capacity、原生转换/拒绝、4+1同卡排队、显存不足、默认整池、CPU、取消及embedding联合实测通过；0.3.0普通wheel与成对升级/回滚说明已交付 |
+| R0 | 包、配置、模板、init/config show/doctor，editable/普通 wheel 与设施探针，见 [R0–R5 结果](result.md) |
+| R1 | 跨项目共享模型、请求取消/截止、空闲与故障生命周期，见 R0–R5 结果 |
+| R2 | Condor 提交/状态/等待/取消、UTF-8 参数桥接，见 R0–R5 结果 |
+| R3 | embedding 与普通 GPU 任务联合运行及资源准入，见 R0–R5 结果 |
+| R4 | 作业树、共享服务隔离和清理故障回归，见 R0–R5 结果 |
+| R5 | 普通 wheel 源码外两项目、移动、新检出及联合验收，使用文档和 resources skill，见 R0–R5 结果 |
+| R6 | 通用节点容量、4 个同卡名额与 7164 MiB 普通显存记账，0.2.0 验收见 [结果](native-condor.md) |
+| R7 | 官方 GPU 提交字段、schedd 原生转换/拒绝和原筛选保留，0.3.0 验收见 [结果](standard-submit-result.md) |
 
-## 当前部署与检查
+## R8 状态
 
-- 普通容量唯一来源：`C:/condor/config/60_resources.conf`。实际父slot为12 CPU/24576 MiB RAM、4个同卡GPU名额、7164MiB显存；背景总预留9216MiB，不再额外扣原2048MiB。`70_job_transforms.conf`在同一主配置加载，按官方属性转换新提交作业并追加原匹配条件；CPU不转换。
-- 系统Python仍为 `C:/Program Files/Python313/python.exe`；0.3.0普通包在其 `Lib/site-packages/basepack`。机器TOML只维护路径与embedding自身设置，额度为 `[embedding].gpu_memory_mib=9216`。
-- 独立交互用户broker43200在作业树外运行，无模型驻留；测试worker21732、broker18524与升级前broker8060已退出。不是登录自启服务，机器重启后按管理员说明启动。
-- 当前wheel为 `dist/basepack-0.3.0-py3-none-any.whl`，35193 B，SHA256 `ee19d7ec94be4abc933f58854b62c5129ebf2763db6d42cd95033f40df4ee26a`；22份代码/模板/许可与源码和系统安装一致，源码与源码外普通wheel回归均22项通过。旧wheel与成对回滚备份保留。
-- 原生14319/14320用官方字段完成正确CUDA计算；14322–14325四项同卡进展共同重叠16.163秒，14326因令牌用完排队后执行。5000+3000在尚有令牌时因显存不足排队；缺显存14329自动预订全池，CPU14331正常，取消后排队GPU恢复。原筛选及非法申报拒绝通过。
-- 普通客户端14332–14334从源码外调用安装包；4×2048 token向量正确，推理期间6个GPU正确进展点，取消后同一共享worker继续。所有测试作业已清理，队列为空、资源全部归还，临时提交闸门已移除。
-- R7证据在 `artifacts/standard-submit/`，完整结论见 [R7回执](standard-submit-result.md)。离线工具退出1的源代码原因已查清并留回归，真实服务器规则另行验收；SSPI原错保留且未改认证政策。R6证据仍在 `artifacts/native-condor/`，历史时限与R0–R5测量范围见 [原始结果](result.md)。
+| 阶段 | 状态 | 下一项交付 |
+| --- | --- | --- |
+| R8.0 | 待实施 | 修复 JobSpec 原地修改和重复活动 request_id，保留对应回归 |
+| R8.1 | 待实施 | project/ 源码归组、轻量配置作用域与 .basepack/ 实例目录 |
+| R8.2 | 待实施 | embedding 职责拆分、管理入口与身份合同 |
+| R8.3 | 待实施 | jobs/CondorClient、CLI/TOML 命名和提交/进程职责整理 |
+| R8.4 | 待实施 | 一次性配置/API 迁移、普通 wheel 源码外功能验收和交付说明 |
 
-## 后续边界
+本轮只读审查已用内存替身复现 R8.0 的两项问题；没有把修复、回归或新合同记为完成。详细验收条件只在计划维护。
 
-R0–R7无未完成交付项。声明额度是合作约束，小矩阵验证调度记账，不提供显存硬隔离或吞吐结论；Python原生提交经subprocess调用官方CLI，现有cp39绑定不适配系统3.13，未宣称bindings API验收。当前仅核本机Windows、单NVIDIA GPU和固定VL2B配置，没有实施记忆数据库、自动重试、多机调度或远端发布。模型、输入上限或背景峰值变更先排空、重标定，再调整通用Condor节点容量。
+## 0.3.0 交付快照
+
+以下沿用 R7 回执，不是本轮重新查询的服务/队列状态；实施升级前须核实际在途工作和运行实例。
+
+- Condor 的 60_resources.conf 维护 12 CPU、24576 MiB RAM、4 个同卡名额和 7164 MiB 普通池；70_job_transforms.conf 维护标准字段转换。背景预留为 9216 MiB，机器 TOML 维护 embedding 自身设置。
+- 系统 Python 为 C:/Program Files/Python313/python.exe，普通包在其 Lib/site-packages/basepack。0.3.0 wheel 为 dist/basepack-0.3.0-py3-none-any.whl，SHA256 为 ee19d7ec94be4abc933f58854b62c5129ebf2763db6d42cd95033f40df4ee26a；22 份代码/模板/许可一致，源码与源码外回归各 22 项通过。
+- R7 原生 14319–14331 和普通客户端 14332–14334 的调度、CUDA 结果、图文 embedding、取消及资源归还通过。回执最终队列为空，独立 broker 43200 无模型驻留，测试 worker 21732 已退出；服务不是登录自启。
+- 原始材料为 artifacts/standard-submit/；R6 为 artifacts/native-condor/。历史时限、测量和合作声明边界见各结果，不据小矩阵、声明额度或测试数量推断显存硬隔离和吞吐。
 
 ## 下一步
 
-按 R8 完成项目接入源码归组与导入/包数据调整、初始化/模板调整、旧实例迁移和源码外普通 wheel 验收，再更新产品与系统文档；本次计划修改不作为实现或部署完成。记忆任务复用同一布局合同。
+执行 R8.0 → R8.1；公共配置明确后，R8.2 与 R8.3 可分工并行，最后在 R8.4 一次部署验收。站点容量、模型和机器 schema 保持当前合同。实际改动落地时才更新 README、产品/系统说明、示例及 skills；远端发布按用户指令执行。

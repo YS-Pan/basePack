@@ -1,129 +1,125 @@
-# 计算资源协调实施计划
+# 公共包与资源协调维护计划
 
-R0–R7 已完成，现行部署为 0.3.0，结果见 [R7 回执](standard-submit-result.md)。当前新增 [R8：项目局部文件统一目录](deployment-layout-plan.md#r8-项目局部文件统一目录)，项目接入源码和模板归到 `src/basepack/project/`，生成到业务项目的配置、详细操作指令及局部数据集中到 `.basepack/`；本批待实施，状态见 [进度](progress.md)。
+更新：2026 年 11 月 8 日。R0–R7 已交付，本轮将架构评审、命名和两侧目录要求收敛为 R8 待实施计划。现行版本仍为 0.3.0；本轮只维护文档，未修复代码、移动文件或升级部署。实际状态只维护在 [进度](progress.md)，源码/实例布局及安装迁移只维护在 [部署合同](deployment-layout-plan.md)。
 
-R0–R5 的原实施与验收保留如下。2026-11-08 用户要求普通容量直接由通用 HTCondor 节点维护、背景总预留 9 GiB、单 GPU 最多 4 个普通作业共享；该后续批次的设计、依据和验收见 [通用节点改造](native-condor.md)，状态见 [进度](progress.md)。
+目标以 [项目纲领](../../project-charter.md) 为准。当前先完成这次公共工具维护，再继续 [记忆 P0–P5](../20261106-memory-system/plan.md)；底座比较和小资料集准备可并行，不以全部改名完成为前提。
 
-2026 年 11 月 7 日按现行纲领、部署布局及近期提交重新评估。下一阶段先做资源协调，独立于记忆系统交付；保留独立 embedding 服务与 HTCondor 两条链，以固定显存预留支持并行。目标依据为 [项目纲领](../../project-charter.md#资源协调系统)，用户要求见 [原规划聊天](codex://threads/01a1b435-4d35-7e31-943e-3ff66fc2cad6)，复用证据见 [旧实现专项核对](research/legacy-implementation.md)，路径合同见 [部署计划](deployment-layout-plan.md)。状态统一记在 [工作进度](progress.md)，接口名和具体预算仍是工程建议。
+## 保留的边界
 
-本任务负责资源 R0–R5 及先行交付的公共包/配置和共享 embedding；[记忆任务](../20261106-memory-system/plan.md) 只引用这些接口，独立维护检索、索引、图和应用效果验收。跨工具顺序与发布条件见 [重建总览](../20261106-rebuild/plan.md)。
+- 项目知识、索引、输入引用和作业材料属于各自项目；系统 Python、模型、机器配置和服务状态共享，Condor 独立安装。
+- embedding 由作业树外轻量启动者拥有一个模型 worker；客户端直接请求 worker。worker 按需加载、空闲整进程退出，请求取消不杀共享模型，Windows Job Object 保证所有权。
+- Condor 是普通作业的容量、队列、终态及 GPU 策略权威。作业客户端只生成标准申请、观察状态和确认回收；embedding 与作业模块相互独立。
+- 保留延迟导入模型依赖、原始错误、UTF-8 参数 worker、提交不确定时只查询不重投、成功空查询处理和必要故障回归。CPU/RAM 预检只读实际总量；原生时限与 run 的交互时限均保留，依据见 [历史验收](result.md#预算修复与边界)。
+- 当前统一 wheel 与同代代码/配置校验继续使用。先做职责和配置解耦；独立客户端发行版、跨版本服务兼容、通用后端/插件和统一进程框架留待真实需求，不扩大本批。
 
-## 已有能力与实际缺口
+## R8 设计决定
 
-本节保留 11 月 7 日实施前基线；11 月 8 日开始的交付与真实功能验收统一见 [进度](progress.md) 和 [资源模块](../../system/modules/resources.md)。
+### 命名与公共接口
 
-本仓库尚未交付运行工具，但旧项目已实现多模态模型加载、文本/图片预处理、向量归一化、批处理、loopback 服务、短时热复用、超时和 owned 进程清理，并有真实 GPU 回执；这些应提取和改造，不从零再写。
+以下为本批拟实施的名称，当前实现尚未切换；路径映射和完整目标树见部署合同。
 
-旧服务是项目局部复用，查询默认使用，建库却另起 owned worker；还沿用整卡文件锁和启动空闲至少 13 GiB 等门槛。真正待补的是跨项目同模型单实例、建库与查询共用服务、独立 GPU 工作负载的显存预算，以及普通重任务的统一 Condor 入口和完整生命周期。已有模型、共享 Python 与 Condor 部署优先复用；旧索引、业务授权和任务状态各自保留。
-
-Windows Condor 接入另参考 [yadof 使用经验](research/yadof-condor.md)：实际线程环境、submit 字段引用、资源单位、slot、输出回传与时限均有事故依据。仅提取适用机制和探针，不照搬其多机账户政策、HFSS 专属配置或任务重试状态机。
-
-## 两条独立运行链
-
-```text
-项目 A / 项目 B
-  ├─ embed ── 机器共享 embedding 服务 ── 已加载模型
-  └─ run   ── HTCondor ──────────────── 普通 GPU / CPU 重任务
-                   同一物理 GPU 可同时运行两类工作
-```
-
-embedding 自己管理实例、请求队列和批次，不提交为 Condor 作业，也不因普通重任务到来而默认卸载。普通 GPU 重任务先由 Condor 彼此串行；它们与 embedding 在显存预算容许时并行。首版先支持当前单机 Windows、一张 GPU，不引入多机或多个普通 GPU 作业的显存切分。
-
-共享服务沿用已有客户端、传输和 runtime；把 endpoint/实例注册移到机器共享运行目录，实例键由固定模型、版本、精度、预处理和设备等运行配置决定，不含项目路径。保留实例创建锁，取消跨两条链的整卡排他锁。项目资料、索引、向量和结果留在项目内，机器共享目录只保存必要运行配置与状态。具体目录与 agent 读取入口按 [安装与路径布局计划](deployment-layout-plan.md)：代码进系统 Python，模型与 Condor 外置；R8 将项目配置统一到 `.basepack/config.toml`，详细入口与数据同属 `.basepack/`。以下 R0–R5 保留当时实施条件。
-
-共享服务的生命周期独立于任何普通作业。Windows Condor 会回收作业派生的进程，因此作业内的 embedding 客户端只连接共享服务；冷启动也交给作业树之外的机器级启动入口。R0 选定最小可行启动方式与运行账户，R4 验证取消作业后共享实例仍存活；不能直接沿用旧客户端的 spawn 方式。[Windows 作业生命周期](https://htcondor.readthedocs.io/en/25.0/platform-specific/microsoft-windows.html)
-
-## 显存与其他资源预算
-
-先用固定预留把两条机制衔接起来，不另建 GPU 调度服务。定义单卡总显存 T、embedding 峰值预算 E、桌面/驱动及余量 S、普通 GPU 作业峰值估计 H：
-
-```text
-普通 GPU 作业可用预算 B = T - E - S
-准入条件：H <= B
-```
-
-E 包含模型加载瞬时峰值、CUDA context、缓存及允许输入/批次的 workspace，始终保留，服务未加载时也不借给普通任务。这样普通任务先启动后，embedding 仍可冷启动，不依赖两边同时查询 free memory 再抢卡。旧合成图文回执的峰 reserved 约 4.08 GiB 仅是测量起点，不能直接作为 E。
-
-预算由一份机器配置维护，生成 Condor 所需配置片段与发布属性，派生片段不单独手改。wrapper 检查 H 并在作业 requirements 中匹配该属性；重新加载 Condor 后查询确认实际发布值与机器配置一致，才启用该预算。单个普通 GPU 作业仍申请 request_gpus=1；这只用于普通任务之间的设备分配。设备总显存门槛 gpus_minimum_memory 不能代替 B。官方支持自定义 slot 属性与作业匹配；本机具体配置由 R0/R2 验证。[自定义属性](https://htcondor.readthedocs.io/en/25.0/faq/admins/slot-attrs.html)、[资源声明](https://htcondor.readthedocs.io/en/25.0/man-pages/condor_submit.html)
-
-预算是合作约束，agent 粗估用量并限制线程/框架预分配；声明额度不等于 Windows 驱动硬隔离。显存不足或估计失准时直接返回原始错误和测量，不静默改 CPU、不杀其他项目进程。监测 free 用于诊断，不代替预算。首版固定一套模型配置；模型、输入上限或预算变更时暂停新请求/提交，排空相关工作并退出旧实例，重新标定、加载配置后再恢复。
-
-CPU/RAM 同样先扣除 embedding 和桌面的用量，再交给 Condor 分配。磁盘空间用 request_disk 表达执行 scratch 需求，项目输出盘另查容量；实际出现机械盘 I/O 重任务争用时，可用 Condor 自定义 I/O token 限制同类任务并发。检查 START/SUSPEND/PREEMPT，避免 embedding 的 CPU 活动被误当成禁止运行普通任务的桌面策略。[执行点配置](https://htcondor.readthedocs.io/en/25.0/admin-manual/ep-policy-configuration.html)
-
-并行验收要求两类工作在同一时间段均取得真实进展；驱动如何安排 kernel 不是本工具的低延迟或算力隔离承诺。启动时核本机支持多进程共同使用设备的模式。[NVIDIA 计算模式](https://docs.nvidia.com/deploy/mps/when-to-use-mps.html)
-
-## 对外接口与状态责任
-
-| 动作 | 输入 | 返回与职责 |
+| 当前名称 | R8 目标 | 说明 |
 | --- | --- | --- |
-| run | executable、参数数组、工作目录、显式环境、资源请求、排队/运行时限 | 一次提交并等待，返回 job ID、终态、应用退出码、耗时和产物/日志定位 |
-| submit / status / wait / cancel | 任务配置或 job ID | 长任务接续、状态/等待原因、观察时限与作业撤销 |
-| embed | 项目配置、文本/图片输入或路径、请求截止时间 | 读取机器模型配置，内部排队并复用模型，返回向量及模型/预处理标识，不建索引 |
+| Config / load_config / load_machine | ProjectConfig / load_project_config / load_machine_config | 与保留的 MachineConfig 区分作用域 |
+| 根 config.py、setup.py、doctor.py、templates/ | project/ 下的 config.py、init.py、doctor.py、templates/ | 项目接入源码与模板一起归组 |
+| resources / ResourceClient | jobs / CondorClient | Python 模块、CLI jobs 和项目 TOML 的 [jobs] 同批迁移 |
+| broker.py | supervisor.py | 表达模型进程生命周期管理职责 |
+| runtime.py / Runtime | qwen3_vl.py / Qwen3VLEmbedder | 表达当前固定模型实现 |
+| owned.py / OwnedJob | process_owner.py / WorkerProcessOwner | 表达模型进程所有权 |
+| model_identity / instance_key / service_key | embedding_identity / deployment_fingerprint | 分开向量语义与部署一致性，计算函数与登记字段同名 |
+| _cleanup / _admission | _confirm_cleanup / _check_request | 表达确认回收与提交前检查 |
 
-普通 GPU 任务资源声明增加显式的峰值显存估计；H>B 或单任务 CPU/RAM 超本机配置容量时立即说明无法满足。单任务容得下、当前总额度已被占用时由 Condor 排队。先交付 CLI/Python 调用；程序负责等待与超时，长任务可由执行 agent 接续，不要求主 agent 反复轮询。
+JobSpec、EmbeddingClient、MachineConfig、worker 名称和顶层 init/config/doctor/embed 命令保留。embedding 管理入口统一为 `embedding --machine-config <file> serve|status|stop`，取代暴露内部角色名的 broker 动作。resources skill 和 docs/resources.md 覆盖两条资源链，保留名称；basePack 品牌、包名 basepack、现有 devDoc 和技能发现联接保持原约定。
 
-Condor 队列、事件日志和历史维护普通作业状态；本地只保存提交参数、job ID 和输出位置。run 的排队/运行超时取消本作业并确认清理；wait 的观察时限只结束观察。排队截止与运行时限进入 Condor 策略，客户端消失后仍生效；周期策略存在检查间隔。condor_wait 成功只表示完成或中止，仍核应用退出码与产物。[等待语义](https://htcondor.readthedocs.io/en/25.0/man-pages/condor_wait.html)、[自动管理](https://htcondor.readthedocs.io/en/25.0/users-manual/automatic-job-management.html)
+### 模块与配置依赖
 
-共享服务先保留内存请求队列和单实例，复用旧 runtime 内部批处理；多请求可共享模型，首版不要求同时 forward 或跨请求动态合批。请求截止覆盖排队、加载和推理等待：排队输入可移除，在算请求结束等待并丢弃结果，当前 forward 仍可能占用服务直到完成。取消、截止和客户端 close 均只作用于本请求；旧服务的单请求 600 秒/总寿命 watchdog 直接退出进程的策略须改掉，正常卸载放在空闲边界。服务崩溃明确结束受影响请求，重启先核对旧实例后再创建；不建设自动重试/恢复数据库。
+`project/config.py` 是项目/机器配置及路径解析的唯一实现，子包入口保持轻量。ProjectConfig 只解析公共绑定；模块按明确契约读取自身必需节，不让 embedding/作业操作强制依赖未启用的 memory 配置。机器配置可只包含实际使用的设施。重复机器路径从 MachineConfig.path 派生。
+
+EmbeddingClient 接受明确的机器配置/服务发现设置，公开请求、取消和关闭；管理 status/stop 放入 admin.py 的直接函数，启动归 supervisor。机器管理无需项目目录或项目配置。此为调用职责分离，沿用现有凭据，不宣称新增账户权限隔离。
+
+embedding 的 transport 只处理 JSON/HTTP 与远程错误；registry 维护登记文件、锁和部署匹配；identity 维护向量语义标识。模型实现只接收模型/推理设置，脱离 HTTP 与登记模块；worker 保留请求队列和推理生命周期。搬移时将宽泛的 directory/settings 分别明确为 service_state_dir/embedding_settings；已由公开入口 normalize 的输入在内部准备阶段直接使用。
+
+jobs 的 client 保留生命周期编排，submit 集中 JobSpec、字段编码及提交材料，_processes 集中本机进程树观察；薄 worker 保留。payload 只保存一份 spec，worker 从中读取 executable/arguments。各 CLI 统一 register_commands/dispatch，返回简单的结果与退出码；作业成功/清理的退出规则留在 jobs CLI，根入口只组合命令和输出。
+
+### 身份合同
+
+| 身份 | 决定因素与用途 |
+| --- | --- |
+| 协议版本 | RPC 动作、请求/响应和错误格式；单一显式版本，不建立兼容协商矩阵 |
+| embedding_identity | 模型 revision/文件身份、dtype、指令、图像预处理和 pooling 版本等向量语义，供索引记录和比较 |
+| deployment_fingerprint | 显式服务代码清单及相关运行配置，检查登记实例和安装是否同代；不作为向量空间标识或完整环境证明 |
+
+图像缩放等会改变向量的设置计入 embedding_identity；仅影响接纳的 max_length、分批、线程、空闲时限和部署路径归运行设置。真正改变向量语义时更新预处理合同版本，P2 据此处理索引兼容。
+
+本批保留代码指纹与配置不匹配时拒用旧实例的保护，拆分/改名后更新唯一服务文件清单，覆盖新登记/身份/进程所有权和配置解析实现。进程启动时固定自己的部署身份，status 返回实际运行身份，管理员可报告与磁盘目标的差异；协议版本不替代这项校验。客户端仍受同代安装约束，不宣称已经支持独立版本升级。
+
+管理员停止旧实例时，仍能使用旧 marker 中的 endpoint/凭据，不先要求新代码匹配。保留 broker.json、broker.lock 等既有登记路径，避免单纯改源码名称引入第二套发现目录。
 
 ## 实施批次
 
-### R0 复用准备与预算标定
+所有阶段当前均待实施。按阶段提交和运行必要回归；稳定安装与实例迁移集中在 R8.4，一次完成公开接口切换，不逐小改反复部署。
 
-1. 先按 [路径布局计划](deployment-layout-plan.md#实施接续与完成条件) 建立 pyproject.toml、系统 Python 的 basepack 包、配置模块、随包模板、init、config show 和按设施检查的 doctor；交付 [editable 开发与普通 wheel 部署](deployment-layout-plan.md#开发安装与正式部署) 两种入口，核最小 wheel 的命令与模板，验证两个项目及子目录配置。README 和接入说明随入口交付，记忆实现不作为依赖。
-2. 沿 [复用清单](research/legacy-implementation.md#代码复用清单) 提取 runtime、预处理、批处理、传输和进程清理，以最小适配替换旧发布/owner/attempt 绑定；复用系统 Python 和固定模型，核设备映射与独立服务启动方式。替换 13/12/3 GiB 门槛、物理 GPU 0、整卡锁及合同中的强制锁字段。
-3. 先固定本版文本、图片与批次上限，再测加载/推理峰值，确定 E 与 S，同时记录 CPU/RAM 峰值与测量盲区；保留旧短图文回执作对照，不把 allocator reserved 当作整进程显存。
-4. 沿已有 Condor smoke 样例核配置、认证、中文/空格路径、真实 CPU/GPU 产物及取消释放。选定本机可用的执行账户与文件访问方式，实测该账户能读配置/输入、写结果并连接作业外的最小服务探针；显式传程序路径和所需环境，保留 Condor 分配的 GPU 可见性。Windows 作业默认低权限账户且不继承提交环境，具体适配由这些探针决定；先修已有部署，不先重装。[账户与文件访问](https://htcondor.readthedocs.io/en/25.0/platform-specific/microsoft-windows.html)、[作业环境](https://htcondor.readthedocs.io/en/25.0/users-manual/env-of-job.html)
-5. 结合 yadof 事故，探针记录实际解释器、包加载位置、cwd、执行身份、父/动态 slot、分配资源及最终线程环境；核输入与嵌套输出的实际位置。开发模式验证服务/作业账户可读源码；解释器和文件关联按本工具选择验证，不以旧项目某种 executable 形态替代本机实测。
+### R8.0 修复已复现缺陷
 
-**完成与放行：** 公共包/配置入口通过后，embedding 探针和预算标定完成即可进入 R1；Condor 真实作业及账户/路径探针完成即可进入 R2，其 GPU 准入待 E/S 标定后启用。两链分别记录结果，Condor 认证问题不阻塞 R1；R3 必须等两链完成。目录可列出、调度返回 0 或 mock 通过均不能替代相应功能结果。
+- submit 使用局部规范化副本，保持调用者 JobSpec 不变；回归同一相对 cwd 的 spec 在两个项目复用，以及提交失败后对象未改变。[现状](../../../src/basepack/resources/client.py)
+- 在客户端锁内先拒绝重复活动 request_id，再登记状态；用假 RPC 验证第二个同 ID 明确失败，首请求的结果、取消和清理正常，不同 ID 并发不受影响。[现状](../../../src/basepack/embedding/client.py)
 
-### R1 将旧 embedding 服务改为跨项目共用
+两项已在本轮审查用内存替身复现，尚未修复；实施时将它们写成必要回归，不启动模型来证明状态逻辑。
 
-1. 提取现有 loopback 服务和客户端，实例注册与启动改为机器级且独立于作业树；同模型并发首请求只启动一个进程，排队/加载中的实例也纳入注册。
-2. 提供同一个薄客户端，用两个合成项目分别模拟批量建库和单次查询；提取时消除旧 reuse=False 绕行。图片与文本沿用已核实的预处理和向量合同，真实记忆建库/查询在 P2 接入此客户端；本批不要求建立索引或迁移旧业务。
-3. 取消跨机制整卡锁，保留单实例注册锁；用 E 和输入/批次上限替换旧整卡 free 门槛，监测区分自身占用和整卡其他进程。
-4. 复用热模型、空闲退出和错误回传，补本请求的截止/取消并改造旧 watchdog；共享服务停止是独立管理动作。启动失败后保留原始错误与 stderr，不自动重试推理；同步客户端示例及使用说明。
+### R8.1 项目接入源码与实例目录
 
-**完成：** 两个不同项目的建库型/查询型请求使用同一 PID 和模型实例，含并发冷启动；取消或截止一个请求不结束另一个；文本与图片均返回有效向量。复用现有回归并修改受影响断言，不从头搭建测试框架。
+按部署合同归组 project/，同步轻量配置作用域、模板读取、package-data、所有导入和包根诊断。新实例统一生成 .basepack/config.toml 和 instructions.md，按需创建局部数据目录；根只保留宿主短指针与 Git 忽略规则。
 
-### R2 普通重任务的 Condor 薄入口
+**完成：** 配置/模板回归通过；包根和模板定位正确；无 memory 或 Condor 节的 embedding 配置仍可按自身合同使用；任意 cwd、深层配置和中文/空格路径正确解析，原业务指令保留。
 
-1. 从已有 submit 样例与官方 CLI 建立可安装入口，集中实现 run/submit/status/wait/cancel、参数数组、路径与环境处理，沿用 R0 验证的账户和文件访问约定。executable、arguments、environment、transfer list 分字段编码，并验证中文/空格/引号；明确 transfer_executable 和结果回传，不复用一套 shell 引用规则。
-2. 从机器配置发布并核对 B，任务声明 H 并做准入匹配；普通 GPU 作业之间 request_gpus=1 串行，embedding 独立运行。CPU/RAM/磁盘声明采用明确单位，转换集中一处；应用线程与最终 starter 环境一并验证。
-3. 实现退出码/产物判断、held/无匹配原因、两类超时及取消；提交响应不确定时先按本次唯一标识查队列，不直接重复提交。核原生时限在安装版本上的实际效果，run 自身等待有界；timeout 与回收确认分别返回，撤销失败保留原错误，不宣称资源已释放。
-4. 事件等待优先，必要轮询设间隔，空闲无高频写盘；日志留项目内，主 agent 只接收短摘要和定位。随入口交付一次 run 和长任务接续的短示例。
+### R8.2 embedding 职责与身份
 
-**完成：** 一次 run 得到真实结果；单任务超本机预算明确拒绝，暂时无配额的请求排队。含空格/中文的参数与传输字段、嵌套输出及应用失败诊断均按约定可用；排队/执行到期可结束等待，wait 观察到期保留作业继续运行。正常、失败、取消与超时均核本作业释放，无法确认或撤销失败时明确返回清理结果及原错误。
+拆分 transport/registry/identity，收紧 client/admin 边界，实施 supervisor、模型类和进程所有权命名，固定身份合同及启动时身份。机器管理命令直接读取机器配置，旧实例 status/stop 仍可诊断与关闭。
 
-### R3 两机制并行与其他资源准入
+**完成：** 模型实现不依赖传输/登记；同代与错代检查、管理员停止旧实例、共享单 worker、取消/截止隔离、冷启动取消、空闲退出及崩溃回收相关回归通过。向量语义标识不因纯运行设置变化而改变，语义版本变化能够被识别。
 
-1. embedding 已加载时运行 H<=B 的 GPU 重任务；反过来先运行普通任务，再冷启动 embedding。验证两个启动顺序都不因旧锁或 free 门槛退成串行。
-2. 同时运行最长允许 embedding 输入/批次和已声明峰值的普通任务，核峰值、应用结果及 CPU/RAM 预留；记录两者吞吐与延迟变化，用实际结果调整预算。
-3. embedding 保持可用时，提交第二个普通 GPU 作业，确认只有普通任务之间排队；不同项目请求仍共用模型。
-4. 分别验证 CPU/RAM 单任务可容纳但合计超配时排队、总量可容纳时并行、单任务超本机容量时拒绝；磁盘空间及实际启用的 I/O token 按声明工作。
+### R8.3 作业职责与命名
 
-**完成：** 两类 GPU 工作存在重叠执行区间且各有真实进展和正确结果；模型保持已加载。H>B 明确失败，第二个普通 GPU 作业等待，轻任务仍可操作。R1 和 R2 可分别交付，R3 是本工具的核心验收。
+迁移 jobs/CondorClient、CLI jobs、项目 [jobs] 节及 worker 模块入口，拆出 submit/_processes，消除重复 payload 和回执读取。明确 wait 只观察，run 管理作业时限；保留原生时限、查询、取消和清理确认行为。
 
-### R4 生命周期与故障回归
+**完成：** spec 不变性、payload 单一来源、复杂 argv/空参数、应用失败、资源预检、提交响应不确定、成功空查询、状态与回收回归通过。标准 GPU 字段及 Condor 站点策略不变，不重标定额度或改写服务器规则。
 
-| 场景 | 必须观察的结果 |
-| --- | --- |
-| 服务冷态，普通 GPU 作业内请求 embedding，另一项目复用后取消该作业 | 请求在预算内完成；共享 PID 不属作业进程树，取消后模型及另一项目请求继续 |
-| 取消/超时一个普通作业 | 有界返回本作业的终态与进程树清理结果；实际成功回收，共享模型及其他项目请求继续 |
-| 单个 embedding 请求取消/过期，另一项目同时排队/在用 | 本调用按截止返回；在算结果可丢弃，forward 完成后其他请求继续，不触发整服务 watchdog 退出 |
-| 服务空闲退出后再有请求 | 在预留 E 内重新加载，不依赖普通任务先结束 |
-| 服务崩溃/异常重启 | 请求明确失败；旧实例可定位清理，重启不重复加载 |
-| 普通 worker 派生子进程或异常退出 | 整棵任务树正确回收，退出结果与日志可追溯 |
+### R8.4 一次性迁移与普通 wheel 交付
 
-**完成：** 两个全新合成项目完成真实 GPU 联合流程，保留时间线、PID、job ID、加载次数、显存峰值和应用结果。测量是本版本证据，旧顺序复用/文件锁回执不能替代并行验收。
+按部署合同准备 wheel、配置映射和交付说明，排空旧作业并用旧安装停止共享服务，统一切换项目 schema、CLI/API/模块入口后再恢复运行。同步 README、使用/管理员文档、示例、相关 skills、系统说明及结果记录，清除本批失用实现和模板。
 
-### R5 安装与使用交付
-
-用普通 wheel 换路径安装，确认包与模板不依赖源码仓库；两个项目共用一套服务、模型和 Python。整合 R0–R2 已随命令交付的 README、docs/setup-project.md 与短示例，补齐 resource skill，按 [布局完成条件](deployment-layout-plan.md#实施接续与完成条件) 验证配置定位与接入。说明开发/稳定模式切换及服务重启、粗估资源、一次调用、失败定位；管理员文档负责共享服务账户与启动、预算发布、Condor 配置和旧调用方接入。更新系统说明与模块边界，仅源码、skills、短文档和小样例入 Git。
-
-**完成：** 新项目按说明能调用共享 embedding 和普通重任务，两者可并行；无需各自管理模型、编写 Condor 文件或复制环境。R3 核心可用，R4/R5 完成后形成可分发版本，远端发布按用户指令处理。
+**完成：** 普通 wheel 源码外两项目初始化、旧配置迁移、项目移动和新检出重建通过；所有模板可从安装包读取，轻量命令不加载模型依赖。用一次真实图文 embedding 与 CPU/GPU 作业核结果、并存、取消、另一项目服务存活、日志和资源归还。复验受影响的生命周期，既有额度/性能实验按风险复用，不以文件 hash 或测试数量代替功能验收。记忆数据库的真实隔离与应用效果仍由 P1/P5 验收。
 
 ## 顺序与分工
 
-R0 公共入口先完成，再按各链探针分别放行 R1（共享服务）和 R2（Condor 薄入口）；两者按约定接口并行，汇合后执行 R3 → R4 → R5。主 agent 负责预算合同、复用取舍和联合结果；共享预算与实例状态各有一个 owner，不建设固定大团队。每个完整批次检查后在 main 提交相关代码、文档和变更记录。
+R8.0 → R8.1 → R8.2/R8.3 → R8.4。embedding 与 jobs 在明确公共配置接口后可独立分工，公共入口/模板和最终部署各有一个 owner；主 agent 统一检查差异、文档与 main 提交。R8 完成即接续记忆闭环，不增加通用平台建设。
+
+## 已完成阶段索引
+
+R0–R7 的原始方案保留在 Git 历史；以下保留阶段入口，实际结论、当时预算和限制以结果文档为准，早期串行/预算生成方案不再是当前待办。
+
+### R0 复用准备与预算标定
+
+公共包与配置、环境和路径探针已交付，见 [R0–R5 结果](result.md)。
+
+### R1 将旧 embedding 服务改为跨项目共用
+
+跨项目共享模型和请求局部生命周期已交付，见 [R0–R5 结果](result.md)。
+
+### R2 普通重任务的 Condor 薄入口
+
+提交、状态、等待、取消及参数桥接已交付，见 [R0–R5 结果](result.md)。
+
+### R3 两机制并行与其他资源准入
+
+联合 GPU 与普通资源验收已交付，见 [R0–R5 结果](result.md)。
+
+### R4 生命周期与故障回归
+
+作业树和共享服务隔离的实际结果见 [R0–R5 结果](result.md)。
+
+### R5 安装与使用交付
+
+普通 wheel 源码外验收及使用说明已交付，见 [R0–R5 结果](result.md)。
+
+R6 通用节点容量与同卡共享见 [结果](native-condor.md)；R7 标准提交转换见 [计划](standard-submit-plan.md) 和 [结果](standard-submit-result.md)。这些历史结论保持当时条件。
