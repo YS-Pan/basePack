@@ -1,6 +1,6 @@
 """One submit, native queue/history state, bounded observation and confirmed cleanup."""
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 import json
 import locale
@@ -131,7 +131,7 @@ class ResourceClient:
 
     def submit(self, spec: JobSpec) -> dict:
         cwd = (self.config.root / spec.cwd).resolve()
-        spec.cwd = str(cwd)
+        spec = replace(spec, cwd=str(cwd))
         if not Path(spec.executable).is_absolute():
             raise ValueError("Job executable must be an explicit absolute path")
         self._admission(spec)

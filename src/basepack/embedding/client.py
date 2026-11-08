@@ -28,6 +28,8 @@ class EmbeddingClient:
         deadline = time.time() + timeout
         state = {"worker": None, "deadline": deadline, "cancelled": threading.Event()}
         with self._lock:
+            if request_id in self._active:
+                raise ValueError("duplicate active embedding request_id")
             self._active[request_id] = state
         try:
             worker = rpc(self._broker(), "ensure", {"deadline": deadline}, timeout=timeout)

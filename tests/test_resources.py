@@ -1,4 +1,6 @@
 import json
+from copy import deepcopy
+from dataclasses import replace
 import os
 from pathlib import Path
 from datetime import datetime
@@ -111,6 +113,48 @@ def test_cpu_submit_needs_no_gpu_attributes_and_gpu_submit_uses_official_fields(
     assert "request_gpus = 0\n" in cpu_submit
     assert "gpus_minimum_memory" not in cpu_submit
     assert resource_client.capacity()["slots"][0]["total"]["gpus"] == 0
+
+
+def test_submit_reuses_relative_spec_in_each_project_without_changing_it(resource_client, tmp_path):
+    from basepack.resources import JobSpec, ResourceClient
+
+    first_root = resource_client.config.root
+    second_root = tmp_path / "second project 中文"
+    for root in (first_root, second_root):
+        (root / "work").mkdir(parents=True)
+    second = ResourceClient(replace(resource_client.config, root=second_root,
+                                    jobs_dir=second_root / ".basepack" / "jobs"))
+    second._ads = resource_client._ads
+    for client in (resource_client, second):
+        client._call = lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, stdout="123.0", stderr="")
+    spec = JobSpec(executable=sys.executable, cwd="work", arguments=["", "中文"], environment={"VALUE": "text"})
+    original = deepcopy(spec)
+    for client in (resource_client, second):
+        submitted = client.submit(spec)
+        payload = json.loads(Path(submitted["payload"]).read_text(encoding="utf-8"))
+        assert payload["spec"]["cwd"] == str((client.config.root / "work").resolve())
+        assert spec == original
+
+
+@pytest.mark.parametrize("failure", ["admission", "submit"])
+def test_failed_submit_keeps_callers_spec_unchanged(resource_client, failure):
+    from basepack.resources import JobSpec
+
+    spec = JobSpec(executable=sys.executable, cwd=".", arguments=[""], environment={"VALUE": "text"})
+    original = deepcopy(spec)
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("original failure")
+
+    if failure == "admission":
+        resource_client._admission = fail
+    else:
+        resource_client._call = fail
+        resource_client._ads = lambda *args: []
+        resource_client._admission = lambda _: None
+    with pytest.raises(RuntimeError, match="original failure"):
+        resource_client.submit(spec)
+    assert spec == original
 
 
 @pytest.mark.parametrize("custom_resource", [None, "RenamedMemory"])
