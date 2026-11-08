@@ -1,5 +1,9 @@
 # 开发环境核验
 
+2026-11-08 R0：系统 Python 3.13.17 已安装 basepack。普通用户 pip 会回落用户站点，现经管理员安装到系统 site-packages，`python -s` 可加载。editable 引用本仓库 `src/`，新进程观察到临时代码修改；普通 wheel 安装到系统 site-packages 后，从源码目录外初始化两个项目并调用 config show/doctor，通过后恢复 editable。最小安装原始回执位于 `artifacts/r0/*-receipt.json`，管理员安装日志同目录。
+
+pytest 使用 `--basetemp artifacts/<batch>/pytest`，避免受限 Windows 临时目录 ACL。Condor 的 SSPI 查询在受限进程中会失败，同一显式配置命令在正常用户上下文通过；后续真实 Condor 验证用正常上下文，具体功能结果记录在资源任务。
+
 观测时间：2026-11-06 23:34:19（北京时间，UTC 15:34:19）。这是当前开发进程的一次只读快照；仓库尚无依赖声明，最低兼容版本尚未确定。
 
 ## 实测入口与结果

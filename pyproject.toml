@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "basepack"
+version = "0.1.0"
+description = "Project-local tools with shared embedding and HTCondor resources"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[project.optional-dependencies]
+embedding = ["torch>=2.10", "transformers>=5.2", "qwen-vl-utils", "Pillow", "psutil"]
+dev = ["pytest>=9", "build"]
+
+[project.scripts]
+basepack = "basepack.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+basepack = ["templates/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

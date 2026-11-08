@@ -16,6 +16,8 @@ htmlcov/
 .memory/
 /.cache/
 /artifacts/
+/basepack.toml
+/.basepack/
 # Machine-local Codex discovery links; sources stay in skills/.
 /.agents/skills/file-structure/
 /.agents/skills/agent-team/

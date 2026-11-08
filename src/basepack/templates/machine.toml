@@ -1,0 +1,20 @@
+schema_version = 1
+
+[shared]
+state_dir = 'state/basepack'
+
+[embedding]
+model_root = 'models/ORG/MODEL/REVISION'
+device = 'cuda:0'
+
+[htcondor]
+bin_dir = 'C:/condor/bin'
+config_file = 'C:/condor/condor_config'
+
+# Fill after measuring the supported embedding workload; units are MiB.
+[budget]
+total_gpu_mib = 0
+embedding_gpu_mib = 0
+system_gpu_mib = 0
+cpus = 1
+memory_mib = 1024

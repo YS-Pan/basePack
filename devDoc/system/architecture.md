@@ -1,11 +1,15 @@
 # 系统结构与边界
 
-本页描述当前仓库。产品运行流程和拟议接口分别见 [记忆任务](../tasks/20261106-memory-system/plan.md) 与 [资源协调任务](../tasks/20261107-resource-coordination/plan.md)，实现落地后再在此记录实际模块与数据流。
+本页描述已落地的公共入口；后续产品接口及验收见 [记忆任务](../tasks/20261106-memory-system/plan.md) 与 [资源协调任务](../tasks/20261107-resource-coordination/plan.md)。
 
 ## 当前组成
 
 ```text
 AGENTS.md                  开发入口与阅读导航
+pyproject.toml             安装、构建、依赖和模板声明
+src/basepack/              Python 模块入口、唯一配置解析及 init/doctor
+src/basepack/templates/    随包模板的唯一维护源
+docs/                     使用者接入说明
 skills/file-structure/     独立文件结构 skill 与按需参考
 skills/agent-team/         使用宿主 subagent 的分层协作 skill
 devDoc/
@@ -32,6 +36,7 @@ artifacts/                 本机验证材料、辅助脚本、日志与输出�
 - 机器共享环境与模型位于仓库外。本次可见状态及限制见 [环境核验](environment.md)，资料可见不代表已接入产品。
 - `skills/file-structure/` 是可独立使用的文件结构建议工具。入口按任务选择开发文档或实验分包参考，agent 在具体授权范围内建议或整理；它不依赖记忆数据库或模型 API。
 - `skills/agent-team/` 定义动态分工、协调、上下文分配和交接；实际派发、消息、等待、权限与模型可选项由宿主提供。它不自建 agent 服务或保存跨项目任务状态，模型与推理强度不写死在 skill 中。
-- 当前没有运行工具的产品源码、安装配置、测试目录或项目记忆数据库。`brief/search/read/maintain` 及记忆、资源协调运行模块仍是执行方案中的建议，尚无本仓库对应命令。
+- 项目显式指定一份接入配置，绑定 Python 和机器配置；project.root 相对项目配置，数据目录相对 project.root，机器路径相对机器文件。不搜索父目录，也不合并环境变量或多层配置。共享模型与机器状态在项目外，项目资料和作业记录在本项目。
+- `init` 读取安装包资源，生成项目配置并合并 AGENTS 入口和忽略规则；`config show` 显示实际安装，`doctor` 按设施只读检查。记忆检索与数据库尚未实现。
 
 涉及来源、片段、节点和索引时查 [项目术语](../terminology.md)。模块实现后，其说明需明确输入输出、维护责任、数据来源、可重建内容和重要约束，并链接对应代码或配置。
