@@ -1,11 +1,18 @@
 ---
 name: file-structure
-description: "Recommend or reorganize project file layouts for development documentation, independent experiments, or both. Use for structure decisions and requested file moves; ordinary prose or algorithm edits alone are outside scope."
+description: "Recommend or reorganize project file layouts for development documentation, independent experiments, and temporary or retained material. Use for structure decisions and requested file moves; ordinary prose or algorithm edits alone are outside scope."
 ---
 
 # File structure
 
 Choose a layout by purpose, maintenance lifecycle, and execution or delivery boundaries. Preserve working project conventions. Treat directory names as navigation clues; verify knowledge and completion from the contents.
+
+## Temporary and retained material
+
+- Prefer the owning project's `tmp/<task>/` for one-off tests, trial runs, temporary scripts, fixtures, caches and intermediate outputs. Keep disposable contents Git-ignored; retain a directory placeholder only when needed.
+- Assume `tmp/` contents can disappear any time after the task ends, for example through daily cleanup. Before closure, record needed conclusions in documentation and move selected material worth retaining to its stable location.
+- Use `artifacts/` for material deliberately retained across tasks, such as evidence, inputs, scripts, logs and outputs needed for later review. Select by retention need rather than saving all temporary work.
+- Keep source, durable configuration, service state, shared dependencies and deliverables in their stable owning locations, independently usable after `tmp/` is cleared.
 
 ## Choose a pattern
 

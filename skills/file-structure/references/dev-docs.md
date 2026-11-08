@@ -35,8 +35,7 @@ Create only the parts with real content. Keep an existing development-documentat
 
 - Maintain lasting guidance across work stages. Update `system/` with implemented behavior; keep proposals in `tasks/`.
 - Use one task directory for an independent objective or major stage, with internal steps in the same plan when practical. At closure, reconcile valid conclusions into `system/`, hand off remaining work, archive the whole task directory, and repair references.
-- Prefer `tmp/` for one-off tests, fixtures, scripts, caches and intermediate outputs. Assume its contents can disappear after the task; promote needed results before closure. Keep durable dependencies outside it.
-- Make sources, methods, conditions, results, and limits reachable from a short summary. Keep selected evidence in Git-ignored `artifacts/` when later review requires it; large retained outputs may live outside the repository. Task documents retain evidence locations and generation conditions; preserve original snapshots.
+- Apply the shared [material lifecycle](../SKILL.md#temporary-and-retained-material). Make sources, methods, conditions, results, and limits reachable from a short summary; task documents retain evidence locations and generation conditions. Large retained outputs may live outside the repository; preserve original snapshots.
 - Record changes as `YYYYMMDD_HHMMSS_short-description.md`, covering date, change, reason, impact, actual checks, and evidence. Follow the target project's timezone, severity levels, and changelog conventions; trivial changes may omit a record.
 
 ## Reading entry points

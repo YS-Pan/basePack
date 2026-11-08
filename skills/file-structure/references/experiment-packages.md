@@ -21,13 +21,17 @@ project/
       tests/                    Necessary checks and small fixtures
       configs/                  Experiment configuration, when needed
       data/                     Small inputs or source/version/recovery references
-      runs/<run-id>/            Configuration, version, logs, and outputs of one run
+      tmp/<task>/               Disposable probes, trial runs and evaluation scratch
+      artifacts/                Selected evidence retained across tasks, when needed
+      runs/<run-id>/            Run records deliberately kept for tracking or reproduction
       RESULTS.md                Conclusions, comparisons, failures, limits, evidence
   test-cases/                   Shared fixed inputs and evaluation protocol, if needed
-  test-runs/                    Independent evaluation outputs, if isolation needs it
+  test-runs/                    Retained independent evaluations, if isolation needs it
 ```
 
 Adapt the names and create only the needed parts. Each experiment owns its configuration, knowledge, databases, caches, and results. Large data, models, and environments may live outside the project, located through configuration and version information. The coordination layer keeps shared direction, the experiment index, and decision-relevant conclusions; experiments retain their run details.
+
+Apply the shared [material lifecycle](../SKILL.md#temporary-and-retained-material) within each owning project. Prefer `tmp/` for one-off trial runs and evaluations; use stable experiment units, `runs/` and `test-runs/` for work that needs an ongoing lifecycle or retained run history.
 
 ## Choose isolation and packaging
 
