@@ -21,6 +21,9 @@ def test_two_projects_and_subdirectory_config(tmp_path, monkeypatch):
     assert loaded[0].machine_config == loaded[1].machine_config
     assert loaded[0].memory_dir != loaded[1].memory_dir
     assert loaded[0].jobs_dir != loaded[1].jobs_dir
+    assert loaded[0].raw["schema_version"] == 2
+    assert "resources" not in loaded[0].raw
+    assert describe(loaded[0])["jobs_dir"] == str(projects[0] / ".basepack/jobs")
     assert loaded[0].machine.state_dir == tmp_path / "state/basepack"
     assert ".basepack/instructions.md" in (projects[0] / "AGENTS.md").read_text(encoding="utf-8")
     instructions = (projects[0] / ".basepack/instructions.md").read_text(encoding="utf-8")
@@ -79,7 +82,7 @@ def test_embedding_only_configuration_has_no_other_facility_dependencies(tmp_pat
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n[embedding]\nmodel_root='model'\n", encoding="utf-8")
     project = tmp_path / "project.toml"
-    project.write_text("schema_version=1\n[runtime]\npython=" + json.dumps(sys.executable)
+    project.write_text("schema_version=2\n[runtime]\npython=" + json.dumps(sys.executable)
                        + "\nmachine_config=" + json.dumps(str(machine))
                        + "\n[project]\nroot='.'\n", encoding="utf-8")
     config = load_project_config(project)
@@ -90,7 +93,7 @@ def test_embedding_only_configuration_has_no_other_facility_dependencies(tmp_pat
     assert "jobs_dir" not in result
     with pytest.raises(KeyError, match="memory"):
         config.memory_dir
-    with pytest.raises(KeyError, match="resources"):
+    with pytest.raises(KeyError, match="jobs"):
         config.jobs_dir
 
 
@@ -115,6 +118,7 @@ def test_project_and_machine_schema_are_checked_separately(tmp_path):
         load_machine_config(machine)
     machine.write_text("schema_version=1\n", encoding="utf-8")
     path = init_project(tmp_path / "project", machine)
-    path.write_text(path.read_text(encoding="utf-8").replace("schema_version = 1", "schema_version = 2"), encoding="utf-8")
+    assert load_project_config(path).machine.raw["schema_version"] == 1
+    path.write_text(path.read_text(encoding="utf-8").replace("schema_version = 2", "schema_version = 1"), encoding="utf-8")
     with pytest.raises(ValueError, match="schema_version"):
         load_project_config(path)

@@ -18,7 +18,7 @@ python -m basepack --config '<absolute-project>/.basepack/config.toml' doctor --
 
 init 从安装包模板生成 `.basepack/config.toml` 和 `.basepack/instructions.md`，写入当前 Python 路径；根 AGENTS 合并指向详细入口的短指针，保留业务指令。现有配置存在时直接报错。自定义深层配置可传 `--config-name .basepack/config/local.toml`，必须位于 `.basepack/` 内，入口会记录实际配置。不向父目录寻找配置，调用时显式传实际配置绝对路径。
 
-项目配置的机器绑定只有 runtime.python 与 runtime.machine_config。机器配置定位 Condor 及 embedding；普通作业容量由 Condor 自己维护，项目接入不修改节点策略。project.root 相对项目配置，memory.data_dir 和 resources.jobs_dir 相对项目根解析，当前工作目录不参与数据定位。默认状态和作业材料分别放 `.basepack/memory`、`.basepack/jobs`；资源阶段不建立记忆数据库。
+项目配置为 schema 2，机器配置保持 schema 1。项目机器绑定只有 runtime.python 与 runtime.machine_config。机器配置定位 Condor 及 embedding；普通作业容量由 Condor 自己维护，项目接入不修改节点策略。project.root 相对项目配置，memory.data_dir 和 jobs.jobs_dir 相对项目根解析且必须在 `.basepack/` 内，当前工作目录不参与数据定位。默认状态和作业材料分别放 `.basepack/memory`、`.basepack/jobs`；资源阶段不建立记忆数据库。
 
 `.basepack/` 整目录不进 Git，AGENTS 可提交。项目配置只解析公共绑定，各功能按需读取自身必需节；只用 embedding 无需 memory 或 Condor 配置。`config show` 返回两份配置位置、实际 Python、包版本/安装模式/包根及已配置的路径，供诊断，不另存为有效配置。按 [资源使用](resources.md) 调用 embedding 和重任务。
 

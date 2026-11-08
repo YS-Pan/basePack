@@ -10,7 +10,7 @@ pyproject.toml             安装、构建、依赖和模板声明
 src/basepack/              Python 命令组合与包入口
 src/basepack/project/      唯一配置解析、init/doctor 及随包模板
 src/basepack/embedding/    supervisor、单模型worker、图文客户端及独立管理入口
-src/basepack/resources/    Condor薄入口、UTF-8参数worker与生命周期
+src/basepack/jobs/    Condor薄入口、UTF-8参数worker与生命周期
 docs/                     使用者接入说明
 skills/file-structure/     独立文件结构 skill 与按需参考
 skills/agent-team/         使用宿主 subagent 的分层协作 skill

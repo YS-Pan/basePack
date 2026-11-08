@@ -1,13 +1,13 @@
-"""python resources_run.py /absolute/path/to/project/basepack.toml"""
+"""python jobs_run.py /absolute/project/.basepack/config.toml"""
 
 import json
 import sys
 
 from basepack.project.config import load_project_config
-from basepack.resources import JobSpec, ResourceClient
+from basepack.jobs import JobSpec, CondorClient
 
 config = load_project_config(sys.argv[1])
-result = ResourceClient(config).run(JobSpec(
+result = CondorClient(config).run(JobSpec(
     executable=str(config.python),
     arguments=["-c", "print(sum(i*i for i in range(10000)))"],
     cwd=str(config.root), cpus=1, memory_mib=256, disk_mib=16,

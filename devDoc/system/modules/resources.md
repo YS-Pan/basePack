@@ -14,7 +14,7 @@ worker 在线程接入层处理状态、取消与截止，单线程模型循环�
 
 ## 普通重任务
 
-[resources](../../../src/basepack/resources/) 提供 JobSpec 与 run/submit/status/wait/cancel。任务参数和日志留在项目 jobs_dir；队列、事件和历史由 Condor 维护。每次提交使用唯一标识，响应不确定时按标识查询原生队列/历史，不重复提交。
+[jobs](../../../src/basepack/jobs/) 公开 JobSpec 与 CondorClient。client 编排 run/submit/status/wait/cancel，submit 集中字段编码、局部参数规范化与提交材料，_processes 只观察本机进程树。payload 只保存一份 spec，UTF-8 worker 从中读取 executable/arguments；任务参数和日志留在项目 `[jobs].jobs_dir`。队列、事件和历史由 Condor 维护，响应不确定时按唯一提交标识查询，不重复提交。
 
 普通作业容量与策略由 HTCondor 维护，basePack 是标准提交客户端。`capacity` 读取实际父 slot 的总量和剩余量：标准 CPU/RAM/GPU 对应 `cpus/memory_mib/gpus`，其余 `MachineResources` 仅在总量和剩余数量均有发布时按原名、原生单位展示。客户端只按 `TotalSlotCpus/TotalSlotMemory` 判断 CPU/RAM 能否容纳，GPU 与内部额度的拒绝和排队交给 Condor；当前剩余不足不触发客户端拒绝。项目 TOML 不镜像普通额度，也没有专属预算发布或 hash 匹配。
 

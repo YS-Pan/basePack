@@ -60,7 +60,7 @@ class ProjectConfig:
 
     @property
     def jobs_dir(self) -> Path:
-        return self.data_path("resources", "jobs_dir")
+        return self.data_path("jobs", "jobs_dir")
 
 
 def load_machine_config(path: str | Path) -> MachineConfig:
@@ -70,7 +70,7 @@ def load_machine_config(path: str | Path) -> MachineConfig:
 
 def load_project_config(path: str | Path) -> ProjectConfig:
     path = Path(path).resolve()
-    raw = _read(path, 1)
+    raw = _read(path, 2)
     python = _absolute(raw["runtime"]["python"], "runtime.python")
     machine_path = _absolute(raw["runtime"]["machine_config"], "runtime.machine_config")
     root = (path.parent / raw["project"]["root"]).resolve()
@@ -107,6 +107,6 @@ def describe(config: ProjectConfig) -> dict:
     }
     if "memory" in config.raw:
         result["memory_dir"] = str(config.memory_dir)
-    if "resources" in config.raw:
+    if "jobs" in config.raw:
         result["jobs_dir"] = str(config.jobs_dir)
     return result

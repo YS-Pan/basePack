@@ -10,19 +10,20 @@ import sys
 
 import pytest
 
-from basepack.resources.client import _descendants, _process_parents, _terminal_time
+from basepack.jobs._processes import _descendants, _process_parents
+from basepack.jobs.client import _terminal_time
 
 
 @pytest.fixture
 def resource_client(tmp_path):
     from basepack.project.config import load_project_config
-    from basepack.resources import ResourceClient
+    from basepack.jobs import CondorClient
     from basepack.project.init import init_project
 
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n[shared]\nstate_dir='state'\n"
                        "[htcondor]\nbin_dir='bin'\nconfig_file='native.conf'\n", encoding="utf-8")
-    client = ResourceClient(load_project_config(init_project(tmp_path / "project", machine)))
+    client = CondorClient(load_project_config(init_project(tmp_path / "project", machine)))
     slot = {"Name": "slot1@local", "Machine": socket.gethostname().upper(),
             "MachineResources": "Cpus Memory Disk GPUs SiteGpuMiB",
             "TotalSlotCpus": 12, "TotalSlotMemory": 24576, "TotalSlotGPUs": 4,
@@ -32,8 +33,8 @@ def resource_client(tmp_path):
     return client
 
 
-def test_native_capacity_and_admission_distinguish_total_from_currently_available(resource_client):
-    from basepack.resources import JobSpec
+def test_native_capacity_and_check_request_distinguish_total_from_currently_available(resource_client):
+    from basepack.jobs import JobSpec
 
     capacity = resource_client.capacity()
     assert capacity["slots"][0]["total"] == {
@@ -42,12 +43,12 @@ def test_native_capacity_and_admission_distinguish_total_from_currently_availabl
         "cpus": 0, "memory_mib": 0, "gpus": 0, "Disk": 51200, "SiteGpuMiB": 0}
     spec = JobSpec(executable=sys.executable, cwd=str(resource_client.config.root),
                    cpus=2, memory_mib=2048, gpu_memory_mib=4000)
-    resource_client._admission(spec)
+    resource_client._check_request(spec)
     for key, amount in (("cpus", 13), ("memory_mib", 24577)):
         with pytest.raises(ValueError, match="exceeds local Condor slot capacity"):
-            resource_client._admission(JobSpec(**{**spec.__dict__, key: amount}))
+            resource_client._check_request(JobSpec(**{**spec.__dict__, key: amount}))
     # The schedd owns GPU resource admission, including over-pool requests.
-    resource_client._admission(JobSpec(**{**spec.__dict__, "gpu_memory_mib": 7165}))
+    resource_client._check_request(JobSpec(**{**spec.__dict__, "gpu_memory_mib": 7165}))
 
 
 def test_capacity_discovers_renamed_resources_without_client_changes(resource_client):
@@ -76,8 +77,8 @@ def test_capacity_omits_resources_without_published_total_and_available(resource
     assert capacity["total"]["SiteGpuMiB"] == 7164
 
 
-def test_admission_requires_one_local_slot_to_fit_all_requested_resources(resource_client):
-    from basepack.resources import JobSpec
+def test_check_request_requires_one_local_slot_to_fit_all_requested_resources(resource_client):
+    from basepack.jobs import JobSpec
 
     slot = resource_client._ads()[0]
     resource_client._ads = lambda *args: [
@@ -85,12 +86,12 @@ def test_admission_requires_one_local_slot_to_fit_all_requested_resources(resour
         slot | {"Name": "slot2@local", "TotalSlotCpus": 1},
         slot | {"Machine": "another-computer"}]
     with pytest.raises(ValueError, match="exceeds local Condor slot capacity"):
-        resource_client._admission(JobSpec(executable=sys.executable,
+        resource_client._check_request(JobSpec(executable=sys.executable,
             cwd=str(resource_client.config.root), cpus=2, memory_mib=2048))
 
 
 def test_cpu_submit_needs_no_gpu_attributes_and_gpu_submit_uses_official_fields(resource_client):
-    from basepack.resources import JobSpec
+    from basepack.jobs import JobSpec
 
     def command(name, *args, **kwargs):
         return subprocess.CompletedProcess(args, 0, stdout="123.0" if name == "condor_submit" else "", stderr="")
@@ -116,13 +117,13 @@ def test_cpu_submit_needs_no_gpu_attributes_and_gpu_submit_uses_official_fields(
 
 
 def test_submit_reuses_relative_spec_in_each_project_without_changing_it(resource_client, tmp_path):
-    from basepack.resources import JobSpec, ResourceClient
+    from basepack.jobs import JobSpec, CondorClient
 
     first_root = resource_client.config.root
     second_root = tmp_path / "second project 中文"
     for root in (first_root, second_root):
         (root / "work").mkdir(parents=True)
-    second = ResourceClient(replace(resource_client.config, root=second_root))
+    second = CondorClient(replace(resource_client.config, root=second_root))
     second._ads = resource_client._ads
     for client in (resource_client, second):
         client._call = lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, stdout="123.0", stderr="")
@@ -131,13 +132,15 @@ def test_submit_reuses_relative_spec_in_each_project_without_changing_it(resourc
     for client in (resource_client, second):
         submitted = client.submit(spec)
         payload = json.loads(Path(submitted["payload"]).read_text(encoding="utf-8"))
+        assert set(payload) == {"submission_id", "spec", "worker_receipt"}
         assert payload["spec"]["cwd"] == str((client.config.root / "work").resolve())
+        assert "basepack.jobs.worker" in (Path(submitted["job_dir"]) / "job.sub").read_text(encoding=client.encoding)
         assert spec == original
 
 
 @pytest.mark.parametrize("failure", ["admission", "submit"])
 def test_failed_submit_keeps_callers_spec_unchanged(resource_client, failure):
-    from basepack.resources import JobSpec
+    from basepack.jobs import JobSpec
 
     spec = JobSpec(executable=sys.executable, cwd=".", arguments=[""], environment={"VALUE": "text"})
     original = deepcopy(spec)
@@ -146,11 +149,11 @@ def test_failed_submit_keeps_callers_spec_unchanged(resource_client, failure):
         raise RuntimeError("original failure")
 
     if failure == "admission":
-        resource_client._admission = fail
+        resource_client._check_request = fail
     else:
         resource_client._call = fail
         resource_client._ads = lambda *args: []
-        resource_client._admission = lambda _: None
+        resource_client._check_request = lambda _: None
     with pytest.raises(RuntimeError, match="original failure"):
         resource_client.submit(spec)
     assert spec == original
@@ -158,7 +161,7 @@ def test_failed_submit_keeps_callers_spec_unchanged(resource_client, failure):
 
 @pytest.mark.parametrize("custom_resource", [None, "RenamedMemory"])
 def test_standard_gpu_submission_does_not_depend_on_custom_resources(resource_client, custom_resource):
-    from basepack.resources import JobSpec
+    from basepack.jobs import JobSpec
 
     slot = resource_client._ads()[0]
     slot["MachineResources"] = "Cpus Memory Disk GPUs"
@@ -180,9 +183,9 @@ def test_standard_gpu_submission_does_not_depend_on_custom_resources(resource_cl
 
 
 def test_native_empty_query_means_no_matches_but_invalid_json_is_an_error():
-    from basepack.resources import ResourceClient
+    from basepack.jobs import CondorClient
 
-    client = ResourceClient.__new__(ResourceClient)
+    client = CondorClient.__new__(CondorClient)
     client._call = lambda *args: subprocess.CompletedProcess(args, 0, stdout="", stderr="")
     assert client._ads("condor_q", "14294.0") == []
     client._call = lambda *args: subprocess.CompletedProcess(args, 0, stdout="invalid", stderr="")
@@ -192,15 +195,15 @@ def test_native_empty_query_means_no_matches_but_invalid_json_is_an_error():
 
 def test_uncertain_submit_keeps_original_error_without_submitting_twice(tmp_path):
     from basepack.project.config import load_project_config
-    from basepack.resources import JobSpec, ResourceClient
+    from basepack.jobs import JobSpec, CondorClient
     from basepack.project.init import init_project
 
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n[shared]\nstate_dir='state'\n"
                        "[htcondor]\nbin_dir='bin'\nconfig_file='native.conf'\n", encoding="utf-8")
     config = load_project_config(init_project(tmp_path / "project", machine))
-    client = ResourceClient(config)
-    client._admission = lambda _: None
+    client = CondorClient(config)
+    client._check_request = lambda _: None
     calls = []
 
     def command(name, *args, **kwargs):
@@ -226,13 +229,29 @@ def test_worker_preserves_windows_argv_and_application_exit(tmp_path):
     receipt = tmp_path / "worker.json"
     code = "import json,sys; from pathlib import Path; Path(sys.argv[1]).write_text(json.dumps(sys.argv[2:]),encoding='utf-8'); sys.exit(7)"
     payload = tmp_path / "payload.json"
-    payload.write_text(json.dumps({"executable": sys.executable,
-                                   "arguments": ["-c", code, str(output), *values],
+    payload.write_text(json.dumps({"spec": {"executable": sys.executable,
+                                   "arguments": ["-c", code, str(output), *values]},
                                    "worker_receipt": str(receipt)}, ensure_ascii=False), encoding="utf-8")
-    result = subprocess.run([sys.executable, "-m", "basepack.resources.worker", str(payload)])
+    result = subprocess.run([sys.executable, "-m", "basepack.jobs.worker", str(payload)])
     assert result.returncode == 7
     assert json.loads(output.read_text(encoding="utf-8")) == values
     assert json.loads(receipt.read_text(encoding="utf-8"))["exit_code"] == 7
+
+
+@pytest.mark.parametrize("exit_code,returned,success", [(0, True, True), (7, True, False), (0, False, False)])
+def test_terminal_status_checks_application_exit_and_returned_outputs(resource_client, tmp_path, exit_code, returned, success):
+    payload = tmp_path / "payload.json"
+    payload.write_text(json.dumps({"spec": {"cwd": str(tmp_path), "transfer_outputs": ["result.txt"]}}), encoding="utf-8")
+    if returned:
+        (tmp_path / "result.txt").write_text("result", encoding="utf-8")
+    ad = {"JobStatus": 4, "QDate": 10, "CompletionDate": 20, "ExitCode": exit_code,
+          "BasePackPayload": str(payload)}
+    resource_client._ad = lambda _: (ad, True)
+    result = resource_client.status("123.0")
+    assert result["terminal"]
+    assert result["exit_code"] == exit_code
+    assert result["success"] is success
+    assert result["missing_outputs"] == ([] if returned else [str(tmp_path / "result.txt")])
 
 
 def test_process_snapshot_sees_real_child():

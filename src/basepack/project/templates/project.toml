@@ -1,4 +1,4 @@
-schema_version = 1
+schema_version = 2
 
 [runtime]
 python = $python
@@ -10,5 +10,5 @@ root = $root
 [memory]
 data_dir = '.basepack/memory'
 
-[resources]
+[jobs]
 jobs_dir = '.basepack/jobs'

@@ -46,8 +46,8 @@ client.close()  # 只取消该客户端仍活动的请求。
 ```
 
 ```powershell
-python -m basepack --config '<project-config>' resources capacity
-python -m basepack --config '<project-config>' resources run --spec '<project>/job.json'
+python -m basepack --config '<project-config>' jobs capacity
+python -m basepack --config '<project-config>' jobs run --spec '<project>/job.json'
 ```
 
 `capacity` 只读查询本机父 slot 的总容量与当前剩余量，来源是 HTCondor 实际发布的资源。`cpus`、`memory_mib`、`gpus` 为标准键；`MachineResources` 中其余资源在总量和剩余数量均有发布时，按原名和原生单位展示。本机 `gpus` 表示同卡共享名额。客户端按标准总容量核 CPU/RAM，GPU 申请由 Condor 站点策略判断，当前资源不足时排队。`run` 返回 job ID、终态、应用退出码及 stdout/stderr/event log 定位；应用失败、超时或未确认回收时 CLI 退出 1，原始应用退出码保留在 JSON。检查实际产物内容，应用退出 0 只说明正常退出。轻任务可直接运行，无需全部接入。
@@ -70,10 +70,10 @@ gpus_minimum_memory = 3000 MB
 长任务接续：
 
 ```powershell
-python -m basepack --config '<project-config>' resources submit --spec '<project>/job.json'
-python -m basepack --config '<project-config>' resources status '<cluster.proc>' --analyze
-python -m basepack --config '<project-config>' resources wait '<cluster.proc>' --timeout 300
-python -m basepack --config '<project-config>' resources cancel '<cluster.proc>'
+python -m basepack --config '<project-config>' jobs submit --spec '<project>/job.json'
+python -m basepack --config '<project-config>' jobs status '<cluster.proc>' --analyze
+python -m basepack --config '<project-config>' jobs wait '<cluster.proc>' --timeout 300
+python -m basepack --config '<project-config>' jobs cancel '<cluster.proc>'
 ```
 
 `wait --timeout` 只是本次观察时限，到期返回 observation_expired，作业继续运行。任务的 queue_timeout/run_timeout 是作业时限；run 到期撤销并确认回收，原生 Condor 时限在客户端离开后仍生效，但有策略检查间隔。timeout 与 cleanup_confirmed 分别表示时限结果和资源回收确认；cleanup_error 保留撤销或确认失败的原始信息，不能把 timeout 当作已释放。
@@ -89,9 +89,9 @@ Python 同样可一次调用：
 ```python
 import sys
 from basepack.project.config import load_project_config
-from basepack.resources import JobSpec, ResourceClient
+from basepack.jobs import JobSpec, CondorClient
 
-jobs = ResourceClient(load_project_config("<absolute-project-config>"))
+jobs = CondorClient(load_project_config("<absolute-project-config>"))
 capacity = jobs.capacity()
 result = jobs.run(JobSpec(executable=sys.executable, arguments=["analysis.py"],
                           cpus=2, memory_mib=2048, disk_mib=256))

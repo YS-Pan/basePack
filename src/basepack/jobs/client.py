@@ -1,6 +1,5 @@
 """One submit, native queue/history state, bounded observation and confirmed cleanup."""
 
-from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 import json
 import locale
@@ -12,56 +11,12 @@ import shutil
 import socket
 import subprocess
 import time
-import uuid
+
+from ._processes import _descendants, _process_parents
+from .submit import JobSpec, normalize_spec, prepare_submission
 
 
-def _line(value: str) -> str:
-    if any(character in value for character in ("\r", "\n", "\x00")) or "$(" in value:
-        raise ValueError(f"Unsupported submit-field characters: {value!r}")
-    return value
-
-
-def arguments(values: list[str]) -> str:
-    """Condor V2 syntax; only used for the small launcher argument list."""
-    return '"' + " ".join("'" + _line(value).replace("'", "''").replace('"', '""') + "'"
-                           for value in values) + '"'
-
-
-def environment(values: dict[str, str]) -> str:
-    """Condor environment V2 syntax, independent of Windows shell syntax."""
-    for key in values:
-        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
-            raise ValueError(f"Invalid environment variable name: {key!r}")
-    return arguments([f"{key}={value}" for key, value in values.items()])
-
-
-def path_field(value: str | Path) -> str:
-    return _line(str(value).replace("\\", "/"))
-
-
-def transfer_list(values: list[str]) -> str:
-    if any("," in value for value in values):
-        raise ValueError("Condor transfer paths cannot contain commas")
-    return ",".join(path_field(value) for value in values)
-
-
-@dataclass
-class JobSpec:
-    executable: str
-    arguments: list[str] = field(default_factory=list)
-    cwd: str = "."
-    environment: dict[str, str] = field(default_factory=dict)
-    cpus: int = 1
-    memory_mib: int = 512
-    disk_mib: int = 64
-    gpu_memory_mib: int = 0
-    queue_timeout: int = 300
-    run_timeout: int = 600
-    transfer_inputs: list[str] = field(default_factory=list)
-    transfer_outputs: list[str] = field(default_factory=list)
-
-
-class ResourceClient:
+class CondorClient:
     def __init__(self, config):
         self.config = config
         self.machine = config.machine
@@ -114,7 +69,7 @@ class ResourceClient:
                               else slot[attribute] for key, attribute in resources.items()}})
         return {"machine": machine, "slots": result}
 
-    def _admission(self, spec):
+    def _check_request(self, spec):
         for key in ("cpus", "memory_mib", "disk_mib", "queue_timeout", "run_timeout"):
             if getattr(spec, key) <= 0:
                 raise ValueError(f"{key} must be positive")
@@ -130,56 +85,10 @@ class ResourceClient:
             raise ValueError(f"Job request {requested} exceeds local Condor slot capacity: {capacity['slots']}")
 
     def submit(self, spec: JobSpec) -> dict:
-        cwd = (self.config.root / spec.cwd).resolve()
-        spec = replace(spec, cwd=str(cwd))
-        if not Path(spec.executable).is_absolute():
-            raise ValueError("Job executable must be an explicit absolute path")
-        self._admission(spec)
-        token = uuid.uuid4().hex
-        folder = self.config.jobs_dir / token
-        folder.mkdir(parents=True)
-        transfer = bool(spec.transfer_inputs or spec.transfer_outputs)
-        payload = folder / "basepack-job.json"
-        receipt = folder / "worker.json"
-        metadata = {"submission_id": token, "spec": asdict(spec), "worker_receipt": str(receipt)}
-        payload.write_text(json.dumps(metadata | {"executable": spec.executable, "arguments": spec.arguments},
-                                      ensure_ascii=False, indent=2), encoding="utf-8")
-        env = {"OMP_NUM_THREADS": str(spec.cpus), "MKL_NUM_THREADS": str(spec.cpus),
-               "OPENBLAS_NUM_THREADS": str(spec.cpus), "NUMEXPR_NUM_THREADS": str(spec.cpus),
-               **spec.environment}
-        if any(key.upper() == "CUDA_VISIBLE_DEVICES" for key in env):
-            raise ValueError("CUDA_VISIBLE_DEVICES belongs to Condor's device allocation")
-        requirement = f'TARGET.Machine == {json.dumps(socket.gethostname())}'
-        lines = [
-            "universe = vanilla", f"executable = {path_field(self.config.python)}",
-            "transfer_executable = False", "getenv = False",
-            "arguments = " + arguments(["-I", "-m", "basepack.resources.worker", payload.name if transfer else str(payload)]),
-            f"environment = {environment(env)}", f"initialdir = {path_field(cwd)}",
-            f"output = {path_field(folder/'stdout.txt')}", f"error = {path_field(folder/'stderr.txt')}",
-            f"log = {path_field(folder/'events.log')}", f"request_cpus = {spec.cpus}",
-            f"request_memory = {spec.memory_mib} MB", f"request_disk = {spec.disk_mib} MB",
-            f"request_gpus = {int(bool(spec.gpu_memory_mib))}", f"requirements = {requirement}",
-            f'+BasePackSubmissionId = "{token}"', f'+BasePackPayload = {json.dumps(payload.as_posix(), ensure_ascii=False)}',
-            f"+BasePackQueueTimeout = {spec.queue_timeout}", f"+BasePackRunTimeout = {spec.run_timeout}",
-            f"allowed_execute_duration = {spec.run_timeout}",
-            "periodic_remove = "
-            f"(JobStatus == 1 && time() - QDate >= {spec.queue_timeout}) || "
-            f"(JobStatus == 2 && JobCurrentStartExecutingDate > 0 && time() - JobCurrentStartExecutingDate >= {spec.run_timeout}) || "
-            "(JobStatus == 5 && member(HoldReasonCode, {46,47}))",
-            "notification = Never", "on_exit_remove = True",
-            f"should_transfer_files = {'YES' if transfer else 'NO'}",
-        ]
-        if spec.gpu_memory_mib:
-            lines.append(f"gpus_minimum_memory = {spec.gpu_memory_mib} MB")
-        if transfer:
-            inputs = [str(payload), *[str((cwd / path).resolve()) for path in spec.transfer_inputs]]
-            for output in spec.transfer_outputs:
-                if Path(output).is_absolute() or ".." in Path(output).parts:
-                    raise ValueError(f"Transfer output must be relative to scratch: {output}")
-            lines.extend(["when_to_transfer_output = ON_EXIT", "transfer_input_files = " + transfer_list(inputs),
-                          "transfer_output_files = " + transfer_list(spec.transfer_outputs)])
-        submit = folder / "job.sub"
-        submit.write_text("\n".join([*lines, "queue 1", ""]), encoding=self.encoding)
+        spec = normalize_spec(self.config, spec)
+        self._check_request(spec)
+        token, folder, payload, submit = prepare_submission(self.config, spec, self.encoding)
+        submitted = {"submission_id": token, "job_dir": str(folder), "payload": str(payload)}
         try:
             result = self._call("condor_submit", "-terse", submit)
         except (RuntimeError, subprocess.TimeoutExpired) as error:
@@ -191,14 +100,12 @@ class ResourceClient:
                 raise
             ad = matches[0]
             job_id = f'{ad["ClusterId"]}.{ad["ProcId"]}'
-            metadata["submit_response_error"] = str(error)
+            submitted["submit_response_error"] = str(error)
             if isinstance(error, subprocess.TimeoutExpired):
-                metadata["submit_response_error"] += f"\nstdout: {error.stdout!r}\nstderr: {error.stderr!r}"
+                submitted["submit_response_error"] += f"\nstdout: {error.stdout!r}\nstderr: {error.stderr!r}"
         else:
             job_id = re.search(r"\d+\.\d+", result.stdout).group()
-        submitted = {"job_id": job_id, "submission_id": token, "job_dir": str(folder), "payload": str(payload)}
-        if "submit_response_error" in metadata:
-            submitted["submit_response_error"] = metadata["submit_response_error"]
+        submitted["job_id"] = job_id
         (folder / "submission.json").write_text(json.dumps(submitted, indent=2), encoding="utf-8")
         self._call("condor_reschedule")
         return submitted
@@ -237,20 +144,17 @@ class ResourceClient:
             result["analysis"] = diagnostic.stdout + diagnostic.stderr
         return result
 
-    def _cleanup(self, job_id: str, timeout=30, expected_pids=()) -> dict:
+    def _confirm_cleanup(self, job_id: str, timeout=30, expected_pids=()) -> dict:
         deadline = time.monotonic() + timeout
+        expected_pids = set(expected_pids)
         while True:
             ad, history = self._ad(job_id)
-            payload_path = ad.get("BasePackPayload")
-            if payload_path:
-                payload = json.loads(Path(payload_path).read_text(encoding="utf-8"))
-                receipt = Path(payload["worker_receipt"])
-                if receipt.exists():
-                    worker = json.loads(receipt.read_text(encoding="utf-8"))
-                    expected_pids = set(expected_pids) | {worker[key] for key in ("pid", "child_pid")}
+            if not expected_pids:
+                # A not-yet-started worker can publish its fixed PIDs while we wait.
+                expected_pids = _worker_pids(ad)
             try:
                 processes = _process_parents()
-                worker_gone = not (set(expected_pids) & processes.keys())
+                worker_gone = not (expected_pids & processes.keys())
             except OSError as error:
                 return {"cleanup_confirmed": False, "cleanup_error": str(error)}
             # Condor owns all descendants; a completed history record plus gone launcher/application
@@ -264,26 +168,26 @@ class ResourceClient:
 
     def cancel(self, job_id: str, *, cleanup_timeout=30) -> dict:
         ad, history = self._ad(job_id)
-        expected_pids = set()
-        if "BasePackPayload" in ad:
-            payload = json.loads(Path(ad["BasePackPayload"]).read_text(encoding="utf-8"))
-            receipt = Path(payload["worker_receipt"])
-            if receipt.exists():
-                worker = json.loads(receipt.read_text(encoding="utf-8"))
-                expected_pids = _descendants({worker["pid"], worker["child_pid"]}, _process_parents())
+        expected_pids = _worker_pids(ad)
+        if expected_pids:
+            expected_pids = _descendants(expected_pids, _process_parents())
         if not history:
             result = self._call("condor_rm", job_id, check=False)
             if result.returncode:
                 return self.status(job_id) | {"cleanup_confirmed": False, "cleanup_error": result.stdout + result.stderr}
-        cleanup = self._cleanup(job_id, cleanup_timeout, expected_pids)
+        cleanup = self._confirm_cleanup(job_id, cleanup_timeout, expected_pids)
         return self.status(job_id) | cleanup
 
-    def wait(self, job_id: str, *, timeout=300, enforce_limits=False) -> dict:
+    def wait(self, job_id: str, *, timeout=300) -> dict:
+        """Observe native state; expiry leaves the job running."""
+        return self._observe(job_id, timeout=timeout)
+
+    def _observe(self, job_id: str, *, timeout, enforce_limits=False) -> dict:
         deadline = time.monotonic() + timeout
         while True:
             result = self.status(job_id)
             if result["terminal"]:
-                return result | self._cleanup(job_id)
+                return result | self._confirm_cleanup(job_id)
             if result["state"] == "held":
                 if enforce_limits:
                     cleanup = self.cancel(job_id)
@@ -310,19 +214,21 @@ class ResourceClient:
 
     def run(self, spec: JobSpec) -> dict:
         submitted = self.submit(spec)
-        result = self.wait(submitted["job_id"], timeout=spec.queue_timeout + spec.run_timeout + 30, enforce_limits=True)
+        result = self._observe(submitted["job_id"], timeout=spec.queue_timeout + spec.run_timeout + 30, enforce_limits=True)
         if result.get("observation_expired"):
             result = self.cancel(submitted["job_id"]) | {"timeout": "overall"}
         return submitted | result
 
 
-def _descendants(roots: set[int], parents: dict[int, int]) -> set[int]:
-    found = set(roots)
-    while True:
-        children = {pid for pid, parent in parents.items() if parent in found}
-        if children <= found:
-            return found
-        found.update(children)
+def _worker_pids(ad: dict) -> set[int]:
+    if "BasePackPayload" not in ad:
+        return set()
+    payload = json.loads(Path(ad["BasePackPayload"]).read_text(encoding="utf-8"))
+    receipt = Path(payload["worker_receipt"])
+    if not receipt.exists():
+        return set()
+    worker = json.loads(receipt.read_text(encoding="utf-8"))
+    return {worker[key] for key in ("pid", "child_pid")}
 
 
 def _terminal_time(ad: dict, encoding: str) -> int | None:
@@ -341,41 +247,3 @@ def _terminal_time(ad: dict, encoding: str) -> int | None:
     return timestamp
 
 
-def _process_parents() -> dict[int, int]:
-    """Toolhelp lists PIDs and parent PIDs without opening another user's process."""
-    if os.name != "nt":
-        import psutil
-        return {process.pid: process.ppid() for process in psutil.process_iter()}
-    import ctypes
-    from ctypes import wintypes
-
-    class ProcessEntry(ctypes.Structure):
-        _fields_ = [("dwSize", wintypes.DWORD), ("cntUsage", wintypes.DWORD),
-                    ("th32ProcessID", wintypes.DWORD), ("th32DefaultHeapID", ctypes.c_size_t),
-                    ("th32ModuleID", wintypes.DWORD), ("cntThreads", wintypes.DWORD),
-                    ("th32ParentProcessID", wintypes.DWORD), ("pcPriClassBase", wintypes.LONG),
-                    ("dwFlags", wintypes.DWORD), ("szExeFile", wintypes.WCHAR * 260)]
-
-    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-    kernel.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
-    kernel.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
-    for name in ("Process32FirstW", "Process32NextW"):
-        function = getattr(kernel, name)
-        function.argtypes = [wintypes.HANDLE, ctypes.POINTER(ProcessEntry)]
-        function.restype = wintypes.BOOL
-    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
-    snapshot = kernel.CreateToolhelp32Snapshot(2, 0)
-    if snapshot == wintypes.HANDLE(-1).value:
-        raise ctypes.WinError(ctypes.get_last_error())
-    parents = {}
-    entry = ProcessEntry(dwSize=ctypes.sizeof(ProcessEntry))
-    try:
-        more = kernel.Process32FirstW(snapshot, ctypes.byref(entry))
-        while more:
-            parents[entry.th32ProcessID] = entry.th32ParentProcessID
-            more = kernel.Process32NextW(snapshot, ctypes.byref(entry))
-        if ctypes.get_last_error() != 18:
-            raise ctypes.WinError(ctypes.get_last_error())
-    finally:
-        kernel.CloseHandle(snapshot)
-    return parents

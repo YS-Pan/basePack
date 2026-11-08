@@ -10,7 +10,8 @@ import time
 
 def main():
     payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-    child = subprocess.Popen([payload["executable"], *payload["arguments"]])
+    spec = payload["spec"]
+    child = subprocess.Popen([spec["executable"], *spec["arguments"]])
     receipt = {
         "pid": os.getpid(), "child_pid": child.pid, "started": time.time(),
         "python": sys.executable, "cwd": os.getcwd(),

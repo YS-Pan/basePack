@@ -18,8 +18,8 @@ def main():
     check.add_argument("--facility", choices=["core", "embedding", "condor", "all"], default="all")
     from .embedding.cli import register_commands as embedding_commands
     embedding_commands(sub)
-    from .resources.cli import register_commands as resource_commands
-    resource_commands(sub)
+    from .jobs.cli import register_commands as job_commands
+    job_commands(sub)
     args = parser.parse_args()
     exit_code = 0
     if args.command == "init":
@@ -41,15 +41,10 @@ def main():
         elif args.command == "embed":
             from .embedding.cli import dispatch
             result, exit_code = dispatch(args, config)
-        elif args.command == "resources":
-            from .resources.cli import handle
-            result = handle(args, config)
+        elif args.command == "jobs":
+            from .jobs.cli import dispatch
+            result, exit_code = dispatch(args, config)
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    if args.command == "resources":
-        if args.resource_action == "run":
-            return 0 if result.get("success") and result.get("cleanup_confirmed") else 1
-        if args.resource_action == "cancel":
-            return 0 if result["cleanup_confirmed"] else 1
     return exit_code
 
 
