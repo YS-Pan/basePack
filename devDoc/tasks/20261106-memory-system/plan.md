@@ -8,7 +8,7 @@
 
 首个可用版本先包含短项目说明、文字检索、原文定位、一个廉价检索 worker 和最小增量维护；随后补齐本地向量、图片和实际语义图。这些后续能力仍属于完整交付范围。常驻信息中必须保留的指令与前提直接交付，按需信息参与筛选和评分。
 
-资源 R0–R7 已交付，当前先按 R8 整理公共入口与模块，再继续记忆 P0–P5；底座比较和资料准备可并行。各工具可独立使用和发布，一次文字查询不以全部作业改名或三层组织建成为前提。[file-structure](../../../skills/file-structure/SKILL.md) 与 [agent-team](../../../skills/agent-team/SKILL.md) 沿用各自维护源；本任务使用它们，不承担独立的团队组织研发和广读对照验收。
+本任务复用公共包和资源接口，实际安装与 R8 验收状态从 [资源进度](../20261107-resource-coordination/progress.md) 读取；记忆 P0–P5 的状态仅在本任务进度维护。底座比较和资料准备可独立进行。各工具可独立使用和发布，一次文字查询不以全部作业改名或三层组织建成为前提。[file-structure](../../../skills/file-structure/SKILL.md) 与 [agent-team](../../../skills/agent-team/SKILL.md) 沿用各自维护源；本任务使用它们，不承担独立的团队组织研发和广读对照验收。
 
 旧项目仅提供明确需求、事故样例和经确认的小接口，不自动迁入数据库、业务授权、任务台账或验收结论。核实历史时按主题查 [调研依据](../20261106-rebuild/research/sources.md)、[近期历史](../20261106-rebuild/legacy-history.md) 与 [聊天调查](../20261106-rebuild/research/thread-survey.md)，不复制报告或要求接手者重读全部聊天。
 
@@ -18,9 +18,9 @@
 | --- | --- |
 | 记忆行为、底座、来源/片段/图、索引与维护 | 本任务计划；落地后更新 [系统说明](../../system/overview.md) 和对应模块说明 |
 | 当前阶段、完成、阻碍、下一步 | 本任务 [progress.md](progress.md) |
-| 安装代码、公共配置与初始化 | 基础入口已交付；复用 [资源 R8](../20261107-resource-coordination/plan.md#实施批次) 的 ProjectConfig、功能配置作用域和初始化，不自建第二套安装/配置骨架 |
-| 共享 embedding 客户端与服务 | 共享客户端已交付；R8.2 收敛职责与身份合同，P2 的真实建库/查询只调用公开 EmbeddingClient，不依赖 supervisor、worker 或模型实现 |
-| 安装、路径和配置合同 | 唯一来源为 [部署合同](../20261107-resource-coordination/deployment-layout-plan.md)，区分 editable 与普通 wheel，以及源码 project/ 和实例 .basepack/；目标待 R8 实施 |
+| 安装代码、公共配置与初始化 | 复用 ProjectConfig、功能配置作用域和初始化，不自建第二套安装/配置骨架；实现和验收状态见 [资源进度](../20261107-resource-coordination/progress.md) |
+| 共享 embedding 客户端与服务 | P2 的真实建库/查询只调用公开 EmbeddingClient，向量语义使用 embedding_identity，不依赖 supervisor、worker 或模型实现；合同见 [资源模块](../../system/modules/resources.md) |
+| 安装、路径和配置合同 | 唯一来源为 [部署合同](../20261107-resource-coordination/deployment-layout-plan.md)，区分 editable 与普通 wheel，以及源码 project/ 和实例 .basepack/；实际部署见资源进度 |
 | 原件与共享资产 | 原件继续位于业务项目；记忆保存定位、版本及必要派生内容。权重、依赖与机器状态复用已有设施，通过配置定位，不硬编码本机路径 |
 
 共享资源不保存项目知识。来源、片段、节点、边与变化记录优先放 `.basepack/memory/` 内少量数据库/索引文件，避免每节点一文件。项目操作入口为 `.basepack/instructions.md`，短地图、检索委托、派生图片、缓存、日志和临时材料也收在 `.basepack/` 内，沿用模块维护位置并按需创建；根 AGENTS 只留短指针。业务原件和用户指定的导出目标保持其业务归属。产品源码和生成后的 skill 各有一个维护源，实例问题回改同一产品维护源；本仓库开发验收材料仍放被忽略的 `artifacts/`，与业务接入目录区分。

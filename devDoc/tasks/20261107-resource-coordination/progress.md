@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-R0–R7 已完成本机部署和真实验收，稳定安装仍为 0.3.0。R8 按 [维护计划](plan.md) 和 [部署合同](deployment-layout-plan.md) 顺序实施；源码检查与 R8.4 部署验收分别记录。
+R8.0 → R8.1 → R8.2 → R8.3 → R8.4 已依次完成并在 main 提交。当前稳定安装为 0.4.0 普通 wheel；显式迁移、源码外功能和生命周期验收完成，见 [R8 结果](maintenance-result.md)。接口和位置合同见 [维护计划](plan.md) 与 [部署合同](deployment-layout-plan.md)。
 
 记忆检索、建图和数据库尚未交付，由 [独立任务](../20261106-memory-system/plan.md) 接续。记忆 P0 的底座比较与资料准备可以并行，不等待全部作业改名。
 
@@ -23,31 +23,24 @@ R0–R7 已完成本机部署和真实验收，稳定安装仍为 0.3.0。R8 按
 
 ## R8 状态
 
-| 阶段 | 状态 | 下一项交付 |
+| 阶段 | 状态 | 实际交付与阶段检查 |
 | --- | --- | --- |
-| R8.0 | 源码完成 | JobSpec 局部规范化副本；锁内拒绝重复活动 request_id；全套 27 项回归通过 |
-| R8.1 | 源码完成 | project/ 唯一源码/模板、按需功能配置、.basepack/ 配置与指令；全套 34 项通过，构建包模板核验通过 |
-| R8.2 | 源码完成 | supervisor/模型/所有权及 transport/registry/identity/admin 拆分；全套 51 项通过，机器 CLI 轻量检查通过 |
-| R8.3 | 源码完成 | jobs/CondorClient、schema 2/[jobs]、submit/_processes 与单份 spec payload；全套 74 项通过 |
-| R8.4 | 实施中 | 0.4.0 wheel 与显式迁移已准备，源码 92 项通过；待系统安装、实例迁移与真实验收 |
+| R8.0 | 完成 | JobSpec 局部规范化副本；锁内拒绝重复活动 request_id；全套 27 项回归通过 |
+| R8.1 | 完成 | project/ 唯一源码/模板、按需功能配置、.basepack/ 配置与指令；全套 34 项通过，构建包模板核验通过 |
+| R8.2 | 完成 | supervisor/模型/所有权及 transport/registry/identity/admin 拆分；全套 51 项通过，机器 CLI 轻量检查通过 |
+| R8.3 | 完成 | jobs/CondorClient、schema 2/[jobs]、submit/_processes 与单份 spec payload；全套 74 项通过 |
+| R8.4 | 完成 | 0.4.0 普通安装、六配置迁移、源码外两项目及真实图文/作业/生命周期；源码与源码外各 92 项通过 |
 
-R8.0 使用内存替身验证跨项目复用、失败不变性及重复 ID 的结果/取消/清理隔离；未启动模型或改变稳定安装。主 agent 全套检查：`PYTHONPATH=src python -m pytest -q --basetemp artifacts/r80-root-pytest`，27 passed。
+## 0.4.0 当前交付
 
-## 0.3.0 交付快照
+- 系统 Python 为 `C:/Program Files/Python313/python.exe`，普通包在其 `Lib/site-packages/basepack`。wheel 为 `dist/basepack-0.4.0-py3-none-any.whl`，42319 字节，SHA256 `3322c8eebfcd0a12a4518639cf66e7a202fa76d6a47fa7b34be80cdecab15563`；30 份代码/模板/许可与源码、wheel、安装一致，旧源码入口已移除。
+- 用旧安装停止并确认旧 broker 退出后一次安装。六份既有源码外试用配置显式迁到项目 schema 2/[jobs]，备份/映射保存在各项目 `.basepack/migration/`；新两项目、深层中文/空格配置、任意 cwd、移动、新检出及所有模板/轻量命令通过。
+- 作业 14335–14338 实得 CPU 499500、应用退出 7、GPU 256；真实图文向量为 2048 维且归一化，GPU 进展与实际 forward 重叠。请求取消/截止、作业取消、另一项目服务存活、日志、原生历史及进程回收均通过。
+- 真实已加载模型的 supervisor 崩溃回收、锁释放、冷恢复、正常停止和原配置 300 秒空闲整进程退出通过。2026-11-08 17:07 北京时间最终实查：supervisor 17804、无模型 worker，运行与磁盘部署指纹匹配，队列为空；12CPU/24576MiB RAM/4同卡名额/7164MiB普通池全部可用。服务仍非登录自启。
+- 机器 schema 1、模型及共享状态物理位置保持；机器 TOML 和 Condor 60/70 的 SHA256 与升级前相同，背景预留仍为 9216 MiB。本轮未重新标定额度或吞吐，历史额度证据继续见 R6/R7。
 
-以下沿用 R7 回执，不是本轮重新查询的服务/队列状态；实施升级前须核实际在途工作和运行实例。
+回执集中在本机 `artifacts/r8/`，源码外实例为 `D:/project/20261108-basepack-r8-acceptance/`；详细位置和边界见 R8 结果。旧 0.3.0 wheel 保留在 `dist/` 可供恢复，原交付条件见 [R7 结果](standard-submit-result.md)，不把旧 PID 或队列快照作为当前依据。
 
-- Condor 的 60_resources.conf 维护 12 CPU、24576 MiB RAM、4 个同卡名额和 7164 MiB 普通池；70_job_transforms.conf 维护标准字段转换。背景预留为 9216 MiB，机器 TOML 维护 embedding 自身设置。
-- 系统 Python 为 C:/Program Files/Python313/python.exe，普通包在其 Lib/site-packages/basepack。0.3.0 wheel 为 dist/basepack-0.3.0-py3-none-any.whl，SHA256 为 ee19d7ec94be4abc933f58854b62c5129ebf2763db6d42cd95033f40df4ee26a；22 份代码/模板/许可一致，源码与源码外回归各 22 项通过。
-- R7 原生 14319–14331 和普通客户端 14332–14334 的调度、CUDA 结果、图文 embedding、取消及资源归还通过。回执最终队列为空，独立 broker 43200 无模型驻留，测试 worker 21732 已退出；服务不是登录自启。
-- 原始材料为 artifacts/standard-submit/；R6 为 artifacts/native-condor/。历史时限、测量和合作声明边界见各结果，不据小矩阵、声明额度或测试数量推断显存硬隔离和吞吐。
+## 下一步与边界
 
-## 下一步
-
-R8.2 的 22 项 embedding 回归覆盖语义/运行身份、协议、旧 marker 管理、请求隔离、冷启动、空闲退出及 Windows supervisor 崩溃后 worker 回收与重启。机器 CLI 不加载项目配置或模型依赖；当时源码全套 51 passed（`artifacts/r82-root-pytest`），尚未部署。
-
-R8.3 项目 schema 2/[jobs] 已切换；wait 只观察，run 管理交互时限，原生 Condor 时限保留。40 项 jobs 回归覆盖 spec 不变性、单份 payload、复杂 argv/空参数、应用失败、标准字段、资源预检、提交不确定、空查询和取消回收；全套 74 passed（`artifacts/r83-root-final-pytest`）。
-
-R8.4 已准备 0.4.0 普通 wheel（30 份包文件与源码逐字节一致）与显式 `migrate --from-config`；配置/迁移回归 28 项，全套源码 92 passed（`artifacts/r84-source-pytest`）。升级前实际检查见 `artifacts/r8/before.json`：系统 0.3.0 普通安装，旧 broker 43200、无 worker，队列为空，12CPU/24576MiB/4名额/7164MiB 全部可用。找到六份既有源码外试用配置；本轮不接管业务旧库，历史 artifacts 保留原版证据。
-
-下一步用旧安装停止服务，普通安装新 wheel，显式迁移六份配置并做源码外两项目功能验收。稳定安装目前仍为 0.3.0；站点容量、模型和机器 schema 保持当前合同，远端推送与发布不在本次范围。
+R8 无未完成验收项。继续 [记忆 P0–P5](../20261106-memory-system/plan.md)，本轮不实现记忆数据库或继承旧业务知识/授权。历史 Condor ClassAd 保留原绝对路径，项目/数据迁址后的旧 status 不保证可用，按迁移备份和映射回查。远端推送与发布不在本次范围。

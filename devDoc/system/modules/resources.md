@@ -1,12 +1,12 @@
 # 资源工具
 
-公共配置由 [project/config.py](../../../src/basepack/project/config.py) 解析。ProjectConfig 只加载公共绑定，各功能按需读取自身配置；MachineConfig.path 是机器配置位置的唯一来源。产品调用见 [资源使用](../../../docs/resources.md)，机器维护见 [管理员说明](../../../docs/administrator.md)。本模块不维护记忆索引、图或数据库。
+公共配置由 [project/config.py](../../../src/basepack/project/config.py) 解析。项目 schema 2 使用 `[jobs]`，机器保持 schema 1；ProjectConfig 只加载公共绑定，各功能按需读取自身配置，MachineConfig.path 是机器配置位置的唯一来源。实例文件统一在 `.basepack/`，[migrate](../../../src/basepack/project/migrate.py) 显式升级旧配置并保存项目内备份/映射，公共加载器直接拒绝旧项目格式。产品调用见 [资源使用](../../../docs/resources.md)，机器维护见 [管理员说明](../../../docs/administrator.md)。本模块不维护记忆索引、图或数据库。
 
 ## 独立 embedding
 
 [embedding](../../../src/basepack/embedding/) 的 qwen3_vl 模型实现接收模型/推理设置，完成严格图文预处理、归一化和内部批处理；不依赖 HTTP 或登记。identity 维护 embedding_identity：权重 revision/文件身份、FP16、指令、图像缩放及 pooling 合同决定向量语义；max_length、batch_size、线程、空闲时限与部署路径不改变此标识。
 
-机器级 supervisor 必须在 Condor 作业树之外启动。registry 维护登记、锁和 deployment_fingerprint；transport 仅处理 JSON/HTTP、协议版本和原始远程错误。创建锁保证一个启动者；supervisor 按需创建并拥有一个模型 worker。登记物理路径仍为 broker.json/broker.lock，机器共享目录只保存 endpoint、锁与 stderr。EmbeddingClient 明确接收 MachineConfig，公开请求、取消和关闭；管理 status/stop 在 admin，机器 CLI 无需项目配置。
+机器级 supervisor 必须在 Condor 作业树之外启动。registry 维护登记、锁和 deployment_fingerprint；transport 仅处理 JSON/HTTP、协议版本和原始远程错误。创建锁保证一个启动者；supervisor 按需创建并拥有一个模型 worker。登记物理路径仍为 broker.json/broker.lock，机器共享目录只保存 endpoint、锁与 stderr。EmbeddingClient 明确接收 MachineConfig，公开请求、取消和关闭；管理 status/stop 在 admin，CLI `embedding --machine-config <file> serve|status|stop` 无需项目配置。
 
 worker 在线程接入层处理状态、取消与截止，单线程模型循环执行 forward。截止覆盖排队、加载与推理等待；在算 forward 可完成，但结果丢弃，后续内部批次不再执行。空闲边界整进程退出；supervisor 崩溃由 WorkerProcessOwner 的 Windows Job Object 回收其 worker。异常原始类型、信息与 traceback 返回调用方，不自动重试推理。
 
@@ -26,7 +26,7 @@ GPU JobSpec 的 `gpu_memory_mib` 只生成官方 `request_gpus = 1` 与 `gpus_mi
 
 Windows submit 的字段分别编码，文件采用本机原生编码。实际探针表明 Condor 参数转换会丢失空参数，因此随包薄 worker 从 UTF-8 JSON 读取应用参数数组，再用系统进程 API 启动应用。worker 继承最终 starter 环境并保留 GPU 可见性，stdout/stderr 由 Condor 接管；它和应用后代均属于原生作业树。
 
-run 执行有界等待，排队/执行时限同时写入 Condor 原生策略；wait 的时限只结束观察。取消结果分别报告终态与 cleanup_confirmed，确认包含原生历史及已知本任务进程消失；撤销或确认失败保留原错误。完成退出码和显式回传产物只是机械检查，调用者仍核业务结果。
+run 执行有界等待，排队/执行时限同时写入 Condor 原生策略；公开 wait 只观察，不修改作业。`_check_request` 负责提交前检查，`_confirm_cleanup` 确认原生历史及已知本任务进程消失，worker 回执读取集中维护。取消结果分别报告终态与 cleanup_confirmed；撤销或确认失败保留原错误。jobs CLI 自行决定作业成功/清理退出码，各 CLI 使用 register_commands/dispatch，根入口只组合命令和输出。完成退出码和显式回传产物只是机械检查，调用者仍核业务结果。
 
 ## 证据
 

@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-重建大阶段继续进行。资源 R0–R7 已交付，当前先按 R8 完成公共包/资源模块维护，再接续记忆闭环；本轮只重新整理计划，没有修改实现。分步状态只维护在 [资源进度](../20261107-resource-coordination/progress.md) 和 [记忆进度](../20261106-memory-system/progress.md)，本页保留跨工具、文件结构与分层协作入口，顺序和发布条件见 [重建总览](plan.md)。
+重建大阶段继续进行。公共包/资源模块按 R8 顺序维护，随后接续记忆闭环。分步实现、部署和验收状态只维护在 [资源进度](../20261107-resource-coordination/progress.md) 和 [记忆进度](../20261106-memory-system/progress.md)，本页保留跨工具、文件结构与分层协作入口，顺序和发布条件见 [重建总览](plan.md)。
 
 ## 已完成
 
@@ -19,7 +19,7 @@
 - 资源 R0–R5 已完整交付共享embedding、Condor入口及公共包/配置，普通wheel源码外联合验收通过；供记忆任务后续复用的接口见 [结果](../20261107-resource-coordination/result.md)。产品README、使用/管理员说明与resources skill已建立，状态只维护在对应 [进度](../20261107-resource-coordination/progress.md)。
 - 资源后续 R6 已按用户要求切换为通用 Condor 节点容量与同卡显存累计记账，0.2.0 普通 wheel、四作业共享及 embedding 联合验收完成；见 [专项结果](../20261107-resource-coordination/native-condor.md)。
 - 资源 R7 已交付0.3.0普通wheel与Condor原生提交转换；用户只填官方GPU字段，站点内部资源由Condor管理。四项同卡、第五项排队、默认整池、取消与embedding联合实测通过，见 [R7结果](../20261107-resource-coordination/standard-submit-result.md)。
-- 已将本轮架构评审和两侧目录要求收敛为 [R8.0–R8.4](../20261107-resource-coordination/plan.md#实施批次)，同步命名、模块边界、迁移和必要回归；这是计划维护完成，R8 实现尚未开始。
+- 本轮架构评审和两侧目录要求以 [R8.0–R8.4](../20261107-resource-coordination/plan.md#实施批次) 为执行入口，源码接口与部署合同均已更新；实际阶段结论只见 [资源进度](../20261107-resource-coordination/progress.md)。
 
 ## 阻碍与待核
 
@@ -28,6 +28,6 @@
 
 ## 下一步
 
-1. 按资源 R8 分步实施并一次完成普通 wheel 迁移验收；现行 0.3.0 继续按使用文档操作，远端发布按用户指令执行。
+1. 从资源进度核当前普通 wheel、迁移和验收结论；使用接口以产品文档为准，远端发布按用户指令执行。
 2. 记忆 P0 的选型与资料准备可并行；公共接入形成后推进 P1 文字闭环，具体状态从 [记忆进度](../20261106-memory-system/progress.md) 接续。
 3. 文件结构和分层协作在实际任务中继续验证；联合发布按 [总览 P8](plan.md#p8-联合交付与轻量发布) 执行。

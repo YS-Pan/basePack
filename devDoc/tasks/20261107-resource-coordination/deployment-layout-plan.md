@@ -1,6 +1,6 @@
 # 包结构、项目配置与部署合同
 
-更新：2026 年 11 月 8 日。本页是 [R8 维护计划](plan.md#实施批次) 的源码布局、实例目录和迁移合同，目标均待实施。现行 0.3.0 仍使用根 config/setup/doctor 模块、resources 命名和项目根 basepack.toml，实际用法见 [项目接入](../../../docs/setup-project.md)，已交付结果见 [R7 回执](standard-submit-result.md)。阶段状态统一见 [进度](progress.md)。
+更新：2026 年 11 月 8 日。本页维护 0.4.0 的源码布局、实例目录及从 0.3.0 升级的显式迁移合同，对应 [R8 维护计划](plan.md#实施批次)。使用步骤见 [项目接入](../../../docs/setup-project.md)，阶段实施、部署和验收状态统一见 [进度](progress.md)；0.3.0 的原交付条件保留在 [R7 回执](standard-submit-result.md)。
 
 用户明确要求两侧都归组：项目接入相关源码与模板集中在 src/basepack/project/；由 basePack 管理的业务项目局部文件集中在 .basepack/。本页不把 Python 源码当作要复制给业务项目的实例文件。
 
@@ -19,9 +19,9 @@
 
 共享安装路径由解释器管理，不在项目保存 package_dir/PYTHONPATH 或 app 副本。机器路径通过显式配置定位，公共源码不写死本机绝对路径。本仓库 skills/、devDoc/、开发用 artifacts/ 和 .agents/skills/ 发现联接保留原位。
 
-## 目标源码结构
+## 0.4.0 源码结构
 
-以下是 R8 全部阶段完成后的结构；各 __init__.py 按需导出公开接口，保持轻量。记忆模块到 P0 有实际实现时创建。
+源码按以下职责归组；各 __init__.py 按需导出公开接口，保持轻量。记忆模块到 P0 有实际实现时创建。
 
 ```text
 src/basepack/
@@ -31,6 +31,7 @@ src/basepack/
     __init__.py
     config.py                    ProjectConfig、MachineConfig 及唯一解析实现
     init.py                      初始化项目、合并宿主短入口
+    migrate.py                   显式迁移旧项目配置与生成材料
     doctor.py                    只读诊断
     templates/
       project.toml
@@ -61,7 +62,7 @@ src/basepack/
 
 ### 源码迁移映射
 
-| 当前维护位置 | R8 目标 |
+| 0.3.0 维护位置 | 0.4.0 维护位置 |
 | --- | --- |
 | src/basepack/config.py | project/config.py，Config 改为 ProjectConfig，加载函数明确项目/机器作用域 |
 | src/basepack/setup.py | project/init.py |
@@ -99,7 +100,7 @@ src/basepack/
 
 项目文件只绑定运行 Python、机器配置及项目局部设置。R8 项目 schema 升为 2，将旧 [resources] 节显式迁为 [jobs]；机器文件继续 schema 1，不因项目命名调整而升级。解析按文件职责检查版本，不自动覆盖、合并或回退旧格式。
 
-目标 .basepack/config.toml 示例；memory 节仅在启用记忆时必需：
+.basepack/config.toml 示例；memory 节仅在启用记忆时必需：
 
 ```toml
 schema_version = 2
@@ -147,7 +148,7 @@ init 默认写 .basepack/config.toml，对应 project.root = '..'。保留 --con
 
 资源调用前，根 AGENTS 的最短指针引导读取 .basepack/instructions.md；记忆启用后，P1 须验证任务开始/接续时的读取触发和 brief 实际交付。详细指令给出所选配置及启动方式，必须保留的信息直接交付，避免把全部合同变成每轮必读内容。
 
-目标调用形式：
+调用形式：
 
 ```powershell
 & '<python>' -m basepack --config '<project>/.basepack/config.toml' config show
@@ -166,10 +167,11 @@ config show 返回解析位置与实际安装信息，不另存为第二份有�
 
 同一解释器只保留一种有效安装。依赖、入口或元数据变化时重新安装；运行中的进程按受影响范围重启。当前保留一个发行包和可选 embedding 依赖，共用已有模型和环境；专用模型解释器或独立客户端发行版留待实际冲突需求。
 
-R8.4 统一执行：
+从 0.3.0 升级到 0.4.0 的顺序：
+
 1. 准备新 wheel、旧配置到目标的映射和可恢复备份；核实际调用方和在途工作。备份随所属项目的 .basepack/ 保存，不创建新的根目录工具文件。
 2. 暂停提交并排空旧作业，用旧安装停止共享服务。旧 resources.worker 入口与旧 payload 不能留到删除模块后再执行。
-3. 普通安装新 wheel，显式迁移项目 schema/节名、配置路径和宿主指针，再启动新服务。新解析器直接拒绝不支持的项目版本，旧配置只在显式迁移步骤读取，不建设长期双格式加载。
+3. 普通安装新 wheel，对实际接入配置执行 `migrate --from-config <old-config>`，显式迁移项目 schema/节名、配置路径和宿主指针，再启动新服务。新解析器直接拒绝不支持的项目版本，旧配置只在显式迁移步骤读取，不建设长期双格式加载。
 4. 完成源码外功能验收后恢复提交；失败时按记录恢复对应安装和配置。站点 60/70 容量/提交策略、机器 schema、模型及共享状态物理位置保持原合同。
 
 ## 从旧方案到本方案
@@ -184,11 +186,15 @@ R8.4 统一执行：
 | resources CLI/API/worker 模块 | 一次切到 jobs CLI/CondorClient/新模块路径，交付说明列出全部变化 |
 | 旧项目 app 副本、runtime.json、局部模型缓存 | 仅作历史参考；新工具统一安装、共享模型，不自动接管旧知识或任务状态 |
 
-发生数据或项目整体移动时，修复受影响回执、绝对路径和来源定位；保留必要原件与迁移证据。模型身份与索引兼容按记忆合同处理，安装路径变化不等于向量语义变化。
+`project/migrate.py` 只在显式迁移时读取 schema 1，按原解析项目根生成 schema 2 配置。`--config-name` 可指定 `.basepack/` 内的深层目标。原配置、已有 AGENTS/忽略文件/详细入口及改写前 JSON 备份到所属项目 `.basepack/migration/<id>/files/`，mapping.json 保存来源、目标和数据移动映射；成功后移除与目标不同的旧有效配置。TOML 字段和值保留，注释不保留。
+
+已在 `.basepack/` 内的数据保持物理位置；旧自定义目录必须在原项目内且低于项目根，迁入 `.basepack/memory` 或 `.basepack/jobs` 前拒绝目标冲突。迁移修复已知生成 JSON 的路径字段，保留业务 arguments/environment。已完成 Condor 历史 ClassAd 保留原 BasePackPayload 绝对路径，目录移动后的历史 status 不保证可用，可按备份与映射回查。
+
+项目整体移动后，配置按新位置解析，已有作业材料的绝对路径和来源定位仍须核对。模型身份与索引兼容按记忆合同处理，安装路径变化不等于向量语义变化。
 
 ## 实施接续与完成条件
 
-分步动作与验收只维护在 [R8.0–R8.4](plan.md#实施批次)；本页维护目标合同。最终核源码/模板唯一维护源、普通 wheel 包数据和包根诊断，以及两项目、任意 cwd、深层配置、中文/空格路径、移动、新检出和旧配置迁移；真实 embedding/作业结果和资源归还才构成功能验收。实际数据库隔离与应用效果继续由记忆 P1/P5 验证。
+分步动作与完成条件维护在 [R8.0–R8.4](plan.md#实施批次)，按 R8.0 → R8.1 → R8.2 → R8.3 → R8.4 顺序执行；本页维护布局与迁移合同，实际状态只在进度记录。最终核源码/模板唯一维护源、普通 wheel 包数据和包根诊断，以及两项目、任意 cwd、深层配置、中文/空格路径、移动、新检出和旧配置迁移；真实 embedding/作业结果和资源归还才构成功能验收。实际数据库隔离与应用效果继续由记忆 P1/P5 验证。
 
 ## R8 项目局部文件统一目录
 
