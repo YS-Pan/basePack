@@ -33,8 +33,15 @@ def init_project(root: str | Path, machine_config: str | Path,
         root=json.dumps(Path(os.path.relpath(root, config.parent)).as_posix()),
     )
     config.write_text(text, encoding="utf-8")
+    _write_project_entry(root, config, Path(sys.executable))
+    return config
+
+
+def _write_project_entry(root: Path, config: Path, python: Path) -> None:
+    """Write the shared project entry after init or an explicit migration."""
+    instructions = root / ".basepack" / "instructions.md"
     instructions.write_text(Template(template("instructions.md")).substitute(
-        python=str(sys.executable).replace("'", "''"),
+        python=str(python).replace("'", "''"),
         config=config.relative_to(root).as_posix(),
     ), encoding="utf-8")
     agents = root / "AGENTS.md"
@@ -53,4 +60,3 @@ def init_project(root: str | Path, machine_config: str | Path,
     if "/.basepack/" not in lines:
         lines.append("/.basepack/")
     ignore.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return config
