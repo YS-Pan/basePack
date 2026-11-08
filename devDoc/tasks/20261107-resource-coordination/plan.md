@@ -1,6 +1,6 @@
 # 计算资源协调实施计划
 
-R0–R7 已完成，现行部署为 0.3.0，结果见 [R7 回执](standard-submit-result.md)。当前新增 [R8：项目局部文件统一目录](deployment-layout-plan.md#r8-项目局部文件统一目录)，计划将接入配置、详细操作指令及各类项目局部数据集中到 `.basepack/`；本批待实施，状态见 [进度](progress.md)。
+R0–R7 已完成，现行部署为 0.3.0，结果见 [R7 回执](standard-submit-result.md)。当前新增 [R8：项目局部文件统一目录](deployment-layout-plan.md#r8-项目局部文件统一目录)，项目接入源码和模板归到 `src/basepack/project/`，生成到业务项目的配置、详细操作指令及局部数据集中到 `.basepack/`；本批待实施，状态见 [进度](progress.md)。
 
 R0–R5 的原实施与验收保留如下。2026-11-08 用户要求普通容量直接由通用 HTCondor 节点维护、背景总预留 9 GiB、单 GPU 最多 4 个普通作业共享；该后续批次的设计、依据和验收见 [通用节点改造](native-condor.md)，状态见 [进度](progress.md)。
 

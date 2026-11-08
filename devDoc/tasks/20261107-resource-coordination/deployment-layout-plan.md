@@ -1,6 +1,6 @@
 # 安装位置与项目配置布局计划
 
-2026 年 11 月 8 日更新。basePack 的记忆和资源协调共用系统 Python 包入口：本机开发用 editable 安装，稳定部署用普通 wheel。模型保留在 AgentTools，项目数据库留在各项目，HTCondor 独立安装。本页维护公共部署合同；R0–R7 已交付，当前 0.3.0 的实际操作见 [项目接入](../../../docs/setup-project.md)，验收见 [R7 结果](standard-submit-result.md)。本次按用户要求将所有 basePack 管理的项目局部文件统一放入 `.basepack/`，作为 [R8 待实施目标](#r8-项目局部文件统一目录)，尚未修改实现或迁移已有项目；状态见 [进度](progress.md)。
+2026 年 11 月 8 日更新。basePack 的记忆和资源协调共用系统 Python 包入口：本机开发用 editable 安装，稳定部署用普通 wheel。模型保留在 AgentTools，项目数据库留在各项目，HTCondor 独立安装。本页维护公共部署合同；R0–R7 已交付，当前 0.3.0 的实际操作见 [项目接入](../../../docs/setup-project.md)，验收见 [R7 结果](standard-submit-result.md)。本次按用户要求将项目接入源码和模板集中到 `src/basepack/project/`，生成到业务项目的局部文件统一放入 `.basepack/`，作为 [R8 待实施目标](#r8-项目局部文件统一目录)，尚未修改实现或迁移已有项目；状态见 [进度](progress.md)。
 
 公共安装与配置骨架已由 [本任务 R0](plan.md#r0-复用准备与预算标定) 交付，本页是两项工具共用的部署合同；[记忆任务](../20261106-memory-system/plan.md) 引用它，记忆数据库和检索建设仍由该任务负责。
 
@@ -22,7 +22,7 @@
 
 site-packages 的绝对目录由解释器管理，项目不保存 package_dir，也不配置 PYTHONPATH。执行时读取配置中的 Python，以 `python -m basepack` 调用安装包；业务项目不复制 app 源码。普通 wheel 部署不依赖源码仓库，开发模式的源码引用由 pip 建立。
 
-`config.py` 和 `Config` 属于安装包代码；进入业务项目的是 TOML 实例配置。统一目录约束针对 basePack 自己管理的项目局部文件。原业务源码、文档、图片和用户指定的应用输出沿用业务布局，记忆保存引用与必要派生内容；本工具默认生成的文件收进 `.basepack/`。根 `AGENTS.md` 和 `.gitignore` 是宿主/版本控制入口，只合并一条短指针和 `/.basepack/` 忽略规则，保留原有业务内容。本仓库的 `src/`、`skills/`、`devDoc/`、开发用 `artifacts/` 及 `.agents/skills/` 联接属于产品开发结构，本次接入布局调整不移动它们。
+`config.py` 和 `Config` 属于安装包代码；进入业务项目的是 TOML 实例配置。源码侧的项目接入模块与模板也要归在同一目录，目标为 `src/basepack/project/`，映射见下文；业务侧由 basePack 管理的局部文件集中到 `.basepack/`。原业务源码、文档、图片和用户指定的应用输出沿用业务布局，记忆保存引用与必要派生内容。根 `AGENTS.md` 和 `.gitignore` 是宿主/版本控制入口，只合并一条短指针和 `/.basepack/` 忽略规则，保留原有业务内容。本仓库的 `skills/`、`devDoc/`、开发用 `artifacts/` 及 `.agents/skills/` 联接继续保留原位。
 
 ## 开发安装与正式部署
 
@@ -142,7 +142,7 @@ doctor 检查配置、包定位、相关路径及对应设施的只读接入，�
 
 ## GitHub 源码与使用说明
 
-复用现有 devDoc 和 skills，不重组它们。运行工具落地时补这些实际内容：
+复用现有 devDoc 和 skills，不重组它们。R8 将项目接入相关源码与随包模板统一收进 `src/basepack/project/`；以下为目标结构，当前 0.3.0 仍使用原路径：
 
 ```text
 basePack/                          GitHub 源码仓库
@@ -150,17 +150,36 @@ basePack/                          GitHub 源码仓库
   docs/setup-project.md            指导 agent 建立基于 basePack 的项目
   pyproject.toml                  wheel、依赖、入口和模板打包声明
   src/basepack/
+    __init__.py                   包入口与版本
     __main__.py                   模块启动入口
-    config.py                     项目/机器配置与路径解析的唯一实现
+    project/                      项目接入的源码与模板统一维护目录
+      __init__.py                 轻量子包入口
+      config.py                   项目/机器配置与路径解析的唯一实现
+      init.py                     初始化项目、生成配置和合并宿主短入口
+      doctor.py                   接入与设施只读诊断
+      templates/
+        project.toml              项目配置模板
+        machine.toml              机器配置模板
+        instructions.md           项目详细操作入口模板
+        agents-snippet.md          根 AGENTS 短指针模板
     embedding/                    独立 embedding 客户端/服务
     resources/                    Condor 适配与重任务入口
-    templates/
-      project.toml                项目配置模板
-      machine.toml                机器配置模板
-      agents-snippet.md           项目入口短文
   skills/                         既有 skills 与后续按需交付的 skill
   devDoc/                         既有开发材料
 ```
+
+源码迁移映射：
+
+| 当前位置 | R8 目标位置 |
+| --- | --- |
+| `src/basepack/config.py` | `src/basepack/project/config.py` |
+| `src/basepack/setup.py` | `src/basepack/project/init.py` |
+| `src/basepack/doctor.py` | `src/basepack/project/doctor.py` |
+| `src/basepack/templates/` | `src/basepack/project/templates/`，补详细指令模板 |
+
+`project` 是轻量项目接入子包，配置解析不导入 embedding 模型或作业客户端；各工具只引用所需的配置功能，根 `__main__.py` 保留命令组合。实施时同步 CLI、broker/worker、测试、示例和使用文档中的导入路径及 API 调用；模板读取锚定新子包，`pyproject.toml` 的 package-data 随之更新。根目录不再保留第二份实现或模板副本。`Config` 等类名和 embedding/resources 内部改名仍属先前建议，不随这次目录归组自动实施。
+
+模块移动后，`config show` 的 `package_dir` 和 doctor 的包检查仍定位 `basepack` 包根，模板检查则定位 `project/templates/`，不能直接沿用移动前的 `Path(__file__).parent` 假设。broker/worker 的导入修改会改变现有实例代码指纹，升级前用旧安装停止共享服务，升级后重新启动；保留现有显式升级合同，不为目录迁移增加实例身份机制。
 
 模板随安装包分发，维护源各一份；init 从已安装包读取，不要求新项目能访问本机源码仓库。未来 `docs/setup-project.md` 区分本机首次部署与每个项目接入，并覆盖这些步骤：
 
@@ -193,9 +212,9 @@ R0 验证：editable 的最小代码修改能被新进程加载，最小普通 w
 
 ## R8 项目局部文件统一目录
 
-2026-11-08 用户要求所有准备放入业务项目的 basePack 内容集中存放；目标目录沿用 `.basepack/`。本批只处理项目接入布局，前述架构和模块改名建议仍待单独确定；机器配置、共享模型、服务状态和 Condor 部署继续外置。本次仅修改计划。
+2026-11-08 用户要求项目接入相关文件统一存放，并澄清源码 `src/basepack/` 内也按同一职责归组。源码目标为 `src/basepack/project/`，业务实例目标沿用 `.basepack/`。本批处理项目接入源码、模板及生成布局，其余架构和模块改名建议仍待单独确定；机器配置、共享模型、服务状态和 Condor 部署继续外置。本次仅修改计划。
 
-1. **初始化与模板。** 更新 init、配置模板和操作入口模板，生成上述目标结构；自定义配置和本工具管理的数据路径限于 `.basepack/`。按显式配置的所在目录计算项目根，模块仍沿用唯一配置解析实现，数据目录按需创建。
+1. **源码归组与初始化。** 按上述映射将配置、初始化、诊断及模板归入 `project/`，更新导入、模板资源读取与包数据声明；更新 init、配置模板和操作入口模板，生成业务实例目标结构。自定义配置和本工具管理的数据路径限于 `.basepack/`。按显式配置的所在目录计算项目根，模块仍沿用唯一配置解析实现，数据目录按需创建。
 2. **已有实例迁移。** 先确认目标冲突和在途工作，保留原配置及数据。根 `basepack.toml` 移到 `.basepack/config.toml` 时，将 `project.root` 从 `.` 改为 `..`，原有 `.basepack/memory` 和 `.basepack/jobs` 保持位置。旧自定义配置按原先解析出的项目根重新计算相对路径，保持实际项目根不变。旧自定义数据目录在工作结束后按明确映射迁入；作业回执中的绝对路径和来源定位随实际移动修复。更新根短指针和忽略规则，核验新入口后停止使用旧配置。迁移前仍可显式指定旧配置，不增加自动发现、双配置合并或后台搬迁。
-3. **使用交付。** 同步源码、tests、README、项目接入文档、示例、相关 skills 与系统说明，再构建普通 wheel；实际生效后记录结果和部署版本。保持原有业务文件和用户显式导出目标。
-4. **验收。** 在源码外普通 wheel 环境中初始化两个项目，核所有本工具生成的局部文件都位于各自 `.basepack/`，根目录只出现必要的宿主指针/忽略项，既有业务内容保留。验证中文/空格路径、自定义深层配置、从任意工作目录调用、项目移动、新检出重建及旧实例迁移；配置、jobs 与未来 memory 不混入另一项目，也不产生双层目录。检查普通调用不要求迁入共享代码/模型，根指针能实际交付完整操作入口，并跑一次 embedding 和普通作业确认功能及日志定位。记忆数据库的真实迁移和隔离仍由 P1/P5 随实现验收。
+3. **使用交付。** 同步源码、tests、README、项目接入文档、示例、相关 skills 与系统说明，再构建普通 wheel；检查实际安装内容并按既有合同切换受影响服务，实际生效后记录结果和部署版本。保持原有业务文件和用户显式导出目标。
+4. **验收。** 核源码和 wheel 中项目接入模块/模板仅保留 `project/` 这一份维护位置；命令帮助及配置导入不加载模型依赖，`config show` 正确报告包根和实际安装，doctor 核到新模板目录并能读取全部模板，原有配置/服务/资源回归通过。在源码外普通 wheel 环境中初始化两个项目，核所有本工具生成的局部文件都位于各自 `.basepack/`，根目录只出现必要的宿主指针/忽略项，既有业务内容保留。验证中文/空格路径、自定义深层配置、从任意工作目录调用、项目移动、新检出重建及旧实例迁移；配置、jobs 与未来 memory 不混入另一项目，也不产生双层目录。检查普通调用不要求迁入共享代码/模型，根指针能实际交付完整操作入口，并跑一次 embedding 和普通作业确认功能及日志定位。记忆数据库的真实迁移和隔离仍由 P1/P5 随实现验收。
