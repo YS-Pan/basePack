@@ -2,6 +2,8 @@
 
 2026-11-08 后续批次，接续 [0.1.0 交付](result.md)。用户要求普通任务完全由 HTCondor 管理，basePack 作为普通提交客户端；背景总预留 9 GiB，剩余显存交给普通作业，单卡最多 4 项并行。本批不修改项目纲领。
 
+本页记录R6已部署状态；后续消除提交端对内部资源名依赖的 [R7计划](standard-submit-plan.md) 待实施，JOB_TRANSFORM尚未启用。
+
 ## 职责与实现
 
 - 普通容量只维护在本机 `C:/condor/config/60_resources.conf`：12 CPU、24576 MiB RAM、4 个共享 GPU 名额、7164 MiB 普通显存。背景总预留为 `9216 MiB`，由 `16380 - 9216` 得到普通额度，不再额外扣原 2048 MiB。
