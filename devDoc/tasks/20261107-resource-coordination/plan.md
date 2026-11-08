@@ -1,5 +1,7 @@
 # 计算资源协调实施计划
 
+R0–R5 的原实施与验收保留如下。2026-11-08 用户要求普通容量直接由通用 HTCondor 节点维护、背景总预留 9 GiB、单 GPU 最多 4 个普通作业共享；该后续批次的设计、依据和验收见 [通用节点改造](native-condor.md)，状态见 [进度](progress.md)。
+
 2026 年 11 月 7 日按现行纲领、部署布局及近期提交重新评估。下一阶段先做资源协调，独立于记忆系统交付；保留独立 embedding 服务与 HTCondor 两条链，以固定显存预留支持并行。目标依据为 [项目纲领](../../project-charter.md#资源协调系统)，用户要求见 [原规划聊天](codex://threads/01a1b435-4d35-7e31-943e-3ff66fc2cad6)，复用证据见 [旧实现专项核对](research/legacy-implementation.md)，路径合同见 [部署计划](deployment-layout-plan.md)。状态统一记在 [工作进度](progress.md)，接口名和具体预算仍是工程建议。
 
 本任务负责资源 R0–R5 及先行交付的公共包/配置和共享 embedding；[记忆任务](../20261106-memory-system/plan.md) 只引用这些接口，独立维护检索、索引、图和应用效果验收。跨工具顺序与发布条件见 [重建总览](../20261106-rebuild/plan.md)。

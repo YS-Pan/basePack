@@ -47,7 +47,7 @@ def model_identity(machine):
 
 
 def instance_key(machine):
-    value = [model_identity(machine), settings(machine), machine.raw["budget"]["embedding_gpu_mib"],
+    value = [model_identity(machine), settings(machine), machine.raw["embedding"]["gpu_memory_mib"],
              [hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
               for name in ("runtime.py", "worker.py", "broker.py", "transport.py")]]
     return hashlib.sha256(json.dumps(value).encode()).hexdigest()

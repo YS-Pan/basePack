@@ -46,12 +46,15 @@ client.close()  # 只取消该客户端仍活动的请求。
 ```
 
 ```powershell
+python -m basepack --config '<project-config>' resources capacity
 python -m basepack --config '<project-config>' resources run --spec '<project>/job.json'
 ```
 
-返回 job ID、终态、应用退出码及 stdout/stderr/event log 定位。run 的 CLI 在应用失败、超时或未确认回收时退出 1；原始应用退出码保留在 JSON。检查实际产物内容，应用退出 0 只说明正常退出。单任务 CPU/RAM/GPU 超机器预算立即拒绝；单任务可容纳而合计资源已满时交给 Condor 排队。轻任务可直接运行，无需全部接入。
+`capacity` 只读查询本机父 slot 的总容量与当前剩余量，来源是 HTCondor 实际发布的资源。`run` 返回 job ID、终态、应用退出码及 stdout/stderr/event log 定位；应用失败、超时或未确认回收时 CLI 退出 1，原始应用退出码保留在 JSON。检查实际产物内容，应用退出 0 只说明正常退出。单任务 CPU/RAM/GPU 超节点总容量立即拒绝；单任务可容纳而剩余额度不足时交给 Condor 排队。轻任务可直接运行，无需全部接入。
 
-`memory_mib`、`disk_mib`、`gpu_memory_mib` 均用 MiB；disk 是执行 scratch 需求，提交前也查项目输出盘容量。GPU 任务声明整个应用进程树的峰值 `gpu_memory_mib`，含 CUDA context、框架缓存和 workspace，并自行限制预分配。预算是合作约束；声明额度不等于驱动硬隔离。普通 GPU 任务申请一张 GPU，彼此排队；与固定预留显存的 embedding 可并行。保留 Condor 分配的 CUDA_VISIBLE_DEVICES。
+`memory_mib`、`disk_mib`、`gpu_memory_mib` 均用 MiB；disk 是执行 scratch 需求，提交前也查项目输出盘容量。GPU 任务增加正的 `gpu_memory_mib`，声明整个应用进程树的峰值，含 CUDA context、框架缓存和 workspace，并自行限制预分配。适配器将它转换为原生 `request_gpus = 1` 与 `request_GPUMemoryMiB = <峰值>`。节点可允许多个作业共享同卡，Condor 按显存申请量之和及其他剩余资源准入；不满足时排队。声明额度不等于驱动硬隔离，也不保证多作业加速。保留 Condor 分配的 CUDA_VISIBLE_DEVICES。
+
+各项目共用同一套通用节点配置；直接使用 `condor_submit` 也填写上述 GPU 和显存申请。`GPUMemoryMiB` 是节点定义的通用消耗资源；官方 `gpus_minimum_memory` 只筛选 GPU 的广告容量，不能替代显存总额记账。节点配置及背景预留由 [管理员](administrator.md#通用-htcondor-节点容量) 维护。
 
 可用 `environment` 传显式环境。入口按 cpus 提供常用框架线程变量，但 starter 仍可能注入其他线程限制；worker 继承其最终值并记录，应用并行参数由调用者自行设置。Windows 中文、空格、引号与空参数经 UTF-8 任务文件交给随包薄 worker，避免参数数组经过 submit 的有损转换。
 
@@ -80,6 +83,7 @@ from basepack.config import load_config
 from basepack.resources import JobSpec, ResourceClient
 
 jobs = ResourceClient(load_config("<absolute-project-config>"))
+capacity = jobs.capacity()
 result = jobs.run(JobSpec(executable=sys.executable, arguments=["analysis.py"],
                           cpus=2, memory_mib=2048, disk_mib=256))
 ```

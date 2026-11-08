@@ -1,6 +1,6 @@
 # 项目接入
 
-机器管理员先按 [管理员说明](administrator.md) 选择共享 Python、普通安装 basePack wheel、准备机器配置与预算并启动作业外 broker。复用现有模型和 HTCondor。机器模板来自安装包：
+机器管理员先按 [管理员说明](administrator.md) 选择共享 Python、普通安装 basePack wheel、配置通用 HTCondor 节点容量，并准备独立 embedding 的机器配置与作业外 broker。复用现有模型和 HTCondor；只运行普通任务时无需启动 embedding。机器模板来自安装包：
 
 ```powershell
 python -c "from basepack.setup import template; print(template('machine.toml'))"
@@ -18,7 +18,7 @@ python -m basepack --config '<absolute-project>/basepack.toml' doctor --facility
 
 init 从安装包模板生成配置，写入当前 Python 路径，合并 AGENTS 的工具入口与 Git 忽略项。现有配置存在时直接报错。配置放子目录可传 `--config-name config/basepack.toml`。不向父目录寻找配置，调用时显式传实际配置绝对路径。
 
-项目配置的机器绑定只有 runtime.python 与 runtime.machine_config。project.root 相对项目配置，memory.data_dir 和 resources.jobs_dir 相对项目根解析，当前工作目录不参与数据定位。默认状态和作业材料分别放 `.basepack/memory`、`.basepack/jobs`；资源阶段不建立记忆数据库。
+项目配置的机器绑定只有 runtime.python 与 runtime.machine_config。机器配置定位 Condor 及 embedding；普通作业容量由 Condor 自己维护，项目接入不修改节点策略。project.root 相对项目配置，memory.data_dir 和 resources.jobs_dir 相对项目根解析，当前工作目录不参与数据定位。默认状态和作业材料分别放 `.basepack/memory`、`.basepack/jobs`；资源阶段不建立记忆数据库。
 
 `.basepack/` 和实际配置不进 Git，AGENTS 可提交。`config show` 一次返回两份配置位置、实际 Python、包版本/安装模式/加载位置及解析后路径，供诊断，不另存为有效配置。按 [资源使用](resources.md) 调用 embedding 和重任务。
 

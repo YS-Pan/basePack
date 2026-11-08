@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from .client import JobSpec, ResourceClient, budget_config
+from .client import JobSpec, ResourceClient
 
 
 def register_commands(subparsers):
@@ -17,14 +17,14 @@ def register_commands(subparsers):
             command.add_argument("--timeout", type=float, default=300, help="Observation only; leaves the job running")
         if action == "status":
             command.add_argument("--analyze", action="store_true")
-    commands.add_parser("budget-config", help="Generate the Condor config fragment from machine TOML")
+    commands.add_parser("capacity", help="Show local Condor slot capacity and available resources")
 
 
 def handle(args, config):
     action = args.resource_action
-    if action == "budget-config":
-        return budget_config(config.machine)
     client = ResourceClient(config)
+    if action == "capacity":
+        return client.capacity()
     if action in ("run", "submit"):
         spec = JobSpec(**json.loads(Path(args.spec).read_text(encoding="utf-8")))
         return getattr(client, action)(spec)

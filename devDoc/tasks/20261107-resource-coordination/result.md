@@ -2,6 +2,8 @@
 
 2026-11-08。R0–R5 已完成本机功能验收；运行源码版本 `9fc1d4d`，普通 wheel `basepack-0.1.0-py3-none-any.whl` 已安装到系统 Python。记忆检索、建图和数据库未纳入本轮。
 
+本页保留 0.1.0 的验收条件；当前 0.2.0 通用 Condor 节点与多作业共享结果见 [后续改造](native-condor.md)，现行状态以 [资源进度](progress.md) 为准。
+
 ## 交付与稳定部署
 
 - [公共入口与使用文档](../../../docs/setup-project.md)：init/config show/doctor，显式项目配置与唯一机器配置、随包模板；editable开发和普通wheel已分别实际安装验证。

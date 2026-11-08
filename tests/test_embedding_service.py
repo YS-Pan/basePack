@@ -33,8 +33,7 @@ batch_size = 4
 max_pixels = 1048576
 idle_seconds = 30
 cpu_threads = 2
-[budget]
-embedding_gpu_mib = 9216
+gpu_memory_mib = 9216
 ''')
     return load_machine(config)
 

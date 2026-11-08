@@ -93,5 +93,4 @@ def describe(config: Config) -> dict:
         "memory_dir": str(config.memory_dir),
         "jobs_dir": str(config.jobs_dir),
         "machine_paths": paths,
-        "budget": machine.raw.get("budget"),
     }

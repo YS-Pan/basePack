@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-**R0–R5 已完整交付并通过本机真实验收。** 稳定普通 wheel 已安装到系统 Python，机器级轻量 broker 独立运行，模型按请求加载；测试作业及模型进程已释放。最终结论、适用范围及原始证据入口见 [交付结果](result.md)，使用者从 [项目接入](../../../docs/setup-project.md) 开始。
+**R0–R5 与后续 R6 已完成本机部署及真实验收。** 当前普通 wheel 为0.2.0，普通容量由通用Condor节点维护，支持单卡多作业按显存申报总额共享；basePack为普通提交客户端。独立embedding仍按请求加载。现行结果见 [通用节点改造](native-condor.md)，原始R0–R5条件保留在 [历史交付](result.md)，使用者从 [项目接入](../../../docs/setup-project.md) 开始。
 
 本目录按用户指定保留为资源工具的维护入口；记忆检索、建图和数据库由 [独立任务](../20261106-memory-system/plan.md) 接续。
 
@@ -18,17 +18,18 @@
 | R3 | 两种 GPU 启动顺序均有真实重叠进展；第二普通 GPU 排队，CPU/RAM 声明准入、并行/队列及超额拒绝通过 |
 | R4 | 作业内冷请求后取消作业，共享模型及另一项目继续；父子孙进程和异常退出回收、请求局部取消/截止、空闲/崩溃回归通过 |
 | R5 | 普通 wheel 安装到系统 site-packages；源码外两项目、移动项目、新检出、图文/Condor 调用及最终 GPU 并行通过；使用/管理员文档、示例及 resources skill 已交付 |
+| R6 | 普通容量迁至通用Condor配置；4个同卡GPU名额与7164MiB申报额度原生记账，容量查询、排队、GPU声明要求与CPU独立运行实测通过；0.2.0普通wheel及最大embedding联合验收 |
 
 ## 当前部署与检查
 
-- 机器配置：`D:/AgentTools/basepack.toml`；Condor 派生片段：`C:/condor/config/60_basepack.conf`。实际父 slot 为12 CPU/24576 MiB，显存 T16380/E9216/S2048/B5116 MiB，预算版本 `5dd7fc9014b383e0`。CPU/RAM 变更经空队列 peaceful 重启 startd 后核实际值。
-- 系统 Python：`C:/Program Files/Python313/python.exe`；普通包：其 `Lib/site-packages/basepack`。独立 broker PID26696，由交互用户在作业树外启动，当前无模型 worker；不是登录自启服务，机器重启后按管理员说明启动。
-- 最终 wheel：`dist/basepack-0.1.0-py3-none-any.whl`，35350 B；运行源码版本 `9fc1d4d`。22份运行代码/模板/许可与源码、wheel、实际安装逐字节一致。
-- 普通 wheel 模式11项回归通过；resources skill静态校验通过。最终验收job14295退出0、回收确认，最大文本4×2048 token推理期间有50个普通GPU正确进展点，两个源码外项目共worker16464。
-- 无匹配诊断补验14298：实际queued，原生报告明确Disk条件0slot，取消后清理确认。CPU满配时better-analyze可模拟排空后称可匹配，其诊断范围已写入使用文档；补验结束队列为空，broker26696保持。
-- 原生执行3秒上限实测11秒移除，排队3秒上限实测52秒，存在策略周期；run另有客户端有界等待。WDDM CUDA free是device-view，全卡证据使用外部nvidia采样，均不参与动态抢占准入。
-- R5捕获的空查询解析回归已修复并重新构建、重装、完整重验；非空无效JSON仍报原错。详细证据集中在 `artifacts/r0/`、`artifacts/condor/`、`artifacts/resource-acceptance/`、`artifacts/r5/`。
+- 普通容量唯一来源：`C:/condor/config/60_resources.conf`。实际父slot为12 CPU/24576 MiB RAM、4个同卡GPU名额、7164MiB显存；背景总预留9216MiB，不再额外扣原2048MiB。旧专属片段、发布hash和节点属性已移除。
+- 系统Python仍为 `C:/Program Files/Python313/python.exe`；普通包0.2.0安装在其 `Lib/site-packages/basepack`。机器TOML只维护路径与embedding自身设置，额度为 `[embedding].gpu_memory_mib=9216`。
+- 独立交互用户broker8060在作业树外运行，无模型驻留；测试worker7484及旧broker37864已释放。不是登录自启服务，机器重启后按管理员说明启动。
+- 当前wheel为 `dist/basepack-0.2.0-py3-none-any.whl`，35060 B，SHA256 `e4224f4d708e8b534297205d444e2ca75096e0377857063c09c18ce28437aa88`；22份代码/模板/许可与源码和实际安装一致，14项普通wheel回归通过。旧0.1.0 wheel保留。
+- 原生14299/14300申报4000+3000MiB同卡正确计算；5000+3000超显存总额时排队，尚有GPU名额。14305–14308四项实际进展共同重叠17.509秒，第5项在显存尚足时因GPU名额用完排队，释放后执行。缺显存声明的GPU未执行，CPU无GPU字段正常。
+- 普通客户端14310/14311从源码目录外调用安装包；4×2048 token向量正确，推理期间普通GPU有5个正确进展点，取消普通作业后共享模型继续。14299–14311全部已清理，队列为空，节点全部资源恢复。
+- 证据集中在 `artifacts/native-condor/`；原生调度按申报量记账，没有实际分配全部额度，未做吞吐性能比较。历史时限、生命周期与R0–R5测量范围仍见 [原始结果](result.md)。
 
 ## 后续边界
 
-本轮无未完成交付项。资源预算是合作约束；RAM验证声明和排队，没有实际分配全部额度。首版仅本机Windows、单NVIDIA GPU及固定VL2B配置；没有实施记忆数据库、自动重试、多机调度或远端发布。后续按实际需求另开实施批次，模型/输入上限变更先排空、重标定并发布预算。
+本轮无未完成交付项。声明额度是合作约束，不提供显存硬隔离；本版仅核本机Windows、单NVIDIA GPU和固定VL2B配置，没有实施记忆数据库、自动重试、多机调度或远端发布。后续按实际需求接续；模型、输入上限或背景峰值变更先排空、重标定，再调整通用Condor节点容量。

@@ -10,13 +10,15 @@
 
 worker 在线程接入层处理状态、取消与截止，单线程模型循环执行 forward。截止覆盖排队、加载与推理等待；在算 forward 可完成，但结果丢弃，后续内部批次不再执行。空闲边界卸载；broker 崩溃由 Windows Job Object 回收其 worker。异常原始类型、信息与 traceback 返回调用方，不自动重试推理。
 
-修改运行代码或机器模型配置前，先用旧安装停止并确认旧服务退出；实例代码身份不一致时直接拒绝旧 endpoint。模型进程启动/失败与普通作业的生命周期独立。
+机器 TOML 的 `[embedding].gpu_memory_mib` 是模型分配器额度，也参与实例身份；独立 embedding 不依赖 Condor。修改运行代码或机器模型配置前，先用旧安装停止并确认旧服务退出；实例代码身份不一致时直接拒绝旧 endpoint。模型进程启动/失败与普通作业的生命周期独立。
 
 ## 普通重任务
 
 [resources](../../../src/basepack/resources/) 提供 JobSpec 与 run/submit/status/wait/cancel。任务参数和日志留在项目 jobs_dir；队列、事件和历史由 Condor 维护。每次提交使用唯一标识，响应不确定时按标识查询原生队列/历史，不重复提交。
 
-机器 TOML 是资源预留的唯一来源，budget-config 生成 Condor 片段。所有提交核实际父 slot 的预算版本、显存预算及 CPU/RAM 总量；GPU 还要求声明 H 不超 B，requirements 固定本机和预算版本，request_gpus=1 使普通 GPU 任务彼此排队。embedding 的 E 始终保留，两链共享显存靠预算协作，不依赖整卡排他锁。
+普通作业容量由通用 HTCondor 节点配置维护，basePack 是普通提交客户端。`capacity` 读取本机实际父 slot 的总容量与剩余资源；准入按 `TotalSlot*` 判断单任务能否容纳，当前不足交给原生队列。GPU 作业将声明峰值转换为 `request_GPUMemoryMiB`，同时申请一个 GPU；节点用重复 GPU 分配令牌允许同卡共享，用通用自定义资源 `GPUMemoryMiB` 对显存申请量之和记账。节点 START 要求所有 GPU 作业申报显存，直接使用原生客户端也遵守该规则。项目 TOML 不镜像普通额度，不存在专属预算发布或 hash 匹配。
+
+背景与普通作业共享物理 GPU，通过管理员固定预留协调；应用按声明限制实际峰值。GPU 共享和资源记账不提供显存硬隔离，也不承诺更高吞吐；本机配置与真实联合验收见下方进度入口。
 
 自身 PyTorch allocator 指标与 CUDA device-view 指标分开命名；WDDM 下 CUDA free 不能代表全卡其他进程占用。外部 nvidia-smi 时间线才用于本版全卡峰值证据，动态 free 不参与准入。
 

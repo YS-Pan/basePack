@@ -33,6 +33,8 @@ def test_init_preserves_existing_project_instructions(tmp_path):
     assert (root / "AGENTS.md").read_text(encoding="utf-8").startswith("# Business\nKeep original instructions.")
     assert (root / ".gitignore").read_text(encoding="utf-8").startswith("/original/\n")
     assert "[embedding]" in template("machine.toml")
+    assert "gpu_memory_mib" in template("machine.toml")
+    assert "[budget]" not in template("machine.toml")
 
 
 def test_project_data_cannot_escape_project(tmp_path):

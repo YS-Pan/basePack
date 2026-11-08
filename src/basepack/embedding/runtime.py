@@ -55,7 +55,7 @@ class Runtime:
         torch.set_num_threads(self.options["cpu_threads"])
         torch.cuda.set_device(self.device)
         self.before = self.snapshot()
-        budget = machine.raw["budget"]["embedding_gpu_mib"] * 1024 * 1024
+        budget = machine.raw["embedding"]["gpu_memory_mib"] * 1024 * 1024
         torch.cuda.set_per_process_memory_fraction(budget / self.before["cuda_total_bytes"], self.device)
         torch.cuda.reset_peak_memory_stats(self.device)
         root = machine.path_value("embedding", "model_root")

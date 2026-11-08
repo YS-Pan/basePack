@@ -10,7 +10,8 @@
 | --- | --- | --- |
 | basePack 代码、依赖、随包模板 | 普通 wheel 安装进系统 Python；开发模式由该解释器引用源码仓库 | pip 管理安装，项目统一通过模块调用；模式边界见下节 |
 | 模型权重 | AgentTools/models/组织/模型/revision | 机器部署时维护，多个项目共用固定版本 |
-| 机器路径、模型选择与资源预算 | AgentTools/basepack.toml | 全机一份，各项目引用；embedding 和 Condor 使用同一预算来源 |
+| 机器路径、模型选择与 embedding 设置 | AgentTools/basepack.toml | 全机一份，各项目引用；embedding 自身额度随服务配置维护 |
+| 普通任务容量与调度规则 | HTCondor 已加载的机器配置 | 0.2.0 起直接维护通用节点容量，不由项目或 basePack TOML 生成 |
 | embedding 实例注册、endpoint、运行锁 | AgentTools/state/basepack/embedding/ | 独立共享服务的运行状态 |
 | HTCondor 程序、原生配置与守护进程状态 | HTCondor 自己的安装/运行目录 | 按其安装管理，basePack 只配置入口与必要适配 |
 | 项目接入配置 | 项目根/basepack.toml | agent 的固定路径入口，本机有效 |
@@ -100,7 +101,7 @@ bin_dir = 'C:\condor\bin'
 config_file = 'C:\condor\condor_config'
 ```
 
-机器文件同时保存 [资源专项](plan.md#显存与其他资源预算) 标定出的 embedding 峰值预留和系统余量；上例只展示路径，未填尚未测得的预算。首版共用一套固定模型配置，切换配置时一并核定预算。动态 endpoint 由共享状态发现，不把端口/PID 或模型实际安装位置再复制到每个项目。
+机器文件保存标定后的 embedding 自身额度；普通 CPU/RAM/GPU 容量在通用 HTCondor 节点配置维护，0.2.0 的职责调整与验收见 [后续结果](native-condor.md)。上例只展示路径，实际模板由安装包提供。共用固定模型配置，切换时重新核定背景峰值和普通可用容量。动态 endpoint 由共享状态发现，不把端口/PID 或模型实际安装位置再复制到每个项目。
 
 相对路径按下表解析，当前工作目录不参与数据目录定位：
 
