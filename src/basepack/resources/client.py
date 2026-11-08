@@ -95,7 +95,9 @@ class ResourceClient:
         return result
 
     def _ads(self, command, *args):
-        return json.loads(self._call(command, *args, "-json").stdout)
+        output = self._call(command, *args, "-json").stdout
+        # HTCondor 25.4 emits empty text for a successful query with no matching ad.
+        return json.loads(output) if output.strip() else []
 
     def _ad(self, job_id):
         if not re.fullmatch(r"\d+\.\d+", job_id):

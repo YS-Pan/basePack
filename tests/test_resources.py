@@ -5,7 +5,20 @@ from datetime import datetime
 import subprocess
 import sys
 
+import pytest
+
 from basepack.resources.client import _descendants, _process_parents, _terminal_time
+
+
+def test_native_empty_query_means_no_matches_but_invalid_json_is_an_error():
+    from basepack.resources import ResourceClient
+
+    client = ResourceClient.__new__(ResourceClient)
+    client._call = lambda *args: subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+    assert client._ads("condor_q", "14294.0") == []
+    client._call = lambda *args: subprocess.CompletedProcess(args, 0, stdout="invalid", stderr="")
+    with pytest.raises(json.JSONDecodeError):
+        client._ads("condor_q", "14294.0")
 
 
 def test_uncertain_submit_keeps_original_error_without_submitting_twice(tmp_path):
