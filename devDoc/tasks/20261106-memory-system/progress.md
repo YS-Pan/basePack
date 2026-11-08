@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-工程入口已归入唯一 active 的 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，开发安装和构建以该实验根为目标，依赖与路径沿 [部署合同](../../system/deployment.md)；布局迁移未交付记忆功能。
+工程入口已归入唯一 active 的 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，开发安装和构建以该实验根为目标，依赖与路径沿 [部署合同](../../system/deployment.md)；布局迁移已完成，证据见 [迁移结果](../../archive/20261109-project-layout/result.md)，未交付记忆功能。P0 原型与后续产品交付落点已在计划中对齐。
 
 记忆工具仍未实现，没有可安装的记忆命令、检索底座或项目数据库；按 [P0–P5 计划](plan.md#阶段与完成条件) 接续。资源公共包 R8 已交付，实际安装与后续 R9 简化状态只在 [资源进度](../20261107-resource-coordination/progress.md) 维护。
 
