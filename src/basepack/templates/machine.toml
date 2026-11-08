@@ -6,6 +6,11 @@ state_dir = 'state/basepack'
 [embedding]
 model_root = 'models/ORG/MODEL/REVISION'
 device = 'cuda:0'
+max_length = 2048
+batch_size = 4
+max_pixels = 1048576
+idle_seconds = 300
+cpu_threads = 2
 
 [htcondor]
 bin_dir = 'C:/condor/bin'

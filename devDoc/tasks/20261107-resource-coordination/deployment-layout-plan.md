@@ -1,6 +1,6 @@
 # 安装位置与项目配置布局计划
 
-2026 年 11 月 8 日更新。basePack 的记忆和资源协调共用系统 Python 包入口：本机开发用 editable 安装，稳定部署用普通 wheel。模型保留在 AgentTools，项目数据库留在各项目，HTCondor 独立安装。本页规定拟议文件结构、路径入口及未来 GitHub 接入说明；配置解析、安装命令和下述新文件尚待实现。
+2026 年 11 月 8 日更新。basePack 的记忆和资源协调共用系统 Python 包入口：本机开发用 editable 安装，稳定部署用普通 wheel。模型保留在 AgentTools，项目数据库留在各项目，HTCondor 独立安装。本页保留部署合同；公共配置、安装入口与随包模板已交付，资源运行验收状态见 [进度](progress.md)，实际操作见 [项目接入](../../../docs/setup-project.md)。
 
 公共安装与配置骨架由 [本任务 R0](plan.md#r0-复用准备与预算标定) 先交付，本页是两项工具共用的部署合同；[记忆任务](../20261106-memory-system/plan.md) 引用它，记忆数据库和检索建设仍由该任务负责。
 
@@ -123,7 +123,7 @@ HTCondor 适配器使用已配置 bin_dir，给子进程显式传 config_file �
 
 `config show` 在一次调用内解析项目文件与机器文件，返回实际 Python、包版本/安装模式/实际加载位置、项目根、数据库目录、模型根、共享服务状态目录及 Condor 入口，并标出两份源配置位置。平常的 memory/resources 命令内部使用同一个配置模块，agent 无需手工传递所有底层路径。该输出用于查看，不另存为第二份有效配置。
 
-拟议调用形式如下；本仓库尚无对应命令：
+已交付调用形式如下：
 
 ```powershell
 & 'C:\Program Files\Python313\python.exe' -m basepack --config '<project>/basepack.toml' config show
@@ -144,7 +144,7 @@ basePack/                          GitHub 源码仓库
   src/basepack/
     __main__.py                   模块启动入口
     config.py                     项目/机器配置与路径解析的唯一实现
-    memory/                       记忆及独立 embedding 客户端/服务
+    embedding/                    独立 embedding 客户端/服务
     resources/                    Condor 适配与重任务入口
     templates/
       project.toml                项目配置模板

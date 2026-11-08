@@ -1,11 +1,17 @@
 # basePack
 
-basePack 为多个项目提供共享本地 embedding 与 HTCondor 重任务入口。项目数据留在各自项目，模型与机器资源显式共用。当前正在实施资源工具；记忆检索、建图和数据库尚未交付。
+basePack 让多个项目共用一套本地多模态 embedding，并通过 HTCondor 排队执行 CPU/GPU 重任务。项目输入、结果与作业记录留在各自项目；共享服务只加载一份模型。
 
-需要 Python 3.13。开发时对现有系统 Python 执行：
+首版面向单机 Windows、单张 NVIDIA GPU，使用已有 Python 3.13、Qwen3-VL-Embedding-2B 权重和 HTCondor。embedding 固定预留显存，普通 GPU 作业在剩余预算内与其并行；普通 GPU 作业彼此排队。记忆检索、建图和数据库由独立任务建设。
+
+稳定使用安装普通 wheel；在可供服务和 Condor 执行账户读取的系统 Python 中安装：
 
 ```powershell
-python -m pip install -e .
+python -m pip install '<basepack-wheel>'
+python -m basepack init --project-root '<project>' --machine-config '<absolute-machine-config>'
+python -m basepack --config '<absolute-project>/basepack.toml' config show
 ```
 
-稳定部署安装构建好的 wheel，不依赖源码仓库。项目使用同一套配置：[项目接入](docs/setup-project.md)。开发约定见 [AGENTS.md](AGENTS.md)。
+机器配置和独立 embedding broker 由管理员首次设置，项目无需复制模型或编写 Condor submit 文件。[项目接入](docs/setup-project.md) 说明安装与换路径，[资源使用](docs/resources.md) 给出图文 embedding、一次 run 及长任务接续，[管理员说明](docs/administrator.md) 负责预算发布与服务生命周期。agent 可使用 [resources skill](skills/resources/SKILL.md)。
+
+本机开发用 `python -m pip install -e <repo>`；普通模块修改由新进程加载。稳定部署与交付验收使用普通 wheel，切换前先排空并停止受影响共享服务。开发入口与实际验收状态见 [AGENTS.md](AGENTS.md) 和 [资源进度](devDoc/tasks/20261107-resource-coordination/progress.md)。

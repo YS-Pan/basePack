@@ -4,7 +4,7 @@
 
 已交付 `basepack` Python 包和公共入口：`init` 从随包模板接入项目，`config show` 显示实际路径与安装来源，`doctor` 按设施进行只读检查。安装与项目接入见 [使用说明](../../docs/setup-project.md)，配置解析唯一实现为 [config.py](../../src/basepack/config.py)。系统 Python 的 editable 与普通 wheel 已实测，详细证据见 [资源进度](../tasks/20261107-resource-coordination/progress.md)。
 
-共享 embedding 与 Condor 入口正在资源专项实施；记忆检索、建图和数据库尚未交付。分层组织已提供指令层初版；参考与行为检查见 [专项记录](../tasks/20261106-rebuild/research/agent-team.md)，复杂广读的质量与总成本对照仍待完成。
+共享 embedding 与 Condor 入口的实现边界见 [资源模块](modules/resources.md)，真实验收进度见资源任务。记忆检索、建图和数据库尚未交付。分层组织已提供指令层初版；参考与行为检查见 [专项记录](../tasks/20261106-rebuild/research/agent-team.md)，复杂广读的质量与总成本对照仍待完成。
 
 旧项目和机器上已有设施是参考与可复用资源，调查范围见 [调研依据](../tasks/20261106-rebuild/research/sources.md)；其能力不代表本项目已完成实现或验收。
 
