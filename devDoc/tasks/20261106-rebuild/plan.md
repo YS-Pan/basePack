@@ -13,7 +13,7 @@
 | 文件结构建议 | [专项计划](file-organization-plan.md)、[skill](../../../skills/file-structure/SKILL.md) | 独立使用，记忆可按需引用 |
 | 分层协作 | [P7 完成条件](#p7-分层-agent-组织)、[研究与初版检查](research/agent-team.md) | 使用宿主订阅 subagent，按真实任务继续验证 |
 
-当前先执行资源任务，之后继续记忆 P0–P5。记忆的文字闭环不要求完整资源平台或三层组织先完成；资源任务用合成 embedding 请求独立验收。公共部署合同只维护在 [路径布局计划](../20261107-resource-coordination/deployment-layout-plan.md)，各任务引用它，不各写一份配置实现。
+当前先执行资源任务，之后继续记忆 P0–P5。记忆的文字闭环不要求完整资源平台或三层组织先完成；资源任务用合成 embedding 请求独立验收。公共部署合同只维护在 [路径布局计划](../20261107-resource-coordination/deployment-layout-plan.md)，包括系统 Python 的 editable 开发与普通 wheel 稳定部署，各任务引用同一合同，不各写一份配置实现。
 
 ## P7 分层 agent 组织
 

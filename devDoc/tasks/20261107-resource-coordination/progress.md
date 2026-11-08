@@ -13,6 +13,7 @@
 - 已完成 [安装与项目配置布局](deployment-layout-plan.md)：系统 Python 包、机器共享配置、项目接入文件、局部数据/任务目录、随包模板与 agent 读取入口。配置、命令和安装包仍待交付。
 - 已有 [初次设施调查](research/infrastructure.md) 和 [系统环境快照](../../system/environment.md)，它们只提供各自时点的观测，不代表当前接入成功。
 - 已按用户要求由三名 subagent 分查 yadof 的 admin_tool、dev_doc 与实现/测试，主 agent 复读关键原证，形成 [Windows Condor 使用经验](research/yadof-condor.md)。补 R0/R2 的线程环境、字段引用、资源单位、slot、传输与超时探针，区分已解决事故、撤回方案及旧部署特例；本次未运行作业或修改机器配置。
+- 已据后续讨论维护 [部署合同](deployment-layout-plan.md#开发安装与正式部署)：开发机使用系统 Python editable 引用，稳定部署和发布验收普通安装 wheel；补重装/服务重启时机、源码账户访问及安装来源检查，项目配置保持统一。R0/R5 与 Condor R2/R4 的完成条件已同步，尚未实际安装或验证运行行为。
 
 ## 待核与边界
 
@@ -22,8 +23,8 @@
 
 ## 下一步
 
-1. R0 交付 basepack 包、配置模块、随包模板及 init/config show/doctor，文档随入口交付；提取最小 runtime 并标定预算。
+1. R0 交付 basepack 包、配置模块、随包模板及 init/config show/doctor，验证 editable 开发与最小普通 wheel，文档随入口交付；提取最小 runtime、核账户下实际加载位置并标定预算。
 2. embedding 探针通过即推进 R1；Condor 作业和账户/路径探针通过即推进 R2，GPU 准入待 E/S 标定后启用。
-3. 两链完成后执行 R3 真实并行，再完成 R4 生命周期回归、R5 换路径交付，实际实现同步 [系统说明](../../system/overview.md)。
+3. 两链完成后执行 R3 真实并行，再完成 R4 生命周期回归、R5 普通 wheel 换路径交付，实际实现同步 [系统说明](../../system/overview.md)。
 
-本次迁移只调整开发材料，未运行模型、提交计算作业、安装产品或修改机器配置。详细动作和完成条件只在 [计划](plan.md) 维护，本页记录实际状态。
+本轮只维护计划，未运行模型、提交计算作业、安装产品或修改机器配置。详细动作和完成条件只在 [计划](plan.md) 维护，本页记录实际状态。
