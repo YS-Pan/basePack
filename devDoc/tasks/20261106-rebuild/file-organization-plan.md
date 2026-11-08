@@ -1,17 +1,17 @@
 # 文件结构建议 skill 初版
 
-2026 年 11 月 8 日更新。用户将文件结构建议调整为独立小工具，以 skill 实施。此计划取代此前随记忆工具提供 devDoc 推荐 prompt 的安排；记忆系统可以引用它，各自独立交付。
+2026 年 11 月 9 日更新。用户将文件结构建议调整为独立小工具，以 skill 实施。此计划取代此前随记忆工具提供 devDoc 推荐 prompt 的安排；记忆系统可以引用它，各自独立交付。
 
 ## 初版范围与实现
 
 入口为 [file-structure](../../../skills/file-structure/SKILL.md)，共享部分负责选择、组合、增量整理及读取原则，按需进入两份参考：
 
-- [开发文档布局](../../../skills/file-structure/references/dev-docs.md)：从本项目 devDoc 提炼长期依据、系统说明、活动工作、历史和逐次变更的职责。
-- [实验分包布局](../../../skills/file-structure/references/experiment-packages.md)：从旧项目未完成的结构要求提炼独立实验工程、共享资源与一次运行的边界。
+- [开发文档布局](../../../skills/file-structure/references/dev-docs.md)：项目根统一维护长期依据、系统说明、活动工作和历史，archive 始终存在、允许为空。
+- [实验路线布局](../../../skills/file-structure/references/experiment-packages.md)：同一项目内的候选实现及其运行；通常一条路线 active，少数路线短期比较后收敛，长期独立演进则分成多个 project。
 
-两种方案可以组合，尊重既有命名、Git 和依赖机制。其它布局有实际场景后增加一份参考及选择条件，不预建模板库或重组框架。公开说明独立实验单元与可安装软件包的差别，避免每次运行都复制源码、环境或新建包。
+两种方案可以组合，尊重既有命名、Git 和依赖机制。每个 project 只维护根目录一套 devDoc，现行内容围绕 active 路线，退出路线的必要结论和切换理由进入根历史。experiment 保留代码、配置、依赖及简短入口，不建立独立 devDoc 或另一份结果正文；发布可安装软件包是可选实现。其它布局建议沿用现有 skill，只有技能维护属于任务范围时才扩展参考。
 
-两种方案共用入口中的 [材料生命周期](../../../skills/file-structure/SKILL.md#temporary-and-retained-material)：一次性内容默认优先放所属项目 tmp/，按任务结束后随时可清除处理；有长期保留需要的材料进入 artifacts/ 或其稳定归属。正式实验及需复现的运行记录保留自己的生命周期，临时试跑与一次性评估优先进入 tmp/。
+两种方案共用入口中的 [材料生命周期](../../../skills/file-structure/SKILL.md#temporary-and-retained-material)：一次性内容默认优先放根 tmp/，按任务结束后随时可清除处理。选留的运行及评测原证统一到根 artifacts/runs/；共享评测输入、协议和程序按需放 evaluation/。持续维护的源码、配置、回归夹具及输入版本说明保留在受版本管理的稳定位置，运行快照和输出按长期复核需要保存。
 
 源码维护在仓库 `skills/`，使用标准 SKILL.md 及按需参考；本机发现入口与源码保持单一维护源。参考项目及本项目的业务内容、授权和机器路径不写入通用 skill。
 

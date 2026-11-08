@@ -1,67 +1,64 @@
-# Independent experiment layout
+# Experiment routes and runs
 
-Use this pattern to compare methods, prototypes, or experiment tracks whose code, dependencies, state, and results need separate ownership. An experiment unit is an independently evolving project; publishing a Python package is an optional implementation choice.
+Use this pattern for candidate methods, prototypes, or implementations pursuing one project's goal. An experiment is a route within the project. Usually keep only the latest route active; compare a few briefly and converge on one. Routes that need sustained independent development belong in separate projects.
 
-## Experiment units and runs
+## Project, experiment and run
 
-An experiment unit owns a method, its dependencies, and its lifecycle. A changed seed, parameter, or repetition count usually creates another run in the same unit. Create a new unit when the method, dependency, or delivery boundary evolves independently.
+An experiment groups a route's code, dependencies, configuration and stable inputs. A changed seed, parameter, or repetition count usually creates another run of that route. Publishing an installable package is optional.
 
 ```text
 project/
-  AGENTS.md                     Shared conventions and direct entry points
-  README.md                     Experiment index and shared goals
-  devDoc/                       Shared decisions, plans, and conclusions
+  AGENTS.md                     Project conventions and direct entry points
+  README.md                     Goal, active route and experiment index
+  devDoc/                       One documentation set for the active route
+    archive/                    Always present; may be empty
   experiments/
     YYYYMMDD-short-topic/
-      .git/                     Separate-repository option; retain existing boundaries
-      README.md                 Hypothesis, status, entry points, reproduction, gaps
-      AGENTS.md                 Necessary experiment-local rules, when needed
+      README.md                 Route identity, commands and links to project docs
       pyproject.toml            Dependency/run declarations; use the actual stack
       src/                      Code layout appropriate to the language, when needed
-      tests/                    Necessary checks and small fixtures
+      tests/                    Maintained checks and versioned regression fixtures
       configs/                  Experiment configuration, when needed
-      data/                     Small inputs or source/version/recovery references
-      tmp/<task>/               Disposable probes, trial runs and evaluation scratch
-      artifacts/                Selected evidence retained across tasks, when needed
-      runs/<run-id>/            Run records deliberately kept for tracking or reproduction
-      RESULTS.md                Conclusions, comparisons, failures, limits, evidence
-  test-cases/                   Shared fixed inputs and evaluation protocol, if needed
-  test-runs/                    Retained independent evaluations, if isolation needs it
+      data/                     Stable inputs or source/version/recovery references
+  evaluation/                   Shared evaluation inputs, protocol and code, when needed
+  tmp/<task>/                   One-off runs, evaluations and other disposable work
+  artifacts/runs/<run-id>/      Selected run and evaluation evidence retained for review
 ```
 
-Adapt the names and create only the needed parts. Each experiment owns its configuration, knowledge, databases, caches, and results. Large data, models, and environments may live outside the project, located through configuration and version information. The coordination layer keeps shared direction, the experiment index, and decision-relevant conclusions; experiments retain their run details.
+Adapt names and create parts as needed, while keeping `devDoc/archive/` present even when empty. Preserve existing experiment names or use creation dates and stable route identifiers. Project knowledge, databases and task state remain with the project; large data, models and environments may be external, located through configuration and recovery information.
 
-Apply the shared [material lifecycle](../SKILL.md#temporary-and-retained-material) within each owning project. Prefer `tmp/` for one-off trial runs and evaluations; use stable experiment units, `runs/` and `test-runs/` for work that needs an ongoing lifecycle or retained run history.
+Apply the shared [material lifecycle](../SKILL.md#temporary-and-retained-material). Use the project-root `tmp/` by default for trial runs and evaluations, and select retained evidence into project-root `artifacts/runs/`. A run may refer to one or several experiments; evaluation is a run purpose, not a separate output hierarchy.
+
+Use the [development documentation layout](dev-docs.md) once at the project root. Keep current implementation, plans and progress focused on active work. When a route ends, preserve useful conclusions and switch reasons in root history, update current documents, and link them from experiment READMEs. Experiment folders hold their implementation and brief entry points; maintain detailed plans, progress and results in root `devDoc/`.
 
 ## Choose isolation and packaging
 
 | Condition | Approach |
 | --- | --- |
-| A small script can use the project environment | Group its script, configuration, inputs, and result entry point; declare dependencies through the existing mechanism |
-| Independent entry points, dependencies, reuse, or distribution matter | Use the language's project declarations, code layout, and necessary tests; Python may use `pyproject.toml` and `src/package_name/` |
-| A separate repository and uncommitted experiment work already exist | Preserve the repository and WIP; register its entry point in the parent and retain the existing child-repository mechanism |
-| Several packages evolve together in one repository | Retain the monorepo or workspace with declared dependencies and a reproducible overall revision |
+| A disposable probe can use the project environment | Keep it in root `tmp/`; declare required dependencies through the existing mechanism |
+| A route needs distinct entry points, dependencies, reuse, or distribution | Use the language's declarations, code layout and necessary tests; Python may use `pyproject.toml` and `src/package_name/` |
+| A separate repository and uncommitted experiment work already exist | Preserve Git/WIP and register the entry point; change repository boundaries only within the authorized migration scope |
 | Dependencies conflict or reproduction boundaries differ | Isolate environments as needed; explicitly share compatible environments, fixed weights, or caches |
 
-Maintain shared code once and consume it through declared dependencies or explicit versions. Each experiment must explain dependency recovery without relying on a sibling's mutable source, database, or machine-specific links. Sharing an environment leaves project memory and business state with their owning projects.
+Maintain shared code once and consume it through declared dependencies or explicit versions. Recover a route's dependencies without relying on another experiment's mutable source, database, or machine-specific links. Use existing repository/workspace mechanisms where appropriate; the default tree does not require nested repositories.
 
 ## Entry points and evidence
 
-The experiment README identifies its question or hypothesis, status, commands, dependencies, input identity, results, limits, and next steps. Link to relevant configuration and reports rather than duplicating them.
+The project README identifies the active route and links to current documentation. Each experiment README gives its question, entry points and dependency/input references, then links to the relevant root plans and results. Keep detailed status and conclusions in that one documentation set.
 
-A run must connect its code revision, effective configuration, input identity, environment, and result location; retain seeds and hardware conditions when relevant. Reuse program-generated records. Verify the relationship between data, methods, and outputs; directories or dependency locks alone do not establish successful reproduction.
+A retained run connects its experiment identity, code revision, effective configuration, input identity, environment and result location; retain seeds and hardware conditions when relevant. Reuse program-generated records rather than imposing another schema. Keep maintained code, configurations, fixtures and recovery references in their versioned stable locations; selected execution snapshots, logs and outputs belong in `artifacts/runs/`.
 
-Separate benchmark inputs from answers and judge materials according to evaluation visibility requirements. Experiment runs and independent evaluation runs may have separate locations; enforce reading boundaries through the actual evaluation mechanism.
+Keep shared evaluation inputs, protocol and evaluation code in `evaluation/`. Separate inputs from answers and judge materials according to visibility requirements, enforced by the evaluation mechanism. Selected evaluation outputs use the same `artifacts/runs/` location as other runs.
 
 ## Migrate existing experiments
 
 Inventory each experiment's root, Git/WIP, dependencies, data locations, commands, and active process dependencies. Apply an agreed old-to-new path mapping in batches, preserving date names or stable identifiers. Check related configuration and results together, including paths, imports, commands, working directories, ignore rules, and external tool references. Use reference checks for relocation; rerun expensive experiments only when execution behavior needs validation.
 
-Keep experiment ownership local while referencing shared weights and environments externally. If active runs depend on old paths, identify the affected parts and migrate them in a safe window; reorganize unaffected parts first. Summarize results and recovery conditions before archival. Handle deletion under the project's retention requirements and explicit cleanup scope, even for regenerable evidence.
+Keep project state local while referencing shared weights and environments externally. If active runs depend on old paths, migrate those parts in a safe window and reorganize unaffected parts first. Before retiring a route, reconcile the root documentation and preserve needed results and recovery conditions. Handle deletion and any project split within the authorized scope.
 
 ## Sources and limits
 
-This pattern gives independent approaches their own project boundaries, state, and evidence under `experiments`. Treat legacy layouts as structural references; use the current project's task state, authorization, and acceptance criteria. Several toolchains can support the pattern:
+This pattern separates candidate implementations while keeping one active development direction and one documentation set per project. The active-route and material-location choices are project conventions; the sources below inform code, data and dependency organization rather than prescribing that exact tree. Treat legacy layouts as structural references and use the current project's task state, authorization and acceptance criteria.
 
 - The [research compendium paper](https://faculty.washington.edu/bmarwick/PDFs/Marwick-Boettiger-Mullen-2018-TAS-research-compendia.pdf) supports separating data, methods, and outputs with environment documentation; it does not require a formal package for every unit.
 - [PyPA's src/flat comparison](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/) explains packaging and import tradeoffs; [inline script metadata](https://packaging.python.org/en/latest/specifications/inline-script-metadata/) offers dependency declarations for small scripts.

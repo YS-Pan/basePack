@@ -23,7 +23,7 @@ project/
         progress.md           Stage, completed work, blockers, and next steps
         result.md             Deliverables, checks, evidence, limits, when needed
         research/             Research and evidence index, when needed
-    archive/                  Whole directories of finished work, when needed
+    archive/                  Always present; retained finished work, may be empty
     change_log/
       major/                  One record per significant change
       minor/                  Meaningful local changes, when needed
@@ -31,10 +31,11 @@ project/
   artifacts/                  Selected evidence and outputs retained for later review; Git-ignored
 ```
 
-Create only the parts with real content. Keep an existing development-documentation directory name in place of `devDoc`. Divide README and AGENTS responsibilities by their readers and existing entry points. A short plan can also hold progress and closure.
+Keep one development-documentation tree at the project root, retaining an existing directory name in place of `devDoc`. Always keep its `archive/` directory, even when empty; use a `.gitkeep` when Git must retain it. Create other parts only for real content. Divide README and AGENTS responsibilities by their readers and entry points. A short plan can also hold progress and closure.
 
 - Maintain lasting guidance across work stages. Update `system/` with implemented behavior; keep proposals in `tasks/`.
-- Use one task directory for an independent objective or major stage, with internal steps in the same plan when practical. At closure, reconcile valid conclusions into `system/`, hand off remaining work, archive the whole task directory, and repair references.
+- For [experiment routes](experiment-packages.md), keep current system and task documents aligned with active routes. Retired routes contribute selected history to this root tree rather than separate maintained documentation.
+- Use one task directory for an independent objective or major stage, with internal steps in the same plan when practical. At closure, reconcile still-applicable conclusions into `system/`, hand off remaining work, archive retained task directories intact, and repair references.
 - Apply the shared [material lifecycle](../SKILL.md#temporary-and-retained-material). Make sources, methods, conditions, results, and limits reachable from a short summary; task documents retain evidence locations and generation conditions. Large retained outputs may live outside the repository; preserve original snapshots.
 - Record changes as `YYYYMMDD_HHMMSS_short-description.md`, covering date, change, reason, impact, actual checks, and evidence. Follow the target project's timezone, severity levels, and changelog conventions; trivial changes may omit a record.
 

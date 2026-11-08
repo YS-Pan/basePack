@@ -1,6 +1,6 @@
 # 重建总进度
 
-更新：2026 年 11 月 8 日（北京时间）。
+更新：2026 年 11 月 9 日（北京时间）。
 
 ## 当前阶段
 
@@ -12,7 +12,7 @@
 - 开发文档已集中到 `devDoc/`；README 的介绍与入口已合入根目录 AGENTS.md，重建材料集中在本目录。组织变化见 [变更记录](../../change_log/major/20261106_232701_organize-dev-docs.md)。
 - 文档维护规则、术语、现行结构与环境说明已补齐，交接与调研结论索引已完善；实际结果和检查见 [文档整理结果](result.md)。
 - 已按用户选定名称统一为 `devDoc/system/`、`devDoc/tasks/` 和项目根 `artifacts/`，同步文档引用、技能示例、本机脚本及 Git 边界，见 [变更记录](../../change_log/minor/20261107_144504_rename-documentation-directories.md)。
-- 已建立 [file-structure skill](../../../skills/file-structure/SKILL.md)，支持开发文档与实验分包两类布局；来源和初版验证见 [专项调研](research/file-layouts.md)。[纲领建议稿](charter-file-layout-proposal.md) 供用户自行填写，正文保持原文。
+- 已建立 [file-structure skill](../../../skills/file-structure/SKILL.md)，支持开发文档与实验路线两类布局；根目录单套 devDoc、始终保留 archive、active 路线收敛及统一 artifacts/runs 的现行约定见 [专项说明](file-organization-plan.md)。来源和初版验证见 [专项调研](research/file-layouts.md)，纲领正文保持原文。
 - 已按用户要求将该技能改名为 `file-structure`，同步源码目录、元数据、文档引用与本机发现联接；纲领保持原样，见 [改名记录](../../change_log/minor/20261107_150816_rename-file-structure-skill.md)。
 - 已按用户要求重新筛查高星项目、独立口碑和公开实测，建立 [agent-team skill](../../../skills/agent-team/SKILL.md) 指令层初版，以纲领为目标，参考项目只提供机制。[专项记录](research/agent-team.md) 区分第三方证据、本机行为检查和待完成的 P7 对照。
 - 已将记忆计划 P0–P5 拆入 `20261106-memory-system`，将资源计划、部署布局和专项调研迁入 `20261107-resource-coordination`；两任务各有 plan/progress，原综合执行计划的共性工作与 P7/P8 归入 [总览](plan.md)。
