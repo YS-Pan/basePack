@@ -25,6 +25,8 @@
 
 原始回执：`artifacts/r8/before.json`、`deployment.json`、`wheel-receipt.json`、`installed-files.json`、`installation-receipt.json`。源码与源码外 pytest 分别使用 `artifacts/r84-source-pytest/` 与验收目录 `verification/pytest/`。
 
+11 月 8 日临时文件整理后，原 R8 验收目录收进本项目 `tmp/acceptance/20261108-basepack-r8-acceptance/`，测试夹具与构建缓存也移入 `tmp/`。长期复核所需的项目配置、图文输入输出、真实作业日志及迁移证据保存在 `artifacts/tmp-reorganization-20261108/evidence/`；完整源路径、临时位置和证据副本见 `artifacts/tmp-reorganization-20261108/moves.json`。历史回执不改写为新路径，已完成的验收结论保留原条件；临时目录清除后按证据副本复核。
+
 ## 实际功能与生命周期
 
 | 场景 | 实际结果 |

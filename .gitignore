@@ -16,6 +16,8 @@ htmlcov/
 .memory/
 /.cache/
 /artifacts/
+/tmp/*
+!/tmp/.gitkeep
 /basepack.toml
 /.basepack/
 # Machine-local Codex discovery links; sources stay in skills/.

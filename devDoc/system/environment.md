@@ -1,12 +1,18 @@
 # 开发环境核验
 
+## 当前临时目录约定
+
+一次性验证默认使用 `--basetemp tmp/<task>/pytest`；构建需要设置 TEMP/TMP 时，也指向 `tmp/<task>/` 下按需创建的目录。目录寿命与长期证据归属见 [文档维护约定](../documentation.md)。
+
+下文保留各轮实测时的路径。2026-11-08 临时材料整理的迁移映射位于 `artifacts/tmp-reorganization-20261108/moves.json`；回执中的原绝对路径用于追溯当时条件，当前位置按映射查找，`tmp/` 内材料按可清除处理。
+
 ## 2026-11-08 R8 部署核验
 
 系统 Python `C:/Program Files/Python313/python.exe` 已普通安装 basepack 0.4.0，包根为 `C:/Program Files/Python313/Lib/site-packages/basepack`。30 份代码/模板/许可与 wheel 及源码一致，旧源码入口不存在；源码和源码外安装回归各 92 项通过。六份旧配置已显式迁移，源码外两项目、深层中文/空格配置、项目移动及新检出初始化已核验。
 
 真实作业 14335–14338 核得 CPU 结果 499500、应用退出 7、GPU 矩阵结果 256，以及图文向量、GPU/embedding 并存、请求/作业取消、日志和资源归还。机器 schema 1、模型、共享状态位置及 Condor 60/70 策略保持原合同；容量仍为 12 CPU/24576 MiB RAM、4 个同卡名额、7164 MiB 普通池及 9216 MiB 背景预留。本段记录本轮已取得的环境证据，最终生命周期和交付状态只维护在 [资源进度](../tasks/20261107-resource-coordination/progress.md)。原始回执为 `artifacts/r8/installed-files.json`、`installation-receipt.json` 和 `runtime-receipt.json`。
 
-pytest 使用仓库内忽略目录作为 `--basetemp`；wheel 构建将 TEMP/TMP 置于该目录，避免受限 Windows 临时目录 ACL。真实 Condor 查询与作业使用正常用户认证上下文，保留受限进程 SSPI 失败的原始信息；不改认证策略。
+本次 pytest 使用仓库内忽略目录作为 `--basetemp`；wheel 构建将 TEMP/TMP 置于该目录，避免受限 Windows 临时目录 ACL。真实 Condor 查询与作业使用正常用户认证上下文，保留受限进程 SSPI 失败的原始信息；不改认证策略。
 
 ## 较早环境快照
 
@@ -20,7 +26,7 @@ pytest 使用仓库内忽略目录作为 `--basetemp`；wheel 构建将 TEMP/TMP
 
 2026-11-08 R0：系统 Python 3.13.17 已安装 basepack。普通用户 pip 会回落用户站点，现经管理员安装到系统 site-packages，`python -s` 可加载。editable 引用本仓库 `src/`，新进程观察到临时代码修改；普通 wheel 安装到系统 site-packages 后，从源码目录外初始化两个项目并调用 config show/doctor，通过后恢复 editable。最小安装原始回执位于 `artifacts/r0/*-receipt.json`，管理员安装日志同目录。
 
-pytest 使用 `--basetemp artifacts/<batch>/pytest`，避免受限 Windows 临时目录 ACL。Condor 的 SSPI 查询在受限进程中会失败，同一显式配置命令在正常用户上下文通过；后续真实 Condor 验证用正常上下文，具体功能结果记录在资源任务。
+当时 pytest 使用 `--basetemp artifacts/<batch>/pytest`，避免受限 Windows 临时目录 ACL。Condor 的 SSPI 查询在受限进程中会失败，同一显式配置命令在正常用户上下文通过；后续真实 Condor 验证用正常上下文，具体功能结果记录在资源任务。
 
 2026-11-08 R0–R4：复用 torch2.10.0+cu128、torchvision0.25.0+cu128、transformers5.22.1、qwen-vl-utils0.0.14、既有VL2B权重与Condor25.4.0。实际slot账户condor-slot1_1可加载系统包、访问权重/项目并连接作业外broker；普通任务不继承提交环境，保留Condor设备UUID。机器配置 `D:/AgentTools/basepack.toml` 派生 `C:/condor/config/60_basepack.conf`，执行端现为12CPU/24576MiB、单GPU普通预算5116MiB，hash5dd7fc9014b383e0。NUM_CPUS/MEMORY变更仅reconfig不足，实测peaceful重启startd才更新既有父slot。测量与功能证据见资源进度。
 

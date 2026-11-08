@@ -26,3 +26,4 @@ basepack = ["embedding/*.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+cache_dir = "tmp/pytest-cache"

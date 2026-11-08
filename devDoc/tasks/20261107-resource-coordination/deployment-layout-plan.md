@@ -19,7 +19,7 @@ R9 的库替换和允许的行为变化见 [复用计划](plan.md#r9-复用优�
 | 普通作业容量、站点策略及原生状态 | HTCondor 的安装/运行目录，Condor 唯一维护 |
 | 原件、业务源码及用户指定导出 | 沿用业务布局，工具保存引用和必要派生内容 |
 
-共享安装路径由解释器管理，不在项目保存 package_dir/PYTHONPATH 或 app 副本。机器路径通过显式配置定位，公共源码不写死本机绝对路径。本仓库 skills/、devDoc/、开发用 artifacts/ 和 .agents/skills/ 发现联接保留原位。
+共享安装路径由解释器管理，不在项目保存 package_dir/PYTHONPATH 或 app 副本。机器路径通过显式配置定位，公共源码不写死本机绝对路径。本仓库 skills/、devDoc/ 和 .agents/skills/ 发现联接保留原位；开发临时材料默认进入 tmp/，需长期复核的证据才进入 artifacts/，生命周期见 [文档约定](../../documentation.md)。
 
 ## 0.4.0 源码结构
 

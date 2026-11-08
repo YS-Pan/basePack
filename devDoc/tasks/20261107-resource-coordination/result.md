@@ -28,7 +28,7 @@
 | 联合取消与异常退出 | 作业内冷embedding后另一项目复用；取消作业父子孙消失，worker35956继续；请求deadline/cancel隔离。14293应用创建睡眠孙进程后exit7，两者实际消失 | 同目录 `lifecycle.json`；`artifacts/condor/r4-abnormal-tree.json` |
 | 最终普通wheel | 源码外两项目、移动B、新检出接入与图文调用通过；共worker16464，GPU14295值512.0/exit0/cleanup确认；最大文本推理期间50个普通GPU正确进展点 | `artifacts/r5/wheel-receipt.json`、`deployed-state.json` |
 
-联合汇总在 `artifacts/resource-acceptance/joint/summary.json`。最终项目位于 `D:/project/20261108-basepack-wheel-acceptance-final/`，可复核安装包调用及本地日志。所有测试作业、测试broker和模型worker已确认退出；最终独立broker无模型驻留，Condor队列为空。
+联合汇总在 `artifacts/resource-acceptance/joint/summary.json`。验收时最终项目位于 `D:/project/20261108-basepack-wheel-acceptance-final/`。11 月 8 日整理后，首轮与最终测试目录均收进本项目 `tmp/acceptance/`；需长期复核的配置、迁移备份、真实作业日志和结果已另存 `artifacts/tmp-reorganization-20261108/evidence/`，原路径映射见同目录上级的 `moves.json`。历史回执保留原路径，临时项目可随任务结束清除。原验收收尾确认所有测试作业、测试broker和模型worker退出，最终独立broker无模型驻留，Condor队列为空。
 
 ## 预算、修复与边界
 

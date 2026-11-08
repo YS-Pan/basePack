@@ -25,7 +25,8 @@ devDoc/
     20261106-memory-system/  记忆系统计划与进度
     20261107-resource-coordination/  资源协调计划、部署、调研与进度
   change_log/              按次记录的已发生变化
-artifacts/                 本机验证材料、辅助脚本、日志与输出，Git 忽略
+tmp/                       一次性内容的默认位置，任务结束后可随时清除，内容 Git 忽略
+artifacts/                 需长期复核的本机证据、脚本、日志与输出，Git 忽略
 .gitattributes             文本格式与原文字节保护
 .gitignore                 本地数据、依赖和产物排除规则
 ```

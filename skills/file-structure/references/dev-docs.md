@@ -27,14 +27,16 @@ project/
     change_log/
       major/                  One record per significant change
       minor/                  Meaningful local changes, when needed
-  artifacts/                  Local validation inputs, helper scripts, logs and outputs; Git-ignored
+  tmp/                        Disposable tests and scratch material; contents Git-ignored
+  artifacts/                  Selected evidence and outputs retained for later review; Git-ignored
 ```
 
 Create only the parts with real content. Keep an existing development-documentation directory name in place of `devDoc`. Divide README and AGENTS responsibilities by their readers and existing entry points. A short plan can also hold progress and closure.
 
 - Maintain lasting guidance across work stages. Update `system/` with implemented behavior; keep proposals in `tasks/`.
 - Use one task directory for an independent objective or major stage, with internal steps in the same plan when practical. At closure, reconcile valid conclusions into `system/`, hand off remaining work, archive the whole task directory, and repair references.
-- Make sources, methods, conditions, results, and limits reachable from a short summary. Group local validation materials in Git-ignored `artifacts/`; large runtime outputs may live outside the repository. Task documents retain evidence locations and generation conditions; preserve original snapshots.
+- Prefer `tmp/` for one-off tests, fixtures, scripts, caches and intermediate outputs. Assume its contents can disappear after the task; promote needed results before closure. Keep durable dependencies outside it.
+- Make sources, methods, conditions, results, and limits reachable from a short summary. Keep selected evidence in Git-ignored `artifacts/` when later review requires it; large retained outputs may live outside the repository. Task documents retain evidence locations and generation conditions; preserve original snapshots.
 - Record changes as `YYYYMMDD_HHMMSS_short-description.md`, covering date, change, reason, impact, actual checks, and evidence. Follow the target project's timezone, severity levels, and changelog conventions; trivial changes may omit a record.
 
 ## Reading entry points

@@ -50,7 +50,7 @@
 - 真实已加载模型的 supervisor 崩溃回收、锁释放、冷恢复、正常停止和原配置 300 秒空闲整进程退出通过。2026-11-08 17:07 北京时间最终实查：supervisor 17804、无模型 worker，运行与磁盘部署指纹匹配，队列为空；12CPU/24576MiB RAM/4同卡名额/7164MiB普通池全部可用。服务仍非登录自启。
 - 机器 schema 1、模型及共享状态物理位置保持；机器 TOML 和 Condor 60/70 的 SHA256 与升级前相同，背景预留仍为 9216 MiB。本轮未重新标定额度或吞吐，历史额度证据继续见 R6/R7。
 
-回执集中在本机 `artifacts/r8/`，源码外实例为 `D:/project/20261108-basepack-r8-acceptance/`；详细位置和边界见 R8 结果。旧 0.3.0 wheel 保留在 `dist/` 可供恢复，原交付条件见 [R7 结果](standard-submit-result.md)，不把旧 PID 或队列快照作为当前依据。
+回执集中在本机 `artifacts/r8/`。验收临时实例已收进本项目 `tmp/acceptance/`，需长期复核的原证另存 `artifacts/tmp-reorganization-20261108/evidence/`；原路径与迁移映射见 [R8 结果](maintenance-result.md)。旧 0.3.0 wheel 保留在 `dist/` 可供恢复，原交付条件见 [R7 结果](standard-submit-result.md)，不把旧 PID 或队列快照作为当前依据。
 
 ## 下一步与边界
 
