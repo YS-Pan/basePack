@@ -1,6 +1,6 @@
 # 资源工具
 
-公共配置由 [config.py](../../../src/basepack/config.py) 解析，产品调用见 [资源使用](../../../docs/resources.md)，机器维护见 [管理员说明](../../../docs/administrator.md)。本模块不维护记忆索引、图或数据库。
+公共配置由 [project/config.py](../../../src/basepack/project/config.py) 解析。ProjectConfig 只加载公共绑定，各功能按需读取自身配置；MachineConfig.path 是机器配置位置的唯一来源。产品调用见 [资源使用](../../../docs/resources.md)，机器维护见 [管理员说明](../../../docs/administrator.md)。本模块不维护记忆索引、图或数据库。
 
 ## 独立 embedding
 

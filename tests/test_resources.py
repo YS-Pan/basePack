@@ -15,14 +15,14 @@ from basepack.resources.client import _descendants, _process_parents, _terminal_
 
 @pytest.fixture
 def resource_client(tmp_path):
-    from basepack.config import load_config
+    from basepack.project.config import load_project_config
     from basepack.resources import ResourceClient
-    from basepack.setup import init_project
+    from basepack.project.init import init_project
 
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n[shared]\nstate_dir='state'\n"
                        "[htcondor]\nbin_dir='bin'\nconfig_file='native.conf'\n", encoding="utf-8")
-    client = ResourceClient(load_config(init_project(tmp_path / "project", machine)))
+    client = ResourceClient(load_project_config(init_project(tmp_path / "project", machine)))
     slot = {"Name": "slot1@local", "Machine": socket.gethostname().upper(),
             "MachineResources": "Cpus Memory Disk GPUs SiteGpuMiB",
             "TotalSlotCpus": 12, "TotalSlotMemory": 24576, "TotalSlotGPUs": 4,
@@ -122,8 +122,7 @@ def test_submit_reuses_relative_spec_in_each_project_without_changing_it(resourc
     second_root = tmp_path / "second project 中文"
     for root in (first_root, second_root):
         (root / "work").mkdir(parents=True)
-    second = ResourceClient(replace(resource_client.config, root=second_root,
-                                    jobs_dir=second_root / ".basepack" / "jobs"))
+    second = ResourceClient(replace(resource_client.config, root=second_root))
     second._ads = resource_client._ads
     for client in (resource_client, second):
         client._call = lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, stdout="123.0", stderr="")
@@ -192,14 +191,14 @@ def test_native_empty_query_means_no_matches_but_invalid_json_is_an_error():
 
 
 def test_uncertain_submit_keeps_original_error_without_submitting_twice(tmp_path):
-    from basepack.config import load_config
+    from basepack.project.config import load_project_config
     from basepack.resources import JobSpec, ResourceClient
-    from basepack.setup import init_project
+    from basepack.project.init import init_project
 
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n[shared]\nstate_dir='state'\n"
                        "[htcondor]\nbin_dir='bin'\nconfig_file='native.conf'\n", encoding="utf-8")
-    config = load_config(init_project(tmp_path / "project", machine))
+    config = load_project_config(init_project(tmp_path / "project", machine))
     client = ResourceClient(config)
     client._admission = lambda _: None
     calls = []

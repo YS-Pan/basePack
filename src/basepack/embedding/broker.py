@@ -10,7 +10,7 @@ import sys
 import threading
 import time
 
-from basepack.config import load_machine
+from basepack.project.config import load_machine_config
 from .owned import OwnedJob, process_alive
 from .transport import (atomic_json, directory, instance_key, make_server, marker_path,
                         read_marker, registry_lock, rpc)
@@ -133,7 +133,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--machine-config", required=True)
     args = parser.parse_args()
-    serve(load_machine(args.machine_config))
+    serve(load_machine_config(args.machine_config))
 
 
 if __name__ == "__main__":

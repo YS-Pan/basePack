@@ -3,10 +3,10 @@
 import json
 import sys
 
-from basepack.config import load_config
+from basepack.project.config import load_project_config
 from basepack.resources import JobSpec, ResourceClient
 
-config = load_config(sys.argv[1])
+config = load_project_config(sys.argv[1])
 result = ResourceClient(config).run(JobSpec(
     executable=str(config.python),
     arguments=["-c", "print(sum(i*i for i in range(10000)))"],

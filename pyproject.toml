@@ -21,7 +21,8 @@ basepack = "basepack.__main__:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-basepack = ["templates/*", "embedding/*.txt"]
+basepack = ["embedding/*.txt"]
+"basepack.project" = ["templates/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

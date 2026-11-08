@@ -5,14 +5,15 @@ from pathlib import Path
 import shutil
 import subprocess
 
-from .config import Config, describe
+from .config import ProjectConfig, describe
 
 
-def doctor(config: Config, facility: str = "all") -> dict:
+def doctor(config: ProjectConfig, facility: str = "all") -> dict:
     result = describe(config)
     checks = {}
     for name, path in {"python": config.python, "project_root": config.root,
-                       "package": Path(__file__).parent, "templates": Path(__file__).parent / "templates"}.items():
+                       "package": Path(__file__).resolve().parents[1],
+                       "templates": Path(__file__).resolve().parent / "templates"}.items():
         if not path.exists():
             raise FileNotFoundError(path)
         checks[name] = str(path)

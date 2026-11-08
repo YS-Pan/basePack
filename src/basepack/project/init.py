@@ -9,17 +9,22 @@ import sys
 
 
 def template(name: str) -> str:
-    return files("basepack").joinpath("templates", name).read_text(encoding="utf-8")
+    return files("basepack.project").joinpath("templates", name).read_text(encoding="utf-8")
 
 
-def init_project(root: str | Path, machine_config: str | Path, config_name: str = "basepack.toml") -> Path:
+def init_project(root: str | Path, machine_config: str | Path,
+                 config_name: str = ".basepack/config.toml") -> Path:
     root = Path(root).resolve()
     machine_config = Path(machine_config).resolve(strict=True)
     config = (root / config_name).resolve()
-    if not config.is_relative_to(root):
-        raise ValueError("Project config must be inside the project root")
+    managed = root / ".basepack"
+    if config == managed or not config.is_relative_to(managed):
+        raise ValueError("Project config must be inside the project's .basepack directory")
+    instructions = managed / "instructions.md"
     if config.exists():
         raise FileExistsError(config)
+    if instructions.exists():
+        raise FileExistsError(instructions)
     root.mkdir(parents=True, exist_ok=True)
     config.parent.mkdir(parents=True, exist_ok=True)
     text = Template(template("project.toml")).substitute(
@@ -28,9 +33,13 @@ def init_project(root: str | Path, machine_config: str | Path, config_name: str 
         root=json.dumps(Path(os.path.relpath(root, config.parent)).as_posix()),
     )
     config.write_text(text, encoding="utf-8")
+    instructions.write_text(Template(template("instructions.md")).substitute(
+        python=str(sys.executable).replace("'", "''"),
+        config=config.relative_to(root).as_posix(),
+    ), encoding="utf-8")
     agents = root / "AGENTS.md"
     existing = agents.read_text(encoding="utf-8") if agents.exists() else ""
-    snippet = Template(template("agents-snippet.md")).substitute(config=config.relative_to(root).as_posix())
+    snippet = template("agents-snippet.md")
     start, end = "<!-- basepack:start -->", "<!-- basepack:end -->"
     if start in existing:
         before, _, tail = existing.partition(start)
@@ -41,8 +50,7 @@ def init_project(root: str | Path, machine_config: str | Path, config_name: str 
     agents.write_text(existing.lstrip("\n"), encoding="utf-8")
     ignore = root / ".gitignore"
     lines = ignore.read_text(encoding="utf-8").splitlines() if ignore.exists() else []
-    for entry in ("/" + config.relative_to(root).as_posix(), "/.basepack/"):
-        if entry not in lines:
-            lines.append(entry)
+    if "/.basepack/" not in lines:
+        lines.append("/.basepack/")
     ignore.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return config

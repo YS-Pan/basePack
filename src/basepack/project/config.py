@@ -8,10 +8,10 @@ import sys
 import tomllib
 
 
-def _read(path: Path) -> dict:
+def _read(path: Path, schema_version: int) -> dict:
     with path.open("rb") as stream:
         raw = tomllib.load(stream)
-    if raw["schema_version"] != 1:
+    if raw["schema_version"] != schema_version:
         raise ValueError(f"Unsupported schema_version in {path}")
     return raw
 
@@ -37,33 +37,44 @@ class MachineConfig:
 
 
 @dataclass(frozen=True)
-class Config:
+class ProjectConfig:
     path: Path
     python: Path
-    machine_config: Path
     root: Path
-    memory_dir: Path
-    jobs_dir: Path
+    raw: dict
     machine: MachineConfig
 
+    @property
+    def machine_config(self) -> Path:
+        return self.machine.path
 
-def load_machine(path: str | Path) -> MachineConfig:
+    def data_path(self, section: str, key: str) -> Path:
+        target = (self.root / self.raw[section][key]).resolve()
+        if not target.is_relative_to(self.root / ".basepack"):
+            raise ValueError(f"Project data directory must be inside {self.root / '.basepack'}: {target}")
+        return target
+
+    @property
+    def memory_dir(self) -> Path:
+        return self.data_path("memory", "data_dir")
+
+    @property
+    def jobs_dir(self) -> Path:
+        return self.data_path("resources", "jobs_dir")
+
+
+def load_machine_config(path: str | Path) -> MachineConfig:
     path = Path(path).resolve()
-    return MachineConfig(path, _read(path))
+    return MachineConfig(path, _read(path, 1))
 
 
-def load_config(path: str | Path) -> Config:
+def load_project_config(path: str | Path) -> ProjectConfig:
     path = Path(path).resolve()
-    raw = _read(path)
+    raw = _read(path, 1)
     python = _absolute(raw["runtime"]["python"], "runtime.python")
     machine_path = _absolute(raw["runtime"]["machine_config"], "runtime.machine_config")
     root = (path.parent / raw["project"]["root"]).resolve()
-    memory = (root / raw["memory"]["data_dir"]).resolve()
-    jobs = (root / raw["resources"]["jobs_dir"]).resolve()
-    for target in (memory, jobs):
-        if not target.is_relative_to(root):
-            raise ValueError(f"Project data directory must be inside {root}: {target}")
-    return Config(path, python, machine_path, root, memory, jobs, load_machine(machine_path))
+    return ProjectConfig(path, python, root, raw, load_machine_config(machine_path))
 
 
 def installation() -> dict:
@@ -73,24 +84,29 @@ def installation() -> dict:
     return {
         "version": dist.version,
         "mode": "editable" if editable else "wheel",
-        "package_dir": str(Path(__file__).resolve().parent),
+        "package_dir": str(Path(__file__).resolve().parents[1]),
         "python": sys.executable,
     }
 
 
-def describe(config: Config) -> dict:
+def describe(config: ProjectConfig) -> dict:
     machine = config.machine
-    paths = {"state_dir": str(machine.state_dir)}
+    paths = {}
+    if "shared" in machine.raw:
+        paths["state_dir"] = str(machine.state_dir)
     for section, keys in {"embedding": ["model_root"], "htcondor": ["bin_dir", "config_file"]}.items():
         if section in machine.raw:
             paths[section] = {key: str(machine.path_value(section, key)) for key in keys}
-    return {
+    result = {
         "installation": installation(),
         "project_config": str(config.path),
         "machine_config": str(config.machine_config),
         "runtime_python": str(config.python),
         "project_root": str(config.root),
-        "memory_dir": str(config.memory_dir),
-        "jobs_dir": str(config.jobs_dir),
         "machine_paths": paths,
     }
+    if "memory" in config.raw:
+        result["memory_dir"] = str(config.memory_dir)
+    if "resources" in config.raw:
+        result["jobs_dir"] = str(config.jobs_dir)
+    return result

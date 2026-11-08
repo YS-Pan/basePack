@@ -11,7 +11,7 @@ def main():
     init = sub.add_parser("init", help="Connect a project using installed templates")
     init.add_argument("--project-root", required=True)
     init.add_argument("--machine-config", required=True)
-    init.add_argument("--config-name", default="basepack.toml")
+    init.add_argument("--config-name", default=".basepack/config.toml")
     config = sub.add_parser("config")
     config.add_subparsers(dest="config_action", required=True).add_parser("show")
     check = sub.add_parser("doctor", help="Read-only facility checks")
@@ -22,17 +22,17 @@ def main():
     resource_commands(sub)
     args = parser.parse_args()
     if args.command == "init":
-        from .setup import init_project
+        from .project.init import init_project
         result = {"project_config": str(init_project(args.project_root, args.machine_config, args.config_name))}
     else:
         if not args.config:
             parser.error("--config is required for this action")
-        from .config import load_config, describe
-        config = load_config(args.config)
+        from .project.config import load_project_config, describe
+        config = load_project_config(args.config)
         if args.command == "config":
             result = describe(config)
         elif args.command == "doctor":
-            from .doctor import doctor
+            from .project.doctor import doctor
             result = doctor(config, args.facility)
         elif args.command in ("embed", "embedding"):
             from .embedding.cli import dispatch

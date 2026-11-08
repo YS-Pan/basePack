@@ -19,10 +19,10 @@ python -m basepack --config '<project-config>' embedding status
 Python 可并发调用并只取消自己的请求：
 
 ```python
-from basepack.config import load_config
+from basepack.project.config import load_project_config
 from basepack.embedding.client import EmbeddingClient
 
-client = EmbeddingClient(load_config("<absolute-project-config>"))
+client = EmbeddingClient(load_project_config("<absolute-project-config>"))
 result = client.embed(["text"], timeout=120, request_id="my-request")
 # 另一执行线程可调用 client.cancel("my-request")。
 client.close()  # 只取消该客户端仍活动的请求。
@@ -88,10 +88,10 @@ Python 同样可一次调用：
 
 ```python
 import sys
-from basepack.config import load_config
+from basepack.project.config import load_project_config
 from basepack.resources import JobSpec, ResourceClient
 
-jobs = ResourceClient(load_config("<absolute-project-config>"))
+jobs = ResourceClient(load_project_config("<absolute-project-config>"))
 capacity = jobs.capacity()
 result = jobs.run(JobSpec(executable=sys.executable, arguments=["analysis.py"],
                           cpus=2, memory_mib=2048, disk_mib=256))

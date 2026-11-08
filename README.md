@@ -9,7 +9,7 @@ basePack 让多个项目共用一套本地多模态 embedding，并通过 HTCond
 ```powershell
 python -m pip install '<basepack-wheel>'
 python -m basepack init --project-root '<project>' --machine-config '<absolute-machine-config>'
-python -m basepack --config '<absolute-project>/basepack.toml' config show
+python -m basepack --config '<absolute-project>/.basepack/config.toml' config show
 ```
 
 机器配置、Condor 站点策略和独立 embedding broker 由管理员首次设置，项目无需复制模型或编写 Condor submit 文件。原生 Condor 用户只需填写 `request_gpus = 1` 和 `gpus_minimum_memory = <峰值> MB`，无需安装 basePack。[项目接入](docs/setup-project.md) 说明安装与换路径，[资源使用](docs/resources.md) 给出图文 embedding、一次 run 及长任务接续，[管理员说明](docs/administrator.md) 负责站点策略与服务生命周期。agent 可使用 [resources skill](skills/resources/SKILL.md)。

@@ -1,6 +1,6 @@
 # 机器部署与维护
 
-0.3.0 的部署范围为单机 Windows、单张 NVIDIA GPU。复用现有 Python 3.13、固定 Qwen3-VL-Embedding-2B 权重与 HTCondor；模型目录含 model.lock.json 与 model/。机器 TOML 维护路径及 embedding 设置，HTCondor 维护普通容量和提交策略。随包机器模板由 `from basepack.setup import template` 读取，见 [项目接入](setup-project.md)。实际部署与验收状态统一见 [资源进度](../devDoc/tasks/20261107-resource-coordination/progress.md)。
+0.3.0 的部署范围为单机 Windows、单张 NVIDIA GPU。复用现有 Python 3.13、固定 Qwen3-VL-Embedding-2B 权重与 HTCondor；模型目录含 model.lock.json 与 model/。机器 TOML 维护路径及 embedding 设置，HTCondor 维护普通容量和提交策略。随包机器模板由 `from basepack.project.init import template` 读取，见 [项目接入](setup-project.md)。实际部署与验收状态统一见 [资源进度](../devDoc/tasks/20261107-resource-coordination/progress.md)。
 
 ## 包与执行账户
 

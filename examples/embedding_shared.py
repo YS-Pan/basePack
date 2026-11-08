@@ -4,14 +4,14 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import math
 
-from basepack.config import load_config
+from basepack.project.config import load_project_config
 from basepack.embedding import EmbeddingClient
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("project_a_config")
 parser.add_argument("project_b_config")
 args = parser.parse_args()
-with EmbeddingClient(load_config(args.project_a_config)) as a, EmbeddingClient(load_config(args.project_b_config)) as b:
+with EmbeddingClient(load_project_config(args.project_a_config)) as a, EmbeddingClient(load_project_config(args.project_b_config)) as b:
     with ThreadPoolExecutor() as pool:
         batch = pool.submit(a.embed, ["document one", "document two"])
         query = pool.submit(b.embed, ["find a document"])

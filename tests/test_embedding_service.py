@@ -10,7 +10,7 @@ import time
 
 import pytest
 
-from basepack.config import load_machine
+from basepack.project.config import load_machine_config
 from basepack.embedding import worker
 from basepack.embedding.client import EmbeddingClient
 from basepack.embedding.transport import EmbeddingError, marker_path, read_marker, rpc
@@ -35,7 +35,7 @@ idle_seconds = 30
 cpu_threads = 2
 gpu_memory_mib = 9216
 ''')
-    return load_machine(config)
+    return load_machine_config(config)
 
 
 def test_cancel_and_deadline_leave_another_request_and_the_model_alive(machine):

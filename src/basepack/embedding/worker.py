@@ -10,7 +10,7 @@ import threading
 import time
 import traceback
 
-from basepack.config import load_machine
+from basepack.project.config import load_machine_config
 from .transport import atomic_json, instance_key, make_server, marker_path
 
 
@@ -150,7 +150,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--machine-config", required=True)
     args = parser.parse_args()
-    serve(load_machine(args.machine_config))
+    serve(load_machine_config(args.machine_config))
 
 
 if __name__ == "__main__":
