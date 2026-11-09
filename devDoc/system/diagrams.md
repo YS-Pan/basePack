@@ -1,6 +1,6 @@
 # 当前文件与运行逻辑框图
 
-按 2026 年 11 月 9 日的 0.6.0 源码、正式客户端安装与本机部署绘制。0.5.0 core/jobs 和共享 embedding 服务继续保留，后者与 0.6.0 客户端协议兼容。沿用[参考 chat](codex://threads/01a1bb3f-4db8-7c10-8d71-c951aba18aa2) 按文件位置分层的方法；记忆行为的实际验收边界见[专项进度](../tasks/20261106-memory-system/progress.md)，后续目标见[记忆方案图](../tasks/20261106-memory-system/diagrams.md)。
+按 2026 年 11 月 9 日的 0.6.0 源码、正式客户端安装与本机部署绘制。0.5.0 core/jobs 和共享 embedding 服务继续保留，后者与 0.6.0 客户端协议兼容。沿用[参考 chat](codex://threads/01a1bb3f-4db8-7c10-8d71-c951aba18aa2) 按文件位置分层的方法；记忆行为的实际验收边界见[专项进度](../tasks/20261106-memory-system/progress.md)，阶段合同见[记忆方案图](../tasks/20261106-memory-system/diagrams.md)。
 
 ## 路径与读图约定
 

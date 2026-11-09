@@ -1,14 +1,14 @@
 # 记忆系统方案逻辑框图
 
-这是 2026 年 11 月 9 日[实施计划](plan.md)的图解。**P0 原生接入已通过，P1 实施中，其余阶段待验**；接入映射见 [P0 结果](p0-result.md)，实际状态只在[进度](progress.md)维护。已交付的接入、embedding 和 jobs 见[当前系统图](../../system/diagrams.md)。
+这是 2026 年 11 月 9 日[实施计划](plan.md)的逻辑图解，涵盖本轮已交付的记忆闭环及阶段验收依赖。各阶段的实际证据与未测边界只在[进度](progress.md)及结果文档维护；现行模块与调用关系见[当前系统图](../../system/diagrams.md)。
 
 ## 1. 项目局部知识、原件与共享能力
 
 ```mermaid
 flowchart TB
-  subgraph project["项目 P：记忆方案待实施"]
+  subgraph project["项目 P：项目局部记忆"]
     original["业务原件与版本系统<br/>文档、图片/PDF、聊天定位"]
-    entry["P/AGENTS.md → .basepack/instructions.md<br/>已有读取入口，记忆内容交付待实现"]
+    entry["P/AGENTS.md → .basepack/instructions.md<br/>宿主读取入口并执行 brief"]
     work["工作 agent<br/>接收启动信息 / 一次检索委托"]
     reader["宿主实际派发的订阅 worker<br/>同次阅读：智能分块、摘要、节点/边"]
     store["项目局部唯一持久知识源<br/>来源/表示ID、版本、原文范围<br/>块边界、层级、摘要、语义边与更正"]
@@ -41,7 +41,7 @@ flowchart TB
   embedding -.->|向量与语义身份| index
 ```
 
-建议知识与索引收在 `P/.basepack/memory/` 的少量存储文件，具体格式由 P0 实测决定；通用底座程序可以共用，库文件仍分别留在各项目。业务原件不自动整库复制，原件备份沿业务责任；旧依据须能由版本系统回查或保留必要片段。
+知识与索引收在 `P/.basepack/memory/`，使用项目独立的 SurrealKV 目录；接入映射见 [P0 结果](p0-result.md)。通用底座程序可以共用，库文件仍分别留在各项目。业务原件不自动整库复制，原件备份沿业务责任；旧依据须能由版本系统回查或保留必要片段。
 
 启动时，必须保留的信息直接交付，相关与探索线索才参加预算选择；入口存在不等于内容已经到达。变化维护沿“检测 → 同读智能分块/摘要/建边 → 核版本 → 原生事务 → 更新索引”进行。结构解析只供定位，embedding 只编码，语义判断由实际订阅 agent 完成。行为与数据合同见[计划](plan.md#最小行为与数据合同)。
 

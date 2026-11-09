@@ -1,6 +1,6 @@
 # 项目记忆
 
-记忆将文件摘要、章节摘要、原文块和图片保存在本项目的 SurrealDB 中，并保留层级、原文范围、语义关系和修改依据。宿主订阅 agent 负责智能分块、摘要、识图、建图和评分；已有共享服务编码图文，数据库执行存储、事务与混合查询。小文件不必虚造章节。
+记忆在本项目的 SurrealDB 中保存文件摘要、章节摘要、原文块、图片描述与定位，并保留层级、原文范围、语义关系和修改依据；图片原字节快照保存在项目记忆目录的 assets 中。宿主订阅 agent 负责智能分块、摘要、识图、建图和评分；已有共享服务编码图文，数据库执行存储、事务与混合查询。小文件不必虚造章节。
 
 ## 启用
 
@@ -35,9 +35,9 @@ python -m basepack --config '<config>' memory embed
 python -m basepack --config '<config>' memory changes --scope '资料目录'
 ```
 
-prepare 提供新旧编号原文、已有成员、相关关系及 expected 知识版本；图片返回可打开的原图路径。将材料交给订阅 agent，在同次阅读中选择最终块边界并生成摘要、节点和图边；结构备读单元只用于定位。批次 JSON 合同与操作流程在 `memory guide` 返回的已安装 skill 中，源码维护源为 [SKILL.md](../src/basepack/memory/SKILL.md)。
+prepare 时包括本批所用依据与关系两端的材料；它提供新旧编号原文、已有与关联成员、节点、关系及 expected 知识版本，图片返回可打开的原图路径。关联记录的来源原文仍需 read 或扩充 prepare 范围核实。将材料交给订阅 agent，在同次阅读中选择最终块边界并生成摘要、节点和图边；结构备读单元只用于定位。批次 JSON 合同与操作流程在 `memory guide` 返回的已安装 skill 中，源码维护源为 [SKILL.md](../src/basepack/memory/SKILL.md)。
 
-apply 核对来源版本和本批被修改知识的 expected 版本，再原子写入；缺 expected 仅允许新建。原文块由程序按范围取原词，摘要、边界、依据、历史与更正持久保存。旧草稿冲突时重新 prepare、共读后再提交。来源变化使相关块、祖先摘要及依赖关系待更新，未变兄弟与兼容向量可复用；文件追加的新内容也必须重核完整摘要。部分摘要显式保存 coverage_gaps。接受删除保留旧依据，相关主张按剩余证据重核。再次共读、apply、embed 并查询新结果后，才算完成增量维护；深检查使用 `changes --deep`。
+apply 核对来源版本，以及本批改写、退休、更正目标、实际使用的既有依据成员和关系两端的 expected 版本，再原子写入；无关 expected 不阻塞并行，缺 expected 仅允许本批新建记录。原文块由程序按范围取原词，摘要、边界、依据、历史与更正持久保存。旧草稿冲突时重新 prepare、共读后再提交。来源变化使相关块、祖先摘要及依赖关系待更新，失效也刷新知识版本；未变兄弟与兼容向量可复用，文件追加的新内容必须重核完整摘要。部分摘要显式保存 coverage_gaps。接受删除保留旧依据，相关主张按剩余证据重核。再次共读、apply、embed 并查询新结果后，才算完成增量维护；深检查使用 `changes --scope <文件或目录> --deep`。
 
 embed 复用 [共享 embedding](resources.md)，不另外加载模型。文件/章节使用已接受摘要，块使用原文，图片使用原始图片；兼容且输入未变的向量复用。超限保留原错误，交回原阅读 agent 调整分块或摘要，不能静默截断。仅文字试用可暂不编码，并显式使用 search 的 text 模式。
 
@@ -59,7 +59,7 @@ brief 直接提供必须保留的信息、相关线索、来源与覆盖缺口�
 
 brief 的状态明细有上限并返回总数，必保留信息不因此省略；vector_pending 报告尚未编码或输入已变的当前成员，模型身份兼容性在实际向量查询时核对。`memory sources` 列完整来源元数据，供手动深维护抽样；抽到的材料与旧图要实际共读，未发现新关系也如实记录。已待核知识不会每次启动重复写相同失效日志。启动由项目指令驱动宿主实际运行 brief，维护由宿主派发订阅 agent，程序没有后台语义工作进程。
 
-read 只接受 member ID；语义 node/edge 经 neighbors 查看依据，再读对应成员。neighbors 默认展开当前关系，历史复核显式加 `--include-stale`。图像 read 将描述与 `original.image_path` 分开；实际打开快照，并报告 original_missing。
+read 只接受 member ID；语义 node/edge 经 neighbors 查看依据，再读对应成员。neighbors 默认展开当前关系，历史复核显式加 `--include-stale`。图像 read 将描述与 `original.image_path` 分开；实际打开快照，并报告 original_missing。业务原图缺失时仍可读保留快照；原图已变化或快照缺失时直接报错。
 
 任务已知少量文件时，启动 brief 后可以直接批量读取；需要发现位置、未点名前提或跨材料依据时，再用记忆检索。父级摘要用于补背景或条件，选证据时避免重复已选原文块。
 
@@ -74,4 +74,4 @@ read 只接受 member ID；语义 node/edge 经 neighbors 查看依据，再读�
 & $surreal import --endpoint '<新目录服务的 endpoint>' --username '<username>' --namespace '<namespace>' --database '<database>' '<backup.surql>'
 ```
 
-原生 CLI 使用 SURREAL_PASS 等环境变量；basepack 使用配置中的 password_env。备份集合包括 export、项目配置、业务原件及 `.basepack/memory/assets/` 必要图片快照；数据库内的摘要、边界、依据、更正和旧文字快照随 export 恢复。新目录保留 project_id，使用自己的数据目录与端口，再核原文定位、图关系和检索。向量可随 export 恢复，也可从保留文字和原图重新 embed，无需重新总结。运行中的库使用原生 export；复制物理目录须先停写并停止服务。长期备份目的地与保留周期由业务项目确定。
+原生 CLI 使用 SURREAL_PASS 等环境变量；basepack 使用配置中的 password_env。备份集合包括 export、项目配置、业务原件及 `memory.data_dir` 下的 assets 图片快照（默认 `.basepack/memory/assets/`）；数据库内的摘要、边界、依据、更正和旧文字快照随 export 恢复。新目录保留 project_id，使用自己的数据目录与端口，再核原文定位、图关系和检索。向量可随 export 恢复，也可从保留表示和原图重新 embed，无需重新总结；重编码仍要求业务原件存在且版本一致。运行中的库使用原生 export；复制物理目录须先停写并停止服务。长期备份目的地与保留周期由业务项目确定。

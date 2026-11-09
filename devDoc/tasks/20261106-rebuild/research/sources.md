@@ -17,7 +17,7 @@
 | 主动性与总成本 | 证据限制：旧小样本、合成检索分数和安装回执未证明普遍净收益 | 在新项目按任务质量、未点名信息发现及全周期成本评估 | [测试证据与限制](thread-survey.md#读取到的测试证据与限制)、[历史总结的证据边界](../legacy-history.md#新项目继承与舍弃) |
 | 共享模型与资源协调 | 初步调查观察：已有模型、合作式 GPU 锁和 HTCondor；队列查询当时认证失败 | 原调查保留旧时点；按最新核验继续确认配置、接口和认证 | [初步设施调查](../../../archive/20261107-resource-coordination/research/infrastructure.md#agenttools-当前可复用部分)、[本次环境核验](../../../system/environment.md) |
 | 资源工具复用与并行 | 2026-11-07 先读相关聊天，再核源码：多模态 runtime、批处理、局部热复用和进程清理已存在；跨项目服务与并行预算待改造 | 用户明确 embedding 独立且可与普通 GPU 任务并行；旧整卡互斥策略不继承为新要求 | [专项核对](../../../archive/20261107-resource-coordination/research/legacy-implementation.md)、[详细计划](../../../archive/20261107-resource-coordination/plan.md) |
-| 实施路线与待决项 | 工程建议：最短闭环、一次委托、分数排序、批量 I/O 与最小增量维护 | 记忆首期仅用 SurrealDB；接法、动作接口和预算由专项 P0 核定。2026-11-09 已静态复核，尚未运行原型 | [任务总览](../plan.md)、[接入依据](../../20261106-memory-system/research/backend-review.md)、[本轮未决问题](#本轮归纳和未决问题) |
+| 实施路线与待决项 | SurrealDB 首期路线已完成 P0–P5 本轮实施与 0.6.0 安装试用；静态调查保留为选型依据 | 公开/合成样例与三份 devDoc 自用已验；真实业务、大规模性能及全周期成本净收益仍未证明 | [记忆进度](../../20261106-memory-system/progress.md)、[接入依据](../../20261106-memory-system/research/backend-review.md)、[本轮未决问题](#本轮归纳和未决问题) |
 
 ## 范围和阅读方式
 
@@ -67,6 +67,6 @@
 
 其余思想进入执行方案：单一维护源、最短完整闭环先行、简单来源版本、批量 I/O、跨 worker 合并、手动/自动共用、可选审核、分数排序、一次委托、多模态与资源准入分离。没有承接旧的十人固定班组、双 Luna 强制链、三份长期工作树或多级审计协议。
 
-调查当时留下的资源认证与 Windows 资源行为问题，现已有 [R9 交付及证据](../../../archive/20261107-resource-coordination/r9-result.md)，当前边界由 [资源模块](../../../system/modules/resources.md) 维护，不再作为记忆前置待办。记忆仍需验证宿主启动信息实际交付、底座的中文/并发/少文件批量 I/O、真实 agent 语义与评分链路，以及主动提示和总成本效果；下一步按 [现行记忆计划](../../20261106-memory-system/plan.md) 及其静态复核执行。旧调查与旧分数保留原条件。
+调查当时留下的资源认证与 Windows 资源行为问题，现已有 [R9 交付及证据](../../../archive/20261107-resource-coordination/r9-result.md)，当前边界由 [资源模块](../../../system/modules/resources.md) 维护，不再作为记忆前置待办。记忆已完成本轮启动信息实收、中文/并发与 HDD 小样例、订阅 agent 语义与评分链路及安装恢复验证；[记忆进度](../../20261106-memory-system/progress.md) 集中维护已验范围与下一步。真实业务中的主动提示、长期效果和全周期成本净收益仍待评估；旧调查与旧分数保留原条件。
 
 GitHub 连接器只读查询 [YS-Pan/basePack](https://github.com/YS-Pan/basePack) 得到 public、默认分支 main、size=0；本轮没有写远端。大小预算是执行计划建议，发布前以实际待提交文件和远端引用核对。

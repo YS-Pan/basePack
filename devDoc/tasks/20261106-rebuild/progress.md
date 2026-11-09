@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-当前唯一 active 路线为 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，源码、构建声明、测试、产品文档、示例及 resources skill 在该实验工程内维护；根目录保留统一 devDoc 和两项通用技能。本次布局迁移的实际检查与接续见 [迁移结果](../../archive/20261109-project-layout/result.md)，不改变 R9 和记忆功能的完成状态。
+当前唯一 active 路线为 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，源码、构建声明、测试、产品文档、示例及资源和记忆 skill 在该实验工程内维护；根目录保留统一 devDoc 和两项通用技能。本次布局迁移的实际检查与接续见 [迁移结果](../../archive/20261109-project-layout/result.md)，不改变 R9 和记忆功能的完成状态。
 
 资源 R9 已交付 0.5.0 并结案归档，详见 [R9 结果](../../archive/20261107-resource-coordination/r9-result.md)。记忆 P0–P5 本轮公开/合成闭环、独立评估与 0.6.0 正式安装试用已交付；质量/成本边界和具体状态只在 [记忆进度](../20261106-memory-system/progress.md) 接续；本页跟踪跨工具状态与公共工作，共性取舍见 [复用优先](plan.md#复用优先)。
 

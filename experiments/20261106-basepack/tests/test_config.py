@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import subprocess
 import sys
 
 import pytest
@@ -58,6 +59,71 @@ def test_init_preserves_existing_project_instructions(tmp_path):
     assert "[embedding]" in template("machine.toml")
     assert "gpu_memory_mib" in template("machine.toml")
     assert "[budget]" not in template("machine.toml")
+
+
+@pytest.mark.parametrize("markers", ["<!-- basepack:start -->", "<!-- basepack:end -->",
+                                    "<!-- basepack:end -->\r\n<!-- basepack:start -->",
+                                    "<!-- basepack:start -->\r\n<!-- basepack:start -->\r\n<!-- basepack:end -->",
+                                    "<!-- basepack:start -->\r\n<!-- basepack:end -->\r\n<!-- basepack:end -->"])
+def test_init_rejects_broken_host_entry_without_writing_files(tmp_path, markers):
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    root = tmp_path / "project"
+    root.mkdir()
+    agents = root / "AGENTS.md"
+    original = ("# Business\r\nKeep original instructions.\r\n"
+                + markers + "\r\nKeep following instructions.\r\n").encode("utf-8")
+    agents.write_bytes(original)
+    with pytest.raises(ValueError):
+        init_project(root, machine)
+    assert agents.read_bytes() == original
+    assert not (root / ".basepack/config.toml").exists()
+    assert not (root / ".basepack/instructions.md").exists()
+    assert not (root / ".gitignore").exists()
+    agents.write_text("# Business\nKeep original instructions.\n", encoding="utf-8")
+    assert load_project_config(init_project(root, machine)).root == root
+
+
+def test_init_round_trips_nonbmp_paths(tmp_path, monkeypatch):
+    machine = tmp_path / "machine-🚀.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    root = tmp_path / "project-🚀"
+    python = tmp_path / "python-🚀" / "python.exe"
+    monkeypatch.setattr(sys, "executable", str(python))
+    path = init_project(root, machine, ".basepack/config-🚀/basepack.toml")
+    config = load_project_config(path)
+    assert config.python == python
+    assert config.machine_config == machine
+    assert config.root == root
+
+
+def test_init_config_with_quote_is_a_valid_powershell_argument(tmp_path):
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    root = tmp_path / "project"
+    config_name = ".basepack/user's.toml"
+    path = init_project(root, machine, config_name)
+    assert load_project_config(path).root == root
+    instructions = (root / ".basepack/instructions.md").read_text(encoding="utf-8")
+    command = instructions.split("```powershell\n", 1)[1].split("\n```", 1)[0]
+    parse = """$tokens = $null
+$parseErrors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseInput([Console]::In.ReadToEnd(), [ref]$tokens, [ref]$parseErrors)
+if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+$ast.EndBlock.Statements[0].PipelineElements[0].CommandElements[4].Value
+"""
+    argument = subprocess.check_output(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", parse],
+                                       input=command, text=True, timeout=10).strip()
+    assert argument == config_name
+
+
+def test_init_config_cannot_overwrite_instructions(tmp_path):
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    root = tmp_path / "project"
+    with pytest.raises(ValueError, match="instructions.md"):
+        init_project(root, machine, ".basepack/instructions.md")
+    assert not root.exists()
 
 
 @pytest.mark.parametrize("target", ["../other", "other"])

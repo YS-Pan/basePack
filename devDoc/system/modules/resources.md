@@ -1,14 +1,14 @@
 # 资源工具
 
-本页描述 active 路线 [20261106-basepack](../../../experiments/20261106-basepack/README.md) 的 0.5.0 源码职责与合同；正式安装切换、预算和功能验收的实际状态见 [资源进度](../../archive/20261107-resource-coordination/progress.md)。产品操作见 [资源使用](../../../experiments/20261106-basepack/docs/resources.md)，服务安装与维护见 [管理员说明](../../../experiments/20261106-basepack/docs/administrator.md)。
+本页描述 active 路线 [20261106-basepack](../../../experiments/20261106-basepack/README.md) 的资源模块职责与合同。当前 0.6.0 客户端兼容已验的 0.5.0 共享 embedding 服务；安装与升级边界见 [部署合同](../deployment.md)，资源部署、预算和验收基线见 [R9 结果](../../archive/20261107-resource-coordination/r9-result.md)。产品操作见 [资源使用](../../../experiments/20261106-basepack/docs/resources.md)，服务安装与维护见 [管理员说明](../../../experiments/20261106-basepack/docs/administrator.md)。
 
-[project/config.py](../../../experiments/20261106-basepack/src/basepack/project/config.py) 唯一解析项目 schema 2 与机器 schema 1 配置；各功能按需读取自身节，实例数据统一在项目 `.basepack/`。0.5.0 读取 0.4.0 的项目格式；更老配置先用保留的 0.4.0 迁移，见 [部署合同](../deployment.md)。本模块不维护记忆索引、图或数据库。
+[project/config.py](../../../experiments/20261106-basepack/src/basepack/project/config.py) 唯一解析项目 schema 2 与机器 schema 1 配置；各功能按需读取自身节，实例数据统一在项目 `.basepack/`。0.6.0 继续读取既有格式；更老的 schema 1 项目先用保留的 0.4.0 迁移。本模块不维护记忆索引、图或数据库。
 
 ## 共享 embedding
 
 [embedding/qwen3_vl.py](../../../experiments/20261106-basepack/src/basepack/embedding/qwen3_vl.py) 通过 Sentence Transformers 6.2.0 加载本地 Qwen3-VL-Embedding-2B，复用其图文预处理、last-token pooling、归一化和请求内批处理。必要的薄适配负责输入限制、CUDA 分配器预算，以及在 Transformer forward 前按实际 attention_mask 拒绝超长输入；截断被显式关闭，图片原件经验证后交给库处理。
 
-[identity.py](../../../experiments/20261106-basepack/src/basepack/embedding/identity.py) 维护 `embedding_identity`：模型 revision/文件清单、Sentence Transformers 版本、FP16、指令、图像缩放和 pooling/归一化合同共同决定语义。服务地址、模型存放路径、队列期限、请求批次、线程和预算不改变此标识。0.5.0 使用新的身份；小样例排序一致只支持该样例结论，记忆 P2 仍须按身份核索引兼容或重建。
+[identity.py](../../../experiments/20261106-basepack/src/basepack/embedding/identity.py) 维护 `embedding_identity`：模型 revision/文件清单、Sentence Transformers 版本、FP16、指令、图像缩放和 pooling/归一化合同共同决定语义。服务地址、模型存放路径、队列期限、请求批次、线程和预算不改变此标识。0.5.0 引入新的身份，0.6.0 保持兼容。[记忆向量模块](../../../experiments/20261106-basepack/src/basepack/memory/vectors.py) 已按身份与输入版本判断复用、过滤不兼容向量，并通过 `memory embed` 重建。
 
 [service.py](../../../experiments/20261106-basepack/src/basepack/embedding/service.py) 只适配 LitAPI：setup 加载一份常驻模型，predict 调用编码器。LitServe 0.2.19 提供 HTTP、队列、健康检查和 worker 管理；单设备、单推理 worker、单 API 接入线程，跨请求批次为 1。请求内批次由模型库处理。`restart_workers=True` 负责重建失败 worker，失败请求不自动重投。
 

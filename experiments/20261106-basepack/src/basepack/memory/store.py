@@ -86,14 +86,14 @@ class Memory:
         return [statement["result"] for statement in statements][1 if check_project else 0:]
 
     def install_schema(self) -> dict:
-        # Schema installation is idempotent; binding is a native transaction.
+        # Install the schema and bind its project in one native transaction.
         namespace = "`" + self.connection["namespace"].replace("`", "\\`") + "`"
         database = "`" + self.connection["database"].replace("`", "\\`") + "`"
         self._execute(f"DEFINE NAMESPACE IF NOT EXISTS {namespace}; USE NS {namespace}; "
                       f"DEFINE DATABASE IF NOT EXISTS {database};", check_project=False)
-        self._execute(Path(__file__).with_name("schema.surql").read_text(encoding="utf-8"), check_project=False)
+        schema = Path(__file__).with_name("schema.surql").read_text(encoding="utf-8")
         project_id = _sql(self.connection["project_id"])
-        self._execute("BEGIN; "
+        self._execute("BEGIN;\n" + schema + "\n"
                       f"IF meta:project.project_id != NONE AND meta:project.project_id != {project_id} "
                       "{ THROW 'Memory database belongs to another project'; }; "
                       f"UPSERT meta:project SET project_id={project_id}; COMMIT;", check_project=False)
@@ -148,9 +148,21 @@ class Memory:
                               f"out IN {_sql([_record(i) for i in ids])} OR "
                               f"basis.*.member CONTAINSANY {_sql([_record(i) for i in ids])};")[0] if ids else []
         nodes = self._rows("node")
+        selected = set(ids)
+        related = set(selected)
+        related.update(value for edge in edges for value in (edge["in"], edge["out"])
+                       if _record(value).table == "member")
+        node_ids = {value for edge in edges for value in (edge["in"], edge["out"])
+                    if _record(value).table == "node"}
+        related_nodes = [node for node in nodes if node["id"] in node_ids or any(
+            basis["member"] in selected for basis in node.get("basis", []))]
+        selected_members = [member for member in members if member["id"] in selected]
+        related.update(basis["member"] for row in selected_members + related_nodes + edges
+                       for basis in row.get("basis", []))
+        neighborhood_members = [member for member in members if member["id"] in related - selected]
         expected = {row["id"]: row["knowledge_revision"] for row in
-                    [member for item in prepared for member in item["members"]] + nodes + edges}
-        return {"sources": prepared, "neighborhood": {"edges": edges,
+                    [member for item in prepared for member in item["members"]] + neighborhood_members + nodes + edges}
+        return {"sources": prepared, "neighborhood": {"members": neighborhood_members, "edges": edges,
                 "nodes": nodes}, "expected": expected,
                 "instruction": "Read originals together. Choose semantic boundaries, summaries, and evidenced relations in one batch; reading_units are structural hints only."}
 
@@ -216,9 +228,9 @@ class Memory:
                 f"previous={{members:(SELECT * OMIT embedding FROM member WHERE id IN {refs}), "
                 f"nodes:(SELECT * FROM node WHERE basis.*.member CONTAINSANY {refs}), "
                 f"edges:(SELECT * FROM semantic WHERE basis.*.member CONTAINSANY {refs} OR in IN {refs} OR out IN {refs} OR in IN {nodes} OR out IN {nodes})}};",
-                f"UPDATE member SET stale=true WHERE id IN {refs};",
-                f"UPDATE node SET stale=true WHERE basis.*.member CONTAINSANY {refs};",
-                f"UPDATE semantic SET stale=true WHERE basis.*.member CONTAINSANY {refs} OR in IN {refs} OR out IN {refs} OR in IN {nodes} OR out IN {nodes};"]
+                f"UPDATE member SET stale=true, knowledge_revision={_sql(uuid4().hex)} WHERE id IN {refs};",
+                f"UPDATE node SET stale=true, knowledge_revision={_sql(uuid4().hex)} WHERE basis.*.member CONTAINSANY {refs};",
+                f"UPDATE semantic SET stale=true, knowledge_revision={_sql(uuid4().hex)} WHERE basis.*.member CONTAINSANY {refs} OR in IN {refs} OR out IN {refs} OR in IN {nodes} OR out IN {nodes};"]
 
     def apply(self, batch: dict) -> dict:
         """Check exact source revisions, then accept one agent batch atomically.
@@ -242,8 +254,12 @@ class Memory:
                        [("member", "delete_members"), ("node", "delete_nodes"), ("semantic", "delete_edges")]
                        for value in batch.get(key, []))
         targets.update(_record(item["target"]) for item in batch.get("corrections", []))
+        dependencies = {_record(value) for key in ("members", "nodes", "edges")
+                        for item in batch.get(key, []) for value in item.get("evidence", [])}
+        dependencies.update(_record(item[endpoint]) for item in batch.get("edges", [])
+                            for endpoint in ("in", "out"))
         expected = {_record(key): value for key, value in batch.get("expected", {}).items()}
-        for target in sorted(targets, key=lambda value: (value.table, value.key)):
+        for target in sorted(targets | dependencies, key=lambda value: (value.table, value.key)):
             record = _sql(target)
             if target in expected:
                 statements.append(f"IF {record}.knowledge_revision != {_sql(expected[target])} "
@@ -374,7 +390,7 @@ class Memory:
             statements.append(f"CREATE {_sql(_Record('change', uuid4().hex))} SET operation='accept', target={_sql(record)}, previous=(SELECT * OMIT embedding FROM ONLY {_sql(record)}), at=time::now(), context={_sql(context)};")
             if table == "node":
                 statements.append(f"IF {_sql(record)}.text != {_sql(value['text'])} OR {_sql(record)}.kind != {_sql(value['kind'])} OR {_sql(record)}.basis != {_sql(value['basis'])} {{ "
-                                  f"UPDATE semantic SET stale=true WHERE in={_sql(record)} OR out={_sql(record)}; }};")
+                                  f"UPDATE semantic SET stale=true, knowledge_revision={_sql(uuid4().hex)} WHERE in={_sql(record)} OR out={_sql(record)}; }};")
             # MERGE preserves derived vectors; input_revision gates their validity.
             statements.append(f"UPSERT {_sql(record)} MERGE {_sql(value)} RETURN NONE;")
         for item in batch.get("edges", []):
@@ -395,7 +411,7 @@ class Memory:
                 statements.append(f"CREATE {_sql(_Record('change', uuid4().hex))} SET operation='retire', target={_sql(record)}, previous=(SELECT * OMIT embedding FROM ONLY {_sql(record)}), at=time::now(), context={_sql(context)};")
                 statements.append(f"UPDATE {_sql(record)} SET stale=true, retired=true, knowledge_revision={_sql(uuid4().hex)};")
                 if table == "node":
-                    statements.append(f"UPDATE semantic SET stale=true WHERE in={_sql(record)} OR out={_sql(record)};")
+                    statements.append(f"UPDATE semantic SET stale=true, knowledge_revision={_sql(uuid4().hex)} WHERE in={_sql(record)} OR out={_sql(record)};")
         for correction in batch.get("corrections", []):
             target = _record(correction["target"])
             # The snapshot precedes all accepts in the transaction.

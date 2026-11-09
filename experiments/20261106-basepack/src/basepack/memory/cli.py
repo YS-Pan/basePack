@@ -14,7 +14,7 @@ def register_commands(subparsers):
     actions["search"].add_argument("--text", required=True)
     actions["search"].add_argument("--scope", default="")
     actions["search"].add_argument("--limit", type=int, default=12)
-    actions["search"].add_argument("--literal", action="store_true", help="Explicit original-substring search")
+    actions["search"].add_argument("--literal", action="store_true", help="Case-insensitive substring search in stored titles/text")
     actions["search"].add_argument("--mode", choices=["hybrid", "text", "vector"], default="hybrid")
     actions["search"].add_argument("--timeout", type=float, default=600)
     actions["embed"].add_argument("--ids", nargs="+", help="Member IDs; otherwise index current representations")

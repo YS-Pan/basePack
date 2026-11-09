@@ -1,6 +1,6 @@
 # 将 Basic Memory 纳入正式底座比较
 
-按用户要求，把 Basic Memory 与 SQLite 方案、SurrealDB 放入 [同一记忆工作流比较](../../tasks/20261106-memory-system/research/backend-review.md#按记忆工作流比较)，同步记忆计划/进度和重建入口，替代上一轮固定首选/后备与最多两条原型的安排。
+按用户要求，把 Basic Memory 与 SQLite 方案、SurrealDB 放入 [同一记忆工作流比较](../../tasks/20261106-memory-system/research/backend-review.md#历史比较依据)，同步记忆计划/进度和重建入口，替代上一轮固定首选/后备与最多两条原型的安排。
 
 比较计入 Basic Memory 已有笔记、关系、变化同步、检索和上下文工具省下的应用代码，不再仅凭图文向量入口差异提前降级。补核公开项目内配置/数据库位置，区分现成 provider 的身份限制与可扩展身份协议；文本协议适配及 model alias 为尚未运行的集成推断，原始图片向量仍有公开入口缺口。计划采用原生关系定位与写入边界，不先锁定自有边表或跨文件事务；完整目标保持。
 

@@ -8,6 +8,10 @@
 
 选留证据现统一位于根 `artifacts/runs/`。前次临时材料整理的映射为 `artifacts/runs/tmp-reorganization-20261108/moves.json`，本次位置映射为 `artifacts/runs/20261109-project-layout/moves.json`；原始回执及下文历史路径保留当时含义，结合两轮映射回查长期副本，tmp 内容按可清除处理。
 
+## 2026-11-09 升级后一致性修复（源码）
+
+P5 安装基线之后，仓库修复了失效知识版本、关系依赖并发核查、错项目初始化的 schema 副作用，以及项目入口生成的路径/标记问题，见 [修复记录](../change_log/minor/20261109_170434_reconcile-memory-contracts.md)。本轮修复只在源码与隔离测试中交付，未重建 wheel 或重装稳定客户端；下节仍描述此前的普通安装版本，共享资源服务保持原状。
+
 ## 2026-11-09 记忆与 0.6.0 部署核验
 
 0.6.0 普通 wheel 已安装于 `D:/AgentTools/envs/basepack-client/`，仅含轻量客户端及 psutil 7.2.2；非 editable，无 user-site overlay。系统 Python 的原安装及 embedding 0.5.0 环境未改。本项目已由该解释器执行 init 和 memory init，跨调用 brief 成功；实际 devDoc 首建与完整试用结果统一见 [记忆进度](../tasks/20261106-memory-system/progress.md)。

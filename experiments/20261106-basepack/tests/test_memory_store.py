@@ -63,7 +63,8 @@ def test_real_multilevel_roundtrip_local_edit_and_correction(memory):
     assert memory.neighbors("node:local")["edges"][0]["id"] == "semantic:requires"
     assert memory.brief("资料", limit=0)["mandatory"][0]["id"] == "member:guide"
     old = {row["id"]: row for row in memory._rows("member")}
-    updated = batch_for(memory, "# 数据库\n数据库离线运行并隔离项目。\n\n# 保留\n资料必须保留。\n")
+    updated_text = "# 数据库\n数据库离线运行并隔离项目。\n\n# 保留\n资料必须保留。\n"
+    (memory.config.root / "guide.md").write_bytes(updated_text.encode("utf-8"))
     assert memory.changes(["guide.md"])[0]["kind"] == "modified"
     assert memory.search("数据库") == []
     assert memory.search("资料")[0]["id"] == "member:retention"
@@ -71,6 +72,7 @@ def test_real_multilevel_roundtrip_local_edit_and_correction(memory):
         memory.read("storage")
     prepared = memory.prepare(["guide.md"])
     assert "本地数据库隔离项目" in prepared["sources"][0]["previous"]["numbered_text"]
+    updated = batch_for(memory, updated_text)
     updated["members"] = [row for row in updated["members"] if row["id"] != "retention"]
     updated["members"][0]["text"] = "项目数据库离线运行，资料必须保留。"
     updated["members"][1]["text"] = "数据库必须离线运行并隔离项目。"
@@ -88,7 +90,8 @@ def test_real_multilevel_roundtrip_local_edit_and_correction(memory):
     assert correction["previous"]["text"] == old["member:storage"]["text"]
     assert len(memory._rows("source_version")) == 2
     # Adding a second native edge leaves the first intact.
-    memory.apply({"sources": [], "edges": [{"id": "also", "in": "member:storage", "out": "member:retention",
+    memory.apply({"sources": [], "expected": memory.prepare(["guide.md"])["expected"],
+                  "edges": [{"id": "also", "in": "member:storage", "out": "member:retention",
                   "kind": "supports", "text": "隔离与保留共同约束存储", "evidence": ["storage", "retention"]}]})
     assert {edge["id"] for edge in memory._rows("semantic")} == {"semantic:requires", "semantic:also"}
     assert memory.changes(["guide.md"], deep=True) == []
@@ -194,7 +197,8 @@ def test_real_node_correction_invalidates_relations_and_stale_draft_rejected(mem
     assert memory._rows("node")[0]["text"].startswith("人工更正")
     # A separately prepared, independent new relation remains authorized by
     # source evidence; it does not require a global knowledge epoch.
-    memory.apply({"sources": [], "edges": [{"id": "independent", "in": "member:storage", "out": "member:retention",
+    memory.apply({"sources": [], "expected": memory.prepare(["guide.md"])["expected"],
+                  "edges": [{"id": "independent", "in": "member:storage", "out": "member:retention",
                    "kind": "supports", "text": "两个原文条件共同约束存储", "evidence": ["storage", "retention"]}]})
     fresh = memory.prepare(["guide.md"])
     memory.apply({"sources": [], "expected": fresh["expected"], "edges": batch["edges"]})
@@ -229,3 +233,75 @@ def test_real_prepare_includes_evidenced_node_edges_and_read_rejects_graph_ids(m
     for record_id in ["node:local", "semantic:node_constraint"]:
         with pytest.raises(ValueError, match="read requires a member ID"):
             memory.read(record_id)
+
+
+def test_real_node_correction_rejects_edge_only_draft_prepared_before_invalidation(memory):
+    batch = batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n")
+    memory.apply(batch)
+    prepared = memory.prepare(["guide.md"])
+    memory.apply({"sources": [], "expected": prepared["expected"], "nodes": [
+        {"id": "local", "kind": "decision", "text": "人工更正：隔离属于必须条件", "evidence": ["storage"]}]})
+    relation = memory._rows("semantic")[0]
+    assert relation["stale"] is True
+    assert relation["knowledge_revision"] != prepared["expected"][relation["id"]]
+    with pytest.raises(RuntimeError, match="Knowledge revision changed"):
+        memory.apply({"sources": [], "expected": prepared["expected"], "edges": batch["edges"]})
+    assert memory._rows("semantic")[0]["stale"] is True
+
+
+def test_real_wrong_project_init_preserves_existing_database_schema(memory):
+    memory._execute("REMOVE TABLE semantic; REMOVE TABLE node; REMOVE TABLE member; "
+                    "REMOVE TABLE source_version; REMOVE TABLE source; REMOVE TABLE change; "
+                    "REMOVE ANALYZER memory_zh;")
+    before = memory._execute("INFO FOR DB;")[0]
+    assert set(before["tables"]) == {"meta"}
+    wrong = deepcopy(memory.config.raw)
+    wrong["memory"]["project_id"] = "another_project"
+    config = ProjectConfig(memory.config.path, memory.config.python, memory.config.root, wrong, memory.config.machine)
+    with pytest.raises(RuntimeError, match="another project"):
+        Memory(config).install_schema()
+    assert memory._execute("INFO FOR DB;")[0] == before
+
+
+def test_real_new_relations_check_used_dependencies_and_allow_unrelated_changes(memory):
+    batch = batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n")
+    memory.apply(batch)
+    prepared = memory.prepare(["guide.md"])
+    memory.apply({"sources": [], "expected": prepared["expected"], "nodes": [
+        {"id": "local", "kind": "decision", "text": "人工更正：隔离属于必须条件", "evidence": ["storage"]}]})
+    drafted = {"sources": [], "expected": prepared["expected"],
+               "edges": [{**batch["edges"][0], "id": "drafted_relation"}]}
+    with pytest.raises(RuntimeError, match="Knowledge revision changed"):
+        memory.apply(drafted)
+    assert {row["id"] for row in memory._rows("semantic")} == {"semantic:requires"}
+
+    prepared = memory.prepare(["guide.md"])
+    corrected = {**batch["members"][0], "text": "人工更正：项目必须隔离并保留资料。"}
+    memory.apply({"sources": batch["sources"], "expected": prepared["expected"], "members": [corrected]})
+    # The changed guide is in expected, but is not used by this new relation.
+    independent = {"sources": [], "expected": prepared["expected"], "edges": [
+        {"id": "independent", "in": "member:storage", "out": "member:retention", "kind": "supports",
+         "text": "两个原文条件共同约束存储", "evidence": ["storage", "retention"]}]}
+    memory.apply(independent)
+    assert next(row for row in memory._rows("semantic") if row["id"] == "semantic:independent")["stale"] is False
+    with pytest.raises(RuntimeError, match="Knowledge revision changed"):
+        memory.apply({"sources": [], "expected": prepared["expected"], "nodes": [
+            {"id": "stale_evidence", "kind": "condition", "text": "旧摘要形成的主张", "evidence": ["guide"]}]})
+    assert "node:stale_evidence" not in {row["id"] for row in memory._rows("node")}
+
+
+def test_real_prepare_includes_relation_endpoints_and_their_original_evidence(memory):
+    batch = batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n")
+    memory.apply(batch)
+    text = "另一份存储约束。\n"
+    (memory.config.root / "other.md").write_bytes(text.encode("utf-8"))
+    prepared = memory.prepare(["guide.md", "other.md"])
+    other = next(source for source in prepared["sources"] if source["path"] == "other.md")
+    memory.apply({"sources": [{"path": "other.md", "revision": other["revision"]}],
+                  "expected": prepared["expected"],
+                  "members": [{"id": "other", "kind": "chunk", "path": "other.md", "start_line": 1, "end_line": 1}],
+                  "edges": [{"id": "across", "in": "member:storage", "out": "member:other", "kind": "supports",
+                             "text": "两份材料共同约束存储", "evidence": ["storage", "other"]}]})
+    prepared = memory.prepare(["other.md"])
+    assert {row["id"] for row in prepared["neighborhood"]["members"]} >= {"member:storage"}
+    assert "member:storage" in prepared["expected"]
