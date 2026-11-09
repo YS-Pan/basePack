@@ -8,7 +8,7 @@ def register_commands(subparsers):
     memory = subparsers.add_parser("memory", help="Project-local multilevel memory")
     commands = memory.add_subparsers(dest="memory_action", required=True)
     actions = {name: commands.add_parser(name) for name in
-               ("init", "guide", "prepare", "apply", "embed", "search", "read", "neighbors", "brief", "changes", "rank")}
+               ("init", "guide", "sources", "prepare", "apply", "embed", "search", "read", "neighbors", "brief", "changes", "rank")}
     actions["prepare"].add_argument("--paths", nargs="+", required=True)
     actions["apply"].add_argument("--batch", required=True, help="Agent-produced UTF-8 JSON batch")
     actions["search"].add_argument("--text", required=True)
@@ -45,6 +45,8 @@ def dispatch(args, config):
         if action == "init":
             result = memory.install_schema()
             _activate(config)
+        elif action == "sources":
+            result = memory.sources()
         elif action == "prepare":
             result = memory.prepare(args.paths)
         elif action == "apply":
@@ -89,7 +91,7 @@ def _activate(config):
 & '{python}' -m basepack --config '{project_config}' memory brief --task '<当前任务>'
 ```
 
-直接保留当前 mandatory 信息；stale=true 的内容只作待核，不当作当前事实。相关与探索线索按需回查原文。检索时可一次委托 worker 完成查询、阅读、给分和内容交付；检索与维护按 [记忆流程](<{skill}>) 执行。
+直接保留当前 mandatory 信息；stale=true 的内容只作待核，不当作当前事实。brief 会快检已登记原件与配置的 source_scope；出现 changes/pending 时，在当前任务预算内共读并维护必要小批，余项明确交接。可将维护和检索合并为一次 worker 委托，交付实际证据与缺口；按 [记忆流程](<{skill}>) 执行。
 {end}"""
     if start in existing:
         before, _, tail = existing.partition(start)

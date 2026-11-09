@@ -68,6 +68,8 @@ def _files(path: Path):
     if path.is_dir():
         with scandir(path) as entries:
             for entry in entries:
+                if entry.name in {".basepack", ".git"}:
+                    continue
                 if entry.is_dir(follow_symlinks=False):
                     yield from _files(Path(entry.path))
                 elif entry.is_file():
@@ -148,6 +150,12 @@ def detect_changes(root: str | Path, sources: Iterable[Mapping], scope: Iterable
         for candidate in _files(selected):
             path = _project_path(root, candidate.relative_to(root).as_posix())
             current[path.relative_to(root).as_posix()] = path
+    # Directory discovery skips managed trees; an already registered file there
+    # is still an explicit source and must not be mistaken for a deletion.
+    for relative in known:
+        target = _project_path(root, relative)
+        if relative not in current and target.is_file():
+            current[relative] = target
     changes = []
     for relative in sorted(known.keys() | current.keys()):
         if relative not in current:

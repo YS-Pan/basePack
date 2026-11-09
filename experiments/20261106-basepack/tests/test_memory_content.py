@@ -166,3 +166,14 @@ def test_reading_a_concurrently_changed_source_fails(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "read_bytes", read_then_change)
     with pytest.raises(RuntimeError, match="Source changed while reading"):
         read_source(tmp_path, path.name)
+
+
+def test_project_discovery_skips_own_storage_and_git_but_explicit_job_scope_is_allowed(tmp_path):
+    write_source(tmp_path, "docs/note.md", b"knowledge")
+    write_source(tmp_path, ".basepack/memory/db/log", b"database state")
+    write_source(tmp_path, ".basepack/jobs/result.txt", b"explicit job evidence")
+    write_source(tmp_path, ".git/index", b"git state")
+    assert [change.path for change in detect_changes(tmp_path, [], ["."])] == ["docs/note.md"]
+    assert [change.path for change in detect_changes(tmp_path, [], [".basepack/jobs"])] == [".basepack/jobs/result.txt"]
+    registered = read_source(tmp_path, ".basepack/jobs/result.txt")
+    assert [change.path for change in detect_changes(tmp_path, [asdict(registered)], ["."])] == ["docs/note.md"]

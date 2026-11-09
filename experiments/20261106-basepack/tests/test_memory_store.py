@@ -131,7 +131,7 @@ def test_real_stale_evidence_and_deleted_original(memory):
     brief = memory.brief(limit=0)
     assert brief["mandatory"][0]["stale"] is True
     assert {row["id"] for row in brief["pending"]} == {
-        "member:guide", "member:storage_section", "member:storage", "member:retention"}
+        "member:guide", "member:storage_section", "member:storage", "member:retention", "node:local", "semantic:requires"}
     # Missing originals stay a visible failure; retained history is not passed
     # off as the current business file.
     with pytest.raises(FileNotFoundError):

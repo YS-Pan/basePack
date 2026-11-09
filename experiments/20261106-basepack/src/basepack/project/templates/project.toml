@@ -16,6 +16,8 @@ namespace = 'basepack'
 database = 'memory'
 username = 'root'
 password_env = 'BASEPACK_MEMORY_PASSWORD'
+# Optional files/directories for discovering additions; otherwise check registered paths.
+source_scope = []
 
 [jobs]
 jobs_dir = '.basepack/jobs'

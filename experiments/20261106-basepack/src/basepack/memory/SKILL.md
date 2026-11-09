@@ -7,7 +7,7 @@ description: Use an enabled basePack project memory to retrieve evidence, follow
 
 Read the project's `.basepack/instructions.md` for its explicit config and Python. Invoke that Python with `-m basepack --config <absolute-config> memory ...`. The local SurrealDB server must already be running; keep its data in this project. Credentials come from the configured environment variable. `guide` prints this file's installed location; action help describes arguments.
 
-At task start or continuation, run `brief --task <goal>`. Keep current `mandatory` content directly; stale mandatory information remains an obligation to recheck, not a current fact. Use relevant and exploration hints to notice missing premises. Check coverage and open the original when a fact matters.
+At task start or continuation, run `brief --task <goal>`. Keep current `mandatory` content directly; stale mandatory information remains an obligation to recheck, not a current fact. Brief fast-checks registered originals and configured `memory.source_scope`. If changes/pending affect the task, maintain a necessary small batch within the task, optionally combined with the retrieval delegation; explicitly hand off remaining work. The map channel also delivers prerequisites sharing no literal task terms. Open the original when a fact matters.
 
 ## Retrieve in one delegation
 
@@ -22,7 +22,7 @@ Use a cheaper available worker for routine retrieval. Record its actual model wh
 
 ## Read and maintain together
 
-1. Run `changes --scope <explicit-files-or-directories>` after edits or when checking freshness. Fast checks use metadata; `--deep` hashes originals when a deeper check is needed.
+1. Run `changes --scope <explicit-files-or-directories>` after edits or when checking freshness. Fast checks use metadata; `--deep` hashes originals when needed. Configure `memory.source_scope` to discover new files in declared directories; without it, startup checks registered paths only. Brief caps detail lists and reports total counts; `sources` gives the full metadata inventory for explicit maintenance.
 2. Run `prepare --paths <affected-files-and-related-material> --output <reading.json>`. Read the new/old numbered originals together with relevant neighbors. Reading units are location hints. Decide the final semantic chunk boundaries, file/section summaries, knowledge nodes and semantic edges during this same reading, including conditions and evidence. Preserve original wording inside chunks.
 3. Write one batch and run `apply --batch <batch.json>`. Reuse stable IDs for unchanged members. The program checks source versions, writes native records/relations transactionally, preserves snapshots/corrections and invalidates affected dependencies. A source changed during the work requires another reading of that batch; preserve actual errors.
 4. Run `embed` to encode accepted current members through the existing shared service, or `embed --ids <member-ids>` for an explicit batch. It reuses compatible unchanged vectors and reports pending members. Then search/read changed knowledge and ensure old conclusions are no longer current. A text-only project may defer embedding and use `--mode text`. Report uncovered ranges and remaining stale knowledge.
@@ -30,14 +30,16 @@ Use a cheaper available worker for routine retrieval. Record its actual model wh
 Batch fields:
 
 - `expected`: copy this object unchanged from prepare. It holds the knowledge versions read for existing members/nodes/edges. Apply checks only targets changed by this batch; a stale draft fails explicitly, while unrelated writes remain possible. Missing expected versions permit new records only.
-- `sources`: `{path, revision}` from prepare; image sources add `kind:'image'`. An accepted missing source adds `deleted:true` and its previous revision.
-- `members`: `{id, kind, path, parent, start_line, end_line, title, text, evidence, mandatory, coverage_gaps}`. Text kinds are `file`, `section`, `chunk`; line ranges are 1-based and inclusive. Summary evidence names the covered chunks; chunk text is exact original text. Images use `kind:'image'`, actual visual description/OCR as text, and `locator` for page/region/origin as available; no invented line range. Mark only explicitly required startup information mandatory.
+- `sources`: `{path, revision}` from prepare, never the null revision of a fast changes check; image sources add `kind:'image'`. An accepted missing source adds `deleted:true` and its previous revision.
+- `members`: `{id, kind, path, parent, start_line, end_line, title, text, evidence, mandatory, coverage_gaps}`. Text kinds are `file`, `section`, `chunk`; line ranges are 1-based and inclusive. Summary evidence names the covered chunks. For chunks, omit text and let the program take exact original bytes/line endings; explicitly supplied text is strictly checked. Images use `kind:'image'`, actual visual description/OCR as text, and `locator` for page/region/origin as available; no invented line range. Mark only explicitly required startup information mandatory.
 - `nodes`: optional `{id, kind, text, evidence}` for entities, decisions and conditions.
 - `edges`: optional `{id, in, out, kind, text, conditions, evidence}`. Endpoints name `member:<id>` or `node:<id>`; evidence names member IDs read together. Edit an existing edge by its ID; adding one preserves other edges.
 - `delete_members`, `delete_nodes`, `delete_edges`: explicit IDs retired by this batch. `corrections`: `{id, target, reason}`; the program captures the previous record.
 - `context`: actual available `chat`, `turn`, `root_chat`; leave unavailable fields absent.
 
 For broad maintenance, use a coordinator and at most four cheaper readers per coordinator. Merge cross-worker candidates and read both ends together before accepting a relation. Batch review is optional. Deep maintenance may revisit old or randomly selected material to seek missed relations; do not claim every pair was examined.
+
+For a manual deep pass, use `sources`, sample distinct materials within the declared scope, then actually read those materials together with their old neighborhood, including `--include-stale` when inspecting history. Record a discovered relation or an honest negative result. Extend the evidence of an existing relation when new material supports it; preserve other valid edges and explicit conditions. After a source disappears, reread remaining evidence before deciding whether a claim survives.
 
 Back up with SurrealDB's native export and restore into a separate project directory. Include this project's configuration, original documents/images and required derived assets. Database exports preserve explicitly stored knowledge/history; vector indexes can be rebuilt from retained representations.
 

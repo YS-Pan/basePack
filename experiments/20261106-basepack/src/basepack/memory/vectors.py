@@ -8,7 +8,7 @@ from basepack.embedding.admin import status
 from basepack.embedding.qwen3_vl import MAX_REQUEST_INPUTS
 from .content import read_source
 from .images import read_image
-from .store import _record, _sql
+from .store import _CANDIDATE_OMIT, _record, _sql
 
 
 def embed_members(memory, ids=None, *, timeout=600) -> dict:
@@ -79,7 +79,7 @@ def vector_search(memory, text, *, scope="", limit=12, timeout=600) -> list[dict
         f"SELECT VALUE id FROM member WHERE {scope_filter} AND embedding_identity={_sql(identity)} "
         "AND embedded_revision=input_revision AND embedding!=NONE LIMIT 1; "
         "SELECT *, source_revision AS revision, "
-        f"vector::distance::cosine(embedding, {vector}) AS distance OMIT embedding FROM member "
+        f"vector::distance::cosine(embedding, {vector}) AS distance OMIT {_CANDIDATE_OMIT} FROM member "
         f"WHERE stale=false AND embedding_identity={_sql(identity)} "
         "AND embedded_revision=input_revision AND embedding!=NONE "
         f"AND string::starts_with(path, {_sql(scope)}) "
