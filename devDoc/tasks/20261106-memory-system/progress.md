@@ -29,6 +29,8 @@
 
 ## 下一步与未定
 
+PPT 小项目的首次真实业务试用已形成 [修改与维护计划](real-project-maintenance-plan.md)：优先修复特殊记录 ID 往返，再完善接入与失败定位、交付可识别的补丁安装版，并补真实增量、恢复及效果对照。当前只交付计划，已确认 ID 缺陷仍在；具体顺序、依据与完成条件只在该计划维护。
+
 本轮实施、源码外生命周期、devDoc 自用及文档核验已完成，安装位置、启动方式与原证见 P5。已知少量文件可以直接批量读取，记忆用于发现位置/前提及跨材料取证；不强制所有读取经过检索。正式业务范围、长期备份去向及保留周期仍待实际接入时确定；小样本未证明广泛召回、长期使用效果或费用优势。
 
 资源设施的历史交付见 [R9 结果](../../archive/20261107-resource-coordination/r9-result.md)。选型依据保留在 [SurrealDB 调研](research/backend-review.md)、[多层检索调研](research/multilevel-retrieval.md) 与 [旧项目核查](research/legacy-multilevel.md)，研究收益不写成本机结果。其它独立工具及联合发布状态只在 [重建总进度](../20261106-rebuild/progress.md) 维护。
