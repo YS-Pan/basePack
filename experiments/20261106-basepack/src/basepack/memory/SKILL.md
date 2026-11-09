@@ -11,6 +11,8 @@ At task start or continuation, run `brief --task <goal>`. Keep current `mandator
 
 ## Retrieve in one delegation
 
+When a task names a few known files, read those files together directly after brief. Use memory when locations, relevant prerequisites or cross-material evidence need discovery. Select the shortest useful evidence set; parent summaries add background or missing conditions rather than repeating already selected chunks.
+
 The working agent may delegate the question, project scope and content budget once to a subscription worker. That worker completes retrieval and scoring, then returns usable content and sources:
 
 1. Run `search --text <terms>` for default hybrid retrieval across file/section summaries, original chunks and images. `--mode text` is the explicit text-only path; `--mode vector` queries only compatible vectors. Chinese segmentation is not substring matching; use `--literal --mode text` for exact substrings, identifiers or missed proper names.

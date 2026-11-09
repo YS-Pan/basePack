@@ -61,6 +61,8 @@ brief 的状态明细有上限并返回总数，必保留信息不因此省略�
 
 read 只接受 member ID；语义 node/edge 经 neighbors 查看依据，再读对应成员。neighbors 默认展开当前关系，历史复核显式加 `--include-stale`。图像 read 将描述与 `original.image_path` 分开；实际打开快照，并报告 original_missing。
 
+任务已知少量文件时，启动 brief 后可以直接批量读取；需要发现位置、未点名前提或跨材料依据时，再用记忆检索。父级摘要用于补背景或条件，选证据时避免重复已选原文块。
+
 工作 agent 可只委托一次，让 worker 完成检索、父子/语义展开、原文核实和评分，再用 `rank --input <scored.json> --budget <文字字符数>` 排序交付实际内容。词法分数与 agent 分数不同。超预算证据保留补读入口，不静默截掉条件；工作 agent 仍可自由补读。
 
 ## 备份与恢复
