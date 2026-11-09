@@ -8,6 +8,8 @@
 
 按用户本次要求，**Basic Memory、SQLite CLI + FTS5 + sqlite-vec、SurrealDB 原生本地 MCP 均为正式候选**，替代上一轮先 SurrealDB、SQLite 对照、Basic Memory 后备的顺序。Basic Memory 复用记忆应用，SQLite 提供部署简洁基线，SurrealDB 集中数据库能力；按同一完整工作流比较总维护量，当前不预设赢家。原生 MCP 和单一 embedding 接口差异都不足以单独决定取舍。
 
+本次新增的 [多层次默认合同](../plan.md#多层次表示与跨层检索) 同样适用于三者。文件/章节摘要与原文块须各自可寻址、检索和作为图节点，不能以“有自动 chunk”或“章节可读取”直接判定满足；研究依据与机制复用见 [多层调研](multilevel-retrieval.md)。
+
 | 已核版本 | 官方能力证据 | 尚需项目承担及本机核实 |
 | --- | --- | --- |
 | [SurrealDB 4.0.0](https://github.com/surrealdb/surrealdb/releases/tag/v4.0.0)，11 月 3 日发布 | Windows 发行、[原生 MCP](https://surrealdb.com/docs/build/ai-agents/mcp/embedded)、独立关系、全文、外部向量和导入/导出 | 来源/版本/定位、更正与条件、语义身份、变化清单仍需短 schema/SQL/skill；本地 server、中文、恢复和磁盘代价待验 |
@@ -21,6 +23,7 @@
 | 交付层次 | 已有记忆应用，可复用笔记、观察、关系和工具流程 | 数据库与扩展，应用规则由本项目实现 | 多模型数据库，应用规则由本项目实现 |
 | 来源与变化 | 笔记、定位、校验和、文件同步已有入口；外部业务原件的版本依据仍需接入 | 来源表/定位/变化检测需定义，复用原生事务与索引 | 来源记录/定位/变化检测需定义，复用原生事务与索引 |
 | 关系与上下文 | 已有带类型的笔记链接、关系 context 和上下文工具；关系修改走笔记编辑，复杂条件/更正与多依据需验 | 边表与递归 SQL 可做图查询，简单邻域无需另造图执行器 | 原生关系边和遍历更直接，语义规则仍需定义 |
+| 多层身份与索引 | 独立摘要 note 可带层级/父级元数据；原生 section/chunk 与稳定成员身份的映射须核 | 成员/表示表、递归 SQL 与外部向量可表达各层，需维护对应 SQL | 记录、带属性关系、外部向量及原生排名融合可表达各层，需维护依赖与查询 |
 | 存储与部署 | Markdown 加应用数据库，文件同步和恢复集合需核 | 项目内数据库、CLI，无数据库服务；向量扩展单独管理 | 项目内存储；同项目多聊天连接一个本地 server，计入实例管理 |
 | 图文向量 | 现成文本 provider 与当前服务存在接入缺口，需核最薄接法 | 扩展可存外部向量，身份和原图定位由集成保存 | 可存外部向量，原生近似索引可按规模使用；身份和原图定位由集成保存 |
 | 应比较的成本 | 少写应用代码能否抵消接入适配、文件 I/O 和上游约束 | 少组件能否抵消自维护 schema/SQL/同步和查询流程 | 原生图/向量/MCP 能否抵消额外进程、配置及升级维护 |
@@ -45,6 +48,12 @@ Basic Memory 的现成功能见 [观察与关系](https://docs.basicmemory.com/c
 
 [语义搜索说明](https://docs.basicmemory.com/concepts/semantic-search) 与 [v1 依赖](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/pyproject.toml) 明确自动生成文本向量，FastEmbed/sqlite-vec 为核心依赖，旧 `semantic_search_enabled` 开关已移除。不能假设 Basic Memory 能纯文字启动且完全不接 embedding：P0 需先核模型/provider 和自动索引行为，避免试验时意外下载模型或另起一份共享模型。其可选本地/API reranker 也不替代本项目要求的订阅 agent 给分。
 
+### 多层合同的新增差距
+
+Basic Memory 的 [搜索](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/mcp/tools/ranked_search.py) 面向 notes/observations/relations，章节读取不是独立章节搜索；[语义分块](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/repository/semantic_chunking.py) 会合并短章节、拆长章节，文本 hash 派生的 chunk 身份不等于稳定段落节点。[章节投影](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/repository/note_section_repository.py) 也会随 note generation 重建。独立 note 能提供身份/metadata/关系，但段落级文件量与重复索引要实测；少文件的 note/observation/section 映射只有通过稳定身份、层级过滤及原文定位样例才可采用，不预设等价或立即淘汰。
+
+SQLite 的 [递归查询](https://sqlite.org/lang_with.html) 可找祖先，[FTS5](https://sqlite.org/fts5.html) 与触发器可维护全文索引；祖先摘要和语义边的依赖失效仍须明确 SQL。SurrealDB 的 [混合检索/排名融合](https://surrealdb.com/docs/learn/data-models/vector-search/hybrid-search) 可复用，但不自动消除父子内容重复；[事件](https://surrealdb.com/docs/learn/schema-management/events-and-triggers/defining-events) 也只执行已定义规则，导入不触发事件。三者均需以同样本证明“源变化→相关表示/依据失效→局部更新→当前检索正确”，不能由数据库功能推断该工作流已交付。
+
 ## P0 如何消除未知
 
 先固定同一资料集与完整目标，核 Basic Memory 的现成记忆流程及公开 embedding 接法、SQLite 的必要 SQL、SurrealDB 的原生查询与实例代价，再按不确定性选择最短原型。比较可分批，最终只保留一套产品接入，不为三者各建完整应用。除 [计划的数据与行为合同](../plan.md#最小行为与数据合同)，样例重点包含：
@@ -54,5 +63,6 @@ Basic Memory 的现成功能见 [观察与关系](https://docs.basicmemory.com/c
 3. 原有节点上增改边而保留其它边、更正/失效与旧依据回查、恢复到另一目录；显式保存的修改记录也必须恢复。
 4. 两个聊天连接同一项目的读写与冲突，以及另一个项目的实际隔离；数据物理位置仍属各项目，不能以服务器 namespace 代替归属核查。
 5. 冷/热启动、批量维护、文件数和读写；小样例只筛明显代价，代表性语料及真实 HDD 验收留 P4。
+6. 同一长文件的文件/章节/原文块稳定身份、固定摘要与各层预计算向量；跨层候选/父子展开、摘要回源、重叠去重、局部修改使相关祖先/依据失效、未变兄弟复用及恢复。具体合同只在计划维护。
 
 按实际新增代码、SQL/skill/配置、额外进程和运行维护共同选唯一底座；原型数量按消除差异的需要调整，不沿用“最多两条”排除本次新增候选。关键能力缺口未解决时保留失败与代价后调整方案，不用 P1 文字成功替代完整范围判断。官方资料只支持上述静态能力，Windows、并发、中文召回、HDD 与净收益目前都没有本机记忆验收证据。

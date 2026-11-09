@@ -11,6 +11,7 @@
 | 项目方向与隔离 | 用户要求：主动未知提示、低成本、项目局部记忆；通用资源可以显式共用 | 约束新项目目标；旧任务、业务授权和验收结论各自保留原身份 | [项目纲领](../../../project-charter.md)、[原始快照](user-plan.original.md) |
 | 继承什么、舍弃什么 | 历史事故与归纳：多层协议、重复发布和维护规则增加了固定开销 | 用于选择短流程和保留事故回归；不证明某种模型或底座是唯一原因 | [维护负担的原因](../legacy-history.md#为什么越来越难推进)、[继承与舍弃](../legacy-history.md#新项目继承与舍弃) |
 | 图创建与关系发现 | 历史事故：大量分段提交不等于已建立可用的语义关系 | 新实现仍需用有依据的跨材料关系验证建图行为 | [旧项目近期历史](../legacy-history.md#从实验工作区到复杂的自用系统)、[建图专项原计划](<D:/project/20261024 doc system/docs/plans/20261105-graph-maintenance.md>) |
+| 多层次表示与旧实现 | 2026-11-09 用户选择多层次，重新核论文/成熟实现及旧 Context、Atlas、LightGraph、trial | 多层为新计划默认；旧分段、语义 note 与回源是局部能力，已查范围无完整三层摘要向量/父子检索验收 | [多层调研](../../20261106-memory-system/research/multilevel-retrieval.md)、[旧代码核查](../../20261106-memory-system/research/legacy-multilevel.md) |
 | 检索、评分与交付 | 历史审计：资料召回、评分实际调用和必要证据交付可能脱节 | 核实真实订阅 agent 链路与最终结果，分别报告缺口 | [测试证据与限制](thread-survey.md#读取到的测试证据与限制)、[真实试用审计](<D:/project/20261024 doc system/docs/context/20261102-live-trial-review/report.md>) |
 | 主动性与总成本 | 证据限制：旧小样本、合成检索分数和安装回执未证明普遍净收益 | 在新项目按任务质量、未点名信息发现及全周期成本评估 | [测试证据与限制](thread-survey.md#读取到的测试证据与限制)、[历史总结的证据边界](../legacy-history.md#新项目继承与舍弃) |
 | 共享模型与资源协调 | 初步调查观察：已有模型、合作式 GPU 锁和 HTCondor；队列查询当时认证失败 | 原调查保留旧时点；按最新核验继续确认配置、接口和认证 | [初步设施调查](../../../archive/20261107-resource-coordination/research/infrastructure.md#agenttools-当前可复用部分)、[本次环境核验](../../../system/environment.md) |
