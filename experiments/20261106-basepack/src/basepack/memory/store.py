@@ -7,6 +7,7 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import re
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from uuid import uuid4
@@ -22,13 +23,30 @@ _CANDIDATE_OMIT = "embedding,basis,raw_revision,knowledge_revision"
 @dataclass(frozen=True)
 class _Record:
     table: str
-    key: str
+    key: str | int
 
 
 def _record(value: str, table: str = "member") -> _Record:
-    if ":" in value:
-        table, value = value.split(":", 1)
-    return _Record(table, value.removeprefix("⟨").removesuffix("⟩"))
+    """Keep bare string keys literal; decode native table-qualified IDs."""
+    if ":" not in value:
+        return _Record(table, value)
+    table, value = value.split(":", 1)
+    if value.startswith(("`", "⟨")):
+        closing = "`" if value[0] == "`" else "⟩"
+        if not value.endswith(closing):
+            raise ValueError(f"Unterminated record ID: {table}:{value}")
+        escapes = {"0": "\0", "r": "\r", "t": "\t", "n": "\n", "f": "\f", "\\": "\\", "`": "`", "⟩": "⟩"}
+
+        def unescape(match):
+            escaped = match[1]
+            return chr(int(escaped[2:-1], 16)) if escaped.startswith("u{") else escapes[escaped]
+
+        return _Record(table, re.sub(r"\\(u\{[0-9a-fA-F]+\}|.)", unescape, value[1:-1]))
+    if re.fullmatch(r"-?[0-9]+", value) and -(2 ** 63) <= int(value) < 2 ** 63:
+        return _Record(table, int(value))
+    if value.startswith(("[", "{", "u'", 'u"')):
+        raise ValueError("Memory record IDs require a string or integer key")
+    return _Record(table, value)
 
 
 def _sql(value) -> str:
@@ -238,6 +256,11 @@ class Memory:
         Unmentioned records and edges survive. Accepted chunk text comes from the
         original, never from generated prose. Corrections retain actual old data.
         """
+        for index, item in enumerate(batch.get("members", [])):
+            if item["kind"] in {"file", "section", "chunk"}:
+                missing = [field for field in ("start_line", "end_line") if field not in item]
+                if missing:
+                    raise ValueError(f"members[{index}] ({item['id']}) missing required fields: {', '.join(missing)}")
         known = self._rows("source")
         by_path = {source["path"]: source for source in known}
         by_id = {source["id"]: source for source in known}
@@ -259,7 +282,7 @@ class Memory:
         dependencies.update(_record(item[endpoint]) for item in batch.get("edges", [])
                             for endpoint in ("in", "out"))
         expected = {_record(key): value for key, value in batch.get("expected", {}).items()}
-        for target in sorted(targets | dependencies, key=lambda value: (value.table, value.key)):
+        for target in sorted(targets | dependencies, key=lambda value: (value.table, _sql(value.key))):
             record = _sql(target)
             if target in expected:
                 statements.append(f"IF {record}.knowledge_revision != {_sql(expected[target])} "
@@ -438,6 +461,8 @@ class Memory:
         if _record(member_id).table != "member":
             raise ValueError("read requires a member ID; inspect node/edge evidence via neighbors")
         member = self._execute(f"SELECT * OMIT embedding FROM ONLY {_sql(_record(member_id))};")[0]
+        if member is None:
+            raise ValueError(f"Member not found: {member_id}")
         if member["kind"] == "image":
             snapshot = self.config.memory_dir / member["asset"]
             if sha256(snapshot.read_bytes()).hexdigest() != member["source_revision"]:

@@ -1,6 +1,6 @@
 # 项目配置与部署合同
 
-更新：2026 年 11 月 9 日。当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.6.0。本文维护代码、业务实例、共享设施与升级边界；正式记忆安装状态见 [专项进度](../tasks/20261106-memory-system/progress.md)，共享资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。操作从路线 README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md) 和 [管理员说明](../../experiments/20261106-basepack/docs/administrator.md) 进入。
+更新：2026 年 11 月 10 日。当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.6.1。本文维护代码、业务实例、共享设施与升级边界；正式记忆安装状态见 [专项进度](../tasks/20261106-memory-system/progress.md)，共享资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。操作从路线 README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md) 和 [管理员说明](../../experiments/20261106-basepack/docs/administrator.md) 进入。
 
 ## 位置与责任
 

@@ -1,17 +1,24 @@
 # 项目接入
 
-在选定 Python 环境普通安装 basepack 0.6.0 客户端；可使用稳定的独立环境，无需写入系统 Python。按 [部署说明](administrator.md) 准备所需设施：多项目共用 embedding，普通重任务使用 Condor，记忆使用每项目独立的 SurrealDB 数据目录与进程。文字记忆和普通任务可分别使用。随包机器模板可这样读取：
+在选定 Python 环境普通安装 basepack 0.6.1 客户端；可使用稳定的独立环境，无需写入系统 Python。按 [部署说明](administrator.md) 只准备所需设施：多项目共用 embedding，普通重任务使用 Condor，记忆使用每项目独立的 SurrealDB 数据目录与进程。文字记忆可以独立使用。随包机器模板可这样读取：
 
 ```powershell
 python -c "from basepack.project.init import template; print(template('machine.toml'))"
 ```
 
-每个新项目执行一次：
+每个新项目执行一次。下面的 `bp` 在原生命令失败时立即停止当前脚本；本页后续命令沿用同一 PowerShell 中的函数。`-X utf8` 保证 Python 取证输出为 UTF-8：
 
 ```powershell
-python -m basepack init --project-root '<project>' --machine-config '<absolute-machine-config>'
-python -m basepack --config '<absolute-project>/.basepack/config.toml' config show
-python -m basepack --config '<absolute-project>/.basepack/config.toml' doctor --facility core
+$python = '<absolute-python.exe>'
+$OutputEncoding = [Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = $OutputEncoding
+function bp {
+    & $python -X utf8 -m basepack @args
+    if ($LASTEXITCODE -ne 0) { throw "basepack failed ($LASTEXITCODE)" }
+}
+bp init --project-root '<absolute-project>' --machine-config '<absolute-machine-config>'
+bp --config '<absolute-project>/.basepack/config.toml' config show
+bp --config '<absolute-project>/.basepack/config.toml' doctor --facility core
 ```
 
 init 从安装包生成 `.basepack/config.toml` 和 `.basepack/instructions.md`，写入当前 Python 路径；根 AGENTS 只合并指向详细入口的短指针，原业务指令保留，Git 忽略整个 `.basepack/`。配置或入口已存在时直接报错。自定义配置可传 `--config-name .basepack/config/local.toml`，必须在 `.basepack/` 内；入口记录实际文件，project.root 按深度生成。调用显式传配置路径，不向父目录搜索。
@@ -44,19 +51,26 @@ python -m basepack embedding --machine-config '<absolute-machine-config>' status
 
 ## 启用记忆
 
-先为本项目启动 [SurrealDB 进程](administrator.md#项目-surrealdb)，再核 `[memory]` 的 endpoint、namespace、database、username 与 password_env。普通用户手动进程即可共用，SCM 托管是管理员可选项。init 生成独立 project_id，保留它随项目移动与恢复。调用 shell 需提供 password_env 指定的变量；普通资源调用不读取该凭据。
+在 `memory init` 前，先核项目配置的 `[memory]`，为本项目选定独立的 `data_dir`、`endpoint` 和 init 生成的 `project_id`。模板的 18080 是待选择的默认值；若已有项目占用它，直接编辑新项目配置中的 endpoint。例子中两个项目可以共用 exe、namespace/database 和共享模型服务，但各自使用下列值：
+
+| 项目 | memory.data_dir 的实际位置 | memory.endpoint | memory.project_id |
+| --- | --- | --- | --- |
+| A | `<project-A>/.basepack/memory` | `http://127.0.0.1:18080` | A 的 init 生成的 UUID |
+| B | `<project-B>/.basepack/memory` | `http://127.0.0.1:18081` | B 的 init 生成的另一 UUID |
+
+再按 [项目 SurrealDB](administrator.md#项目-surrealdb) 启动。该示例从目标配置读取 endpoint，启动绑定与客户端使用同一个值。普通用户可手动启动隐藏进程供同项目多聊天共用，SCM 托管是管理员可选项。启动调用结束后，必须在下一次独立调用检查 `/ready`，然后加载本项目的凭据，执行下面的 init/brief；只有 PID 不算可用。每个新调用 shell 都要提供 `password_env` 指定的变量，凭据读取方式见管理员示例。
 
 ```powershell
-python -m basepack --config '<absolute-project>/.basepack/config.toml' memory init
-python -m basepack --config '<absolute-project>/.basepack/config.toml' memory guide
-python -m basepack --config '<absolute-project>/.basepack/config.toml' memory brief --task '当前任务'
+bp --config '<absolute-project>/.basepack/config.toml' memory init
+bp --config '<absolute-project>/.basepack/config.toml' memory guide
+bp --config '<absolute-project>/.basepack/config.toml' memory brief --task '当前任务'
 ```
 
-memory init 绑定数据库身份，并把 brief 与已安装 skill 的入口加入项目 instructions。由宿主实际读取并执行该入口，才会取得启动信息。首建、混合检索、任务内小批维护与恢复见 [记忆使用](memory.md)。配置 source_scope 后，启动快检也发现声明范围内的新增文件；默认只检查已登记原件。
+memory init 才安装 schema、绑定数据库身份，并把 brief 与已安装 skill 的入口加入项目 instructions；普通 init 不启动服务、不建库。误连另一 UUID 的库会失败，保留 UUID 随本项目移动与恢复。由宿主实际读取并执行入口，才会取得启动信息。首建、混合检索、任务内小批维护与恢复见 [记忆使用](memory.md)。配置 source_scope 后，启动快检也发现声明范围内的新增文件；默认只检查已登记原件。
 
 ## 版本升级
 
-0.5.0 升级到 0.6.0 保留 schema 2 项目、schema 1 机器配置及资源数据，普通安装新客户端即可。已有 0.5.0 embedding 服务的协议与语义身份兼容，可继续运行；本次客户端升级无需停模型。启用记忆的旧配置显式补齐当前 [项目模板](../src/basepack/project/templates/project.toml) 中的 memory 字段，为本项目生成新 UUID，然后运行 memory init。不要复制另一项目的 project_id 或数据库。
+0.6.0 → 0.6.1 保留项目配置、UUID 和记忆数据，先保留旧 wheel 与原生备份，再普通安装新客户端并从源码外核安装位置、read/search 和小批维护。0.5.0 升级也保留 schema 2 项目、schema 1 机器配置及资源数据。已有 0.5.0 embedding 服务的协议与语义身份兼容，可继续运行；本次客户端升级无需停模型。启用记忆的旧配置显式补齐当前 [项目模板](../src/basepack/project/templates/project.toml) 中的 memory 字段，为本项目生成新 UUID，然后运行 memory init。不要复制另一项目的 project_id 或数据库。
 
 0.4.0 的资源接口切换按 [管理员升级步骤](administrator.md#升级与回滚) 处理。当前 Python embedding 使用 `client.embed(inputs, timeout=...)`，超时只结束调用方等待。
 

@@ -1,6 +1,6 @@
 # 项目记忆实现
 
-0.6.0 源码实现 SurrealDB 上的多层文字、原图向量与语义关系，首建和维护由宿主订阅 reader 同读完成。正式 wheel 与完整行为验收状态见 [专项进度](../../tasks/20261106-memory-system/progress.md)，P0 原生接入证据见 [结果](../../tasks/20261106-memory-system/p0-result.md)，用户流程见 [记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
+0.6.1 源码实现 SurrealDB 上的多层文字、原图向量与语义关系，首建和维护由宿主订阅 reader 同读完成。正式 wheel 与完整行为验收状态见 [专项进度](../../tasks/20261106-memory-system/progress.md)，P0 原生接入证据见 [结果](../../tasks/20261106-memory-system/p0-result.md)，用户流程见 [记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
 
 ## 职责与数据
 
@@ -17,6 +17,8 @@ prepare 时包括本批所用依据与关系两端的材料，取得同读的新
 变化检查与 apply 按原文范围、包含及摘要依据使受影响知识失效；真实失效同步刷新 knowledge_revision，文件增长也使全文摘要待核，未变叶块可复用。节点含义或依据改变时旧关联边待核，本批显式复核的边可恢复。接受删除保留旧快照与更正，不反复报告已处理删除。
 
 文字查询使用原生标题/正文全文，literal 显式调用原生包含匹配。read 仅接受 member ID，严格核对应版本原文；图像 read 返回独立的快照路径与原件缺失标记。原图缺失时可读保留快照，原图版本变化或快照缺失直接失败。neighbors 默认过滤 stale 的父子/语义展开，历史复核显式 include_stale。
+
+记录 ID 的单一转换入口统一原始字符串 key 与底座返回的规范 ID，保留数字 key 的类型及字符串转义；同一身份同时用于 SQL 与 Python 的 expected/依据集合比较。有限解码只覆盖现行字符串/整数合同，底座仍通过原生 type::record 构造记录。缺少文字成员起止行时，apply 在写入前报出成员、批次位置及字段；不存在的 read 目标明确报错。输入方式与最小批次见用户流程及随包 skill。
 
 brief 快检已登记原件及 source_scope：未变文件仅查元数据，已变材料才读原文定位失效，显式 deep 再哈希完整声明范围。它直接交付全部未退休 mandatory、相关线索及短项目地图；stale mandatory 仍交付但标待核。状态明细限量并带总数，sources 提供全量元数据供手动抽样。宿主按当前任务预算维护小批，程序不常驻派发语义 agent；已标待核条目不重复写同一失效日志。
 

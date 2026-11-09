@@ -1,17 +1,17 @@
 # 机器部署与维护
 
-本页属于当前 active 路线 [20261106-basepack](../README.md)，说明 0.6.0 客户端、项目 SurrealDB 4 与共享资源设施的部署。面向 Windows、Python 3.13；图文模型使用单张 NVIDIA GPU。机器格式保持 schema 1，项目格式保持 schema 2。资源基线见 [R9 结果](../../../devDoc/archive/20261107-resource-coordination/r9-result.md)，记忆正式安装与试用状态见 [专项进度](../../../devDoc/tasks/20261106-memory-system/progress.md)。
+本页属于当前 active 路线 [20261106-basepack](../README.md)，说明 0.6.1 客户端、项目 SurrealDB 4 与共享资源设施的部署。面向 Windows、Python 3.13；图文模型使用单张 NVIDIA GPU。机器格式保持 schema 1，项目格式保持 schema 2。资源基线见 [R9 结果](../../../devDoc/archive/20261107-resource-coordination/r9-result.md)，记忆正式安装与试用状态见 [专项进度](../../../devDoc/tasks/20261106-memory-system/progress.md)。
 
 ## 安装与执行账户
 
-客户端普通安装 wheel，可使用稳定的独立 Python 3.13 环境；本机 0.6.0 客户端位于 `D:/AgentTools/envs/basepack-client/`，系统及共享模型环境保持原状。若选择系统目录安装，通常需要管理员终端；核 pip 没有回落 user-site：
+客户端普通安装 wheel，可使用稳定的独立 Python 3.13 环境；本机客户端环境位于 `D:/AgentTools/envs/basepack-client/`，系统及共享模型环境保持原状。若选择系统目录安装，通常需要管理员终端；核 pip 没有回落 user-site：
 
 ```powershell
 python -m pip install --no-user '<basepack-wheel>'
 python -s -c "import basepack; print(basepack.__file__)"
 ```
 
-新建共享模型服务时，使用独立、稳定的纯净环境，按工程原生锁准备依赖，再安装普通 wheel。已有兼容的 0.5.0 服务可继续供 0.6.0 客户端使用，本次客户端升级无需重新加载模型：
+新建共享模型服务时，使用独立、稳定的纯净环境，按工程原生锁准备依赖，再安装普通 wheel。已有兼容的 0.5.0 服务可继续供 0.6.1 客户端使用，本次客户端升级无需重新加载模型：
 
 ```powershell
 $env:UV_PROJECT_ENVIRONMENT = '<absolute-shared-service-env>'
@@ -31,26 +31,56 @@ CondorClient 使用机器配置的 bin_dir/config_file，向原生命令显式�
 
 ## 项目 SurrealDB
 
-安装官方 SurrealDB 4 的发行 exe 到稳定位置，多个项目可共用程序；每个项目使用自己的物理数据目录、端口和进程。同项目多个聊天共用这个进程，namespace/database 不能代替物理隔离。本机选用 `D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`；产品配置只绑定 endpoint 与逻辑库，不写死 exe 路径。
+安装官方 SurrealDB 4 的发行 exe 到稳定位置，多个项目可共用程序；在 `memory init` 前选定每个项目的独立物理数据目录、端口和 UUID，见 [双项目示例](setup-project.md#启用记忆)：A 使用 18080，B 使用 18081，各自保存 init 生成的 project_id。namespace/database 不能代替物理隔离。同项目多个聊天共用进程。本机选用 `D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`；产品通过配置定位 endpoint。
 
-前台命令见 [记忆启用](memory.md#启用)。普通用户也可手动启动隐藏进程供多聊天共用：以项目 `.basepack/memory/` 为 cwd，数据路径用 `surrealkv://store`。凭据从本机秘密文件读入 SURREAL_USER/SURREAL_PASS 环境后启动原生进程；basepack 客户端只读 password_env，产品配置与源码不保存密码。本机把 password.txt 与 serve.ps1 放在被忽略的 memory 目录；脚本只读取凭据并执行原生命令。
+普通用户可手动启动隐藏进程。下面的 `serve.ps1` 保存到配置的 memory.data_dir（默认 `.basepack/memory/`）；先创建该目录及 `logs/`，并将本项目密码原文写入其中的 `password.txt`，不添加末尾换行。秘密文件与 launcher 留在本项目被忽略的目录；执行账户需要读凭据、读写数据与日志。SURREAL_USER/PASS 只在新库首次启动时创建 root，重启已有库不改密码。
 
-serve.ps1 使用下面的原生命令，替换 exe 路径；password.txt 保存该实例的密码原文，不添加末尾换行。文件由管理员在项目的忽略目录准备：
+替换三个绝对路径，Python 使用项目 instructions 中的实际入口；Windows PowerShell 5.1 的 `.ps1` 保存为带 BOM 的 UTF-8，以正确读取中文路径。脚本从同一个项目配置读取 endpoint、username 和数据目录；以该目录为 cwd，`surrealkv://store` 因而始终指向该项目的 store：
 
 ```powershell
-$env:SURREAL_USER = 'root'
-$env:SURREAL_PASS = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'password.txt')
-& '<absolute-surreal.exe>' start --bind 127.0.0.1:18080 'surrealkv://store'
+$ErrorActionPreference = 'Stop'
+$python = '<absolute-python.exe>'
+$config = '<absolute-project-config>'
+$surreal = '<absolute-surreal.exe>'
+$json = & $python -X utf8 -c "import json,sys; from basepack.project.config import load_project_config; c=load_project_config(sys.argv[1]); print(json.dumps({'endpoint':c.raw['memory']['endpoint'],'username':c.raw['memory']['username'],'data_dir':str(c.memory_dir)}))" $config
+if ($LASTEXITCODE -ne 0) { throw "Cannot load project config ($LASTEXITCODE)" }
+$memory = $json | ConvertFrom-Json
+Set-Location -LiteralPath $memory.data_dir
+$env:SURREAL_USER = $memory.username
+$env:SURREAL_PASS = [IO.File]::ReadAllText((Join-Path $memory.data_dir 'password.txt'))
+& $surreal start --bind ([Uri]$memory.endpoint).Authority 'surrealkv://store'
 exit $LASTEXITCODE
 ```
 
-普通用户隐藏启动示例，保留返回 PID 供该项目维护者观察：
+启动调用 A：memoryDir 是上述配置解析出的实际目录。日志分别保留标准输出与错误，返回 PID 属于 PowerShell launcher，仅供观察：
 
 ```powershell
-$memoryDir = '<absolute-project>/.basepack/memory'
-$memoryProcess = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', ('"' + "$memoryDir/serve.ps1" + '"')) -WorkingDirectory $memoryDir -WindowStyle Hidden -PassThru
+$ErrorActionPreference = 'Stop'
+$memoryDir = '<absolute-memory.data_dir>'
+New-Item -ItemType Directory -Force -Path "$memoryDir/logs" | Out-Null
+$memoryProcess = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', ('"' + "$memoryDir/serve.ps1" + '"')) -WorkingDirectory $memoryDir -WindowStyle Hidden -RedirectStandardOutput "$memoryDir/logs/surreal.stdout.log" -RedirectStandardError "$memoryDir/logs/surreal.stderr.log" -PassThru
 $memoryProcess.Id
 ```
+
+让调用 A 完整结束，再在独立调用 B（新 shell 或下一次宿主工具调用）执行下面的检查。`/ready` 的成功只证明节点 ready；随后用目标配置 init/brief 触发 UUID 检查。每个 shell 单独加载 password_env，过程中不打印密码：
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$python = '<absolute-python.exe>'
+$config = '<absolute-project-config>'
+$json = & $python -X utf8 -c "import json,sys; from basepack.project.config import load_project_config; c=load_project_config(sys.argv[1]); print(json.dumps({'endpoint':c.raw['memory']['endpoint'],'password_env':c.raw['memory']['password_env'],'project_id':c.raw['memory']['project_id'],'data_dir':str(c.memory_dir)}))" $config
+if ($LASTEXITCODE -ne 0) { throw "Cannot load project config ($LASTEXITCODE)" }
+$memory = $json | ConvertFrom-Json
+Invoke-WebRequest -UseBasicParsing -Uri ($memory.endpoint.TrimEnd('/') + '/ready') -ErrorAction Stop | Select-Object StatusCode
+[Environment]::SetEnvironmentVariable($memory.password_env, [IO.File]::ReadAllText((Join-Path $memory.data_dir 'password.txt')), 'Process')
+$memory.project_id
+& $python -X utf8 -m basepack --config $config memory init
+if ($LASTEXITCODE -ne 0) { throw "memory init failed ($LASTEXITCODE)" }
+& $python -X utf8 -m basepack --config $config memory brief --task '核对项目接入'
+if ($LASTEXITCODE -ne 0) { throw "memory brief failed ($LASTEXITCODE)" }
+```
+
+同项目另开调用也须能继续 brief，再按 [最小记忆闭环](memory.md#最小闭环示例) 验证知识读写。若调用 A 后进程被宿主回收，保留该次原错误与 stdout/stderr，核 exe/Python/配置绝对路径、cwd、执行账户和目录权限；在普通用户终端前台运行同一个 serve.ps1 以定位并使用可存续的启动方式。PID、ready 或 doctor 各自都不能代替这些后续调用。服务未 ready 时先查日志，不重复启动同一 store。Windows `Start-Process` 的本地与远程会话寿命有差异，见 [Microsoft 文档](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/start-process)；ready 的语义见 [SurrealDB HTTP 文档](https://surrealdb.com/docs/reference/rest-api/http-protocol#-get-ready)。
 
 需要 SCM 托管时，管理员可为同一 launcher 注册服务，替换服务名和路径；这是可选部署方式，本轮没有创建该服务：
 
@@ -63,7 +93,7 @@ Set-Service -Name $memoryService -StartupType Manual
 Start-Service -Name $memoryService
 ```
 
-launcher 显式绑定 loopback endpoint（本机为 `127.0.0.1:18080`），配置中的 endpoint 必须一致；执行账户须能读写项目目录。先核 `/ready`，再用实际项目配置运行 memory init/brief，随后首建和 read/search；进程启动成功不代替知识验收。调用 shell 也须提供 password_env 指定的变量。
+launcher 只绑定所选 loopback endpoint；执行账户须能读写项目目录。SCM 启动后也执行上面的独立 ready/init/brief 和知识检查。
 
 手动进程由该项目维护者管理，停止时核对所属进程树与监听端口均已退出；共享 embedding 独立运行。SCM 方式使用 Stop-Service 并等待 Stopped，保持 Manual，Shawl 不自动重启。项目搬迁后更新 cwd/launcher 与日志位置，保留 project_id。原生 export、必要 assets、配置与业务原件共同构成恢复集合，步骤见 [备份恢复](memory.md#备份与恢复)。
 
@@ -129,7 +159,7 @@ Shawl 的 log-dir 保存包装器和命令输出；推理异常保留在服务�
 
 ## 升级与回滚
 
-0.5.0 → 0.6.0：保留客户端 wheel、配置与项目知识备份，普通安装新客户端，核实际安装来源，再从源码外执行记忆首建、查询、维护与恢复。共享 embedding 的 HTTP 协议和 embedding_identity 合同未变，已有 0.5.0 服务继续运行；Condor 策略保持。回退客户端时保留项目库，旧 0.5.0 仍只提供资源工具。修改底座或知识 schema 前先保留原生 export，按相应版本验证恢复。
+0.6.0 → 0.6.1：保留旧 wheel、配置、UUID 与原生知识备份，普通安装新客户端，记录 wheel SHA256、实际 Python 和导入位置，再从源码外执行首次接入、特殊 ID、小批维护及恢复。共享 embedding 的 HTTP 协议和 embedding_identity 合同未变，已有 0.5.0 服务继续运行；Condor 策略保持。0.5.0 升级也沿此流程，启用记忆时补齐项目配置。回退客户端时保留项目库，旧 0.5.0 仍只提供资源工具。修改底座或知识 schema 前先保留原生 export，按相应版本验证恢复。
 
 下面是 0.4.0 → 0.5.0 的历史资源接口切换，仅从该旧版升级时使用：
 
