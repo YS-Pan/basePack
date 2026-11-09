@@ -16,7 +16,7 @@
 | 主动性与总成本 | 证据限制：旧小样本、合成检索分数和安装回执未证明普遍净收益 | 在新项目按任务质量、未点名信息发现及全周期成本评估 | [测试证据与限制](thread-survey.md#读取到的测试证据与限制)、[历史总结的证据边界](../legacy-history.md#新项目继承与舍弃) |
 | 共享模型与资源协调 | 初步调查观察：已有模型、合作式 GPU 锁和 HTCondor；队列查询当时认证失败 | 原调查保留旧时点；按最新核验继续确认配置、接口和认证 | [初步设施调查](../../../archive/20261107-resource-coordination/research/infrastructure.md#agenttools-当前可复用部分)、[本次环境核验](../../../system/environment.md) |
 | 资源工具复用与并行 | 2026-11-07 先读相关聊天，再核源码：多模态 runtime、批处理、局部热复用和进程清理已存在；跨项目服务与并行预算待改造 | 用户明确 embedding 独立且可与普通 GPU 任务并行；旧整卡互斥策略不继承为新要求 | [专项核对](../../../archive/20261107-resource-coordination/research/legacy-implementation.md)、[详细计划](../../../archive/20261107-resource-coordination/plan.md) |
-| 实施路线与待决项 | 工程建议：最短闭环、一次委托、分数排序、批量 I/O 与最小增量维护 | 记忆底座、动作接口和具体预算按对应任务核定；2026-11-09 已做新一轮静态复核，尚未运行原型 | [任务总览](../plan.md)、[底座复核](../../20261106-memory-system/research/backend-review.md)、[本轮未决问题](#本轮归纳和未决问题) |
+| 实施路线与待决项 | 工程建议：最短闭环、一次委托、分数排序、批量 I/O 与最小增量维护 | 记忆首期仅用 SurrealDB；接法、动作接口和预算由专项 P0 核定。2026-11-09 已静态复核，尚未运行原型 | [任务总览](../plan.md)、[接入依据](../../20261106-memory-system/research/backend-review.md)、[本轮未决问题](#本轮归纳和未决问题) |
 
 ## 范围和阅读方式
 

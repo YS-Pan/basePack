@@ -4,16 +4,18 @@
 
 战略以 [项目纲领](../../project-charter.md) 为准；公共调查见 [调研索引](research/sources.md) 与 [近期历史](legacy-history.md)，本目录状态见 [总进度](progress.md)。旧项目只取思想、事故样例和经核实的薄接口，不迁入其数据库、任务状态或业务授权。
 
+本目录管理四工具的跨任务顺序、共性取舍与联合发布；`20261106-memory-system` 管记忆专项实施及验收。两个目录保留职责分工：日常记忆开发只以专项 plan/progress 接续，跨工具决策或发布时才读本总览；阶段与基座合同不在两处重复维护。
+
 ## 任务入口与建设顺序
 
 | 工作 | 独立入口 | 范围与依赖 |
 | --- | --- | --- |
 | 公共包与资源维护 | [R9 交付结果](../../archive/20261107-resource-coordination/r9-result.md)、[当前实现](../../system/modules/resources.md) | 0.5.0 已交付，后续新需求按实际目标另建任务 |
-| 记忆系统 | [计划 P0–P5](../20261106-memory-system/plan.md)、[进度](../20261106-memory-system/progress.md) | 默认文件/章节/原文块多层表示；选唯一原生底座，先文字/摘要闭环，再补各层向量、语义图、图片与主动维护 |
+| 记忆系统 | [计划 P0–P5](../20261106-memory-system/plan.md)、[进度](../20261106-memory-system/progress.md) | 首期 SurrealDB；多层表示，同次智能分块/摘要/建边，独立交付记忆闭环 |
 | 文件结构建议 | [专项计划](file-organization-plan.md)、[skill](../../../skills/file-structure/SKILL.md) | 独立使用，记忆可按需引用 |
 | 分层协作 | [P7 完成条件](#p7-分层-agent-组织)、[研究与初版检查](research/agent-team.md) | 使用宿主订阅 subagent，按真实任务继续验证 |
 
-资源 R9 已完成。记忆 P0 用同一多层样例比较 Basic Memory、SQLite 方案和 SurrealDB，见 [底座复核](../20261106-memory-system/research/backend-review.md)；多层次是用户目标，研究与策略边界见 [专项调研](../20261106-memory-system/research/multilevel-retrieval.md)。P1 先交付各层文字/摘要，无需 Condor 或 P2 图文向量，候选自身文本 embedding 依赖在 P0 核定。P2 的语义图和各层/图片向量可分开推进，P3 从 P1 延伸任务内维护，图维护接图分支。共享 HTTP/EmbeddingClient 与 embedding_identity 沿已有交付，各阶段验收只在记忆计划维护；公共配置归属见 [部署合同](../../system/deployment.md)。
+资源 R9 已完成，记忆复用已交付的共享 embedding 和公共接入。首期仅验证 SurrealDB，阶段依赖、智能分块、多层数据与验收统一在记忆专项维护；公共配置归属见 [部署合同](../../system/deployment.md)。
 
 普通功能演进继续在当前 active 工程；一次性候选原型进入根 `tmp/<task>/`。后续 memsys 等工作若确需替代工程，再按 [路线约定](file-organization-plan.md) 建立 experiment，短期比较后收敛；切换时同步根 README、system、任务状态和技能发现入口，长期独立演进则拆成 project。布局迁移已完成，不作为 R9 或记忆 P0 的前置待办。
 
@@ -22,7 +24,7 @@
 - 用户明确：简洁以自己实现和维护的代码尽量少衡量；可另行安装现成库与软件，允许适度调整行为。运行计算与存储采用本地能力，理解、建图和评分使用 Codex 订阅，不新增联网模型 API。
 - 通用模型适配、服务、进程管理、检索、事务和依赖安装优先交给现成实现；自己保留来源版本、项目隔离、主动线索及必要的接入代码。候选按净删代码、剩余配置与运维负担和真实功能共同选择，移动代码或另包一层不算精简。
 - 先用最短样例验证首选；不适合时记录具体缺口，再试一个备选。选定一套实现后删除本次涉及的重复逻辑；行为差异写清调用与升级方式，不为完整复制旧工程细节增加兼容层。
-- 资源 0.5.0 的现行行为由 [模块说明](../../system/modules/resources.md) 维护，取舍与验收保留在 [R9 结果](../../archive/20261107-resource-coordination/r9-result.md)；记忆底座由 P0 决定。历史验收保持原条件。
+- 资源 0.5.0 的现行行为由 [模块说明](../../system/modules/resources.md) 维护，取舍与验收保留在 [R9 结果](../../archive/20261107-resource-coordination/r9-result.md)；记忆首期基座为 SurrealDB，P0 验其实际接入。历史验收保持原条件。
 
 ## 后续维护的简化
 

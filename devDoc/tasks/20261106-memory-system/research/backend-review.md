@@ -1,68 +1,52 @@
-# 记忆底座静态复核
+# SurrealDB 首期适用性复核
 
-2026 年 11 月 9 日，供 [P0](../plan.md#p0-收敛底座与数据合同) 选择试验入口。只读核对当前源码、官方文档、发布记录和固定版本源码；未安装候选、运行原型或操作共享服务。以下区分能力证据与待验取舍，最终选择仍须本机同样本验证。
+2026 年 11 月 9 日更新。按用户当前决定，**首期只使用 SurrealDB**；[P0](../plan.md) 验证其能否承载记忆合同，验证后推进同一实现。此前三者调查保留为历史依据，不安排备选安装、适配或并行原型。出现真实阻碍时，报告具体冲突、证据与影响，再评估替代。
 
-## 当前事实与取舍
+本页复用同日已核官方文档、发布记录和固定版本源码；本轮仅调整文档，未安装软件、运行原型或操作服务。实现状态见 [进度](../progress.md)，目标以 [项目纲领](../../../project-charter.md#记忆系统) 为准。
 
-基线 main `5d72275` 只有公共接入与资源工具。[CLI](../../../../experiments/20261106-basepack/src/basepack/__main__.py) 无记忆动作；[init](../../../../experiments/20261106-basepack/src/basepack/project/init.py) 和 [配置测试](../../../../experiments/20261106-basepack/tests/test_config.py) 表明 memory 仅预留项目内路径，不创建数据库。资源 [R9](../../../archive/20261107-resource-coordination/r9-result.md) 已交付公开 HTTP 客户端与新向量身份，不能再把传输协议待定当作记忆选型前提。
+## 当前范围与职责
 
-按用户本次要求，**Basic Memory、SQLite CLI + FTS5 + sqlite-vec、SurrealDB 原生本地 MCP 均为正式候选**，替代上一轮先 SurrealDB、SQLite 对照、Basic Memory 后备的顺序。Basic Memory 复用记忆应用，SQLite 提供部署简洁基线，SurrealDB 集中数据库能力；按同一完整工作流比较总维护量，当前不预设赢家。原生 MCP 和单一 embedding 接口差异都不足以单独决定取舍。
+全文、本地图文向量、语义图和多层次表示均保留。文件、章节、段落分别成为可寻址检索成员；原文块向量与章节/文件摘要向量共同参与检索，结构包含、摘要来源和跨材料语义关系分别表达。检索要融合候选、处理父子内容重叠，并回到对应版本的原文或图片；具体合同只在 [实施计划](../plan.md) 维护，机制依据见 [多层调研](multilevel-retrieval.md)。
 
-本次新增的 [多层次默认合同](../plan.md#多层次表示与跨层检索) 同样适用于三者。文件/章节摘要与原文块须各自可寻址、检索和作为图节点，不能以“有自动 chunk”或“章节可读取”直接判定满足；研究依据与机制复用见 [多层调研](multilevel-retrieval.md)。
+宿主订阅 agent 在同次阅读中确定智能分块边界，产出摘要、节点和边；软件保存边界、定位及依据，并调用共享 embedding 服务。SurrealDB 负责持久化、事务、索引和查询，不自动理解分块或生成摘要、语义边。本路线不引入新的 LLM API，也不把分块另建成先于语义阅读的全量流程。
 
-| 已核版本 | 官方能力证据 | 尚需项目承担及本机核实 |
-| --- | --- | --- |
-| [SurrealDB 4.0.0](https://github.com/surrealdb/surrealdb/releases/tag/v4.0.0)，11 月 3 日发布 | Windows 发行、[原生 MCP](https://surrealdb.com/docs/build/ai-agents/mcp/embedded)、独立关系、全文、外部向量和导入/导出 | 来源/版本/定位、更正与条件、语义身份、变化清单仍需短 schema/SQL/skill；本地 server、中文、恢复和磁盘代价待验 |
-| [SQLite 3.54.1](https://sqlite.org/changes.html)，10 月 16 日；[sqlite-vec 0.1.9](https://github.com/asg017/sqlite-vec/releases/tag/v0.1.9)，3 月 31 日 | Windows [CLI](https://sqlite.org/cli.html)、事务、FTS5、递归查询、备份；vec0 接收预计算向量 | 来源、图边语义、依据、更正、索引一致性及迁移均需维护 SQL/schema；CLI 加短 skill 即可，不为 MCP 另写服务 |
-| [Basic Memory 1.0.0](https://github.com/basicmachines-co/basic-memory/releases/tag/v1.0.0)，10 月 29 日 | 原生 CLI/MCP、Markdown、观察/关系、搜索/上下文、文件同步及本地文本 embedding provider | 正式应用复用候选；公开图文向量接入、关系依据/更正表达、项目局部配置和 HDD 成本需核，不直接继承旧项目适配与验收 |
+资源 [R9](../../../archive/20261107-resource-coordination/r9-result.md) 已交付公开 HTTP 客户端与向量语义身份；接入复用该成果，P0 以少量预计算向量核存取，真实本地图文语义留 P2。项目知识及数据库留在对应项目内，软件、依赖与模型按现行部署合同显式共用。
 
-## 按记忆工作流比较
+## SurrealDB 的能力证据与项目差距
 
-| 比较项 | Basic Memory | SQLite 方案 | SurrealDB |
-| --- | --- | --- | --- |
-| 交付层次 | 已有记忆应用，可复用笔记、观察、关系和工具流程 | 数据库与扩展，应用规则由本项目实现 | 多模型数据库，应用规则由本项目实现 |
-| 来源与变化 | 笔记、定位、校验和、文件同步已有入口；外部业务原件的版本依据仍需接入 | 来源表/定位/变化检测需定义，复用原生事务与索引 | 来源记录/定位/变化检测需定义，复用原生事务与索引 |
-| 关系与上下文 | 已有带类型的笔记链接、关系 context 和上下文工具；关系修改走笔记编辑，复杂条件/更正与多依据需验 | 边表与递归 SQL 可做图查询，简单邻域无需另造图执行器 | 原生关系边和遍历更直接，语义规则仍需定义 |
-| 多层身份与索引 | 独立摘要 note 可带层级/父级元数据；原生 section/chunk 与稳定成员身份的映射须核 | 成员/表示表、递归 SQL 与外部向量可表达各层，需维护对应 SQL | 记录、带属性关系、外部向量及原生排名融合可表达各层，需维护依赖与查询 |
-| 存储与部署 | Markdown 加应用数据库，文件同步和恢复集合需核 | 项目内数据库、CLI，无数据库服务；向量扩展单独管理 | 项目内存储；同项目多聊天连接一个本地 server，计入实例管理 |
-| 图文向量 | 现成文本 provider 与当前服务存在接入缺口，需核最薄接法 | 扩展可存外部向量，身份和原图定位由集成保存 | 可存外部向量，原生近似索引可按规模使用；身份和原图定位由集成保存 |
-| 应比较的成本 | 少写应用代码能否抵消接入适配、文件 I/O 和上游约束 | 少组件能否抵消自维护 schema/SQL/同步和查询流程 | 原生图/向量/MCP 能否抵消额外进程、配置及升级维护 |
+| 已核能力 | 对本项目的适用边界 |
+| --- | --- |
+| [4.0.0 正式版](https://github.com/surrealdb/surrealdb/releases/tag/v4.0.0)，2026-11-03 发布；[Windows 安装](https://surrealdb.com/docs/running/installation/windows) 后可离线运行 | 固定版本、持久路径与新目录启动仍需 P0 实测。SurrealKV 的 [Windows 平台等级](https://github.com/surrealdb/surrealkv#platform-support) 为 Tier 2：有构建，原生测试跳过；发行包不是本机稳定性证据。 |
+| 原生 [CLI/MCP](https://surrealdb.com/docs/build/ai-agents/mcp/embedded) 提供查询与记录/关系操作，支持 stdio embedded 或本地 server 的 `/mcp` | 同项目多聊天连接一个本地 server，数据库物理目录属于该项目；各聊天另开 embedded 进程访问同一路径不能作为并发方案。P0 计入实例启动、路径、端口与进程管理成本，不自写数据库 MCP。 |
+| [外部向量](https://surrealdb.com/docs/learn/data-models/vector-search/embedding-pipelines)、[独立关系边](https://surrealdb.com/docs/reference/query-language/statements/relate) 与图遍历 | 原文、摘要和图片向量可由外部生成后保存。成员身份、层级、原文范围、来源版本、embedding_identity、边的条件/依据与修改记录仍需短 schema/SQL/skill；原生图能力不等于已完成语义建图。 |
+| 全文、[排名融合](https://surrealdb.com/docs/learn/data-models/vector-search/hybrid-search) 与精确/近似向量检索 | 原生融合不自动完成跨层候选配额、父子覆盖去重或摘要回源。中文单字/两字/长词及中英混合须用实际样例核 [分析器](https://surrealdb.com/docs/reference/query-language/statements/define/analyzer)；不能只凭 Unicode/FTS 标签放行。近似索引按实际规模需要采用。 |
+| [事务内事件](https://surrealdb.com/docs/learn/schema-management/events-and-triggers/defining-events) 可处理记录变化，访问变更前后值 | 事件只执行显式规则，导入不触发。原件变化检测、受影响祖先摘要与语义边的依赖、待维护状态和检索过滤仍须项目定义；摘要重写与边复核由 agent 完成。优先用同一批量维护事务复用这些能力。 |
+| [逻辑导出/恢复](https://surrealdb.com/docs/manage/self-hosted/backups-and-recovery) 与 [文件引擎](https://surrealdb.com/docs/running/file-backed) | 导出只有当前记录；修改依据与历史必须显式保存，不能依赖引擎旧版本恰好仍在。直接复制数据库目录须先关闭使用者；原件、派生图片及数据库的备份集合另须明确。SurrealKV 的 LSM/压实有额外 I/O，冷/热启动、批量读写及 HDD 代价待验。 |
 
-Basic Memory 的现成功能见 [观察与关系](https://docs.basicmemory.com/concepts/observations-and-relations)、[工具合同](https://docs.basicmemory.com/reference/mcp-tools-reference)；SQLite 原生 [递归图查询](https://sqlite.org/lang_with.html#queries_against_a_graph) 说明“无专门图数据库”不等于需要自写图执行器。三者都需要宿主 agent 共读建图、启动交付和实际评分；Basic Memory 的上下文工具不自动证明这些行为已按本项目要求执行。
+## P0 要取得的适用性证据
 
-## 决策相关的能力边界
+P0 围绕 SurrealDB 跑最小完整资料集，复用原生 CLI/MCP 和查询能力，仅补实际缺口。样例与完成条件以计划为准，关键未知为：
 
-**SurrealDB。** 原生 MCP 支持 stdio embedded 或本地 server 的 `/mcp`；多聊天共享同一库应连接同一个本地 server，不能各起 embedded 进程打开同一路径。4.0 使用 SurrealKV，[平台支持](https://github.com/surrealdb/surrealkv#platform-support) 将 Windows 标为 Tier 2（构建、跳过原生测试）；有 Windows 包不能代替本机稳定性证据。[文件引擎](https://surrealdb.com/docs/running/file-backed) 与 [MCP 文档](https://surrealdb.com/docs/build/ai-agents/mcp/embedded) 是 P0 运行依据。
+1. 新目录安装、持久化重启、离线查询与两个项目隔离；同项目两个聊天通过一个本地 server 读写，冲突和失败能定位。
+2. 中文、编号与中英混合检索返回正确来源；少量预计算 2048 维文本/图片向量、身份不同的负例及原图/页定位得到正确结果，不切换现有模型服务。
+3. 同一长文件的文件/章节/段落身份、智能边界及原文范围，章节/文件摘要与各层向量能共同检索；父子展开、摘要回源和重叠去重不丢必要证据。分块、摘要和图关系同次阅读的实际行为依计划验收。
+4. 原有节点增改边时保留其它边；局部来源变化使相关祖先摘要及依赖旧依据的边退出当前结论，维护后恢复正确检索，未变兄弟可复用；旧依据与人工更正仍可回查。
+5. 备份恢复到另一目录后，成员身份、层级、原文定位、显式修改记录、摘要与边的依据仍对应。记录数据库、原件及派生内容的实际备份/恢复流程。
+6. 记录新增代码、SQL/skill/配置、额外进程、文件数及冷/热读写。小样例筛明显代价，代表性规模和真实 HDD 验收留 P4；安装成功或节点数量不替代功能验收。
 
-外部模型产生数字数组，由库原生 [保存与查询向量](https://surrealdb.com/docs/learn/data-models/vector-search/embedding-pipelines)；[关系边](https://surrealdb.com/docs/reference/query-language/statements/relate) 有独立记录及数据。它们可以承载项目合同，但不会自动生成来源定位、语义判断或审计。[逻辑备份](https://surrealdb.com/docs/manage/self-hosted/backups-and-recovery) 只导出当前记录；要恢复的修改依据必须显式保存，不能依赖引擎旧版本恰好仍在。
+这些证据决定当前实现如何收敛，不用于预排三套原型。若 SurrealDB 出现无法满足完整目标的真实阻碍，先报告受阻行为、复现条件和必要代价，再讨论是否更换底座。当前没有本机记忆验收证据。
 
-**SQLite。** [FTS5](https://sqlite.org/fts5.html#tokenizers) 的 unicode61 不提供中文词切分，trigram 的 MATCH 对不足三个 Unicode 字符无匹配；短词扫描等行为须在决定中说明代价。vec0 稳定版支持 2048 维预计算向量，但按穷举评估；[ANN 首发](https://github.com/asg017/sqlite-vec/releases/tag/v0.1.10-alpha.1) 属于预发布，不能把当前在线文档的新能力归给稳定版。多进程同机操作仍是单 writer，先使用短事务，冲突直接返回；[在线备份](https://sqlite.org/backup.html) 或 CLI `.backup` 可避免只复制活跃 WAL 数据库主文件的遗漏。[WAL 合同](https://sqlite.org/wal.html) 需随恢复样例核对。
+## 历史比较依据
 
-**Basic Memory。** 文字闭环较完整，Markdown 本身不是排除理由。固定版本的 [provider 契约](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/repository/embedding_provider.py) 接收文本，也有可选的 `identity_key()` 身份能力；不能笼统说整个软件无法表达自定义身份。现成 [OpenAI provider](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/repository/openai_provider.py) 发送 model 与字符串 input，默认身份没有当前共享服务的权重/预处理身份；[配置工厂](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/repository/embedding_provider_factory.py) 只提供内置 provider，不能把协议存在推成已有公开插件注册配置。[内部向量协议](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/repository/semantic_vector_index.py) 也不等于公开 CLI/MCP 的预计算图文向量入口。
+以下是本次收敛前的静态调查，保留用于解释已有判断及必要时复核，不是当前执行路线。
 
-文本可能通过公开 OpenAI 兼容端点加薄 HTTP 适配接现有 `/predict`，不一定改 Basic Memory 源码；将完整 embedding_identity 映射为不可复用的 model alias，也可能利用现成身份失效机制触发重建。这些是源码支持的集成推断，尚未运行，不能据此宣称图片向量已接通。P0 要核实际适配范围，把代码、升级耦合与它省下的应用代码共同计算；公开原始图片向量入口仍有缺口。优先公开扩展，私有补丁或第二知识维护源的真实代价必须写明，不因文字成功放弃完整图文目标。
+| 历史路线与版本 | 仍有价值的调查结论 |
+| --- | --- |
+| [SQLite 3.54.1](https://sqlite.org/changes.html)（2026-10-16）加 [sqlite-vec 0.1.9](https://github.com/asg017/sqlite-vec/releases/tag/v0.1.9)（2026-03-31） | [CLI](https://sqlite.org/cli.html) 与短 skill 可直接使用；[递归图查询](https://sqlite.org/lang_with.html#queries_against_a_graph) 可处理邻域与层级，无须另造图执行器。稳定 vec0 可存 2048 维预计算向量，按穷举评估；[ANN 首发](https://github.com/asg017/sqlite-vec/releases/tag/v0.1.10-alpha.1) 属预发布。来源、关系语义、多层表示、融合与失效规则均需自维护 SQL/schema。 |
+| [Basic Memory 1.0.0](https://github.com/basicmachines-co/basic-memory/releases/tag/v1.0.0)（2026-10-29） | 已有 [笔记/观察/关系、读取/搜索/上下文与局部编辑](https://docs.basicmemory.com/reference/mcp-tools-reference)、文件同步及文本向量索引，可省应用代码；Markdown 本身不是排除理由。[配置](https://docs.basicmemory.com/reference/configuration) 公开支持 `BASIC_MEMORY_CONFIG_DIR` 将配置及默认数据库放入项目内。完整目标的接入代价与文件 I/O 先前均未实测。 |
 
-[关系格式](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/markdown/schemas.py) 可保存 context，`bm_edit` 编辑关系行后由上游同步图，不能说依据或修改必须私有改库。它没有独立 edge UUID/CRUD，且 [bm_context](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/mcp/tools/context.py) 不交付关系 context，追证仍需读所属笔记。P0 以原生关系或独立断言笔记表达条件/多依据，核稳定定位与更正；额外笔记带来的文件量计入 HDD 成本，不先锁成自有边表。
+SQLite 的 [FTS5](https://sqlite.org/fts5.html#tokenizers) 不提供默认中文词切分，trigram 的 MATCH 对不足三个 Unicode 字符无匹配；[WAL](https://sqlite.org/wal.html) 同机多进程仍是单 writer，活跃库应使用 [在线备份](https://sqlite.org/backup.html) 或 CLI `.backup`，不能只复制主文件。这些是历史边界，不构成当前实施任务。
 
-1.0 的 [CLI 源码](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/cli/commands/tool.py) 使用 `bm tool read/write/search`，MCP 为 `bm_*`；部分在线说明保留旧命名，实施应按固定版本帮助核对。[配置合同](https://docs.basicmemory.com/reference/configuration) 已公开支持 `BASIC_MEMORY_CONFIG_DIR` 隔离配置和默认应用数据库，`BASIC_MEMORY_MCP_PROJECT` 约束会话项目；可用它们规划项目内实例，本机移动/隔离/恢复仍需实测。
+Basic Memory 的公开 metadata 和关系 context 能表达来源、范围及依据，编辑关系行后由上游更新图；并非必须私有改库。但没有独立 edge UUID/CRUD，[context 输出](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/mcp/tools/context.py) 也不交付关系 context。[搜索](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/mcp/tools/ranked_search.py) 面向 notes/observations/relations，章节读取不是独立章节搜索；[原生分块](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/repository/semantic_chunking.py) 与 [章节投影](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/repository/note_section_repository.py) 不等于稳定章节/段落成员。独立 note 建模能复用公开功能，文件量仍有代价；工具名称可回查 [v1 CLI 源码](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/cli/commands/tool.py)。
 
-[语义搜索说明](https://docs.basicmemory.com/concepts/semantic-search) 与 [v1 依赖](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/pyproject.toml) 明确自动生成文本向量，FastEmbed/sqlite-vec 为核心依赖，旧 `semantic_search_enabled` 开关已移除。不能假设 Basic Memory 能纯文字启动且完全不接 embedding：P0 需先核模型/provider 和自动索引行为，避免试验时意外下载模型或另起一份共享模型。其可选本地/API reranker 也不替代本项目要求的订阅 agent 给分。
-
-### 多层合同的新增差距
-
-Basic Memory 的 [搜索](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/mcp/tools/ranked_search.py) 面向 notes/observations/relations，章节读取不是独立章节搜索；[语义分块](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/repository/semantic_chunking.py) 会合并短章节、拆长章节，文本 hash 派生的 chunk 身份不等于稳定段落节点。[章节投影](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/repository/note_section_repository.py) 也会随 note generation 重建。独立 note 能提供身份/metadata/关系，但段落级文件量与重复索引要实测；少文件的 note/observation/section 映射只有通过稳定身份、层级过滤及原文定位样例才可采用，不预设等价或立即淘汰。
-
-SQLite 的 [递归查询](https://sqlite.org/lang_with.html) 可找祖先，[FTS5](https://sqlite.org/fts5.html) 与触发器可维护全文索引；祖先摘要和语义边的依赖失效仍须明确 SQL。SurrealDB 的 [混合检索/排名融合](https://surrealdb.com/docs/learn/data-models/vector-search/hybrid-search) 可复用，但不自动消除父子内容重复；[事件](https://surrealdb.com/docs/learn/schema-management/events-and-triggers/defining-events) 也只执行已定义规则，导入不触发事件。三者均需以同样本证明“源变化→相关表示/依据失效→局部更新→当前检索正确”，不能由数据库功能推断该工作流已交付。
-
-## P0 如何消除未知
-
-先固定同一资料集与完整目标，核 Basic Memory 的现成记忆流程及公开 embedding 接法、SQLite 的必要 SQL、SurrealDB 的原生查询与实例代价，再按不确定性选择最短原型。比较可分批，最终只保留一套产品接入，不为三者各建完整应用。除 [计划的数据与行为合同](../plan.md#最小行为与数据合同)，样例重点包含：
-
-1. 中文单字、两字、长词、精确编号及中英混合；SurrealDB 的 [分析器](https://surrealdb.com/docs/reference/query-language/statements/define/analyzer) 与 SQLite 各方案都需实际测，不能只凭 Unicode/FTS 标签放行。
-2. 少量预计算 2048 维文本/图片向量、身份不同的负例、原图/页定位；P0 核存取，真实本地图文语义留 P2，不切现有模型服务。
-3. 原有节点上增改边而保留其它边、更正/失效与旧依据回查、恢复到另一目录；显式保存的修改记录也必须恢复。
-4. 两个聊天连接同一项目的读写与冲突，以及另一个项目的实际隔离；数据物理位置仍属各项目，不能以服务器 namespace 代替归属核查。
-5. 冷/热启动、批量维护、文件数和读写；小样例只筛明显代价，代表性语料及真实 HDD 验收留 P4。
-6. 同一长文件的文件/章节/原文块稳定身份、固定摘要与各层预计算向量；跨层候选/父子展开、摘要回源、重叠去重、局部修改使相关祖先/依据失效、未变兄弟复用及恢复。具体合同只在计划维护。
-
-按实际新增代码、SQL/skill/配置、额外进程和运行维护共同选唯一底座；原型数量按消除差异的需要调整，不沿用“最多两条”排除本次新增候选。关键能力缺口未解决时保留失败与代价后调整方案，不用 P1 文字成功替代完整范围判断。官方资料只支持上述静态能力，Windows、并发、中文召回、HDD 与净收益目前都没有本机记忆验收证据。
+其 [provider 协议](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/repository/embedding_provider.py) 有可选 `identity_key()`；限制在现成 [OpenAI provider](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/repository/openai_provider.py) 与 [配置工厂](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/repository/embedding_provider_factory.py)，不能说整个应用无法保存自定义身份。公开 OpenAI 兼容端点加 HTTP 适配可能接入现有文本服务；model alias 映射完整语义身份仍是未运行推断，[内部向量协议](https://github.com/basicmachines-co/basic-memory/blob/v1.0.0/src/basic_memory/repository/semantic_vector_index.py) 不是公开预计算图文向量入口。[语义搜索](https://docs.basicmemory.com/concepts/semantic-search) 自动建向量且关闭开关已移除，不能假设纯文字索引无需 embedding。这些历史接法均未实施。

@@ -6,7 +6,7 @@
 
 当前唯一 active 路线为 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，源码、构建声明、测试、产品文档、示例及 resources skill 在该实验工程内维护；根目录保留统一 devDoc 和两项通用技能。本次布局迁移的实际检查与接续见 [迁移结果](../../archive/20261109-project-layout/result.md)，不改变 R9 和记忆功能的完成状态。
 
-资源 R9 已交付 0.5.0 并结案归档：真实联合、进程及显存回收、旧新版本回退通过，详见 [R9 结果](../../archive/20261107-resource-coordination/r9-result.md)。记忆仍未实现，由 [记忆进度](../20261106-memory-system/progress.md) 接续；共性取舍见 [复用优先](plan.md#复用优先)。
+资源 R9 已交付 0.5.0 并结案归档，详见 [R9 结果](../../archive/20261107-resource-coordination/r9-result.md)。记忆首期仅用 SurrealDB，P0 尚未执行，具体状态只在 [记忆进度](../20261106-memory-system/progress.md) 接续；本页跟踪跨工具状态与公共工作，共性取舍见 [复用优先](plan.md#复用优先)。
 
 ## 已完成
 
@@ -22,11 +22,11 @@
 - 资源后续 R6 已按用户要求切换为通用 Condor 节点容量与同卡显存累计记账，0.2.0 普通 wheel、四作业共享及 embedding 联合验收完成；见 [专项结果](../../archive/20261107-resource-coordination/native-condor.md)。
 - 资源 R7 已交付0.3.0普通wheel与Condor原生提交转换；用户只填官方GPU字段，站点内部资源由Condor管理。四项同卡、第五项排队、默认整池、取消与embedding联合实测通过，见 [R7结果](../../archive/20261107-resource-coordination/standard-submit-result.md)。
 - R8 的源码归组、实例目录、接口整理与统一迁移已经交付，详细结果从 [资源进度](../../archive/20261107-resource-coordination/progress.md) 读取；R8 设计与验收保留为历史依据。
-- 先前完成现成库/软件调查与 [R9 复用路线](../../archive/20261107-resource-coordination/plan.md#r9-复用优先的资源实现)，随后已实际落地 Sentence Transformers＋LitServe＋Shawl，退役旧模型/服务与一次性迁移实现；交付和失败修正见 R9 结果。记忆 P0 的底座比较仍待执行。
+- 先前完成现成库/软件调查与 [R9 复用路线](../../archive/20261107-resource-coordination/plan.md#r9-复用优先的资源实现)，随后已实际落地 Sentence Transformers＋LitServe＋Shawl，退役旧模型/服务与一次性迁移实现；交付和失败修正见 R9 结果。记忆接入仍待 P0 验证。
 - 已补充 [后续维护的简化](plan.md#后续维护的简化)：原生环境与接口、上游补丁替代、旧接口/迁移退役、数据导出和可复用的小型回归；资源与记忆计划给出实际交付及按需复查条件，不增加当前实施前置。
 - 已按用户要求将一次性测试和临时材料的默认位置设为项目根 `tmp/`，按任务结束后随时可清除处理；`artifacts/` 保留有长期复核需要的材料。规则见 [文档维护约定](../../documentation.md)，前次材料迁移映射现位于 `artifacts/runs/tmp-reorganization-20261108/moves.json`；此次路径变动与旧路径回查见 [迁移结果](../../archive/20261109-project-layout/result.md)。
 - 已根据 main `5d72275` 重评 [记忆计划](../20261106-memory-system/plan.md)，完成源码与官方底座能力静态复核，补齐启动实收、真实评分、增量/恢复、图与图片向量、HDD 及成本验收；仅交付文档，P0 原型与 P1–P5 功能均未开始。
-- 按用户多层次要求重新联网调研并更新记忆方案：文件/章节摘要与原文块成为默认检索成员和图节点，加入各层向量、跨层交付与依赖局部维护；三底座按同一合同继续比较。实际状态仍为未实施，研究依据与边界见 [多层调研](../20261106-memory-system/research/multilevel-retrieval.md)。
+- 按用户多层次要求重新联网调研并更新记忆方案，保留 [多层调研](../20261106-memory-system/research/multilevel-retrieval.md) 与旧代码核查；后续按已提交纲领加入同读智能分块，并收敛首期 SurrealDB。记忆实施规则在专项维护，总览删去重复阶段依赖，两个任务目录保留职责分工。
 
 ## 阻碍与待核
 
@@ -35,5 +35,5 @@
 
 ## 下一步
 
-1. 下次记忆实施从 P0 固定多层样例开始，将 Basic Memory、SQLite 方案和 SurrealDB 按各层身份/摘要/向量、增量/恢复与总维护量比较；唯一底座确定后交付 P1。实际状态、P2/P3 依赖与余项从 [记忆进度](../20261106-memory-system/progress.md) 接续。
+1. 记忆下一步为 SurrealDB 的 P0 适用性验证，沿 [专项进度](../20261106-memory-system/progress.md) 执行；本轮仅维护计划，不自动开始实施。
 2. 文件结构和分层协作在实际任务中继续验证；联合发布按 [总览 P8](plan.md#p8-联合交付与轻量发布) 执行。
