@@ -12,4 +12,4 @@
 
 记忆检索、建图和数据库尚未交付，由 [记忆任务](../tasks/20261106-memory-system/progress.md) 接续。旧项目和已有机器设施仅提供参考与可复用资源，不代表本项目已完成实现或验收；依据见 [调研索引](../tasks/20261106-rebuild/research/sources.md)。
 
-跨模块修改读 [架构说明](architecture.md)，准备运行或诊断读 [环境说明](environment.md)，概念歧义查 [项目术语](../terminology.md)。跨工具状态见 [重建总进度](../tasks/20261106-rebuild/progress.md)。
+按文件位置理解源码、安装、业务实例与共享设施时读 [逻辑框图](diagrams.md)。跨模块修改读 [架构说明](architecture.md)，准备运行或诊断读 [环境说明](environment.md)，概念歧义查 [项目术语](../terminology.md)。跨工具状态见 [重建总进度](../tasks/20261106-rebuild/progress.md)。
