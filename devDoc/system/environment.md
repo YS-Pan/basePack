@@ -4,11 +4,19 @@
 
 当前唯一 active 路线位于 `experiments/20261106-basepack/`；安装、构建与测试目标均为该实验工程，具体命令见 [路线 README](../../experiments/20261106-basepack/README.md)。从仓库根运行 pytest 时，显式指定实验的 pyproject、tests 和根 `tmp/<task>/pytest` 作为 basetemp。pytest 不保留持久缓存；构建 TEMP/TMP 和隔离验证环境也进入根 tmp。目录寿命见 [文档维护约定](../documentation.md)。
 
-2026-11-09 先前布局迁移只改变开发维护位置；当时只读核查的系统安装为 0.4.0、site-packages、无 editable 映射。其后 R9 已升级为下节的 0.5.0 当前部署；布局迁移和更早批次记录按各自原条件阅读。
+2026-11-09 先前布局迁移只改变开发维护位置；当时系统安装为 0.4.0。其后 R9 形成下节的 0.5.0 共享资源基线，本轮在独立稳定环境安装 0.6.0 客户端并运行项目局部数据库。历史快照按各自条件阅读。
 
 选留证据现统一位于根 `artifacts/runs/`。前次临时材料整理的映射为 `artifacts/runs/tmp-reorganization-20261108/moves.json`，本次位置映射为 `artifacts/runs/20261109-project-layout/moves.json`；原始回执及下文历史路径保留当时含义，结合两轮映射回查长期副本，tmp 内容按可清除处理。
 
-## 2026-11-09 R9 当前部署
+## 2026-11-09 记忆与 0.6.0 部署核验
+
+0.6.0 普通 wheel 已安装于 `D:/AgentTools/envs/basepack-client/`，仅含轻量客户端及 psutil 7.2.2；非 editable，无 user-site overlay。系统 Python 的原安装及 embedding 0.5.0 环境未改。本项目已由该解释器执行 init 和 memory init，跨调用 brief 成功；实际 devDoc 首建与完整试用结果统一见 [记忆进度](../tasks/20261106-memory-system/progress.md)。
+
+稳定 SurrealDB 4.0.0 程序位于 `D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。本项目 `.basepack/memory/serve.ps1` 读取同目录 password.txt 后设置原生凭据环境，以普通用户隐藏手动进程启动 `surrealkv://store`，监听 loopback 18080，数据保留在本项目并供多聊天共用。SCM 管理员安装未执行，本轮不以创建服务为完成前提；脚本、秘密文件与库均被 Git 忽略。启动 source_scope 声明项目纲领、文档维护约定及记忆计划三个文件，不代表整个 devDoc 已有语义覆盖。
+
+共享 embedding 继续沿用 R9 的 0.5.0 服务、8765 endpoint 和原有语义身份，0.6.0 客户端保持 HTTP 合同兼容，实际健康与身份保持不变，本轮未重启共享模型。开发真实回归已覆盖跨层文字/图像编码、身份及输入版本排除、原生恢复和从保留表示重建向量；源码证据与正式安装分别验收。
+
+## 2026-11-09 R9 共享资源基线
 
 系统 Python `C:/Program Files/Python313/python.exe` 普通安装 basepack 0.5.0 core/jobs；服务 wheel 普通安装于 `C:/ProgramData/basepack/envs/service/`，依赖由 uv.lock 与 cu128 源准备，不继承系统 site-packages。共享模型保持原 D 盘 revision，17 个 manifest 文件的字节及 SHA256 已核实。Shawl 1.9.0 位于 `D:/AgentTools/bin/shawl-1.9.0/shawl.exe`，SCM BasepackEmbedding 采用 LocalSystem/Manual，日志在 `D:/AgentTools/state/basepack/embedding/logs/`。
 

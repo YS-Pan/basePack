@@ -33,3 +33,7 @@
 - 每完成一项完整修改并通过相应检查，及时在 `main` 上 commit；相关代码、文档和 `change_log` 一同提交。特别小的修改可省略 `change_log`。
 - 由主 agent 统一检查差异并提交，仅纳入本次相关内容，保留用户已有改动。使用清晰的提交说明。
 - Git 保存源码、skills、短文档和小样例；模型、虚拟环境、项目数据库、缓存、密钥及大型运行产物留在仓库外或忽略目录中。
+
+<!-- basepack:start -->
+开始或接续本项目任务时，读取 [.basepack/instructions.md](.basepack/instructions.md)。
+<!-- basepack:end -->

@@ -146,6 +146,10 @@ def test_real_native_restore_and_rebuild_from_retained_text_and_pixels(memory, t
     assert len(restored.embed_members()["embedded"]) == 5
     assert restored.vector_search("A red triangle next to a blue square", limit=1)[0]["id"] == "member:shapes"
     assert len(restored.neighbors("shapes")["edges"]) == 1
+    retired = restored.prepare(["shapes.png"])
+    restored.apply({"sources": [], "expected": retired["expected"], "delete_members": ["shapes"]})
+    assert restored.embed_members([])["pending"] == []
+    assert "member:shapes" not in {row["id"] for row in restored.vector_search("red triangle", limit=10)}
 
 
 def test_real_file_and_section_token_overflow_keeps_accepted_knowledge(memory, tmp_path):

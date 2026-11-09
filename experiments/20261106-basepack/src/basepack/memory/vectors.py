@@ -64,8 +64,8 @@ def embed_members(memory, ids=None, *, timeout=600) -> dict:
         memory._execute("\n".join(statements))
         embedded.extend(member["id"] for member in batch)
     return {"embedding_identity": identity, "embedded": embedded, "reused": reused,
-            "pending": memory._execute("SELECT VALUE id FROM member WHERE stale=true "
-                         f"OR embedding_identity!={_sql(identity)} OR embedded_revision!=input_revision OR embedding=NONE;")[0]}
+            "pending": memory._execute("SELECT VALUE id FROM member WHERE retired!=true AND (stale=true "
+                         f"OR embedding_identity!={_sql(identity)} OR embedded_revision!=input_revision OR embedding=NONE);")[0]}
 
 
 def vector_search(memory, text, *, scope="", limit=12, timeout=600) -> list[dict]:

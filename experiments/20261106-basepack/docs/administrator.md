@@ -1,17 +1,17 @@
 # 机器部署与维护
 
-本页属于当前 active 路线 [20261106-basepack](../README.md)，按 0.5.0 接口说明 Windows、Python 3.13 和单张 NVIDIA GPU 的部署。机器配置保持 schema 1；普通项目保持 schema 2。模型目录含 model.lock.json 和 model/，多个项目复用同一份权重。本机实际安装及验收状态见 [资源进度](../../../devDoc/archive/20261107-resource-coordination/progress.md)。
+本页属于当前 active 路线 [20261106-basepack](../README.md)，说明 0.6.0 客户端、项目 SurrealDB 4 与共享资源设施的部署。面向 Windows、Python 3.13；图文模型使用单张 NVIDIA GPU。机器格式保持 schema 1，项目格式保持 schema 2。资源基线见 [R9 结果](../../../devDoc/archive/20261107-resource-coordination/r9-result.md)，记忆正式安装与试用状态见 [专项进度](../../../devDoc/tasks/20261106-memory-system/progress.md)。
 
 ## 安装与执行账户
 
-客户端普通安装 wheel；系统目录安装通常需要管理员终端，确认 pip 没有回落 user-site：
+客户端普通安装 wheel，可使用稳定的独立 Python 3.13 环境；本机 0.6.0 客户端位于 `D:/AgentTools/envs/basepack-client/`，系统及共享模型环境保持原状。若选择系统目录安装，通常需要管理员终端；核 pip 没有回落 user-site：
 
 ```powershell
 python -m pip install --no-user '<basepack-wheel>'
 python -s -c "import basepack; print(basepack.__file__)"
 ```
 
-共享模型服务使用独立、稳定的纯净环境。用已安装的 uv 按工程原生锁准备依赖，再安装普通 wheel：
+新建共享模型服务时，使用独立、稳定的纯净环境，按工程原生锁准备依赖，再安装普通 wheel。已有兼容的 0.5.0 服务可继续供 0.6.0 客户端使用，本次客户端升级无需重新加载模型：
 
 ```powershell
 $env:UV_PROJECT_ENVIRONMENT = '<absolute-shared-service-env>'
@@ -28,6 +28,44 @@ uv pip install --python $servicePython --no-deps '<basepack-wheel>'
 项目只绑定 Python 和机器配置，代码通过正常安装使用。开发 editable 与普通 wheel 在同一解释器中只保留一种有效安装，构建入口和交付包位置见 [路线 README](../README.md)。机器模板通过 `from basepack.project.init import template` 读取，项目接入见 [说明](setup-project.md)。
 
 CondorClient 使用机器配置的 bin_dir/config_file，向原生命令显式传 CONDOR_CONFIG。受限 sandbox 的 Windows SSPI 认证可能失败；保留原错误，在正常用户上下文复核，不因此改认证政策。
+
+## 项目 SurrealDB
+
+安装官方 SurrealDB 4 的发行 exe 到稳定位置，多个项目可共用程序；每个项目使用自己的物理数据目录、端口和进程。同项目多个聊天共用这个进程，namespace/database 不能代替物理隔离。本机选用 `D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`；产品配置只绑定 endpoint 与逻辑库，不写死 exe 路径。
+
+前台命令见 [记忆启用](memory.md#启用)。普通用户也可手动启动隐藏进程供多聊天共用：以项目 `.basepack/memory/` 为 cwd，数据路径用 `surrealkv://store`。凭据从本机秘密文件读入 SURREAL_USER/SURREAL_PASS 环境后启动原生进程；basepack 客户端只读 password_env，产品配置与源码不保存密码。本机把 password.txt 与 serve.ps1 放在被忽略的 memory 目录；脚本只读取凭据并执行原生命令。
+
+serve.ps1 使用下面的原生命令，替换 exe 路径；password.txt 保存该实例的密码原文，不添加末尾换行。文件由管理员在项目的忽略目录准备：
+
+```powershell
+$env:SURREAL_USER = 'root'
+$env:SURREAL_PASS = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'password.txt')
+& '<absolute-surreal.exe>' start --bind 127.0.0.1:18080 'surrealkv://store'
+exit $LASTEXITCODE
+```
+
+普通用户隐藏启动示例，保留返回 PID 供该项目维护者观察：
+
+```powershell
+$memoryDir = '<absolute-project>/.basepack/memory'
+$memoryProcess = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', ('"' + "$memoryDir/serve.ps1" + '"')) -WorkingDirectory $memoryDir -WindowStyle Hidden -PassThru
+$memoryProcess.Id
+```
+
+需要 SCM 托管时，管理员可为同一 launcher 注册服务，替换服务名和路径；这是可选部署方式，本轮没有创建该服务：
+
+```powershell
+$shawl = '<absolute-shawl.exe>'
+$memoryDir = '<absolute-project>/.basepack/memory'
+$memoryService = '<unique-project-service-name>'
+& $shawl add --name $memoryService --no-restart --kill-process-tree --stop-timeout 3000 --log-dir "$memoryDir/logs" --cwd $memoryDir -- powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$memoryDir/serve.ps1"
+Set-Service -Name $memoryService -StartupType Manual
+Start-Service -Name $memoryService
+```
+
+launcher 显式绑定 loopback endpoint（本机为 `127.0.0.1:18080`），配置中的 endpoint 必须一致；执行账户须能读写项目目录。先核 `/ready`，再用实际项目配置运行 memory init/brief，随后首建和 read/search；进程启动成功不代替知识验收。调用 shell 也须提供 password_env 指定的变量。
+
+手动进程由该项目维护者管理，停止时核对所属进程树与监听端口均已退出；共享 embedding 独立运行。SCM 方式使用 Stop-Service 并等待 Stopped，保持 Manual，Shawl 不自动重启。项目搬迁后更新 cwd/launcher 与日志位置，保留 project_id。原生 export、必要 assets、配置与业务原件共同构成恢复集合，步骤见 [备份恢复](memory.md#备份与恢复)。
 
 ## Condor 容量与策略
 
@@ -91,7 +129,9 @@ Shawl 的 log-dir 保存包装器和命令输出；推理异常保留在服务�
 
 ## 升级与回滚
 
-从 0.4.0 一次切换到 0.5.0：
+0.5.0 → 0.6.0：保留客户端 wheel、配置与项目知识备份，普通安装新客户端，核实际安装来源，再从源码外执行记忆首建、查询、维护与恢复。共享 embedding 的 HTTP 协议和 embedding_identity 合同未变，已有 0.5.0 服务继续运行；Condor 策略保持。回退客户端时保留项目库，旧 0.5.0 仍只提供资源工具。修改底座或知识 schema 前先保留原生 export，按相应版本验证恢复。
+
+下面是 0.4.0 → 0.5.0 的历史资源接口切换，仅从该旧版升级时使用：
 
 1. 保留旧 wheel、机器配置和调用脚本，暂停新请求与作业提交，核当前服务和 Condor 队列，等待在途作业终结并确认回收。
 2. 用仍安装的 0.4.0 执行 `python -m basepack embedding --machine-config '<machine-config>' stop`，确认旧 supervisor/worker 已退出。保留旧安装直至具备回退包和配置，按当前实际状态操作。
