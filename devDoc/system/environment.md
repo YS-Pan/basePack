@@ -8,6 +8,14 @@
 
 选留证据现统一位于根 `artifacts/runs/`。前次临时材料整理的映射为 `artifacts/runs/tmp-reorganization-20261108/moves.json`，本次位置映射为 `artifacts/runs/20261109-project-layout/moves.json`；原始回执及下文历史路径保留当时含义，结合两轮映射回查长期副本，tmp 内容按可清除处理。
 
+## 2026-11-10 0.6.1 修复与安装
+
+特殊记录 ID 往返与最小输入诊断已在源码提交 `488e298` 实现，连同此前并发/初始化修复进入普通 0.6.1 wheel。源码与源码外普通安装分别 157 passed、0 skipped，均执行四项真实共享向量检查。wheel 为 `experiments/20261106-basepack/dist/memory-0.6.1/basepack-0.6.1-py3-none-any.whl`，54,761 B，SHA256 `2a1bc7e014e2a89697ced0970352cf9f724f287ebf3baa728a4edb4b4403efd2`。
+
+稳定客户端 `D:/AgentTools/envs/basepack-client/Scripts/python.exe` 已普通升级到 0.6.1，导入来自其 site-packages，全部包文件与该 wheel 一致。此环境不含 pip，升级使用现有测试环境的 pip `--python` 显式指定目标；没有为客户端引入模型依赖。升级前保留旧 wheel 与项目原生恢复集合，升级后本仓库七表全记录逐字段未变，brief/search/read 通过。独立两项目与原生恢复验收、PPT业务实测结果从 [专项进度](../tasks/20261106-memory-system/progress.md) 接续，历史结果不并入本轮。
+
+全套源码初次检查的八项失败来自测试环境缺少锁定 sentence-transformers 发行元数据，安装 6.2.0 的轻量测试包后全套通过；系统 torch/Pillow/pytest/psutil 作为既有测试依赖复用。受限宿主会回收 Hidden 后台进程，普通用户执行相同启动脚本后跨调用 ready/init/brief 与实际读写通过；该环境边界不由产品新建进程管理器处理。M4期间原共享服务停止后由用户以管理员恢复，服务实现与身份不变；两个正式库也按既有入口重开原store。短期存续不等于宿主重连后的长期驻留保证。回执选留 `artifacts/runs/20261110-memory-061/`。
+
 ## 2026-11-09 升级后一致性修复（源码）
 
 P5 安装基线之后，仓库修复了失效知识版本、关系依赖并发核查、错项目初始化的 schema 副作用，以及项目入口生成的路径/标记问题，见 [修复记录](../change_log/minor/20261109_170434_reconcile-memory-contracts.md)。本轮修复只在源码与隔离测试中交付，未重建 wheel 或重装稳定客户端；下节仍描述此前的普通安装版本，共享资源服务保持原状。

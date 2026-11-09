@@ -1,6 +1,6 @@
 # 当前文件与运行逻辑框图
 
-按 2026 年 11 月 9 日的 0.6.0 源码、正式客户端安装与本机部署绘制。0.5.0 core/jobs 和共享 embedding 服务继续保留，后者与 0.6.0 客户端协议兼容。沿用[参考 chat](codex://threads/01a1bb3f-4db8-7c10-8d71-c951aba18aa2) 按文件位置分层的方法；记忆行为的实际验收边界见[专项进度](../tasks/20261106-memory-system/progress.md)，阶段合同见[记忆方案图](../tasks/20261106-memory-system/diagrams.md)。
+按 2026 年 11 月 10 日的 0.6.1 源码、正式客户端安装与本机部署更新版本标注。0.5.0 core/jobs 和共享 embedding 服务继续保留，后者与 0.6.1 客户端协议兼容。沿用[参考 chat](codex://threads/01a1bb3f-4db8-7c10-8d71-c951aba18aa2) 按文件位置分层的方法；记忆行为的实际验收边界见[专项进度](../tasks/20261106-memory-system/progress.md)，阶段合同见[记忆方案图](../tasks/20261106-memory-system/diagrams.md)。
 
 ## 路径与读图约定
 
@@ -8,7 +8,7 @@
 | --- | --- |
 | R | 本源码仓库：`D:/project/20261106 memsys` |
 | E | 当前 active 工程：`R/experiments/20261106-basepack` |
-| Im | 0.6.0 客户端安装包：`D:/AgentTools/envs/basepack-client/Lib/site-packages/basepack` |
+| Im | 0.6.1 客户端安装包：`D:/AgentTools/envs/basepack-client/Lib/site-packages/basepack` |
 | Ic | 保留的 0.5.0 core/jobs：`C:/Program Files/Python313/Lib/site-packages/basepack` |
 | Is | 保留的 0.5.0 embedding 服务：`C:/ProgramData/basepack/envs/service/Lib/site-packages/basepack` |
 | A | 本机共享设施：`D:/AgentTools` |
@@ -24,7 +24,7 @@ flowchart TB
   subgraph source["R / E：唯一产品维护源"]
     code["E/src/basepack/<br/>代码与 project/templates/"]
     deps["E/pyproject.toml + uv.lock<br/>依赖与发行声明"]
-    wheel["E/dist/交付批次/<br/>basepack-0.6.0-*.whl"]
+    wheel["E/dist/交付批次/<br/>basepack-0.6.1-*.whl"]
     r9["E/dist/r9/<br/>保留 basepack-0.5.0 wheel"]
     policy["E/examples/condor/<br/>60_resources.conf、70_job_transforms.conf"]
     code -->|构建| wheel
@@ -39,7 +39,7 @@ flowchart TB
   memory -->|memory init：schema、项目 UUID、brief 入口| instance
 ```
 
-wheel 携带 memory skill，devDoc、根 skills、测试、示例和模型沿各自维护位置保留；运行从普通安装加载。0.6.0 客户端安装没有替换或停止既有 0.5.0 资源服务。普通 `init` 生成接入文件，`memory init` 再绑定已启动的项目库、安装 schema 和宿主入口。依据：[路线入口](../../experiments/20261106-basepack/README.md)、[项目接入实现](../../experiments/20261106-basepack/src/basepack/project/init.py)、[记忆实现](modules/memory.md)。
+wheel 携带 memory skill，devDoc、根 skills、测试、示例和模型沿各自维护位置保留；运行从普通安装加载。0.6.1 客户端安装没有替换或停止既有 0.5.0 资源服务。普通 `init` 生成接入文件，`memory init` 再绑定已启动的项目库、安装 schema 和宿主入口。依据：[路线入口](../../experiments/20261106-basepack/README.md)、[项目接入实现](../../experiments/20261106-basepack/src/basepack/project/init.py)、[记忆实现](modules/memory.md)。
 
 ## 2. 两个业务项目如何绑定共享设施
 
@@ -126,7 +126,7 @@ flowchart TB
   server -->|服务日志| logs["A/state/basepack/embedding/logs/"]
 ```
 
-共享服务仍为 Is 中的 0.5.0，0.6.0 客户端沿用其协议与 embedding_identity 合同，服务本轮未停、未改。单推理 worker 不等于单个系统进程，LitServe 还使用 Manager 等辅助进程。模型常驻，不随客户端超时退出；排队期限不打断已开始推理。worker 故障由 LitServe 重建，主进程或 Shawl 故障后由管理员手动启动；停止按 SCM → Shawl 整树回收。语义身份由模型和编码合同决定，部署路径不属于该身份。依据：[service.py](../../experiments/20261106-basepack/src/basepack/embedding/service.py)、[生命周期与接口](modules/resources.md)、[R9 交付](../archive/20261107-resource-coordination/r9-result.md)。
+共享服务仍为 Is 中的 0.5.0，0.6.1 客户端沿用其协议与 embedding_identity 合同，服务本轮未停、未改。单推理 worker 不等于单个系统进程，LitServe 还使用 Manager 等辅助进程。模型常驻，不随客户端超时退出；排队期限不打断已开始推理。worker 故障由 LitServe 重建，主进程或 Shawl 故障后由管理员手动启动；停止按 SCM → Shawl 整树回收。语义身份由模型和编码合同决定，部署路径不属于该身份。依据：[service.py](../../experiments/20261106-basepack/src/basepack/embedding/service.py)、[生命周期与接口](modules/resources.md)、[R9 交付](../archive/20261107-resource-coordination/r9-result.md)。
 
 ## 5. 项目记忆的数据库与维护归谁管理
 

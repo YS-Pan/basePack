@@ -2,7 +2,7 @@
 
 basePack 建设项目局部记忆、共享计算资源协调，以及可独立使用的 agent 协作和文件结构技能。
 
-当前唯一 active 路线为 [20261106-basepack](experiments/20261106-basepack/README.md)。0.6.0 提供 SurrealDB 上的项目局部多层记忆、共享图文 embedding 与 HTCondor 作业入口；本机客户端已普通安装，共享资源服务继续复用。实际验收和性能边界见 [记忆进度](devDoc/tasks/20261106-memory-system/progress.md)。
+当前唯一 active 路线为 [20261106-basepack](experiments/20261106-basepack/README.md)。0.6.1 提供 SurrealDB 上的项目局部多层记忆、共享图文 embedding 与 HTCondor 作业入口；本机客户端已普通安装，共享资源服务继续复用。实际验收和性能边界见 [记忆进度](devDoc/tasks/20261106-memory-system/progress.md)。
 
 | 入口 | 用途 |
 | --- | --- |

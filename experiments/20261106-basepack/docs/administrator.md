@@ -11,6 +11,8 @@ python -m pip install --no-user '<basepack-wheel>'
 python -s -c "import basepack; print(basepack.__file__)"
 ```
 
+已有目标环境不含 pip 时，用另一个已有 pip 的解释器执行 `python -m pip --python '<target-python.exe>' install --no-user '<basepack-wheel>'`，再由目标解释器核安装来源。本机轻量客户端升级采用该入口并复用已有依赖。
+
 新建共享模型服务时，使用独立、稳定的纯净环境，按工程原生锁准备依赖，再安装普通 wheel。已有兼容的 0.5.0 服务可继续供 0.6.1 客户端使用，本次客户端升级无需重新加载模型：
 
 ```powershell
