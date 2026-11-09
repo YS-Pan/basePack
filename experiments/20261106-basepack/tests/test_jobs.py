@@ -1,7 +1,6 @@
 import json
 from copy import deepcopy
 from dataclasses import replace
-import os
 from pathlib import Path
 from datetime import datetime
 import socket
@@ -10,7 +9,6 @@ import sys
 
 import pytest
 
-from basepack.jobs._processes import _descendants, _process_parents
 from basepack.jobs.client import _terminal_time
 
 
@@ -252,18 +250,6 @@ def test_terminal_status_checks_application_exit_and_returned_outputs(resource_c
     assert result["exit_code"] == exit_code
     assert result["success"] is success
     assert result["missing_outputs"] == ([] if returned else [str(tmp_path / "result.txt")])
-
-
-def test_process_snapshot_sees_real_child():
-    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
-    try:
-        snapshot = _process_parents()
-        assert snapshot[child.pid] == os.getpid()
-        assert child.pid in _descendants({os.getpid()}, snapshot)
-    finally:
-        child.terminate()
-        child.wait(timeout=5)
-    assert child.pid not in _process_parents()
 
 
 def test_removed_job_uses_native_abort_time_instead_of_stale_status(tmp_path):

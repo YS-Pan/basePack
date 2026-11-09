@@ -13,15 +13,13 @@ def register_commands(subparsers):
     source.add_argument("--inputs", type=Path, help="UTF-8 JSON array of strings or {text, image}")
     embed.add_argument("--caption")
     embed.add_argument("--timeout", type=float, default=600)
-    embed.add_argument("--request-id")
-    embed.add_argument("--tokens-only", action="store_true")
     embed.add_argument("--output", type=Path)
     service = subparsers.add_parser("embedding", help="administer the independent machine service")
     service.add_argument("--machine-config", required=True, type=Path)
     actions = service.add_subparsers(dest="embedding_action", required=True)
     actions.add_parser("status")
     actions.add_parser("stop")
-    actions.add_parser("serve", help="run the machine launcher in the foreground outside Condor")
+    actions.add_parser("serve", help="run LitServe in the foreground; production is hosted by Shawl")
 
 
 def dispatch(args, config=None):
@@ -33,7 +31,7 @@ def dispatch(args, config=None):
             return status(machine), 0
         if args.embedding_action == "stop":
             return stop(machine), 0
-        from .supervisor import serve
+        from .service import serve
         serve(machine)
         return {"stopped": True}, 0
     client = EmbeddingClient(config.machine)
@@ -45,9 +43,9 @@ def dispatch(args, config=None):
             inputs[0]["text"] = args.caption
     else:
         inputs = args.text
-    result = client.embed(inputs, timeout=args.timeout, request_id=args.request_id, tokens_only=args.tokens_only)
+    result = client.embed(inputs, timeout=args.timeout)
     if args.output:
         args.output.write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
         return {"pid": result["pid"], "embedding_identity": result["embedding_identity"],
-                "count": len(result["inputs"]), "output": str(args.output.resolve())}, 0
+                "count": len(result["vectors"]), "output": str(args.output.resolve())}, 0
     return result, 0

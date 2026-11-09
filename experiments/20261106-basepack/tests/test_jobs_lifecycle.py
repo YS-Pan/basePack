@@ -3,6 +3,7 @@ import json
 import subprocess
 import sys
 
+import psutil
 import pytest
 
 from basepack.jobs import CondorClient, JobSpec
@@ -85,14 +86,14 @@ def test_cancel_terminal_job_confirms_cleanup_without_removal(client):
     assert checked == ["123.0"]
 
 
-@pytest.mark.parametrize("history,processes,confirmed", [
-    (False, {}, False),
-    (True, {21: 1}, False),
-    (True, {}, True),
+@pytest.mark.parametrize("history,alive,confirmed", [
+    (False, False, False),
+    (True, True, False),
+    (True, False, True),
 ])
-def test_cleanup_requires_native_history_and_known_processes_gone(client, monkeypatch, history, processes, confirmed):
+def test_cleanup_requires_native_history_and_known_processes_gone(client, monkeypatch, history, alive, confirmed):
     client._ad = lambda job_id: ({}, history)
-    monkeypatch.setattr(jobs_client, "_process_parents", lambda: processes)
+    monkeypatch.setattr(jobs_client.psutil, "pid_exists", lambda pid: alive)
     result = client._confirm_cleanup("123.0", timeout=0, expected_pids={21})
     assert result["cleanup_confirmed"] is confirmed
     if confirmed:
@@ -104,12 +105,80 @@ def test_cleanup_requires_native_history_and_known_processes_gone(client, monkey
 def test_cleanup_preserves_process_observation_error(client, monkeypatch):
     client._ad = lambda job_id: ({}, True)
 
-    def fail():
-        raise OSError("original process snapshot failure")
+    def fail(pid):
+        raise OSError("original process observation failure")
 
-    monkeypatch.setattr(jobs_client, "_process_parents", fail)
-    result = client._confirm_cleanup("123.0", timeout=0)
-    assert result == {"cleanup_confirmed": False, "cleanup_error": "original process snapshot failure"}
+    monkeypatch.setattr(jobs_client.psutil, "pid_exists", fail)
+    result = client._confirm_cleanup("123.0", timeout=0, expected_pids={21})
+    assert result == {"cleanup_confirmed": False, "cleanup_error": "original process observation failure"}
+
+
+def test_completed_job_cleanup_is_independent_of_unrelated_process_metadata(client, monkeypatch):
+    class UnrelatedProcess:
+        pid = 999
+
+        def ppid(self):
+            raise OSError("unrelated process metadata is unavailable")
+
+    client._ad = lambda job_id: ({}, True)
+    monkeypatch.setattr(jobs_client.psutil, "process_iter", lambda: iter([UnrelatedProcess()]))
+    monkeypatch.setattr(jobs_client.psutil, "pid_exists", lambda pid: False)
+
+    result = client._confirm_cleanup("123.0", timeout=0, expected_pids={21})
+
+    assert result["cleanup_confirmed"]
+    assert result["checked_pids"] == [21]
+
+
+def test_cancel_observes_only_its_known_process_family(client, monkeypatch):
+    root = subprocess.Popen([sys.executable, "-u", "-c",
+        "import subprocess,sys,time; "
+        "child=subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)']); "
+        "print(child.pid,flush=True); time.sleep(30)"], stdout=subprocess.PIPE, text=True)
+    descendant = psutil.Process(int(root.stdout.readline()))
+    owned_descendants = psutil.Process(root.pid).children(recursive=True)
+    try:
+        client._ad = lambda job_id: ({}, False)
+        monkeypatch.setattr(jobs_client, "_worker_pids", lambda ad: {root.pid})
+        client._call = lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, "", "")
+        client.status = lambda job_id: {"state": "removed", "terminal": True}
+        checked = []
+        client._confirm_cleanup = lambda job_id, timeout, pids: checked.append(pids) or {"cleanup_confirmed": True}
+
+        assert client.cancel("123.0")["cleanup_confirmed"]
+        # Windows venv launchers can add interpreter processes inside this family.
+        assert {root.pid, descendant.pid} <= checked[0]
+        assert psutil.Process().pid not in checked[0]
+    finally:
+        root.terminate()
+        root.wait(timeout=5)
+        for process in owned_descendants:
+            try:
+                process.kill()
+            except psutil.NoSuchProcess:
+                pass
+        _, alive = psutil.wait_procs(owned_descendants, timeout=5)
+        assert not alive
+        root.stdout.close()
+
+
+def test_cancel_still_removes_job_if_known_root_exits_before_observation(client, monkeypatch):
+    client._ad = lambda job_id: ({}, False)
+    monkeypatch.setattr(jobs_client, "_worker_pids", lambda ad: {21})
+
+    def gone(pid):
+        raise psutil.NoSuchProcess(pid)
+
+    monkeypatch.setattr(jobs_client.psutil, "Process", gone)
+    removed = []
+    client._call = lambda *args, **kwargs: removed.append(args) or subprocess.CompletedProcess(args, 0, "", "")
+    client._confirm_cleanup = lambda job_id, timeout, pids: {"cleanup_confirmed": True, "checked_pids": sorted(pids)}
+    client.status = lambda job_id: {"state": "removed", "terminal": True}
+
+    result = client.cancel("123.0")
+
+    assert removed == [("condor_rm", "123.0")]
+    assert result["cleanup_confirmed"] and result["checked_pids"] == [21]
 
 
 @pytest.mark.parametrize("action,answer,code", [

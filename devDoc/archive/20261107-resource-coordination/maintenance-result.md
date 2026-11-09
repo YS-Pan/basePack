@@ -1,6 +1,6 @@
 # R8 维护与 0.4.0 部署结果
 
-路径追溯（2026-11-09）：下文保留当时的运行路径；选留原证现归根 `artifacts/runs/<原批次>/`，原 dist 包现归 `experiments/20261106-basepack/dist/`，位置映射见[布局迁移结果](../../archive/20261109-project-layout/result.md)。
+路径追溯（2026-11-09）：下文保留当时的运行路径；选留原证现归根 `artifacts/runs/<原批次>/`，原 dist 包现归 `experiments/20261106-basepack/dist/`，位置映射见[布局迁移结果](../20261109-project-layout/result.md)。
 
 2026 年 11 月 8 日，按用户要求顺序完成 R8.0 → R8.1 → R8.2 → R8.3 → R8.4。当前状态只维护在 [进度](progress.md)，接口/路径与迁移合同见 [部署合同](../../system/deployment.md)。本轮没有修改项目纲领、机器容量、模型或 Condor 站点策略，没有推送远端。
 

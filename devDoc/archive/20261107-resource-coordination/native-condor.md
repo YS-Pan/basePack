@@ -1,6 +1,6 @@
 # 通用 Condor 节点与 GPU 共享
 
-路径追溯（2026-11-09）：下文保留当时的运行路径；选留原证现归根 `artifacts/runs/<原批次>/`，原 dist 包现归 `experiments/20261106-basepack/dist/`，位置映射见[布局迁移结果](../../archive/20261109-project-layout/result.md)。
+路径追溯（2026-11-09）：下文保留当时的运行路径；选留原证现归根 `artifacts/runs/<原批次>/`，原 dist 包现归 `experiments/20261106-basepack/dist/`，位置映射见[布局迁移结果](../20261109-project-layout/result.md)。
 
 2026-11-08 后续批次，接续 [0.1.0 交付](result.md)。用户要求普通任务完全由 HTCondor 管理，basePack 作为普通提交客户端；背景总预留 9 GiB，剩余显存交给普通作业，单卡最多 4 项并行。本批不修改项目纲领。
 

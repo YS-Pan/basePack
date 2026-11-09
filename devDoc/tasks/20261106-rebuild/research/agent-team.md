@@ -70,7 +70,7 @@ Codex 的调用边界参照 [官方 subagents](https://learn.chatgpt.com/docs/ag
 
 本轮完整读取 20 个既有主聊天（含一个附属分支）和 113 个协作子线程，共 285 个 turn；排除本次审计和自动审批线程。聊天经 App 全部分页读取，组织树按实际父子来源重建；继承日志里的祖先调用不重复计数。原始派工正文存在加密、大工具输出存在截断，重要结论另核选定原证；没有将列举摘要当作消息审阅。
 
-实际交付中的独立验收发现过排队 52 秒被报告为 0、迁移覆盖业务文件等缺陷，并推动修复。R8 有 9 个直属、5 个孙级 agent，局部协调者确实承担了分支管理，见 [R8 交付](../../20261107-resource-coordination/maintenance-result.md)。但主 agent 仍承担不少日常管理，部分下级已查明的关键前提未进入上级表达。11 月 7 日英文版发布后，审计范围内的 71 个子 agent 中，57 个继承历史、14 个使用新上下文，均使用 Sol；相关任务继承背景可以合理，这些数据本身不能证明注意力干扰或模型选择错误。任务、宿主主动派工模式和用户指令不同，缺少同题对照，不能据此量化技能的独立收益。
+实际交付中的独立验收发现过排队 52 秒被报告为 0、迁移覆盖业务文件等缺陷，并推动修复。R8 有 9 个直属、5 个孙级 agent，局部协调者确实承担了分支管理，见 [R8 交付](../../../archive/20261107-resource-coordination/maintenance-result.md)。但主 agent 仍承担不少日常管理，部分下级已查明的关键前提未进入上级表达。11 月 7 日英文版发布后，审计范围内的 71 个子 agent 中，57 个继承历史、14 个使用新上下文，均使用 Sol；相关任务继承背景可以合理，这些数据本身不能证明注意力干扰或模型选择错误。任务、宿主主动派工模式和用户指令不同，缺少同题对照，不能据此量化技能的独立收益。
 
 本轮再查的实现支持几项小改动：[Pi 的默认新上下文解析](https://github.com/nicobailon/pi-subagents/blob/3ff4f75545edf2695d5ea82bf46a1ea9ef2008a8/src/shared/fork-context.ts#L83-L86)是工具层默认值；[Superpowers 的约束传递问题](https://github.com/obra/superpowers/issues/2493)与[完成报告问题](https://github.com/obra/superpowers/issues/2451)说明，原则写在文档里仍可能未进入实际 brief 或报告；[Anthropic 的工程记录](https://www.anthropic.com/research/multi-agent-research-system)采用保存原产物、向协调者传引用来减少多层转述失真。外部机制是参考，没有安装这些项目，也没有把其效果当作本技能验收。
 

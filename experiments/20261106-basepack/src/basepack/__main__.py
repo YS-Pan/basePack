@@ -12,9 +12,6 @@ def main():
     init.add_argument("--project-root", required=True)
     init.add_argument("--machine-config", required=True)
     init.add_argument("--config-name", default=".basepack/config.toml")
-    migrate = sub.add_parser("migrate", help="Explicitly migrate a schema 1 project after draining its jobs")
-    migrate.add_argument("--from-config", required=True)
-    migrate.add_argument("--config-name", default=".basepack/config.toml")
     config = sub.add_parser("config")
     config.add_subparsers(dest="config_action", required=True).add_parser("show")
     check = sub.add_parser("doctor", help="Read-only facility checks")
@@ -28,9 +25,6 @@ def main():
     if args.command == "init":
         from .project.init import init_project
         result = {"project_config": str(init_project(args.project_root, args.machine_config, args.config_name))}
-    elif args.command == "migrate":
-        from .project.migrate import migrate_project
-        result = migrate_project(args.from_config, args.config_name)
     elif args.command == "embedding":
         from .embedding.cli import dispatch
         result, exit_code = dispatch(args)

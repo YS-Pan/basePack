@@ -1,6 +1,6 @@
 # R7：标准提交接口与 Condor 站点策略解耦
 
-路径追溯（2026-11-09）：下文保留当时的运行路径；选留原证现归根 `artifacts/runs/<原批次>/`，原 dist 包现归 `experiments/20261106-basepack/dist/`，位置映射见[布局迁移结果](../../archive/20261109-project-layout/result.md)。
+路径追溯（2026-11-09）：下文保留当时的运行路径；选留原证现归根 `artifacts/runs/<原批次>/`，原 dist 包现归 `experiments/20261106-basepack/dist/`，位置映射见[布局迁移结果](../20261109-project-layout/result.md)。
 
 2026-11-08，R7.0–R7.4 已完成：0.3.0 普通 wheel 与 schedd JOB_TRANSFORM 已部署，原生调度及联合 embedding 真实验收通过。实际结果见 [R7 回执](standard-submit-result.md)，执行状态统一维护在 [进度](progress.md)，原 R0–R5 计划保留在 [原计划](plan.md)。
 

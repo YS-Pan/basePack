@@ -4,12 +4,14 @@ schema_version = 1
 state_dir = 'state/basepack'
 
 [embedding]
+endpoint = 'http://127.0.0.1:8765'
+service_name = 'BasepackEmbedding'
 model_root = 'models/ORG/MODEL/REVISION'
 device = 'cuda:0'
 max_length = 2048
 batch_size = 4
 max_pixels = 1048576
-idle_seconds = 300
+queue_timeout = 600
 cpu_threads = 2
 # Set from the supported embedding workload; units are MiB.
 gpu_memory_mib = 0

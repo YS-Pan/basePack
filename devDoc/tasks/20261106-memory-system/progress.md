@@ -6,7 +6,7 @@
 
 工程入口已归入唯一 active 的 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，开发安装和构建以该实验根为目标，依赖与路径沿 [部署合同](../../system/deployment.md)；布局迁移已完成，证据见 [迁移结果](../../archive/20261109-project-layout/result.md)，未交付记忆功能。P0 原型与后续产品交付落点已在计划中对齐。
 
-记忆工具仍未实现，没有可安装的记忆命令、检索底座或项目数据库；按 [P0–P5 计划](plan.md#阶段与完成条件) 接续。资源公共包 R8 已交付，实际安装与后续 R9 简化状态只在 [资源进度](../20261107-resource-coordination/progress.md) 维护。
+记忆工具仍未实现，没有可安装的记忆命令、检索底座或项目数据库；按 [P0–P5 计划](plan.md#阶段与完成条件) 接续。资源 R9 已交付 0.5.0 并归档，P2 可复用公开 HTTP/EmbeddingClient 与新向量语义身份，实际结果见 [R9 交付](../../archive/20261107-resource-coordination/r9-result.md)。
 
 本次仅更新计划：按用户要求优先调用现成离线 CLI/MCP 与短 skill，静态筛选后至多做两个小原型，以最少自维护代码选唯一底座。尚未安装候选、运行原型或验收记忆功能。P0/P1 可使用现有公共入口独立推进，不等待资源 R9；P2 接入最终公开本地 embedding 接口。
 

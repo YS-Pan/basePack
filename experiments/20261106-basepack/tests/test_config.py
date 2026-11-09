@@ -98,6 +98,7 @@ def test_embedding_only_configuration_has_no_other_facility_dependencies(tmp_pat
 
 
 def test_package_root_and_installed_template_anchor(tmp_path, monkeypatch):
+    assert basepack.__version__ == installation()["version"]
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
     config = load_project_config(init_project(tmp_path / "project", machine))

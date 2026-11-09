@@ -4,15 +4,21 @@
 
 当前唯一 active 路线位于 `experiments/20261106-basepack/`；安装、构建与测试目标均为该实验工程，具体命令见 [路线 README](../../experiments/20261106-basepack/README.md)。从仓库根运行 pytest 时，显式指定实验的 pyproject、tests 和根 `tmp/<task>/pytest` 作为 basetemp。pytest 不保留持久缓存；构建 TEMP/TMP 和隔离验证环境也进入根 tmp。目录寿命见 [文档维护约定](../documentation.md)。
 
-2026-11-09 布局迁移仅改变开发维护位置。只读外部核查确认系统 Python 仍普通安装 basepack 0.4.0，运行包在 site-packages，无 basepack editable 映射；机器配置、模型、共享状态及 Condor 安装保留原位置。当前源码与新 wheel 的实际验证结果由本次整理结果记录，旧批次数据仍按原条件阅读。
+2026-11-09 先前布局迁移只改变开发维护位置；当时只读核查的系统安装为 0.4.0、site-packages、无 editable 映射。其后 R9 已升级为下节的 0.5.0 当前部署；布局迁移和更早批次记录按各自原条件阅读。
 
 选留证据现统一位于根 `artifacts/runs/`。前次临时材料整理的映射为 `artifacts/runs/tmp-reorganization-20261108/moves.json`，本次位置映射为 `artifacts/runs/20261109-project-layout/moves.json`；原始回执及下文历史路径保留当时含义，结合两轮映射回查长期副本，tmp 内容按可清除处理。
+
+## 2026-11-09 R9 当前部署
+
+系统 Python `C:/Program Files/Python313/python.exe` 普通安装 basepack 0.5.0 core/jobs；服务 wheel 普通安装于 `C:/ProgramData/basepack/envs/service/`，依赖由 uv.lock 与 cu128 源准备，不继承系统 site-packages。共享模型保持原 D 盘 revision，17 个 manifest 文件的字节及 SHA256 已核实。Shawl 1.9.0 位于 `D:/AgentTools/bin/shawl-1.9.0/shawl.exe`，SCM BasepackEmbedding 采用 LocalSystem/Manual，日志在 `D:/AgentTools/state/basepack/embedding/logs/`。
+
+源码与源码外安装回归各 68 项通过；真实两项目图文、CPU/GPU 计算重叠、超时隔离、作业取消、正式服务故障与显存回收、0.5→0.4→0.5 回退均通过。当前服务已恢复运行，Condor 60/70 策略与原项目文件未变。完整条件和原证见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。下面 R8 及同日布局迁移段落保留当时快照，不作为当前安装版本。
 
 ## 2026-11-08 R8 部署核验
 
 系统 Python `C:/Program Files/Python313/python.exe` 已普通安装 basepack 0.4.0，包根为 `C:/Program Files/Python313/Lib/site-packages/basepack`。30 份代码/模板/许可与 wheel 及源码一致，旧源码入口不存在；源码和源码外安装回归各 92 项通过。六份旧配置已显式迁移，源码外两项目、深层中文/空格配置、项目移动及新检出初始化已核验。
 
-真实作业 14335–14338 核得 CPU 结果 499500、应用退出 7、GPU 矩阵结果 256，以及图文向量、GPU/embedding 并存、请求/作业取消、日志和资源归还。机器 schema 1、模型、共享状态位置及 Condor 60/70 策略保持原合同；容量仍为 12 CPU/24576 MiB RAM、4 个同卡名额、7164 MiB 普通池及 9216 MiB 背景预留。本段记录本轮已取得的环境证据，最终生命周期和交付状态只维护在 [资源进度](../tasks/20261107-resource-coordination/progress.md)。原始回执为 `artifacts/r8/installed-files.json`、`installation-receipt.json` 和 `runtime-receipt.json`。
+真实作业 14335–14338 核得 CPU 结果 499500、应用退出 7、GPU 矩阵结果 256，以及图文向量、GPU/embedding 并存、请求/作业取消、日志和资源归还。机器 schema 1、模型、共享状态位置及 Condor 60/70 策略保持原合同；容量仍为 12 CPU/24576 MiB RAM、4 个同卡名额、7164 MiB 普通池及 9216 MiB 背景预留。本段记录本轮已取得的环境证据，最终生命周期和交付状态只维护在 [资源进度](../archive/20261107-resource-coordination/progress.md)。原始回执为 `artifacts/r8/installed-files.json`、`installation-receipt.json` 和 `runtime-receipt.json`。
 
 本次 pytest 使用仓库内忽略目录作为 `--basetemp`；wheel 构建将 TEMP/TMP 置于该目录，避免受限 Windows 临时目录 ACL。真实 Condor 查询与作业使用正常用户认证上下文，保留受限进程 SSPI 失败的原始信息；不改认证策略。
 
@@ -20,9 +26,9 @@
 
 以下保留各次观测的当时条件，旧 PID、队列与版本不作为当前操作依据。
 
-2026-11-08 R7 历史状态：系统 Python 普通安装basepack0.3.0，22份代码/模板/许可与源码及wheel一致；源码与源码外安装回归均22项通过。通用60配置容量保持12CPU/24576MiB、4个同卡令牌、7164MiB显存池与9216MiB背景预留；新增70配置由schedd原生转换官方GPU字段，拒绝非法申报并保留原筛选。原生14319–14331与普通客户端14332–14334、最大embedding联合验收通过，均已清理，队列为空且资源归还。作业树外broker43200无模型驻留，测试worker21732已退出。详见 [R7回执](../tasks/20261107-resource-coordination/standard-submit-result.md) 与 `artifacts/standard-submit/final-state.json`。
+2026-11-08 R7 历史状态：系统 Python 普通安装basepack0.3.0，22份代码/模板/许可与源码及wheel一致；源码与源码外安装回归均22项通过。通用60配置容量保持12CPU/24576MiB、4个同卡令牌、7164MiB显存池与9216MiB背景预留；新增70配置由schedd原生转换官方GPU字段，拒绝非法申报并保留原筛选。原生14319–14331与普通客户端14332–14334、最大embedding联合验收通过，均已清理，队列为空且资源归还。作业树外broker43200无模型驻留，测试worker21732已退出。详见 [R7回执](../archive/20261107-resource-coordination/standard-submit-result.md) 与 `artifacts/standard-submit/final-state.json`。
 
-2026-11-08 R6 历史状态：系统 Python 已普通安装 basepack0.2.0，22份代码/模板/许可与源码、wheel逐字节一致，14项普通wheel回归通过。通用 `C:/condor/config/60_resources.conf` 直接维护12CPU/24576MiB、4个同卡GPU名额与7164MiB普通显存，背景总预留9216MiB；旧专属片段与TOML普通预算已移出。原生显存队列、四作业CUDA进展及第5项排队、普通客户端与最大embedding共存全部通过，本轮14299–14311已释放，节点资源全部恢复。独立交互用户broker8060无模型驻留；机器重启后仍按管理员说明启动。证据见 [通用节点结果](../tasks/20261107-resource-coordination/native-condor.md) 与 `artifacts/native-condor/final-state.json`。下文保留各历史批次的当时条件。
+2026-11-08 R6 历史状态：系统 Python 已普通安装 basepack0.2.0，22份代码/模板/许可与源码、wheel逐字节一致，14项普通wheel回归通过。通用 `C:/condor/config/60_resources.conf` 直接维护12CPU/24576MiB、4个同卡GPU名额与7164MiB普通显存，背景总预留9216MiB；旧专属片段与TOML普通预算已移出。原生显存队列、四作业CUDA进展及第5项排队、普通客户端与最大embedding共存全部通过，本轮14299–14311已释放，节点资源全部恢复。独立交互用户broker8060无模型驻留；机器重启后仍按管理员说明启动。证据见 [通用节点结果](../archive/20261107-resource-coordination/native-condor.md) 与 `artifacts/native-condor/final-state.json`。下文保留各历史批次的当时条件。
 
 2026-11-08 R5历史状态：系统Python当时保留basepack0.1.0普通wheel安装，实际位置 `C:/Program Files/Python313/Lib/site-packages/basepack`；22份代码/模板/许可与源码及wheel逐字节一致。源码外两个项目、移动项目、新检出、图文embedding与GPU14295真实并行全部通过，11项普通wheel回归通过。机器级交互用户broker26696从AgentTools工作目录后台启动，当时无模型驻留；测试作业/模型已释放，队列为空。`artifacts/r5/wheel-receipt.json`、`deployed-state.json`保留该批交付回执。
 
@@ -47,9 +53,9 @@
 | 状态与队列 | `condor_status -json`、`condor_q -json` 均退出 1：当前进程的 `CONDOR_CONFIG` 环境变量及注册表未提供配置源 |
 | GPU 元数据 | `nvidia-smi --query-gpu=name,memory.total --format=csv,noheader` 返回 RTX 4060 Ti、16380 MiB |
 
-本次 Condor 查询尚未进入认证阶段；与 [早期调查](../tasks/20261107-resource-coordination/research/infrastructure.md#agenttools-当前可复用部分) 的 `AUTHENTICATE:1005` 是不同观测，不能据此判定调度服务是否可用。
+本次 Condor 查询尚未进入认证阶段；与 [早期调查](../archive/20261107-resource-coordination/research/infrastructure.md#agenttools-当前可复用部分) 的 `AUTHENTICATE:1005` 是不同观测，不能据此判定调度服务是否可用。
 
-2026-11-07 资源协调计划期间定向只读复核：当前进程、用户和机器环境变量中的 `CONDOR_CONFIG` 均为空，但 `HKLM:\SOFTWARE\Condor` 的同名值已为 `C:\condor\condor_config`，该文件与 `.local` 均存在。上表是 11 月 6 日快照；本次未重跑 Condor 查询，注册表入口可见不代表当前认证、队列或 GPU 作业已通。后续按 [资源专项 R0](../tasks/20261107-resource-coordination/plan.md#r0-复用准备与预算标定) 实测。
+2026-11-07 资源协调计划期间定向只读复核：当前进程、用户和机器环境变量中的 `CONDOR_CONFIG` 均为空，但 `HKLM:\SOFTWARE\Condor` 的同名值已为 `C:\condor\condor_config`，该文件与 `.local` 均存在。上表是 11 月 6 日快照；本次未重跑 Condor 查询，注册表入口可见不代表当前认证、队列或 GPU 作业已通。后续按 [资源专项 R0](../archive/20261107-resource-coordination/plan.md#r0-复用准备与预算标定) 实测。
 
 ## 可见模型版本标识
 
@@ -69,7 +75,7 @@
 
 模型可加载性、GPU 推理、实际队列和资源准入、项目安装及产品测试尚未验证。下一阶段由资源专项 R0 核配置来源，分别验证 embedding 与 Condor 接入，再按各链结果推进；公共代码通过配置定位共享资产，本页机器路径仅记录观测。
 
-2026-11-07 安装布局规划期间只读检查：当前系统 Python 的 sysconfig purelib 为 `C:\Program Files\Python313\Lib\site-packages`；find_spec 可定位 basic_memory，未发现 basepack/context_memory。旧安装器仍复制 `.context-memory/app`，详细依据与新部署目标见 [路径布局计划](deployment.md#从旧方案到本方案)。本次未安装包、写入 AgentTools 配置或运行模型。
+2026-11-07 安装布局规划期间只读检查：当前系统 Python 的 sysconfig purelib 为 `C:\Program Files\Python313\Lib\site-packages`；find_spec 可定位 basic_memory，未发现 basepack/context_memory。旧安装器仍复制 `.context-memory/app`，详细依据与新部署目标见 [路径布局计划](deployment.md#升级与回退)。本次未安装包、写入 AgentTools 配置或运行模型。
 
 ## 项目 skill 的本机入口
 

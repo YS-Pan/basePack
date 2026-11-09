@@ -1,6 +1,6 @@
 # basePack 重建总览
 
-2026 年 11 月 9 日更新。本目录维护跨工具取舍、公共历史、skill 工作及联合发布条件；当前阶段从 [总进度](progress.md) 及各任务进度读取。当前唯一 active 路线为 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，R9 和记忆 P0–P5 接续该工程入口；现行部署与路径合同维护在根 system，功能替换尚未实施。
+2026 年 11 月 9 日更新。本目录维护跨工具取舍、公共历史、skill 工作及联合发布条件；当前阶段从 [总进度](progress.md) 及各任务进度读取。当前唯一 active 路线为 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，资源 R9 已交付 0.5.0，记忆 P0–P5 接续该工程；现行实现与部署合同维护在根 system。
 
 战略以 [项目纲领](../../project-charter.md) 为准；公共调查见 [调研索引](research/sources.md) 与 [近期历史](legacy-history.md)，本目录状态见 [总进度](progress.md)。旧项目只取思想、事故样例和经核实的薄接口，不迁入其数据库、任务状态或业务授权。
 
@@ -8,12 +8,12 @@
 
 | 工作 | 独立入口 | 范围与依赖 |
 | --- | --- | --- |
-| 公共包与资源维护 | [R9 复用计划](../20261107-resource-coordination/plan.md#r9-复用优先的资源实现)、[进度](../20261107-resource-coordination/progress.md) | 优先 Sentence Transformers、LitServe 与现成 Windows 服务托管，删除被替代的模型和服务实现 |
+| 公共包与资源维护 | [R9 交付结果](../../archive/20261107-resource-coordination/r9-result.md)、[当前实现](../../system/modules/resources.md) | 0.5.0 已交付，后续新需求按实际目标另建任务 |
 | 记忆系统 | [计划 P0–P5](../20261106-memory-system/plan.md)、[进度](../20261106-memory-system/progress.md) | 优先现成底座的 CLI/MCP，交付文字闭环、向量/图片/图、主动提示与维护；通过公开接口复用共享 embedding |
 | 文件结构建议 | [专项计划](file-organization-plan.md)、[skill](../../../skills/file-structure/SKILL.md) | 独立使用，记忆可按需引用 |
 | 分层协作 | [P7 完成条件](#p7-分层-agent-组织)、[研究与初版检查](research/agent-team.md) | 使用宿主订阅 subagent，按真实任务继续验证 |
 
-资源 R9 与记忆 P0/P1 可并行；现有公共能力足以支持文字闭环，P2 再接入经验证的共享 embedding 接口。各任务顺序与完成条件在所属计划维护；公共配置和文件归属见 [部署合同](../../system/deployment.md)。
+资源 R9 已完成；记忆 P0/P1 可独立推进文字闭环，P2 接入已验证的共享 embedding 公开接口与语义身份。各任务顺序与完成条件在所属计划维护；公共配置和文件归属见 [部署合同](../../system/deployment.md)。
 
 普通功能演进继续在当前 active 工程；一次性候选原型进入根 `tmp/<task>/`。后续 memsys 等工作若确需替代工程，再按 [路线约定](file-organization-plan.md) 建立 experiment，短期比较后收敛；切换时同步根 README、system、任务状态和技能发现入口，长期独立演进则拆成 project。布局迁移已完成，不作为 R9 或记忆 P0 的前置待办。
 
@@ -22,7 +22,7 @@
 - 用户明确：简洁以自己实现和维护的代码尽量少衡量；可另行安装现成库与软件，允许适度调整行为。运行计算与存储采用本地能力，理解、建图和评分使用 Codex 订阅，不新增联网模型 API。
 - 通用模型适配、服务、进程管理、检索、事务和依赖安装优先交给现成实现；自己保留来源版本、项目隔离、主动线索及必要的接入代码。候选按净删代码、剩余配置与运维负担和真实功能共同选择，移动代码或另包一层不算精简。
 - 先用最短样例验证首选；不适合时记录具体缺口，再试一个备选。选定一套实现后删除本次涉及的重复逻辑；行为差异写清调用与升级方式，不为完整复制旧工程细节增加兼容层。
-- 本轮资源路线及允许的行为变化由 [R9](../20261107-resource-coordination/plan.md#r9-复用优先的资源实现) 维护，记忆底座由 P0 决定。已交付版本与历史验收保持原条件，系统说明随实际落地更新。
+- 资源 0.5.0 的现行行为由 [模块说明](../../system/modules/resources.md) 维护，取舍与验收保留在 [R9 结果](../../archive/20261107-resource-coordination/r9-result.md)；记忆底座由 P0 决定。历史验收保持原条件。
 
 ## 后续维护的简化
 

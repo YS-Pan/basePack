@@ -2,7 +2,7 @@
 
 用户明确以尽量少实现和维护自己的代码衡量简洁，可另装现成库与软件，允许适度调整行为。本轮将该方向写入重建总览，并同步资源、记忆计划和进度；纲领正文与原始快照保持原字节。
 
-资源新增 [R9](../../tasks/20261107-resource-coordination/plan.md#r9-复用优先的资源实现)：主线使用 Sentence Transformers、LitServe 与 Shawl，允许模型常驻和客户端只结束等待；退役被替代的模型/服务实现与内部协议，保留项目隔离、单份模型、向量语义和 Condor 调度边界。仅在主线有实际缺口时比较 Xinference，按最短原型、删代码、一次交付推进。官方来源及静态证据集中在 [调查](../../tasks/20261107-resource-coordination/research/reuse-options.md)。
+资源新增 [R9](../../archive/20261107-resource-coordination/plan.md#r9-复用优先的资源实现)：主线使用 Sentence Transformers、LitServe 与 Shawl，允许模型常驻和客户端只结束等待；退役被替代的模型/服务实现与内部协议，保留项目隔离、单份模型、向量语义和 Condor 调度边界。仅在主线有实际缺口时比较 Xinference，按最短原型、删代码、一次交付推进。官方来源及静态证据集中在 [调查](../../archive/20261107-resource-coordination/research/reuse-options.md)。
 
 记忆 P0 优先原生 CLI/MCP 与短 skill，静态筛后至多两个原型、选择唯一底座；P0/P1 不等待 R9，P2 接入最终公开 embedding 接口。补齐持久知识与可重建索引的保存/恢复合同，避免重建自有工作流平台。修正总览里 R8 仍待实施的状态漂移，当前 0.4.0 部署及历史验收保持原身份。
 

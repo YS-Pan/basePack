@@ -10,23 +10,23 @@ python -m basepack --config '<project-config>' embed --image '<absolute-image>' 
 python -m basepack embedding --machine-config '<machine-config>' status
 ```
 
-多条输入可重复 `--text`，或用 `--inputs inputs.json` 传 UTF-8 JSON 数组，元素为字符串或 `{"text":"...","image":"<absolute-local-image>"}`。返回向量、模型/预处理身份、共享 PID 与输入回执。建库型批量输入和查询型单条输入使用同一客户端，不另起模型。
+多条输入可重复 `--text`，或用 `--inputs inputs.json` 传 UTF-8 JSON 数组，元素为字符串或 `{"text":"...","image":"<absolute-local-image>"}`。返回 `vectors`、向量语义 `embedding_identity` 和推理 worker 的 `pid`。建库批量输入与单条查询共用一份模型。
 
-本版每请求 1–8 项；文本每项至多 64 KiB，实际含模板 token 上限由机器配置 max_length 固定，超限报错并保留原文，不截断。本机标定配置为 2048 token、纯文本 batch 4；含图输入逐项运行。每项最多一张静态图，原文件至多 32 MiB、4000 万源像素，预处理按 max_pixels 缩放，本机为 1048576。模型固定为 Qwen3-VL-Embedding-2B、FP16、2048 维 L2 归一化向量。
+每请求 1–8 项，文本每项至多 64 KiB。实际含模板 token 上限由机器 max_length 固定，超限在模型 forward 前报错，原文和图片均不静默截断。每项最多一张静态图，原文件至多 32 MiB、4000 万源像素；预处理按 max_pixels 缩放。本机配置为 2048 token、max_pixels 1048576；纯文本请求内 batch 为 4，含图请求为 1。模型为 Qwen3-VL-Embedding-2B、FP16，输出 2048 维 L2 归一化向量；浮点范数有舍入误差。
 
-`--timeout` 覆盖排队、加载和推理等待。请求过期只结束本次调用；当前 forward 可继续到完成并丢弃结果。其他项目继续复用服务。客户端不启动 broker；未启动时按错误定位请管理员启动。
+`--timeout` 是客户端连接和读取的等待期限；到期报错，服务端排队或已开始的推理仍可继续。机器配置 `queue_timeout` 是 LitServe 的排队期限，出队时检查；超过期限的请求可能要等前一项推理结束才收到 504。它不限制已经开始的推理。超时或断开不自动重投，也不停止另一项目共用的模型。
 
-Python 可并发调用并只取消自己的请求：
+模型随 Windows 服务启动而加载并常驻。客户端只连接机器配置的 endpoint；服务未运行时请管理员启动。Python 使用同一入口：
 
 ```python
 from basepack.project.config import load_project_config
-from basepack.embedding.client import EmbeddingClient
+from basepack.embedding import EmbeddingClient
 
 client = EmbeddingClient(load_project_config("<absolute-project-config>").machine)
-result = client.embed(["text"], timeout=120, request_id="my-request")
-# 另一执行线程可调用 client.cancel("my-request")。
-client.close()  # 只取消该客户端仍活动的请求。
+result = client.embed(["text"], timeout=120)
 ```
+
+服务使用原生 `POST /predict`（JSON `{"inputs":[...]}`）、`GET /health` 和 `GET /info`。`status` 返回健康状态及 `/info` 的模型/服务信息。0.5.0 更换了归一化实现和向量语义身份，已有索引由调用方按 `embedding_identity` 处理兼容。服务停止、升级和日志入口见 [管理员说明](administrator.md#共享服务与身份)。
 
 ## 普通重任务
 

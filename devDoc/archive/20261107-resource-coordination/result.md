@@ -1,6 +1,6 @@
 # 资源工具 R0–R5 交付结果
 
-路径追溯（2026-11-09）：下文保留当时的运行路径；选留原证现归根 `artifacts/runs/<原批次>/`，原 dist 包现归 `experiments/20261106-basepack/dist/`，位置映射见[布局迁移结果](../../archive/20261109-project-layout/result.md)。
+路径追溯（2026-11-09）：下文保留当时的运行路径；选留原证现归根 `artifacts/runs/<原批次>/`，原 dist 包现归 `experiments/20261106-basepack/dist/`，位置映射见[布局迁移结果](../20261109-project-layout/result.md)。
 
 2026-11-08。R0–R5 已完成本机功能验收；运行源码版本 `9fc1d4d`，普通 wheel `basepack-0.1.0-py3-none-any.whl` 已安装到系统 Python。记忆检索、建图和数据库未纳入本轮。
 

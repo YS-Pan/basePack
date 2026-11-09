@@ -4,22 +4,22 @@
 
 ## 当前阶段
 
-当前唯一 active 工程为 [20261106-basepack](../../../experiments/20261106-basepack/README.md)；开发安装、构建和产品说明从实验根进入，现行部署合同在 [system/deployment.md](../../system/deployment.md)。本次布局迁移的实际结果见 [迁移结果](../../archive/20261109-project-layout/result.md)，R9 功能状态保持待实施。
+本任务 R0–R9 已完成，2026-11-09 结案归档，交付 basepack 0.5.0。当前 active 工程仍为 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，现行合同见 [system/deployment.md](../../system/deployment.md)；本目录保留阶段、决定和原验收条件。
 
-当前稳定安装仍为 0.4.0 普通 wheel，R8 已完成的迁移、源码外功能和生命周期验收见 [结果](maintenance-result.md)。用户确认维持 Sentence Transformers＋LitServe＋Shawl；[R9 复用计划](plan.md#r9-复用优先的资源实现) 已明确职责、批处理和超时边界及 Windows 停机验证，尚未安装或替换服务。
+系统客户端与 `C:/ProgramData/basepack/envs/service/` 均普通安装 0.5.0；模型权重复用原位置，17 个 manifest 文件已逐项核实大小与 SHA256。服务使用 Sentence Transformers 6.2.0、LitServe 0.2.19、CUDA cu128 与 Shawl 1.9.0，SCM Manual/LocalSystem。源码外联合、正式生命周期及真实 0.5→0.4→0.5 回退均通过，原项目文件与 Condor 策略未变，最终服务恢复运行。完整结果和限制见 [R9 结果](r9-result.md)，R8 原交付见 [历史结果](maintenance-result.md)。
 
-记忆检索、建图和数据库尚未交付，由 [独立任务](../20261106-memory-system/plan.md) 接续；P0/P1 可复用现有公共能力并行推进，不等待 R9。
+记忆检索、建图和数据库尚未交付，由 [独立任务](../../tasks/20261106-memory-system/plan.md) 接续；P0/P1 可复用现有公共能力并行推进，不等待 R9。
 
-## R9 待实施
+## R9 实施状态
 
-| 阶段 | 状态 | 下一动作 |
+| 阶段 | 状态 | 实际交付 |
 | --- | --- | --- |
-| R9.0 | 待实施 | 现有权重接入 Sentence Transformers，核图文、拒绝截断与语义差异 |
-| R9.1 | 待实施 | LitServe 单推理 worker 与 Shawl 小试，按计划核超时、故障和全部进程回收 |
-| R9.2 | 待实施 | 删除被替代实现，按净收益使用通用库并固定已验收依赖 |
-| R9.3 | 待实施 | 一次安装切换、源码外联合验收及产品说明同步 |
+| R9.0 | 完成 | 同权重离线图文、2048 维向量、拒截断和旧新排序比较通过；新身份与证据见 [结果](r9-result.md) |
+| R9.1 | 完成 | 真实模型与 GPU 作业计算重叠、worker 原生重建、LocalSystem 正常/主进程/Shawl 停机后的整树和显存回收均通过 |
+| R9.2 | 完成 | 替换旧模型/服务、退役旧迁移及全机父表，原生锁定的纯净环境可用；源码与普通安装各 68 项回归通过 |
+| R9.3 | 完成 | 普通安装、源码外两项目图文/CPU/GPU/隔离与回收、实际旧新版本回退及文档交接通过 |
 
-现成实现的支持证据与未测范围见 [调查](research/reuse-options.md)；常驻模型、客户端观察超时等行为取舍只在 R9 计划维护。R8 下列数据仍是原交付证据，不代表新方案通过。
+现成实现的支持证据与当时未测范围见 [调查](research/reuse-options.md)，设计取舍保留在 R9 计划；现行行为由根 system 与产品文档维护。下列 R8 数据仍是原交付证据，R9 的实际验收单独记录于本次结果。
 
 ## 已交付
 
@@ -44,7 +44,7 @@
 | R8.3 | 完成 | jobs/CondorClient、schema 2/[jobs]、submit/_processes 与单份 spec payload；全套 74 项通过 |
 | R8.4 | 完成 | 0.4.0 普通安装、六配置迁移、源码外两项目及真实图文/作业/生命周期；源码与源码外各 92 项通过 |
 
-## 0.4.0 当前交付
+## 0.4.0 历史交付
 
 - 系统 Python 为 `C:/Program Files/Python313/python.exe`，普通包在其 `Lib/site-packages/basepack`。R8 原交付 wheel 现位于 `experiments/20261106-basepack/dist/basepack-0.4.0-py3-none-any.whl`，42319 字节，SHA256 `3322c8eebfcd0a12a4518639cf66e7a202fa76d6a47fa7b34be80cdecab15563`；30 份代码/模板/许可与源码、wheel、安装一致，旧源码入口已移除。
 - 用旧安装停止并确认旧 broker 退出后一次安装。六份既有源码外试用配置显式迁到项目 schema 2/[jobs]，备份/映射保存在各项目 `.basepack/migration/`；新两项目、深层中文/空格配置、任意 cwd、移动、新检出及所有模板/轻量命令通过。
@@ -52,8 +52,8 @@
 - 真实已加载模型的 supervisor 崩溃回收、锁释放、冷恢复、正常停止和原配置 300 秒空闲整进程退出通过。2026-11-08 17:07 北京时间最终实查：supervisor 17804、无模型 worker，运行与磁盘部署指纹匹配，队列为空；12CPU/24576MiB RAM/4同卡名额/7164MiB普通池全部可用。服务仍非登录自启。
 - 机器 schema 1、模型及共享状态物理位置保持；机器 TOML 和 Condor 60/70 的 SHA256 与升级前相同，背景预留仍为 9216 MiB。本轮未重新标定额度或吞吐，历史额度证据继续见 R6/R7。
 
-回执现集中在本机 `artifacts/runs/r8/`。验收临时实例已收进本项目 `tmp/acceptance/`，需长期复核的原证现存 `artifacts/runs/tmp-reorganization-20261108/evidence/`；原回执保留当时路径，当前位置按 [迁移结果](../../archive/20261109-project-layout/result.md) 和 [R8 结果](maintenance-result.md) 回查。旧 0.3.0 wheel 现保留在 `experiments/20261106-basepack/dist/` 可供恢复，原交付条件见 [R7 结果](standard-submit-result.md)，不把旧 PID 或队列快照作为当前依据。
+回执现集中在本机 `artifacts/runs/r8/`。验收临时实例已收进本项目 `tmp/acceptance/`，需长期复核的原证现存 `artifacts/runs/tmp-reorganization-20261108/evidence/`；原回执保留当时路径，当前位置按 [迁移结果](../20261109-project-layout/result.md) 和 [R8 结果](maintenance-result.md) 回查。旧 0.3.0 wheel 现保留在 `experiments/20261106-basepack/dist/` 可供恢复，原交付条件见 [R7 结果](standard-submit-result.md)，不把旧 PID 或队列快照作为当前依据。
 
 ## 下一步与边界
 
-先执行 R9.0/R9.1 的最短验证，按已确认的三件套路线替换；具体阻碍按计划处置，记忆 P0/P1 并行。当前 0.4.0 使用方式与部署保持，历史验收不覆盖新方案。历史 Condor ClassAd 仍保留原绝对路径，迁址后的旧 status 按备份/映射回查；远端发布沿用户指令执行。
+本任务没有待实施阶段。记忆 P0/P1 继续由独立任务推进，P2 可复用已交付的公开 HTTP/EmbeddingClient 接口与新 embedding_identity；没有据此宣称记忆检索、建图或数据库已实现。主服务故障仍需管理员手动恢复，推理 worker 由框架重建；输入/超时及升级步骤从产品文档读取。原始 ClassAd 保留当时绝对路径，旧 status 按备份/映射回查；远端发布沿用户指令执行。

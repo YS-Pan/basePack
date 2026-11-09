@@ -1,6 +1,6 @@
 # 项目术语
 
-本表解释现有开发材料中的特有概念；产品数据结构和命令接口仍以对应实现及 [记忆计划](tasks/20261106-memory-system/plan.md)、[资源协调计划](tasks/20261107-resource-coordination/plan.md) 中标明的建议为准。
+本表解释开发材料中的特有概念；已交付接口以对应实现及 [当前资源说明](system/modules/resources.md) 为准，待实施的记忆方案见 [记忆计划](tasks/20261106-memory-system/plan.md)。
 
 | 术语 | 在本项目中的含义与边界 |
 | --- | --- |

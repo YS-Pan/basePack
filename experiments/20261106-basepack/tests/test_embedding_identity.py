@@ -58,6 +58,12 @@ def test_image_resize_and_model_revision_change_embedding_identity(options):
     assert identity.embedding_identity(options) != expected
 
 
+def test_sentence_transformers_version_changes_embedding_identity(options, monkeypatch):
+    expected = identity.embedding_identity(options)
+    monkeypatch.setattr(identity, "version", lambda _: "different")
+    assert identity.embedding_identity(options) != expected
+
+
 def test_model_module_import_has_no_transport_registry_or_model_dependency():
     model_path = Path(identity.__file__).with_name("qwen3_vl.py")
     imports = {node.module for node in ast.walk(ast.parse(model_path.read_text(encoding="utf-8")))
@@ -66,6 +72,6 @@ def test_model_module_import_has_no_transport_registry_or_model_dependency():
     package_source = str(Path(identity.__file__).resolve().parents[2])
     result = subprocess.run([sys.executable, "-c",
         "import sys; from basepack.embedding.qwen3_vl import Qwen3VLEmbedder; "
-        "assert not {'torch', 'transformers'} & sys.modules.keys()"],
+        "assert not {'torch', 'transformers', 'sentence_transformers'} & sys.modules.keys()"],
         env=os.environ | {"PYTHONPATH": package_source}, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr

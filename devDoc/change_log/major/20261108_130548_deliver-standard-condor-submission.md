@@ -6,4 +6,4 @@ R7已交付basePack0.3.0普通wheel、本机60/70配置、使用/管理员说明
 
 源码与源码外安装回归均22项通过，22份包内文件与源码/安装一致。真实CLI/Python CLI、四+第五、显存不足、默认整池、CPU、原筛选、拒绝与取消归还全部通过；4×2048 token embedding期间有6个正确CUDA进展点，取消后同worker继续。最终空队列、全部资源归还。
 
-定位25.4离线转换工具退出1的源码原因并留原始证据；修正该版提交拒绝规则的JOB作用域和Windows未发布Swap数量处理，保留对应回归。小矩阵只验证调度记账；Python通过官方CLI，未验证不兼容的cp39绑定。完整证据、版本、wheel校验与边界见 [R7回执](../../tasks/20261107-resource-coordination/standard-submit-result.md)。
+定位25.4离线转换工具退出1的源码原因并留原始证据；修正该版提交拒绝规则的JOB作用域和Windows未发布Swap数量处理，保留对应回归。小矩阵只验证调度记账；Python通过官方CLI，未验证不兼容的cp39绑定。完整证据、版本、wheel校验与边界见 [R7回执](../../archive/20261107-resource-coordination/standard-submit-result.md)。

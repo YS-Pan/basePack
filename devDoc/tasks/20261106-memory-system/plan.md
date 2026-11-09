@@ -8,7 +8,7 @@
 
 首个可用版本先包含短项目说明、文字检索、原文定位、一个廉价检索 worker 和最小增量维护；随后补齐本地向量、图片和实际语义图。这些后续能力仍属于完整交付范围。常驻信息中必须保留的指令与前提直接交付，按需信息参与筛选和评分。
 
-本任务从当前唯一 active 的 [20261106-basepack 工程](../../../experiments/20261106-basepack/README.md) 接续，复用公共包和资源接口，实际安装与验收状态从 [资源进度](../20261107-resource-coordination/progress.md) 读取；记忆 P0–P5 的状态仅在本任务进度维护。P0/P1 使用已交付入口独立推进，资源 R9 的简化研究和实现不成为前置。各工具可独立使用和发布。[file-structure](../../../skills/file-structure/SKILL.md) 与 [agent-team](../../../skills/agent-team/SKILL.md) 沿用各自维护源；本任务使用它们，不承担独立的团队组织研发和广读对照验收。
+本任务从当前唯一 active 的 [20261106-basepack 工程](../../../experiments/20261106-basepack/README.md) 接续。资源 R9 已交付 0.5.0，实际结果见 [R9 交付](../../archive/20261107-resource-coordination/r9-result.md)；记忆 P0–P5 的状态仅在本任务进度维护。P0/P1 独立推进，P2 可使用公开 HTTP/EmbeddingClient 与新向量语义身份，当前合同见 [资源模块](../../system/modules/resources.md)。各工具可独立使用和发布。[file-structure](../../../skills/file-structure/SKILL.md) 与 [agent-team](../../../skills/agent-team/SKILL.md) 沿用各自维护源；本任务使用它们，不承担独立的团队组织研发和广读对照验收。
 
 旧项目仅提供明确需求、事故样例和经确认的小接口，不自动迁入数据库、业务授权、任务台账或验收结论。核实历史时按主题查 [调研依据](../20261106-rebuild/research/sources.md)、[近期历史](../20261106-rebuild/legacy-history.md) 与 [聊天调查](../20261106-rebuild/research/thread-survey.md)，不复制报告或要求接手者重读全部聊天。
 
@@ -18,7 +18,7 @@
 | --- | --- |
 | 记忆行为、底座、来源/片段/图、索引与维护 | 本任务计划；落地后更新 [系统说明](../../system/overview.md) 和对应模块说明 |
 | 当前阶段、完成、阻碍、下一步 | 本任务 [progress.md](progress.md) |
-| 安装代码、公共配置与初始化 | 复用 ProjectConfig、功能配置作用域和初始化，不自建第二套安装/配置骨架；实现和验收状态见 [资源进度](../20261107-resource-coordination/progress.md) |
+| 安装代码、公共配置与初始化 | 复用 ProjectConfig、功能配置作用域和初始化，不自建第二套安装/配置骨架；实现和验收状态见 [资源进度](../../archive/20261107-resource-coordination/progress.md) |
 | 共享 embedding 接口与服务 | P2 复用资源任务最终选定的公开本地接口，按向量语义身份判断兼容；适配底座原生接入能力，接口类名和传输协议随实际方案确定。当前实现见 [资源模块](../../system/modules/resources.md) |
 | 安装、路径和配置合同 | 唯一来源为 [部署合同](../../system/deployment.md)，区分 editable 与普通 wheel，以及源码 project/ 和实例 .basepack/；实际部署见资源进度 |
 | 原件与共享资产 | 原件继续位于业务项目；记忆保存定位、版本及必要派生内容。权重、依赖与机器状态复用已有设施，通过配置定位，不硬编码本机路径 |
@@ -62,7 +62,7 @@
 
 **动作：** 复用已交付包、配置和初始化入口，以减少本项目自维护源码和胶水为选型首要依据。先核现成工具的已发布版本、Windows 支持、离线运行、项目隔离和向量接入，静态筛至最多两个候选底座，再用同一小资料集做小原型并选定唯一底座。一次性比较在根 tmp 完成；确需替代工程时沿 [总体路线约定](../20261106-rebuild/plan.md#任务入口与建设顺序)，不将每个底座候选维护成长期 active experiment。
 
-本机开发以 `experiments/20261106-basepack/` 为安装和构建根，按需对选定解释器执行 editable 安装；产品实现、测试与稳定夹具、依赖声明、产品说明和路线专用 skill 均随该工程维护，计划、进度和结果仍归根 devDoc。修改生效、重装和常驻服务重启规则见 [开发安装与正式部署](../../system/deployment.md#开发安装与正式部署)。业务配置仍只绑定 Python 与机器配置，不增加源码路径入口。
+本机开发以 `experiments/20261106-basepack/` 为安装和构建根，按需对选定解释器执行 editable 安装；产品实现、测试与稳定夹具、依赖声明、产品说明和路线专用 skill 均随该工程维护，计划、进度和结果仍归根 devDoc。修改生效、重装和常驻服务重启规则见 [开发安装与正式部署](../../system/deployment.md#环境与服务)。业务配置仍只绑定 Python 与机器配置，不增加源码路径入口。
 
 候选包括 [SurrealDB 本地 MCP](https://surrealdb.com/docs/build/ai-agents/mcp/embedded)、[SQLite CLI](https://www.sqlite.org/sqlite.html) 加 [FTS5](https://www.sqlite.org/fts5.html)/[sqlite-vec](https://github.com/asg017/sqlite-vec)，以及 [Basic Memory 原生 MCP](https://docs.basicmemory.com/reference/mcp-tools-reference)。这是一份静态筛选清单，不同时实现三套适配。优先直接调用原生能力；允许为减少代码调整批量写入、查询输出或维护入口，在底座决定和验收样例中写明实际行为。
 
@@ -70,7 +70,7 @@
 
 同时核底座原生 ID、字段和导入/导出能否保存来源依据、关系及更正；优先复用这些结构，不维护第二份镜像知识或自有中间格式。必要适配只补项目差异，长期取舍遵守 [维护简化](../20261106-rebuild/plan.md#后续维护的简化)。
 
-共享设施的历史观察与适用范围见 [基础设施调查](../20261107-resource-coordination/research/infrastructure.md#agenttools-当前可复用部分)；当前核验限制见 [环境说明](../../system/environment.md)。共享路径、模型和公共骨架沿资源任务成果复用。
+共享设施的历史观察与适用范围见 [基础设施调查](../../archive/20261107-resource-coordination/research/infrastructure.md#agenttools-当前可复用部分)；当前核验限制见 [环境说明](../../system/environment.md)。共享路径、模型和公共骨架沿资源任务成果复用。
 
 **交付：** 可安装运行的记忆骨架、一份不超过一页的底座决定与未选路线的主要理由、一个小资料集。决定写明原生复用、必要自写部分、行为调整和持久数据合同。资料集包含当前/旧决定、低字面相似度关联、跨材料关系、图片和待处理材料；人工预期结果单独保存，用于隔离评测。
 
@@ -134,7 +134,7 @@
 
 ### P5 独立目录安装试用与发布
 
-**动作：** 按 [正式部署合同](../../system/deployment.md#开发安装与正式部署)，在源码外项目正式安装 basePack 与选定底座；basePack 自有包使用普通 wheel，独立 CLI/MCP 按其正式安装方式交付。用公开/合成资料跑首建、检索、修改、任务内维护、手动深维护和恢复；另一个目录核隔离。真实业务资料待用户指定。
+**动作：** 按 [正式部署合同](../../system/deployment.md#环境与服务)，在源码外项目正式安装 basePack 与选定底座；basePack 自有包使用普通 wheel，独立 CLI/MCP 按其正式安装方式交付。用公开/合成资料跑首建、检索、修改、任务内维护、手动深维护和恢复；另一个目录核隔离。真实业务资料待用户指定。
 
 **完成：** 正式安装后换路径可用，不依赖 editable 映射、源码仓库路径或旧项目可变文件/数据库；实例问题回改唯一产品维护源，按实际发行方式重新安装验证；形成短试用报告。真实新业务项目效果待指定资料后验证，公开/合成试用不替代该结论。完成本任务即可发布第一版完整记忆工具，不等待其它工具全部完成。
 

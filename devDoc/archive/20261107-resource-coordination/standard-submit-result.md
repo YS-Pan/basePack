@@ -1,6 +1,6 @@
 # R7：标准提交与站点策略交付
 
-路径追溯（2026-11-09）：下文保留当时的运行路径；选留原证现归根 `artifacts/runs/<原批次>/`，原 dist 包现归 `experiments/20261106-basepack/dist/`，位置映射见[布局迁移结果](../../archive/20261109-project-layout/result.md)。
+路径追溯（2026-11-09）：下文保留当时的运行路径；选留原证现归根 `artifacts/runs/<原批次>/`，原 dist 包现归 `experiments/20261106-basepack/dist/`，位置映射见[布局迁移结果](../20261109-project-layout/result.md)。
 
 2026-11-08，R7 已完成本机部署、原生与普通客户端真实验收，接续 [R6](native-condor.md)，按 [R7 计划](standard-submit-plan.md) 执行。现行状态统一维护在 [进度](progress.md)。
 

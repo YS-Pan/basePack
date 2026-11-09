@@ -6,8 +6,8 @@ Source: https://github.com/QwenLM/Qwen3-VL-Embedding
 Revision: 393e2978d27852b0d0230d6994f37f9c15bed73c
 File: scripts/qwen3_vl_embedding.py
 
-basePack's qwen3_vl.py adapts the model wrapper, text/image conversation template
-and last-unmasked-token pooling. It removes video and remote/CPU loading, uses
-strict local image/token validation and emits float32 L2-normalized embeddings.
-The runtime and strict preprocessing also reuse this project's earlier local
-VL implementation. Model weights and installed dependencies remain external.
+basePack 0.4.0 adapted this source's model wrapper, conversation template and
+pooling. In 0.5.0, Sentence Transformers loads the external model and implements
+multimodal processing, last-token pooling and FP16 L2 normalization. basePack's
+adapter retains local input limits and rejects token truncation. Model weights
+and installed dependencies remain external.

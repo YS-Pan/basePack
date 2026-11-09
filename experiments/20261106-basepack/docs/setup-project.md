@@ -1,6 +1,6 @@
 # 项目接入
 
-机器管理员先按 [管理员说明](administrator.md) 普通安装 wheel、准备机器配置及 Condor 节点，并在作业树外启动所需的 embedding 服务。项目复用既有 Python、模型和 Condor；只运行普通任务时无需启动 embedding。随包机器模板可这样读取：
+机器管理员先按 [管理员说明](administrator.md) 普通安装 wheel、准备机器配置及 Condor 节点，并通过 Shawl 托管所需的 Windows embedding 服务。项目共用模型和服务，仅安装客户端；只运行普通任务时无需启动 embedding。随包机器模板可这样读取：
 
 ```powershell
 python -c "from basepack.project.init import template; print(template('machine.toml'))"
@@ -42,17 +42,11 @@ Python 入口为 `basepack.project.config.load_project_config`、`load_machine_c
 python -m basepack embedding --machine-config '<absolute-machine-config>' status
 ```
 
-## 从 0.3.0 项目迁移
+## 版本升级
 
-先按 [升级步骤](administrator.md#升级与回滚) 核实际调用方、排空旧作业并用旧安装停止服务。普通安装 0.4.0 后，对每份实际接入配置显式执行：
+0.4.0 项目继续使用原 schema 2 配置和 `.basepack/` 数据；按 [升级步骤](administrator.md#升级与回滚) 停止旧共享服务、更新机器配置及客户端，再启用 0.5.0 服务。项目不再保存服务登记或运行代码。Python embedding 调用改用 `client.embed(inputs, timeout=...)`，超时只结束调用方等待。
 
-```powershell
-python -m basepack migrate --from-config '<absolute-old-config>'
-```
-
-目标默认是原解析项目根下的 `.basepack/config.toml`；可用 `--config-name .basepack/config/local.toml` 选择深层位置。迁移将项目 schema 1 和 `[resources]` 改为 schema 2 和 `[jobs]`，按原项目根重算路径并更新入口。原配置、已有 AGENTS/忽略文件/详细入口及改写前 JSON 保存在 `.basepack/migration/<id>/files/`，mapping.json 保存路径映射；成功后移除旧有效配置。新解析器直接拒绝旧项目格式。
-
-原 `.basepack/` 内 memory/jobs 数据保持物理位置；旧自定义数据目录只能在原项目内且非项目根，按映射迁入 `.basepack/memory` 或 `jobs`，目标冲突直接报错。只修复已知生成 JSON 的路径字段，不改业务 arguments。迁移仅处理明确指定的 basePack 配置，不接管旧项目 app 副本、runtime.json、模型缓存、知识或业务授权。完成历史 ClassAd 仍指原绝对路径，数据移动后的历史 status 不保证可用，可从备份和映射回查。
+0.5.0 不再提供旧项目 `migrate` 命令。项目配置仍是 schema 1 时，先在保留的 0.4.0 安装中执行其 `python -m basepack migrate --from-config '<absolute-old-config>'`，检查 `.basepack/migration/` 备份和映射、数据位置及宿主入口，完成 schema 2 迁移后再升级。历史 ClassAd 中的绝对路径保持原含义，项目移动后按旧备份与映射回查。
 
 ## 移动与重新检出
 

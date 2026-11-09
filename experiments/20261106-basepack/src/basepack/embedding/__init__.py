@@ -1,5 +1,5 @@
 """Machine-shared local multimodal embeddings; importing never loads Torch."""
 
-from .client import EmbeddingClient, EmbeddingError
+from .client import EmbeddingClient
 
-__all__ = ["EmbeddingClient", "EmbeddingError"]
+__all__ = ["EmbeddingClient"]

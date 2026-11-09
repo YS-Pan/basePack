@@ -2,7 +2,7 @@
 
 basePack 建设项目局部记忆、共享计算资源协调，以及可独立使用的 agent 协作和文件结构技能。
 
-当前唯一 active 路线为 [20261106-basepack](experiments/20261106-basepack/README.md)。已交付 0.4.0 公共包、共享图文 embedding 与 HTCondor 作业入口；记忆系统和资源 R9 改造继续按根开发文档推进。
+当前唯一 active 路线为 [20261106-basepack](experiments/20261106-basepack/README.md)。已交付 0.5.0 公共包、共享图文 embedding 与 HTCondor 作业入口；资源任务已结案，记忆系统继续按根开发文档推进。
 
 | 入口 | 用途 |
 | --- | --- |

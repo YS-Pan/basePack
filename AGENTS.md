@@ -7,7 +7,7 @@
 - 用户的新指令优先；项目战略以项目纲领为准。执行计划中的接口、目录和数字预算是工程建议。
 - 涉及目标与取舍时读 [项目纲领](devDoc/project-charter.md)；纲领仅记录用户明确表达的意图，修改正文前须获得用户同意。[原始快照](devDoc/tasks/20261106-rebuild/research/user-plan.original.md) 保留原文。
 - 了解系统实现时读 [实现概览](devDoc/system/overview.md)；跨工具建设顺序与公共交付见 [重建总览](devDoc/tasks/20261106-rebuild/plan.md) 和 [总进度](devDoc/tasks/20261106-rebuild/progress.md)。
-- 实施记忆系统时读 [计划](devDoc/tasks/20261106-memory-system/plan.md) 与 [进度](devDoc/tasks/20261106-memory-system/progress.md)；实施资源协调时读 [计划](devDoc/tasks/20261107-resource-coordination/plan.md) 与 [进度](devDoc/tasks/20261107-resource-coordination/progress.md)。
+- 实施记忆系统时读 [计划](devDoc/tasks/20261106-memory-system/plan.md) 与 [进度](devDoc/tasks/20261106-memory-system/progress.md)；修改资源工具时读 [当前实现](devDoc/system/modules/resources.md) 与 [部署合同](devDoc/system/deployment.md)，历史交付见 [R9 结果](devDoc/archive/20261107-resource-coordination/r9-result.md)。
 - 核实旧项目或共享设施时按主题读 [调研依据](devDoc/tasks/20261106-rebuild/research/sources.md) 和 [近期历史](devDoc/tasks/20261106-rebuild/legacy-history.md)，按需深入原证。
 - 目标仓库为 [YS-Pan/basePack](https://github.com/YS-Pan/basePack)；发布前按产品状态编写面向使用者的 README 和使用文档。
 - 新建、调整或归档开发文档时读 [文档维护约定](devDoc/documentation.md)。

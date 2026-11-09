@@ -12,7 +12,8 @@ import socket
 import subprocess
 import time
 
-from ._processes import _descendants, _process_parents
+import psutil
+
 from .submit import JobSpec, normalize_spec, prepare_submission
 
 
@@ -153,8 +154,7 @@ class CondorClient:
                 # A not-yet-started worker can publish its fixed PIDs while we wait.
                 expected_pids = _worker_pids(ad)
             try:
-                processes = _process_parents()
-                worker_gone = not (expected_pids & processes.keys())
+                worker_gone = not any(psutil.pid_exists(pid) for pid in expected_pids)
             except OSError as error:
                 return {"cleanup_confirmed": False, "cleanup_error": str(error)}
             # Condor owns all descendants; a completed history record plus gone launcher/application
@@ -169,9 +169,12 @@ class CondorClient:
     def cancel(self, job_id: str, *, cleanup_timeout=30) -> dict:
         ad, history = self._ad(job_id)
         expected_pids = _worker_pids(ad)
-        if expected_pids:
-            expected_pids = _descendants(expected_pids, _process_parents())
         if not history:
+            for pid in tuple(expected_pids):
+                try:
+                    expected_pids.update(child.pid for child in psutil.Process(pid).children(recursive=True))
+                except psutil.NoSuchProcess:
+                    pass
             result = self._call("condor_rm", job_id, check=False)
             if result.returncode:
                 return self.status(job_id) | {"cleanup_confirmed": False, "cleanup_error": result.stdout + result.stderr}

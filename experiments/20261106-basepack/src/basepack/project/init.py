@@ -38,7 +38,7 @@ def init_project(root: str | Path, machine_config: str | Path,
 
 
 def _write_project_entry(root: Path, config: Path, python: Path) -> None:
-    """Write the shared project entry after init or an explicit migration."""
+    """Write the project's detailed instructions and host entry."""
     instructions = root / ".basepack" / "instructions.md"
     instructions.write_text(Template(template("instructions.md")).substitute(
         python=str(python).replace("'", "''"),

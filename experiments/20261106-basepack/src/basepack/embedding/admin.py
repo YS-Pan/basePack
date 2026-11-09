@@ -1,19 +1,22 @@
-"""Direct machine administration, including diagnosis and stop after an upgrade."""
+"""Native LitServe diagnostics and Windows service control."""
 
-from .registry import deployment_fingerprint, read_marker
-from .transport import rpc
+import json
+import subprocess
+from urllib.request import ProxyHandler, build_opener
 
 
 def status(machine):
-    marker = read_marker(machine, "broker", require_match=False)
-    result = rpc(marker, "status", timeout=5, allow_legacy=True)
-    running = result["deployment_fingerprint"] if "deployment_fingerprint" in result else result["service_key"]
-    target = deployment_fingerprint(machine)
-    return result | {"deployment_fingerprint": running,
-                     "target_deployment_fingerprint": target,
-                     "deployment_matches": running == target}
+    endpoint = machine.raw["embedding"]["endpoint"].rstrip("/")
+    opener = build_opener(ProxyHandler({}))
+    with opener.open(endpoint + "/health", timeout=5) as response:
+        health = response.status
+    with opener.open(endpoint + "/info", timeout=5) as response:
+        info = json.load(response)
+    return {"endpoint": endpoint, "health": health, **info}
 
 
 def stop(machine):
-    marker = read_marker(machine, "broker", require_match=False)
-    return rpc(marker, "stop", timeout=5, allow_legacy=True)
+    name = machine.raw["embedding"]["service_name"]
+    result = subprocess.run(["sc.exe", "stop", name], check=True, capture_output=True, text=True)
+    return {"service_name": name, "control_result": result.stdout,
+            "note": "Stop accepted; use Get-Service to observe the Stopped state."}

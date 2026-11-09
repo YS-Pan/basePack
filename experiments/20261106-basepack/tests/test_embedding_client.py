@@ -1,59 +1,85 @@
-"""Client request-state regressions using an in-memory transport."""
-from concurrent.futures import ThreadPoolExecutor
+"""Exercise the public client against a real local HTTP server."""
+import json
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import threading
+from types import SimpleNamespace
+from urllib.error import HTTPError
 
 import pytest
 
 from basepack.embedding.client import EmbeddingClient
-from basepack.embedding.transport import EmbeddingError
 
 
-@pytest.mark.parametrize("cancel", [False, True])
-def test_duplicate_active_id_preserves_first_request(monkeypatch, cancel):
-    client = EmbeddingClient(object())
-    worker = {"endpoint": "fixture"}
-    entered, release, cancelled = threading.Event(), threading.Event(), threading.Event()
-    monkeypatch.setattr(client, "_supervisor", lambda: {})
+@pytest.fixture
+def service():
+    state = SimpleNamespace(requests=[], entered=threading.Event(),
+                            release=threading.Event(), completed=threading.Event())
 
-    def exchange(marker, action, payload, **_):
-        if action == "ensure":
-            return worker
-        assert marker is worker
-        if action == "cancel":
-            assert payload["request_id"] == "shared"
-            cancelled.set()
-            return {"request_id": "shared", "cancelled": True}
-        assert action == "embed"
-        if payload["request_id"] == "shared":
-            entered.set()
-            assert release.wait(5)
-            if cancelled.is_set():
-                raise EmbeddingError({"error": "RequestCancelled", "message": "cancelled"})
-        return {"request_id": payload["request_id"], "inputs": payload["inputs"]}
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            payload = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+            state.requests.append((self.path, self.headers['Content-Type'], payload))
+            inputs = payload['inputs']
+            if inputs == ['slow']:
+                state.entered.set()
+                assert state.release.wait(5)
+                state.completed.set()
+            status = 503 if inputs == ['error'] else 200
+            body = {'detail': 'native upstream failure'} if status == 503 else {
+                'pid': 123, 'embedding_identity': 'fixture', 'vectors': [[0.6, 0.8]]}
+            encoded = json.dumps(body).encode('utf-8')
+            try:
+                self.send_response(status)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(encoded)))
+                self.end_headers()
+                self.wfile.write(encoded)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                # The timeout test deliberately disconnects while work is still running.
+                pass
 
-    monkeypatch.setattr("basepack.embedding.client.rpc", exchange)
-    with ThreadPoolExecutor() as pool:
-        first = pool.submit(client.embed, ["first"], request_id="shared")
-        try:
-            assert entered.wait(5)
-            with pytest.raises(ValueError, match="duplicate active embedding request_id"):
-                client.embed(["duplicate"], request_id="shared")
-            # The rejected call must neither remove nor replace the first call's state.
-            assert client._active["shared"]["worker"] is worker
-            assert pool.submit(client.embed, ["independent"], request_id="other").result(timeout=5) == {
-                "request_id": "other", "inputs": ["independent"]}
-            if cancel:
-                assert client.cancel("shared")["cancelled"]
-        finally:
-            release.set()
-        if cancel:
-            with pytest.raises(EmbeddingError, match="RequestCancelled"):
-                first.result(timeout=5)
-        else:
-            assert first.result(timeout=5) == {"request_id": "shared", "inputs": ["first"]}
-    assert client._active == {}
-    assert client.close() == []
-    assert client.cancel("shared") == {"request_id": "shared", "cancelled": False}
-    # A completed ID can be reused.
-    cancelled.clear()
-    assert client.embed(["reused"], request_id="shared")["inputs"] == ["reused"]
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    thread = threading.Thread(target=server.serve_forever)
+    thread.start()
+    machine = SimpleNamespace(raw={'embedding': {
+        'endpoint': f'http://127.0.0.1:{server.server_port}/'}})
+    state.client = EmbeddingClient(machine)
+    try:
+        yield state
+    finally:
+        state.release.set()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+        assert not thread.is_alive()
+
+
+def test_client_sends_inputs_and_returns_service_result(service):
+    inputs = [{'text': '项目资料', 'image': 'D:/资料/图像.png'}]
+    assert service.client.embed(inputs, timeout=2) == {
+        'pid': 123, 'embedding_identity': 'fixture', 'vectors': [[0.6, 0.8]]}
+    assert service.requests == [('/predict', 'application/json', {'inputs': inputs})]
+
+
+def test_native_http_error_preserves_status_and_body(service):
+    with pytest.raises(HTTPError) as error:
+        service.client.embed(['error'], timeout=2)
+    assert error.value.code == 503
+    assert json.load(error.value) == {'detail': 'native upstream failure'}
+    assert len(service.requests) == 1
+
+
+def test_timeout_does_not_retry_or_interrupt_another_request(service):
+    try:
+        with pytest.raises(TimeoutError):
+            service.client.embed(['slow'], timeout=0.05)
+        assert service.entered.wait(2)
+        assert not service.completed.is_set()
+        assert service.client.embed(['healthy'], timeout=2)['pid'] == 123
+        assert [item[2]['inputs'] for item in service.requests] == [['slow'], ['healthy']]
+    finally:
+        service.release.set()
+    assert service.completed.wait(2)
