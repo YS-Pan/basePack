@@ -6,7 +6,7 @@
 
 当前唯一 active 路线为 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，源码、构建声明、测试、产品文档、示例及 resources skill 在该实验工程内维护；根目录保留统一 devDoc 和两项通用技能。本次布局迁移的实际检查与接续见 [迁移结果](../../archive/20261109-project-layout/result.md)，不改变 R9 和记忆功能的完成状态。
 
-资源 R9 已交付 0.5.0 并结案归档，详见 [R9 结果](../../archive/20261107-resource-coordination/r9-result.md)。记忆首期仅用 SurrealDB，P0 尚未执行，具体状态只在 [记忆进度](../20261106-memory-system/progress.md) 接续；本页跟踪跨工具状态与公共工作，共性取舍见 [复用优先](plan.md#复用优先)。
+资源 R9 已交付 0.5.0 并结案归档，详见 [R9 结果](../../archive/20261107-resource-coordination/r9-result.md)。记忆的 [SurrealDB P0](../20261106-memory-system/p0-result.md) 已通过，正在实施 P1，具体状态只在 [记忆进度](../20261106-memory-system/progress.md) 接续；本页跟踪跨工具状态与公共工作，共性取舍见 [复用优先](plan.md#复用优先)。
 
 ## 已完成
 
@@ -35,5 +35,5 @@
 
 ## 下一步
 
-1. 记忆下一步为 SurrealDB 的 P0 适用性验证，沿 [专项进度](../20261106-memory-system/progress.md) 执行；本轮仅维护计划，不自动开始实施。
+1. 沿 [记忆专项进度](../20261106-memory-system/progress.md) 继续实际 P1 闭环及后续阶段；P0 接入通过不代替真实理解与产品验收。
 2. 文件结构和分层协作在实际任务中继续验证；联合发布按 [总览 P8](plan.md#p8-联合交付与轻量发布) 执行。

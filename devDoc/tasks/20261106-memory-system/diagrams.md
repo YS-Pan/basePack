@@ -1,6 +1,6 @@
 # 记忆系统方案逻辑框图
 
-这是 2026 年 11 月 9 日[实施计划](plan.md)的图解。**首期仅用 SurrealDB，P0 适用性未验，P1–P5 未实现/验收**；具体数据映射与运行入口待 P0 核定，实际状态只在[进度](progress.md)维护。已交付的接入、embedding 和 jobs 见[当前系统图](../../system/diagrams.md)。
+这是 2026 年 11 月 9 日[实施计划](plan.md)的图解。**P0 原生接入已通过，P1 实施中，其余阶段待验**；接入映射见 [P0 结果](p0-result.md)，实际状态只在[进度](progress.md)维护。已交付的接入、embedding 和 jobs 见[当前系统图](../../system/diagrams.md)。
 
 ## 1. 项目局部知识、原件与共享能力
 
