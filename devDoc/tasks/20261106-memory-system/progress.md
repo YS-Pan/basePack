@@ -8,12 +8,12 @@
 
 唯一 active 工程是 [20261106-basepack](../../../experiments/20261106-basepack/README.md)。当前源码只有公共项目接入、embedding 和 jobs；[`__main__.py`](../../../experiments/20261106-basepack/src/basepack/__main__.py) 没有记忆命令，模板的 `[memory].data_dir` 是路径预留。`init` 不建立记忆数据库，现有配置隔离测试不能代替实际知识隔离、启动或恢复验收。
 
-资源 R9 的 0.5.0 普通安装、真实联合、故障回收及回退已完成，见 [R9 结果](../../archive/20261107-resource-coordination/r9-result.md)。记忆复用当前 [公开 HTTP/EmbeddingClient 与 embedding_identity](../../system/modules/resources.md)，不再等待资源选型；P0/P1 本身无需 embedding 或 Condor。资源归档结果与根 system 各保留其证据/合同责任。
+资源 R9 的 0.5.0 普通安装、真实联合、故障回收及回退已完成，见 [R9 结果](../../archive/20261107-resource-coordination/r9-result.md)。记忆复用当前 [公开 HTTP/EmbeddingClient 与 embedding_identity](../../system/modules/resources.md)，不再等待资源选型；文字闭环无需 Condor 或 P2 图片向量。若选 Basic Memory，仍需先核其自动文本 embedding/provider，不能假设纯文字模式可关闭向量。资源归档结果与根 system 各保留其证据/合同责任。
 
 ## 本轮已维护
 
 - [P0–P5](plan.md#阶段与完成条件) 保留完整目标；P1 纳入真实启动交付、一次实际阅读/评分/排序、显式变更与恢复，P2 的图与图文向量分支可分开推进，P3 从 P1 延伸自动维护。
-- [底座静态复核](research/backend-review.md) 依据官方文档与版本源码给出试验优先顺序：先 SurrealDB 原生本地 MCP，必要时对照 SQLite CLI/FTS5/sqlite-vec；Basic Memory 暂列后备。尚无本机比较或最终底座决定。
+- [底座静态复核](research/backend-review.md) 按用户后续要求将 Basic Memory、SQLite CLI/FTS5/sqlite-vec、SurrealDB 均列正式候选，比较应用复用、必要胶水与部署维护总量，替代先前首选/后备顺序。已补核 Basic Memory 项目内配置/数据库路径、自动文本 embedding 和身份扩展边界；尚无本机比较或最终底座决定。
 - [数据与恢复合同](plan.md#项目知识与恢复) 区分持久知识/旧依据、业务原件和可重建索引，明确项目局部、原生事务、备份集合与新路径恢复；删除/更正、并发、源版本及索引失败均进入实际样例。
 - 启动指针与信息实收、描述文本与真实图片向量、图遍历与建边数量、往返与总成本、替代盘与真实 HDD 验收已分别定义；旧数字预算保留建议身份。
 - 清理“资源最终接口待定”和已结束资源任务的前置待办；P2 沿现有常驻服务合同接入，不依赖退役接口。重建总览、总进度与调研交接同步指向本次方案。
@@ -33,6 +33,6 @@
 
 ## 下一步与待决
 
-本轮文档交付后停止，不自动实施。下次实施从 P0 同样本开始，先试首选的原生命令/MCP，只有明确缺口才试备选；形成底座与持久数据/恢复决定后交付 P1，不另起长期候选工程。
+本轮文档交付后停止，不自动实施。下次实施从 P0 同样本开始，核三者完整能力与接入差距，按不确定性做最短原型，形成唯一底座与持久数据/恢复决定后交付 P1，不另起三套长期候选工程。
 
 当前没有需用户先决定的阻碍。正式业务接入前仍需资料范围、首建/维护投入和长期备份要求；公开/合成资料足以开展 P0/P1。软件 Windows/中文/并发/机械盘表现、宿主启动挂接和实际效果均待验证，官方能力与工程推断的边界见 [静态复核](research/backend-review.md)。
