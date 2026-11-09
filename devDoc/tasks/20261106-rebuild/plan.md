@@ -9,11 +9,11 @@
 | 工作 | 独立入口 | 范围与依赖 |
 | --- | --- | --- |
 | 公共包与资源维护 | [R9 交付结果](../../archive/20261107-resource-coordination/r9-result.md)、[当前实现](../../system/modules/resources.md) | 0.5.0 已交付，后续新需求按实际目标另建任务 |
-| 记忆系统 | [计划 P0–P5](../20261106-memory-system/plan.md)、[进度](../20261106-memory-system/progress.md) | 优先现成底座的 CLI/MCP，交付文字闭环、向量/图片/图、主动提示与维护；通过公开接口复用共享 embedding |
+| 记忆系统 | [计划 P0–P5](../20261106-memory-system/plan.md)、[进度](../20261106-memory-system/progress.md) | 先选唯一原生 CLI/MCP 底座，再交付含启动、增量与恢复的文字闭环，随后补图/图片向量与主动维护 |
 | 文件结构建议 | [专项计划](file-organization-plan.md)、[skill](../../../skills/file-structure/SKILL.md) | 独立使用，记忆可按需引用 |
 | 分层协作 | [P7 完成条件](#p7-分层-agent-组织)、[研究与初版检查](research/agent-team.md) | 使用宿主订阅 subagent，按真实任务继续验证 |
 
-资源 R9 已完成；记忆 P0/P1 可独立推进文字闭环，P2 接入已验证的共享 embedding 公开接口与语义身份。各任务顺序与完成条件在所属计划维护；公共配置和文件归属见 [部署合同](../../system/deployment.md)。
+资源 R9 已完成。记忆下一实施入口是 P0 同样本选型，静态优先顺序见 [底座复核](../20261106-memory-system/research/backend-review.md)。P1 无需 embedding/Condor；P2 的语义图和图文向量可分开推进，P3 从 P1 延伸任务内维护，图维护接图分支。向量分支接入已交付的公开 HTTP/EmbeddingClient 与 embedding_identity，各阶段验收只在记忆计划维护；公共配置和文件归属见 [部署合同](../../system/deployment.md)。
 
 普通功能演进继续在当前 active 工程；一次性候选原型进入根 `tmp/<task>/`。后续 memsys 等工作若确需替代工程，再按 [路线约定](file-organization-plan.md) 建立 experiment，短期比较后收敛；切换时同步根 README、system、任务状态和技能发现入口，长期独立演进则拆成 project。布局迁移已完成，不作为 R9 或记忆 P0 的前置待办。
 
