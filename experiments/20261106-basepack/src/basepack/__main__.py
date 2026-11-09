@@ -20,6 +20,8 @@ def main():
     embedding_commands(sub)
     from .jobs.cli import register_commands as job_commands
     job_commands(sub)
+    from .memory.cli import register_commands as memory_commands
+    memory_commands(sub)
     args = parser.parse_args()
     exit_code = 0
     if args.command == "init":
@@ -43,6 +45,9 @@ def main():
             result, exit_code = dispatch(args, config)
         elif args.command == "jobs":
             from .jobs.cli import dispatch
+            result, exit_code = dispatch(args, config)
+        elif args.command == "memory":
+            from .memory.cli import dispatch
             result, exit_code = dispatch(args, config)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return exit_code

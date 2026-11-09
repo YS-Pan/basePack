@@ -10,6 +10,6 @@
 
 普通 CPU/GPU 作业由 CondorClient 提交至 HTCondor；容量、队列、终态及 GPU 站点策略由 Condor 维护。共享模型服务位于 Condor 作业树之外，通过管理员固定背景预留与普通作业并存。项目知识、来源和工具产物属于各自项目，通用模型和机器环境可显式共用。配置、安装和运行目录见 [部署合同](deployment.md)。
 
-记忆检索、建图和数据库尚未交付，由 [记忆任务](../tasks/20261106-memory-system/progress.md) 接续。旧项目和已有机器设施仅提供参考与可复用资源，不代表本项目已完成实现或验收；依据见 [调研索引](../tasks/20261106-rebuild/research/sources.md)。
+记忆的 [多层文字与初步图关系源码](modules/memory.md) 已实现，正式安装、完整图文与行为验收由 [记忆任务](../tasks/20261106-memory-system/progress.md) 接续；已安装资源版 0.5.0 不包含本轮新增 CLI。旧项目和已有机器设施仅提供参考，不作为新功能完成证据；依据见 [调研索引](../tasks/20261106-rebuild/research/sources.md)。
 
 按文件位置理解源码、安装、业务实例与共享设施时读 [逻辑框图](diagrams.md)。跨模块修改读 [架构说明](architecture.md)，准备运行或诊断读 [环境说明](environment.md)，概念歧义查 [项目术语](../terminology.md)。跨工具状态见 [重建总进度](../tasks/20261106-rebuild/progress.md)。

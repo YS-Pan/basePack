@@ -22,6 +22,7 @@ def test_two_projects_and_subdirectory_config(tmp_path, monkeypatch):
     assert loaded[0].memory_dir != loaded[1].memory_dir
     assert loaded[0].jobs_dir != loaded[1].jobs_dir
     assert loaded[0].raw["schema_version"] == 2
+    assert loaded[0].raw["memory"]["project_id"] != loaded[1].raw["memory"]["project_id"]
     assert "resources" not in loaded[0].raw
     assert describe(loaded[0])["jobs_dir"] == str(projects[0] / ".basepack/jobs")
     assert loaded[0].machine.state_dir == tmp_path / "state/basepack"

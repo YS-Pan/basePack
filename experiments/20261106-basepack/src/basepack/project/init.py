@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from string import Template
 import sys
+from uuid import uuid4
 
 
 def template(name: str) -> str:
@@ -31,6 +32,7 @@ def init_project(root: str | Path, machine_config: str | Path,
         python=json.dumps(sys.executable),
         machine_config=json.dumps(str(machine_config)),
         root=json.dumps(Path(os.path.relpath(root, config.parent)).as_posix()),
+        memory_project_id=str(uuid4()),
     )
     config.write_text(text, encoding="utf-8")
     _write_project_entry(root, config, Path(sys.executable))

@@ -4,6 +4,8 @@
 
 本路线面向 Windows、Python 3.13 和单张 NVIDIA GPU。Sentence Transformers 编码现有 Qwen3-VL-Embedding-2B 权重，LitServe 管理单个常驻推理 worker，Shawl 托管 Windows 服务。普通作业使用官方 GPU 申请字段，容量与队列由 HTCondor 管理。记忆检索、建图和数据库由独立的 [记忆任务](../../devDoc/tasks/20261106-memory-system/plan.md) 接续；本机实际安装及验收状态见 [资源进度](../../devDoc/archive/20261107-resource-coordination/progress.md)。
 
+记忆源码已增加多层文字检索、智能分块批次、初步语义关系与修改历史，见 [记忆使用](docs/memory.md)。已安装的资源版 0.5.0 尚无本轮新增 CLI，正式新版安装及完整行为按专项进度验收。
+
 管理员先按 [部署说明](docs/administrator.md) 准备机器配置、共享服务及 Condor。业务项目普通安装客户端 wheel 后接入：
 
 ```powershell
