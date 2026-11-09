@@ -2,7 +2,7 @@
 
 当前唯一 active 路线是 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.6.0。代码、依赖锁、测试、产品文档、示例及随包 skill 位于实验工程；根 devDoc 维护现行实现与活动工作。资源部署基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)，记忆功能与正式安装的实际完成边界见 [专项进度](../tasks/20261106-memory-system/progress.md)。
 
-本仓库提供两项可独立使用的 skill：[file-structure](../../skills/file-structure/SKILL.md) 推荐或整理开发文档和实验工程布局；[agent-team](../../skills/agent-team/SKILL.md) 使用宿主已有的订阅 subagent 能力组织分工。分层协作已有指令层初版，复杂广读的质量与总成本对照仍见 [专项记录](../tasks/20261106-rebuild/research/agent-team.md)。
+本仓库提供两项可独立使用的 skill：[file-structure](../../skills/file-structure/SKILL.md) 推荐或整理开发文档和实验工程布局；[agent-team](../../skills/agent-team/SKILL.md) 为每项任务选择组织，按完整交付过程判断独立完成、简单协作或清晰分层，并使用宿主已有的订阅 subagent 能力。组织选择与协作已有指令层实现，复杂广读的质量与总成本对照仍见 [专项记录](../tasks/20261106-rebuild/research/agent-team.md)。
 
 `basepack` 的公共入口包括项目 `init`、`config show`、`doctor`，项目 `memory`，共享图文 `embed` 及普通重任务 `jobs`。项目接入源码和模板统一在 [project/](../../experiments/20261106-basepack/src/basepack/project)，[config.py](../../experiments/20261106-basepack/src/basepack/project/config.py) 唯一解析配置。项目使用 schema 2 的 `.basepack/config.toml` 和 `.basepack/instructions.md`，根 AGENTS 只保留短指针；机器格式保持 schema 1。当前客户端兼容原 schema 2 与 0.5.0 embedding 服务，部署与旧格式迁移见 [部署合同](deployment.md)。
 

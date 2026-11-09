@@ -12,7 +12,7 @@
 - 目标仓库为 [YS-Pan/basePack](https://github.com/YS-Pan/basePack)；发布前按产品状态编写面向使用者的 README 和使用文档。
 - 新建、调整或归档开发文档时读 [文档维护约定](devDoc/documentation.md)。
 - 推荐、设计或整理项目文件结构时使用 [file-structure](skills/file-structure/SKILL.md)。
-- 广读、跨材料综合或多步骤任务需要分工时使用 [agent-team](skills/agent-team/SKILL.md)，按任务规模选择直接派工或协调层。
+- 每项任务开始或接续时应用 [agent-team](skills/agent-team/SKILL.md) 的组织判断；当前上下文已有有效规则时直接复用。
 
 ## 实施
 

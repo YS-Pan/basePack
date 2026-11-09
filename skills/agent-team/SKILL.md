@@ -1,16 +1,24 @@
 ---
 name: agent-team
-description: "Organize hierarchical agent teams for broad reading, synthesis across sources, or multi-step work that benefits from focused contexts and delegated coordination."
+description: "Choose and manage the organization for every task, from solo work and direct collaboration to clear multi-level teams."
 ---
 
 # Agent teams
 
-Expand task capacity and improve result quality by giving each agent a focused context. The main agent owns the goal, key decisions, and overall result; coordinators handle routine delegation and integration. Use the host's subscription-based subagent tools without adding a model API or orchestration service.
+Apply this skill to every task, including work the main agent completes alone. Expand task capacity and improve result quality by keeping each agent's context focused. The main agent owns the goal, key decisions, and overall result. Use the host's subscription-based subagent tools when delegation helps, without adding a model API or orchestration service.
 
 ## Choose the organization
 
-- Complete small tasks directly. The main agent may assign a few bounded subtasks itself. Delegate a branch to a coordinator when reading waves, dependencies, or integration would demand substantial routine management.
-- Adjust team size, depth, and roles as the task evolves. Run ready, independent work in parallel; sequence dependent work and leave spare capacity when useful.
+Before execution, imagine the entire authorized deliverable is complete and look back at the work needed to reach it: likely stages, dependencies, ordinary rework, verification, and recovery. Choose for that whole course of work:
+
+- What would fill the main agent's context and attention? Would routine dispatch, preparation, debugging, or integration crowd out its overall judgment?
+- Which sustained branches could a coordinator own through completion, including follow-up work and dependencies?
+- Would that division improve capability, result quality, and focus enough to justify handoff costs, delay, and information loss?
+
+Choose solo work, a few directly managed collaborators, clear coordinator-worker layers, or a mix across branches and phases. Direct collaboration can combine roles. Prefer a simpler structure when expected results are comparable, considering the whole delivery rather than just startup effort. Keep the choice lightweight: a brief mental decision for small tasks, a short statement of structure and reason for substantial work.
+
+Revise the choice when new scope, evidence, dependencies, or actual workload changes its basis. When uncertainty prevents a useful whole-task judgment, use bounded exploration to clarify the work before choosing its continuing organization. Run ready, independent work in parallel; sequence dependent work and leave spare capacity when useful.
+
 - Match available models and reasoning effort to difficulty. Lower-cost models may handle broad reading and extraction; use sufficient capability for complex execution, synthesis, and decisions. Honor user preferences and select concrete models through host parameters or role configuration.
 - Use the tools' actual delegation, nesting, context, and model controls. Report missing required capabilities and preserve original tool errors. Distinguish a prepared brief from a task that actually ran.
 
@@ -29,11 +37,11 @@ Let the recipient search, read broadly, and fill relevant gaps within scope. Ass
 
 ## Coordinate and execute
 
-1. **Own the branch.** Give each branch one dispatcher. The coordinator owns its routine delegation, follow-up, dependencies, and integration, delegating further within its authority. Transfer dispatch ownership explicitly when it changes. The main agent exchanges goals and results with the coordinator and may inspect sources or intervene when needed.
+1. **Own a layered branch.** Assign its coordinator continuing responsibility for routine delegation, follow-up, dependencies, normal fixes, verification, and integration through branch completion, including arranging the next work. The coordinator delegates further within its authority; the main agent exchanges goals, results, and issues requiring key decisions, and may inspect sources or intervene. Keep one dispatcher for that branch. When ownership changes, explicitly hand over active tasks and handles, dependencies, outputs, and open issues.
 2. **Split reading, then connect evidence.** Partition by question or materials and track coverage and unread areas. Bring relevant passages into one agent's context for claims that depend on relationships across partitions; arrange targeted follow-up reading where evidence is missing.
 3. **Assign output ownership.** Give shared files or artifacts one integration owner. Parallelize edits with independent ownership; run dependent checks when their inputs are ready. Arrange overlapping investigation or independent review for a stated purpose.
-4. **Finish bounded work.** Workers read, execute, and perform necessary checks, then return when their completion criteria are met. The responsible coordinator continues the next stage. Resolve gaps within authority; escalate facts, impact, and the decision needed when goals, key tradeoffs, or permissions must change.
-5. **Collect results through events.** Continue independent work while children run. When results are needed, use the host's agent wait or completion notifications. Coordinators handle routine follow-up and report usable results, significant changes, or issues requiring parent intervention.
+4. **Finish bounded work.** Workers read, execute, and perform necessary checks, then return when their completion criteria are met. Resolve gaps within authority; escalate facts, impact, and the decision needed when goals, key tradeoffs, or permissions must change.
+5. **Collect results through events.** Continue independent work while children run. When results are needed, use the host's agent wait or completion notifications. Report usable results, significant changes, or issues requiring parent intervention.
 
 Add specialist review when uncertainty, material risk, or task requirements justify it. Batch related results and keep checks proportionate to the problem.
 
