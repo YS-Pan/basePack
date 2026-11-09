@@ -166,6 +166,10 @@ def test_real_appended_exception_invalidates_complete_summaries(memory):
     assert rows["member:retention_section"]["stale"] is True
     assert rows["member:retention"]["stale"] is False
     assert "member:retention_section" not in {row["id"] for row in memory.search("保留")}
+    partial = {"sources": [{"path": "guide.md", "revision": prepared["revision"]}],
+               "expected": memory.prepare(["guide.md"])["expected"], "members": batch["members"][:1]}
+    with pytest.raises(ValueError, match="Partial file summary"):
+        memory.apply(partial)
 
 
 def test_real_node_correction_invalidates_relations_and_stale_draft_rejected(memory):
@@ -197,3 +201,31 @@ def test_real_node_correction_invalidates_relations_and_stale_draft_rejected(mem
     assert next(row for row in memory._rows("semantic") if row["id"] == "semantic:requires")["stale"] is False
     with pytest.raises(RuntimeError, match="requires expected revision"):
         memory.apply({"sources": [], "edges": batch["edges"]})
+
+
+def test_real_prepare_includes_evidenced_node_edges_and_read_rejects_graph_ids(memory):
+    batch = batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n")
+    batch["nodes"].append({"id": "retention_policy", "kind": "condition", "text": "必须保留资料", "evidence": ["retention"]})
+    batch["edges"].append({"id": "node_constraint", "in": "node:local", "out": "node:retention_policy",
+                            "kind": "depends", "text": "存储决定受资料保留条件约束", "evidence": ["storage"]})
+    memory.apply(batch)
+    memory._execute("UPDATE semantic:node_constraint SET stale=true;")
+    outside_text = "独立材料，不属于本次维护范围。\n"
+    (memory.config.root / "outside.md").write_bytes(outside_text.encode("utf-8"))
+    outside = memory.prepare(["outside.md"])["sources"][0]
+    memory.apply({"sources": [{"path": "outside.md", "revision": outside["revision"]}],
+                  "members": [{"id": "outside", "kind": "chunk", "path": "outside.md", "start_line": 1,
+                               "end_line": 1, "text": outside_text}],
+                  "nodes": [{"id": value, "kind": "entity", "text": value, "evidence": ["outside"]}
+                            for value in ["outside_a", "outside_b"]],
+                  "edges": [{"id": "unrelated", "in": "node:outside_a", "out": "node:outside_b", "kind": "supports",
+                             "text": "独立材料的关系", "evidence": ["outside"]}]})
+    prepared = memory.prepare(["guide.md"])
+    edge = next(edge for edge in prepared["neighborhood"]["edges"] if edge["id"] == "semantic:node_constraint")
+    assert edge["stale"] is True
+    assert prepared["expected"][edge["id"]] == edge["knowledge_revision"]
+    assert "semantic:unrelated" not in {edge["id"] for edge in prepared["neighborhood"]["edges"]}
+    assert "semantic:unrelated" not in prepared["expected"]
+    for record_id in ["node:local", "semantic:node_constraint"]:
+        with pytest.raises(ValueError, match="read requires a member ID"):
+            memory.read(record_id)

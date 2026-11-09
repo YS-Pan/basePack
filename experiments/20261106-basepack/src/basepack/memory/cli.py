@@ -8,15 +8,20 @@ def register_commands(subparsers):
     memory = subparsers.add_parser("memory", help="Project-local multilevel memory")
     commands = memory.add_subparsers(dest="memory_action", required=True)
     actions = {name: commands.add_parser(name) for name in
-               ("init", "guide", "prepare", "apply", "search", "read", "neighbors", "brief", "changes", "rank")}
+               ("init", "guide", "prepare", "apply", "embed", "search", "read", "neighbors", "brief", "changes", "rank")}
     actions["prepare"].add_argument("--paths", nargs="+", required=True)
     actions["apply"].add_argument("--batch", required=True, help="Agent-produced UTF-8 JSON batch")
     actions["search"].add_argument("--text", required=True)
     actions["search"].add_argument("--scope", default="")
     actions["search"].add_argument("--limit", type=int, default=12)
     actions["search"].add_argument("--literal", action="store_true", help="Explicit original-substring search")
+    actions["search"].add_argument("--mode", choices=["hybrid", "text", "vector"], default="hybrid")
+    actions["search"].add_argument("--timeout", type=float, default=600)
+    actions["embed"].add_argument("--ids", nargs="+", help="Member IDs; otherwise index current representations")
+    actions["embed"].add_argument("--timeout", type=float, default=600)
     actions["read"].add_argument("id", help="Member ID; follow a knowledge node's evidence via neighbors")
     actions["neighbors"].add_argument("id")
+    actions["neighbors"].add_argument("--include-stale", action="store_true", help="Explicit historical inspection")
     actions["brief"].add_argument("--task", default="")
     actions["brief"].add_argument("--limit", type=int, default=6)
     actions["changes"].add_argument("--scope", nargs="+", required=True)
@@ -44,12 +49,20 @@ def dispatch(args, config):
             result = memory.prepare(args.paths)
         elif action == "apply":
             result = memory.apply(json.loads(Path(args.batch).read_text(encoding="utf-8")))
+        elif action == "embed":
+            result = memory.embed_members(args.ids, timeout=args.timeout)
         elif action == "search":
-            result = memory.search(args.text, scope=args.scope, limit=args.limit, literal=args.literal)
+            if args.mode == "text":
+                result = memory.search(args.text, scope=args.scope, limit=args.limit, literal=args.literal)
+            elif args.mode == "vector":
+                result = memory.vector_search(args.text, scope=args.scope, limit=args.limit, timeout=args.timeout)
+            else:
+                result = memory.hybrid_search(args.text, scope=args.scope, limit=args.limit,
+                                              timeout=args.timeout, literal=args.literal)
         elif action == "read":
             result = memory.read(args.id)
         elif action == "neighbors":
-            result = memory.neighbors(args.id)
+            result = memory.neighbors(args.id, include_stale=args.include_stale)
         elif action == "brief":
             result = memory.brief(task=args.task, limit=args.limit)
         elif action == "changes":

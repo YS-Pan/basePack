@@ -1,6 +1,6 @@
 # 项目记忆
 
-记忆将文件摘要、章节摘要和原文块保存在本项目的 SurrealDB 中，并保留层级、原文范围、语义关系和修改依据。宿主订阅 agent 负责智能分块、摘要、建图和评分；数据库执行存储、事务与查询。小文件不必虚造章节。
+记忆将文件摘要、章节摘要、原文块和图片保存在本项目的 SurrealDB 中，并保留层级、原文范围、语义关系和修改依据。宿主订阅 agent 负责智能分块、摘要、识图、建图和评分；已有共享服务编码图文，数据库执行存储、事务与混合查询。小文件不必虚造章节。
 
 ## 启用
 
@@ -29,6 +29,7 @@ python -m basepack --config '<项目>/.basepack/config.toml' memory init
 ```powershell
 python -m basepack --config '<config>' memory prepare --paths '说明.md' '决定.md' --output '<reading.json>'
 python -m basepack --config '<config>' memory apply --batch '<agent-batch.json>'
+python -m basepack --config '<config>' memory embed
 python -m basepack --config '<config>' memory changes --scope '资料目录'
 ```
 
@@ -36,17 +37,21 @@ prepare 提供新旧编号原文、已有成员及关系。将这些材料交给
 
 apply 核对来源版本和本批被修改知识的 expected 版本，再原子写入。原文块保持原词；摘要、边界、依据、历史与更正持久保存。旧草稿不能覆盖较新的知识更正。变化检测会使受影响知识待更新；再次共读、apply 并查询新结果后，才算完成增量维护。深检查使用 `changes --deep`。
 
+embed 复用 [共享 embedding](resources.md)，不另外加载模型。文件/章节使用已接受摘要，块使用原文，图片使用原始图片；兼容且输入未变的向量复用。超限保留原错误，交回原阅读 agent 调整分块或摘要，不能静默截断。仅文字试用可暂不编码，并显式使用 search 的 text 模式。
+
+图片先由视觉 agent 实际打开，描述与 OCR 单独标明，程序按 hash 保留必要原字节快照。必要 PDF 页可由宿主读取/渲染为项目内图片，locator 记录原文件、版本、页与区域；原 PDF 变化时重新核相关页面，不声称自动解析所有 PDF。
+
 ## 启动与检索
 
 ```powershell
 python -m basepack --config '<config>' memory brief --task '当前任务'
 python -m basepack --config '<config>' memory search --text '主题'
-python -m basepack --config '<config>' memory search --text 'A-17' --literal
+python -m basepack --config '<config>' memory search --text 'A-17' --mode text --literal
 python -m basepack --config '<config>' memory neighbors 'member:<id>'
 python -m basepack --config '<config>' memory read 'member:<id>'
 ```
 
-brief 直接提供必须保留的信息、相关线索、来源与覆盖缺口。stale 信息只作待核，不当当前事实。中文全文按词典分词，短词不保证子串召回，编号命中也不等于精确匹配；literal 是显式包含查询。
+brief 直接提供必须保留的信息、相关线索、来源与覆盖缺口。stale 信息只作待核，不当当前事实。search 默认融合跨层全文与向量，`--mode text` / `--mode vector` 可单独查询。缺少兼容索引会明确报错；不会因模型失败偷偷改用纯文字。中文全文按词典分词，短词不保证子串召回，编号命中也不等于精确匹配；literal 是显式包含查询。
 
 工作 agent 可只委托一次，让 worker 完成检索、父子/语义展开、原文核实和评分，再用 `rank --input <scored.json> --budget <文字字符数>` 排序交付实际内容。词法分数与 agent 分数不同。超预算证据保留补读入口，不静默截掉条件；工作 agent 仍可自由补读。
 
