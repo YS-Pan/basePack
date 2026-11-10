@@ -37,11 +37,11 @@
 
 ## 下一步
 
-已根据两段讨论制定[接入闭环与运行简化计划](../20261110-onboarding-simplification/plan.md)，状态见[专项进度](../20261110-onboarding-simplification/progress.md)：所选技能安装/发现、可信本机免认证、无配置工具命令、失用接口与有限编码去重。以已交付 0.7.1 为基线，本轮仅规划，现行认证和外部项目保持原状。
+已综合相关讨论维护[接入、记忆维护与运行简化计划](../20261110-onboarding-simplification/plan.md)，状态见[专项进度](../20261110-onboarding-simplification/progress.md)：优先E脚本处理机械变化及历史待核接续、F默认纳入所属Codex project聊天；保留技能发现、本机免认证方案、接口清理与有限编码去重，并增加两份英文README及锚点修正。以已交付0.7.1为基线，产品修改待实施；正式认证迁移、外部项目写入不由本次计划维护直接执行。
 
 独立 [engineering-judgment skill](../../../skills/engineering-judgment/SKILL.md) 已编写、保留并接入，见[交付结果](../20261110-engineering-judgment/result.md)。按用户最新要求取消技能测试与按收益去留，效果在长期真实使用中观察；源码和入口已提交 f8bb5b2。
 
-[basePack整改](../20261110-rectification/progress.md) 已完成故障修复、查询/维护解耦与 CPU/CUDA 适配的源码；随后按用户最新要求删除独立text模式，最终0.7.1普通wheel在Python3.14完整266项通过、无跳过，共用客户端与三个项目已完成向量配置迁移，七表逐字段未变；实际结果沿该进度维护。自动维护随业务结束停止，积压只提醒；正常浮点差异按等价处理。阵列业务事项仍留其项目。
+[basePack整改](../20261110-rectification/progress.md) 已完成故障修复、查询/维护解耦与 CPU/CUDA 适配的源码；随后按用户最新要求删除独立text模式，最终0.7.1普通wheel在Python3.14完整266项通过、无跳过，共用客户端与三个项目已完成向量配置迁移，七表逐字段未变；实际结果沿该进度维护。自动维护在业务期间按来源小批推进，业务结束停止；积压多只限制擅自启动独立手动深维护，不排除正常自动小批。正常浮点差异按等价处理。阵列业务事项仍留其项目。
 
 用户已选择 MIT，[0.6.4 许可补丁](https://github.com/YS-Pan/basePack/releases/tag/v0.6.4) 已发布，GitHub 仓库识别为 MIT；源码、独立包许可证和元数据同步，定向构建/安装及附件下载校验通过，详见 [发布结果](github-publish-result.md#mit-许可补丁-064)。0.6.3 原标签和附件保留，项目记忆不上传。
 
