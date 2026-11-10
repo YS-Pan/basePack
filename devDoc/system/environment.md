@@ -8,6 +8,12 @@
 
 选留证据现统一位于根 `artifacts/runs/`。前次临时材料整理的映射为 `artifacts/runs/tmp-reorganization-20261108/moves.json`，本次位置映射为 `artifacts/runs/20261109-project-layout/moves.json`；原始回执及下文历史路径保留当时含义，结合两轮映射回查长期副本，tmp 内容按可清除处理。
 
+## 2026-11-10 0.6.2 正常用户 CPU 作业复核
+
+受限进程的 `condor_q` 出现 NTSSPI 握手失败；相同配置在正常用户上下文通过队列查询、WRITE 认证及 Condor doctor。随后从源码外工作目录，以稳定 0.6.2 客户端实际提交作业 `14348.0`，申请 1 CPU、512 MiB RAM、64 MiB scratch，不申请 GPU。输入脚本传入 Condor scratch，实际账户为 `condor-slot1_1`；平方和结果 `333328333350000` 经 `result.json` 回传，stdout、事件日志及原生 history 一致，退出码 0。
+
+回收已核原生终态、该作业队列为空、worker/venv 启动器/实际应用三个 PID 消失及 scratch 删除；直接查询 startd 得到动态 slot 为 0，12 CPU/24576 MiB RAM/4 同卡名额/7164 MiB 普通显存池全部可用。运行中的 collector 快照未显示配额扣减，分配依据为原生事件中的 1 CPU/512 MiB；首次验收脚本误判 venv 进程层级，修正验证方法后复核同一已完成作业，没有重提。原脚本、补核脚本与回执选留在 `artifacts/runs/20261110-condor-normal-user-cpu/`，入口为 `verification.json`。本次只覆盖 CPU 成功路径和输入/输出传输，不新增 GPU 计算、取消或超时验收。
+
 ## 2026-11-10 0.6.2 项目模型等级配置与安装
 
 稳定客户端 `D:/AgentTools/envs/basepack-client/Scripts/python.exe` 已普通安装 0.6.2 wheel；源码外以 `-I` 核安装位置与 `config show`、`config ai`，33 个包文件与 wheel 字节一致，wheel SHA256 为 `44658d1856e7a635c7f36a656fd06839422858e019af16d1872d7e5324b7aaec`。本项目配置已补入 AI 节。源码全套 137 passed、41 skipped（未提供一次性数据库的集成项）；配置和 activation 专项 41 passed。本次不重跑数据库全验收，历史 P0–P5 与 0.6.1 结果保持各自条件。安装核验回执选留 `artifacts/runs/20261110-ai-tiers/installed-verification.json`；配置与使用见 [项目接入](../../experiments/20261106-basepack/docs/setup-project.md#agent-模型等级)。
