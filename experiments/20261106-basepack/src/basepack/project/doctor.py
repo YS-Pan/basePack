@@ -2,7 +2,6 @@
 
 import os
 from pathlib import Path
-import shutil
 import subprocess
 
 from .config import ProjectConfig, describe
@@ -27,9 +26,7 @@ def doctor(config: ProjectConfig, facility: str = "core") -> dict:
             if not (model / name).is_file():
                 raise FileNotFoundError(model / name)
         checks["model_root"] = str(model)
-        smi = shutil.which("nvidia-smi")
-        if smi:
-            checks["gpu"] = subprocess.check_output([smi, "--query-gpu=name,memory.total,compute_mode", "--format=csv,noheader"], text=True, timeout=15).strip()
+        checks["embedding_device"] = config.machine.raw["embedding"]["device"]
     if facility in ("condor", "all"):
         machine = config.machine
         native = machine.path_value("htcondor", "config_file")

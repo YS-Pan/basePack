@@ -1,10 +1,10 @@
 # basePack
 
-`20261106-basepack` 是当前唯一 active 工程，包版本为 0.6.4，面向 Windows、Python 3.13。每个项目在自己的 `.basepack/` 保存配置、知识、原文依据和作业记录；通用程序与模型可以共用。首次安装从根 [README](../../README.md#安装轻量客户端) 的 clone、venv 和源码安装命令开始。
+`20261106-basepack` 是当前唯一 active 工程，源码版本为 0.7.0，面向 Windows、Python 3.13+。每个项目在自己的 `.basepack/` 保存配置、知识、原文依据和作业记录；通用程序与模型可以共用。首次安装从根 [README](../../README.md#安装轻量客户端) 的 clone、venv 和源码安装命令开始。
 
-本项目自有源码与文档采用 [MIT 许可证](LICENSE)，与根许可证内容一致；第三方许可声明随包保留。0.6.4 为 0.6.3 的许可与元数据补丁，运行逻辑及项目配置合同保持一致。
+本项目自有源码与文档采用 [MIT 许可证](LICENSE)，与根许可证内容一致；第三方许可声明随包保留。
 
-记忆使用 SurrealDB 4，文件摘要、实际章节、智能原文块及图片均可直接检索和作为图节点。宿主订阅 agent 同读完成分块、摘要、识图、关系与评分；程序核原文版本并原子提交，保留更正与旧依据。任务启动的 brief 交付必保留信息、项目地图、相关线索与变化，宿主按预算维护受影响的小批。新项目默认文字检索；准备图文设施后，可把项目默认改为 hybrid 或 vector。实际验收与质量、费用边界见 [记忆进度](../../devDoc/tasks/20261106-memory-system/progress.md)。
+记忆使用 SurrealDB 4，文件摘要、实际章节、智能原文块及图片均可直接检索和作为图节点。宿主订阅 agent 同读完成分块、摘要、识图、关系与评分；程序核原文版本并原子发布内容与匹配向量。search、brief 和 read 只读已发布知识及其依据快照；维护通过独立 worker 推进，业务结束时停止未发布工作。新项目默认 vector，可按需要显式选择 text 或 hybrid。实际交付见 [整改进度](../../devDoc/tasks/20261110-rectification/progress.md)。
 
 basePack 仍在开发，实际使用同时作为测试样本。使用问题沿自己的项目约定记录，并按 [反馈格式](docs/setup-project.md#问题记录与反馈) 形成可提交的 Issue 草稿。
 
@@ -12,12 +12,12 @@ basePack 仍在开发，实际使用同时作为测试样本。使用问题沿�
 
 | 使用路径 | 设施与入口 |
 | --- | --- |
-| 纯文字记忆 | 轻量客户端、每项目独立 SurrealDB；[项目接入](docs/setup-project.md) → [数据库部署](docs/administrator.md#项目-surrealdb) → [记忆使用](docs/memory.md) |
-| 图文 embedding / 混合检索 | 再准备 NVIDIA CUDA、固定模型与共享服务；[管理员说明](docs/administrator.md) → [资源使用](docs/resources.md) |
+| 无模型的文字记忆 | 轻量客户端、每项目独立 SurrealDB，显式配置 text；[项目接入](docs/setup-project.md) → [数据库部署](docs/administrator.md#项目-surrealdb) → [记忆使用](docs/memory.md) |
+| 图文向量 / 混合检索 | 再准备固定模型与 CPU/CUDA 共享服务；[管理员说明](docs/administrator.md) → [资源使用](docs/resources.md) |
 | 普通重任务 | 再准备 HTCondor 单机 pool 与本站容量配置；[管理员说明](docs/administrator.md) → [作业使用](docs/resources.md) |
 | 独立 skills | [根 README 的安装与发现步骤](../../README.md#独立-skills)；无需 Python、数据库或模型 |
 
-图文编码复用单张 NVIDIA GPU 上的 Qwen3-VL-Embedding-2B 常驻服务，普通作业由 HTCondor 排队。官方安装来源、实测版本、GPU 条件和待验范围由 [管理员说明](docs/administrator.md) 集中维护。下面 `$python` 指已安装客户端的解释器；接入后沿用项目 instructions 记录的实际路径：
+图文编码复用 Qwen3-VL-Embedding-2B 常驻服务，默认优先可用 CUDA，否则 CPU；普通作业由 HTCondor 排队。设施准备见 [管理员说明](docs/administrator.md)。下面 `$python` 指已安装客户端的解释器；接入后沿用项目 instructions 记录的实际路径：
 
 ```powershell
 & $python -m basepack init --project-root '<absolute-project>' --machine-config '<absolute-machine-config>'

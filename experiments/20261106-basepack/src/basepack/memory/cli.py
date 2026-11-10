@@ -8,9 +8,13 @@ def register_commands(subparsers):
     memory = subparsers.add_parser("memory", help="Project-local multilevel memory")
     commands = memory.add_subparsers(dest="memory_action", required=True)
     actions = {name: commands.add_parser(name) for name in
-               ("init", "guide", "sources", "prepare", "apply", "embed", "search", "read", "neighbors", "brief", "changes", "rank")}
-    actions["prepare"].add_argument("--paths", nargs="+", required=True)
+               ("init", "guide", "sources", "prepare", "apply", "stop", "embed", "search", "read", "neighbors", "brief", "changes", "rank")}
+    actions["prepare"].add_argument("--paths", nargs="+", required=True,
+                                    help="Project-relative files; enumerate directories first")
     actions["apply"].add_argument("--batch", required=True, help="Agent-produced UTF-8 JSON batch")
+    actions["apply"].add_argument("--control", help="Unique task control file for host cancellation")
+    actions["apply"].add_argument("--timeout", type=float, default=600, help="Candidate embedding timeout")
+    actions["stop"].add_argument("--control", required=True, help="The task's unique control file")
     actions["search"].add_argument("--text", required=True)
     actions["search"].add_argument("--scope", default="")
     actions["search"].add_argument("--limit", type=int, default=12)
@@ -21,6 +25,10 @@ def register_commands(subparsers):
     actions["embed"].add_argument("--ids", nargs="+", help="Member IDs; otherwise index current representations")
     actions["embed"].add_argument("--timeout", type=float, default=600)
     actions["read"].add_argument("id", help="Member ID; follow a knowledge node's evidence via neighbors")
+    actions["read"].add_argument("--source-version", help="Read an evidence source_version")
+    actions["read"].add_argument("--start-line", type=int, help="Evidence start line (inclusive)")
+    actions["read"].add_argument("--end-line", type=int, help="Evidence end line (inclusive)")
+    actions["read"].add_argument("--locator", help="Image evidence locator as a JSON object")
     actions["neighbors"].add_argument("id")
     actions["neighbors"].add_argument("--include-stale", action="store_true", help="Explicit historical inspection")
     actions["brief"].add_argument("--task", default="")
@@ -37,6 +45,10 @@ def dispatch(args, config):
     action = args.memory_action
     if action == "guide":
         result = {"skill": str(Path(__file__).with_name("SKILL.md"))}
+    elif action == "stop":
+        from .maintenance import stop
+        stop(args.control)
+        result = {"stopped": True}
     elif action == "rank":
         from .selection import select_scored
         result = select_scored(json.loads(Path(args.input).read_text(encoding="utf-8")), args.budget)
@@ -51,7 +63,8 @@ def dispatch(args, config):
         elif action == "prepare":
             result = memory.prepare(args.paths)
         elif action == "apply":
-            result = memory.apply(json.loads(Path(args.batch).read_text(encoding="utf-8")))
+            result = memory.apply(json.loads(Path(args.batch).read_text(encoding="utf-8")),
+                                  control=args.control, timeout=args.timeout)
         elif action == "embed":
             result = memory.embed_members(args.ids, timeout=args.timeout)
         elif action == "search":
@@ -59,12 +72,15 @@ def dispatch(args, config):
             if mode == "text":
                 result = memory.search(args.text, scope=args.scope, limit=args.limit, literal=args.literal)
             elif mode == "vector":
-                result = memory.vector_search(args.text, scope=args.scope, limit=args.limit, timeout=args.timeout)
+                result = memory.vector_search(args.text, scope=args.scope, limit=args.limit, timeout=args.timeout,
+                                              include_coverage=True)
             else:
                 result = memory.hybrid_search(args.text, scope=args.scope, limit=args.limit,
-                                              timeout=args.timeout, literal=args.literal)
+                                              timeout=args.timeout, literal=args.literal, include_coverage=True)
         elif action == "read":
-            result = memory.read(args.id)
+            result = memory.read(args.id, source_version=args.source_version,
+                                 start_line=args.start_line, end_line=args.end_line,
+                                 locator=json.loads(args.locator) if args.locator else None)
         elif action == "neighbors":
             result = memory.neighbors(args.id, include_stale=args.include_stale)
         elif action == "brief":
@@ -108,9 +124,9 @@ if ($LASTEXITCODE -ne 0) {{ throw "memory brief failed ($LASTEXITCODE)" }}
 
 本项目数据库的 launcher 为 `$basepackInfo.memory_dir/serve.ps1`，cwd 为该 `memory_dir`，日志为其中 `logs/surreal.stdout.log` 与 `logs/surreal.stderr.log`。先检查配置 endpoint 的 `/ready`；不可用时查日志，并由项目维护者显式启动该 launcher，以该目录为 cwd。保持同项目多聊天共用的进程，避免并行启动同一 store。首次准备、独立调用验证和故障处理见 [数据库部署](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/administrator.md#项目-surrealdb)，原生导出、原件与 assets 的恢复集合见 [备份恢复](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/memory.md#备份与恢复)。
 
-`memory search` 未传 `--mode` 时采用当前配置 `memory.search_mode`；新项目为 `text`，图文项目显式配置 `hybrid` 或 `vector`。显式 `--mode` 优先；设施或兼容向量缺失保留原错。
+`memory search` 未传 `--mode` 时采用当前配置 `memory.search_mode`；新项目为 `vector`；纯文字项目可显式配置 `text`，也可选择 `hybrid`。显式 `--mode` 优先；设施或兼容向量缺失保留原错。
 
-直接保留当前 mandatory 信息；stale=true 的内容只作待核，不当作当前事实。brief 会快检已登记原件与配置的 source_scope；出现 changes/pending 时，在当前任务预算内共读并维护必要小批，余项明确交接。可将维护和检索合并为一次 worker 委托，交付实际证据与缺口；多轮检索、筛选与重排派工前，用同一命令前缀运行 `config ai --purpose retrieval` 解析项目档位。按 [记忆流程](<{skill}>) 执行。
+直接保留 mandatory 信息；stale=true 的内容只作待核，不当作当前事实。brief、search 和 read 读取已发布知识及其依据快照，不扫描或维护来源。宿主支持可取消子任务与任务开始/完成事件时，并行启动低优先级维护 worker，业务完成时停止该任务的维护；缺少这些能力时说明自动维护不可用。多轮检索、筛选与重排前用同一命令前缀运行 `config ai --purpose retrieval` 解析项目档位。按 [记忆流程](<{skill}>) 执行。
 {end}"""
     if start in existing or end in existing:
         if existing.count(start) != 1 or existing.count(end) != 1:

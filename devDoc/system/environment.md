@@ -54,6 +54,10 @@ P5 安装基线之后，仓库修复了失效知识版本、关系依赖并发�
 
 共享 embedding 继续沿用 R9 的 0.5.0 服务、8765 endpoint 和原有语义身份，0.6.0 客户端保持 HTTP 合同兼容，实际健康与身份保持不变，本轮未重启共享模型。开发真实回归已覆盖跨层文字/图像编码、身份及输入版本排除、原生恢复和从保留表示重建向量；源码证据与正式安装分别验收。
 
+## 2026-11-10 产品文档移出的历史环境事实
+
+整改前管理员文档记录 Python 3.13.17、uv 0.13.7、驱动 617.42、RTX 4060 Ti 16380 MiB；这些是当时机器观测。LitServe 0.2.19 原生 `/shutdown` 在 Windows 小试曾残留进程，因此沿 R9 用 Shawl/SCM 停止服务树。原位置与版本依据见[文档整改结果](../tasks/20261110-rectification/docs-result.md#环境证据交接)，能力条件在产品管理员说明维护。
+
 ## 2026-11-09 R9 共享资源基线
 
 系统 Python `C:/Program Files/Python313/python.exe` 普通安装 basepack 0.5.0 core/jobs；服务 wheel 普通安装于 `C:/ProgramData/basepack/envs/service/`，依赖由 uv.lock 与 cu128 源准备，不继承系统 site-packages。共享模型保持原 D 盘 revision，17 个 manifest 文件的字节及 SHA256 已核实。Shawl 1.9.0 位于 `D:/AgentTools/bin/shawl-1.9.0/shawl.exe`，SCM BasepackEmbedding 采用 LocalSystem/Manual，日志在 `D:/AgentTools/state/basepack/embedding/logs/`。
@@ -125,12 +129,13 @@ P5 安装基线之后，仓库修复了失效知识版本、关系依赖并发�
 
 ## 项目 skill 的本机入口
 
-以下技能使用根 `.agents/skills/` 的项目级发现入口，junction 指向唯一维护源。2026-11-09 将 resources 的目标切至 active 实验内，其余两项保持根维护源。新检出时按下例建立联接；历史发现回执保留当时作用域和名称。[Codex 官方作用域说明](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) 区分项目级与用户级入口。
+以下技能使用根 `.agents/skills/` 的项目级发现入口，junction 指向唯一维护源。2026-11-09 将 resources 的目标切至 active 实验内，其余两项保持根维护源。2026-11-10 新增 engineering-judgment 联接，按用户要求保留，不运行技能测试。新检出时按下例建立联接；历史发现回执保留当时作用域和名称。[Codex 官方作用域说明](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) 区分项目级与用户级入口。
 
 | Skill | 维护源 | 本机发现入口 |
 | --- | --- | --- |
 | `file-structure` | [SKILL.md](../../skills/file-structure/SKILL.md) | `.agents/skills/file-structure` |
 | `agent-team` | [SKILL.md](../../skills/agent-team/SKILL.md) | `.agents/skills/agent-team` |
+| `engineering-judgment` | [SKILL.md](../../skills/engineering-judgment/SKILL.md) | `.agents/skills/engineering-judgment` |
 | `resources` | [SKILL.md](../../experiments/20261106-basepack/skills/resources/SKILL.md) | `.agents/skills/resources` |
 
 本机联接由 `.gitignore` 排除，不重复保存源码。仓库换路径或新检出时，如需在技能列表中自动发现，可从仓库根目录首次建立项目级入口：
@@ -140,6 +145,7 @@ New-Item -ItemType Directory -Force -Path '.agents/skills' | Out-Null
 $skillSources = @{
     'file-structure' = 'skills/file-structure'
     'agent-team' = 'skills/agent-team'
+    'engineering-judgment' = 'skills/engineering-judgment'
     'resources' = 'experiments/20261106-basepack/skills/resources'
 }
 foreach ($entry in $skillSources.GetEnumerator()) {

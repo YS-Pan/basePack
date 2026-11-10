@@ -58,15 +58,17 @@ class CondorClient:
             raise LookupError(f"Condor has no partitionable slot for {machine}")
         result = []
         for slot in local:
+            machine_resources = re.split(r"[\s,]+", slot["MachineResources"])
+            has_gpus = any(name.lower() == "gpus" for name in machine_resources)
             resources = {"cpus": "Cpus", "memory_mib": "Memory", "gpus": "GPUs"}
-            resources.update({name: name for name in re.split(r"[\s,]+", slot["MachineResources"])
+            resources.update({name: name for name in machine_resources
                               if name and name.lower() not in ("cpus", "memory", "gpus")
                               and name in slot and "TotalSlot" + name in slot})
             result.append({
                 "name": slot["Name"],
-                "total": {key: slot.get("TotalSlot" + attribute, 0) if key == "gpus"
+                "total": {key: slot.get("TotalSlot" + attribute, 0) if key == "gpus" and not has_gpus
                           else slot["TotalSlot" + attribute] for key, attribute in resources.items()},
-                "available": {key: slot.get(attribute, 0) if key == "gpus"
+                "available": {key: slot.get(attribute, 0) if key == "gpus" and not has_gpus
                               else slot[attribute] for key, attribute in resources.items()}})
         return {"machine": machine, "slots": result}
 
@@ -79,11 +81,6 @@ class CondorClient:
         cwd = Path(spec.cwd)
         if shutil.disk_usage(cwd).free < spec.disk_mib * 1024**2:
             raise ValueError(f"Insufficient project output disk space at {cwd}")
-        requested = {"cpus": spec.cpus, "memory_mib": spec.memory_mib}
-        capacity = self.capacity()
-        if not any(all(slot["total"][key] >= amount for key, amount in requested.items())
-                   for slot in capacity["slots"]):
-            raise ValueError(f"Job request {requested} exceeds local Condor slot capacity: {capacity['slots']}")
 
     def submit(self, spec: JobSpec) -> dict:
         spec = normalize_spec(self.config, spec)
@@ -94,9 +91,12 @@ class CondorClient:
             result = self._call("condor_submit", "-terse", submit)
         except (RuntimeError, subprocess.TimeoutExpired) as error:
             # A lost submit response does not authorize another submission.
-            matches = self._ads("condor_q", "-constraint", f'BasePackSubmissionId == "{token}"')
-            if not matches:
-                matches = self._ads("condor_history", "-constraint", f'BasePackSubmissionId == "{token}"', "-limit", "1")
+            try:
+                matches = self._ads("condor_q", "-constraint", f'BasePackSubmissionId == "{token}"')
+                if not matches:
+                    matches = self._ads("condor_history", "-constraint", f'BasePackSubmissionId == "{token}"', "-limit", "1")
+            except (RuntimeError, subprocess.TimeoutExpired, OSError, json.JSONDecodeError) as lookup_error:
+                raise error from lookup_error
             if not matches:
                 raise
             ad = matches[0]
@@ -116,17 +116,18 @@ class CondorClient:
         number = ad["JobStatus"]
         state = {1: "queued", 2: "running", 3: "removed", 4: "completed", 5: "held", 6: "transferring", 7: "suspended"}[number]
         finished = _terminal_time(ad, self.encoding) if history else None
-        started = ad.get("JobCurrentStartExecutingDate")
+        started = ad.get("JobCurrentStartExecutingDate") or None
         end = finished if history else time.time()
         result = {
             "job_id": job_id, "state": state, "terminal": history,
             "exit_code": ad.get("ExitCode"), "exit_signal": ad.get("ExitSignal"),
             "reason": ad.get("HoldReason") or ad.get("RemoveReason"),
+            "hold_reason_code": ad.get("HoldReasonCode"), "hold_reason_subcode": ad.get("HoldReasonSubCode"),
             "submitted": ad["QDate"], "started": started,
             "finished": finished, "remote_host": ad.get("RemoteHost", ad.get("LastRemoteHost")),
-            "elapsed_seconds": max(0, end - ad["QDate"]) if end is not None else None,
-            "queued_seconds": max(0, (started or end) - ad["QDate"]) if started or end is not None else None,
-            "running_seconds": max(0, end - started) if started and end is not None else (None if started else 0),
+            "elapsed_seconds": end - ad["QDate"] if end is not None else None,
+            "queued_seconds": (started if started is not None else end) - ad["QDate"] if started is not None or end is not None else None,
+            "running_seconds": end - started if started is not None and end is not None else None,
             "stdout": ad.get("Out"), "stderr": ad.get("Err"), "event_log": ad.get("UserLog"),
         }
         if history and number == 4:
@@ -137,9 +138,9 @@ class CondorClient:
                           missing_outputs=missing)
         elif history:
             result["success"] = False
-            if (ad.get("HoldReasonCode") in (46, 47) or
-                    "periodicremove" in (ad.get("RemoveReason") or "").lower().replace("_", "")):
-                result["timeout"] = "execution" if ad.get("JobCurrentStartExecutingDate") else "queue"
+            result["timeout"] = None
+        if (number == 5 or (number == 3 and ad.get("LastJobStatus") == 5)) and ad.get("HoldReasonCode") in (46, 47):
+            result["timeout"] = "execution"
         if analyze and number == 1:
             diagnostic = self._call("condor_q", job_id, "-better-analyze", check=False)
             result["analysis"] = diagnostic.stdout + diagnostic.stderr
@@ -157,11 +158,14 @@ class CondorClient:
                 worker_gone = not any(psutil.pid_exists(pid) for pid in expected_pids)
             except OSError as error:
                 return {"cleanup_confirmed": False, "cleanup_error": str(error)}
-            # Condor owns all descendants; a completed history record plus gone launcher/application
-            # confirms the process family was reaped, not merely that condor_rm was accepted.
-            if history and worker_gone:
+            if history and expected_pids and worker_gone:
                 return {"cleanup_confirmed": True, "cleanup_scope": "known_processes_and_condor_history",
                         "checked_pids": sorted(expected_pids)}
+            if history and not expected_pids:
+                if ad.get("NumJobStarts") == 0 and not ad.get("JobCurrentStartExecutingDate"):
+                    return {"cleanup_confirmed": True, "cleanup_scope": "condor_history_never_started"}
+                return {"cleanup_confirmed": False, "cleanup_scope": "condor_history_only",
+                        "cleanup_error": "No worker PIDs available to confirm process cleanup"}
             if time.monotonic() >= deadline:
                 return {"cleanup_confirmed": False, "cleanup_error": "Queue/history or local worker still active at cleanup deadline"}
             time.sleep(1)
@@ -194,9 +198,9 @@ class CondorClient:
             if result["state"] == "held":
                 if enforce_limits:
                     cleanup = self.cancel(job_id)
-                    if "execution time" in (result["reason"] or "").lower():
-                        result["timeout"] = "execution"
                     return cleanup | {"original_state": "held", "reason": result["reason"],
+                                      "hold_reason_code": result["hold_reason_code"],
+                                      "hold_reason_subcode": result["hold_reason_subcode"],
                                       **({"timeout": result["timeout"]} if "timeout" in result else {})}
                 return result
             if enforce_limits:

@@ -12,6 +12,14 @@ MAX_TEXT_BYTES = 64 * 1024
 MAX_REQUEST_INPUTS = 8
 
 
+def resolve_device(configured: str):
+    import torch
+
+    if configured == "auto":
+        configured = "cuda:0" if torch.cuda.is_available() else "cpu"
+    return torch.device(configured)
+
+
 def normalize_input(value):
     if isinstance(value, str):
         value = {"text": value}
@@ -34,13 +42,16 @@ class Qwen3VLEmbedder:
 
         self.Image = Image
         self.options = options
-        device = torch.device(options["device"])
-        if device.type != "cuda" or not torch.cuda.is_available():
-            raise RuntimeError("embedding requires the configured CUDA device")
+        device = resolve_device(options["device"])
+        self.device = str(device)
         torch.set_num_threads(options["cpu_threads"])
-        torch.cuda.set_device(device)
-        total = torch.cuda.get_device_properties(device).total_memory
-        torch.cuda.set_per_process_memory_fraction(options["gpu_memory_mib"] * 1024**2 / total, device)
+        if device.type == "cuda":
+            budget = options["gpu_memory_mib"]
+            if budget <= 0:
+                raise ValueError("CUDA embedding requires a measured positive gpu_memory_mib budget")
+            torch.cuda.set_device(device)
+            total = torch.cuda.get_device_properties(device).total_memory
+            torch.cuda.set_per_process_memory_fraction(budget * 1024**2 / total, device)
         self.model = SentenceTransformer(
             str(Path(options["model_root"]) / "model"),
             device=str(device), local_files_only=True, trust_remote_code=False,

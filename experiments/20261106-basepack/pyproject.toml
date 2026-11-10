@@ -4,20 +4,28 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "basepack"
-version = "0.6.4"
+version = "0.7.0"
 description = "Project-local tools with shared embedding and HTCondor resources"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE", "src/basepack/embedding/LICENSE.Qwen3-VL-Embedding.txt", "src/basepack/embedding/NOTICE.Qwen3-VL-Embedding.txt"]
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.13"
 dependencies = ["psutil>=7.2,<8"]
 
 [project.optional-dependencies]
 embedding = ["sentence-transformers==6.2.0", "litserve==0.2.19", "torch==2.10.0", "torchvision==0.25.0", "transformers==5.22.1", "Pillow>=13,<15"]
+embedding-cpu = ["basepack[embedding]", "torch==2.10.0+cpu", "torchvision==0.25.0+cpu"]
+embedding-cuda = ["basepack[embedding]", "torch==2.10.0+cu128", "torchvision==0.25.0+cu128"]
 dev = ["pytest>=9", "build"]
 
 [tool.uv]
 environments = ["sys_platform == 'win32'"]
+conflicts = [[{ extra = "embedding-cpu" }, { extra = "embedding-cuda" }]]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [[tool.uv.index]]
 name = "pytorch-cu128"
@@ -25,8 +33,14 @@ url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
 [tool.uv.sources]
-torch = { index = "pytorch-cu128" }
-torchvision = { index = "pytorch-cu128" }
+torch = [
+    { index = "pytorch-cpu", extra = "embedding-cpu" },
+    { index = "pytorch-cu128", extra = "embedding-cuda" },
+]
+torchvision = [
+    { index = "pytorch-cpu", extra = "embedding-cpu" },
+    { index = "pytorch-cu128", extra = "embedding-cuda" },
+]
 
 [project.scripts]
 basepack = "basepack.__main__:main"

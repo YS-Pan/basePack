@@ -10,8 +10,9 @@ def test_task_start_detects_scoped_addition_without_claiming_it_understood(memor
     incoming.mkdir()
     (incoming / "new.md").write_text("新增例外需要实际阅读。\n", encoding="utf-8")
     brief = memory.brief(limit=0)
-    assert brief["changes"][0]["path"] == "incoming/new.md"
-    assert brief["changes"][0]["kind"] == "added"
+    assert brief["changes"] == []
+    assert memory.changes(["incoming"])[0]["path"] == "incoming/new.md"
+    assert memory.changes(["incoming"])[0]["kind"] == "added"
     assert brief["source_count"] == 1
     assert memory.search("新增例外") == []
     assert len(brief["mandatory"]) == 1
@@ -22,21 +23,19 @@ def test_task_start_checks_registered_originals_outside_new_discovery_scope(memo
     memory.connection["source_scope"] = ["incoming"]
     source = memory.config.root / "guide.md"
     source.write_bytes(source.read_bytes() + "\n新增例外。\n".encode("utf-8"))
-    assert memory.brief()["changes"][0]["path"] == "guide.md"
+    assert memory.brief()["changes"] == []
+    assert memory.changes(["guide.md"])[0]["path"] == "guide.md"
 
 
-def test_task_start_marks_old_facts_and_does_not_duplicate_invalidation_history(memory):
+def test_change_detection_keeps_published_knowledge(memory):
     memory.apply(batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n"))
     source = memory.config.root / "guide.md"
     source.write_bytes(source.read_bytes() + "\n新增关键例外。\n".encode("utf-8"))
-    first = memory.brief(limit=0)
-    assert first["mandatory"][0]["stale"] is True
-    assert "member:guide" in {row["id"] for row in first["pending"]}
     count = len(memory._rows("change"))
-    second = memory.brief(limit=0)
-    assert second["change_count"] == 1
+    assert memory.changes(["guide.md"])[0]["kind"] == "modified"
+    assert memory.brief(limit=0)["mandatory"][0]["stale"] is False
+    assert "member:guide" in {row["id"] for row in memory.search("项目", literal=True)}
     assert len(memory._rows("change")) == count
-    assert "member:guide" not in {row["id"] for row in memory.search("项目", literal=True)}
 
 
 def test_unchanged_start_reads_metadata_without_loading_all_member_bodies(memory, monkeypatch):
@@ -92,7 +91,8 @@ def test_node_merge_and_deleted_support_preserve_remaining_evidence(memory):
     memory.apply({"sources": [{"path": "backup.md", "revision": backup["revision"]}],
                   "expected": prepared["expected"], "members": members, "edges": [edge]})
     (memory.config.root / "backup.md").unlink()
-    assert "semantic:requires" in {row["id"] for row in memory.brief()["pending"]}
+    assert "semantic:requires" not in {row["id"] for row in memory.brief()["pending"]}
+    assert memory.changes(["backup.md"])[0]["kind"] == "deleted"
     prepared = memory.prepare(["guide.md", "backup.md"])
     edge["evidence"] = ["storage"]
     memory.apply({"sources": [{"path": "backup.md", "revision": backup["revision"], "deleted": True}],
@@ -170,14 +170,14 @@ def test_only_active_summary_dependencies_propagate_changes(memory, retired):
                   "members": [guide, storage], "delete_members": ["storage_section"] if retired else []})
     prepared = memory.prepare(["guide.md"])
     section = next(row for row in prepared["sources"][0]["members"] if row["id"] == "member:storage_section")
-    assert section["stale"] is True
+    assert section["stale"] is retired
     assert section["retired"] is retired
     storage["title"] = "离线隔离条件"
     result = memory.apply({"sources": updated["sources"], "expected": prepared["expected"], "members": [storage]})
-    expected = {"member:storage"} if retired else {"member:storage", "member:storage_section", "member:guide"}
-    assert set(result["invalidated"]) == expected
-    assert memory.read("guide")["member"]["stale"] == (not retired)
-    assert memory.neighbors("node:local")["record"]["stale"] is True
+    assert result["invalidated"] == []
+    assert memory.read("guide")["member"]["stale"] is False
+    # Existing node retains its old versioned evidence, even if the new member changes.
+    assert memory.neighbors("node:local")["record"]["stale"] is False
 
 
 def test_retired_unchanged_history_keeps_source_version_and_can_be_explicitly_revived(memory):

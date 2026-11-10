@@ -29,7 +29,7 @@ reasoning_effort = 'ultra'
 
 [memory]
 data_dir = '.basepack/memory'
-search_mode = 'text'
+search_mode = 'vector'
 project_id = '$memory_project_id'
 # Run a separate local server for this project's data; choose its port here.
 endpoint = 'http://127.0.0.1:18080'

@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-当前唯一 active 路线为 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，源码、构建声明、测试、产品文档、示例及资源和记忆 skill 在该实验工程内维护；根目录保留统一 devDoc 和两项通用技能。本次布局迁移的实际检查与接续见 [迁移结果](../../archive/20261109-project-layout/result.md)，不改变 R9 和记忆功能的完成状态。
+当前唯一 active 路线为 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，源码、构建声明、测试、产品文档、示例及资源和记忆 skill 在该实验工程内维护；根目录保留统一 devDoc 和三项通用技能。本次布局迁移的实际检查与接续见 [迁移结果](../../archive/20261109-project-layout/result.md)，不改变 R9 和记忆功能的完成状态。
 
 资源 R9 已交付 0.5.0 并结案归档，详见 [R9 结果](../../archive/20261107-resource-coordination/r9-result.md)。记忆P0–P5基线及0.6.1修复、安装和真实PPT项目维护实测已交付；质量/成本边界和具体状态只在 [记忆进度](../20261106-memory-system/progress.md) 接续；本页跟踪跨工具状态与公共工作，共性取舍见 [复用优先](plan.md#复用优先)。
 
@@ -37,9 +37,9 @@
 
 ## 下一步
 
-独立的 [engineering-judgment skill 计划](../20261110-engineering-judgment/plan.md)已按[有效性复核](../20261110-engineering-judgment/research/feasibility.md)收紧：以现有规则为基线验证新增收益，有收益才保留独立skill，无收益则精简或合回旧入口。当前仅完成规划，技能尚未编写或接入；试用不阻塞产品整改。
+独立 [engineering-judgment skill](../../../skills/engineering-judgment/SKILL.md) 已编写、保留并接入，见[交付结果](../20261110-engineering-judgment/result.md)。按用户最新要求取消技能测试与按收益去留，效果在长期真实使用中观察；源码和入口已提交 f8bb5b2。
 
-已综合新机反馈、当前聊天及工程取舍讨论维护[basePack整改计划](../20261110-rectification/plan.md)：保留查询/维护解耦、自动维护随业务结束停止、积压只提醒，以及CPU/CUDA正常浮点误差等价的要求；补齐能力合同、实测与使用/研发职责的取舍。交付拆为A真实故障/兼容、B查询与维护解耦、C CPU/CUDA向量，独立技能试用不作前置，按批适用条件验收。阵列事项仍留其项目的独立待执行计划。当前仅完成规划。
+[basePack整改](../20261110-rectification/progress.md) 已完成故障修复、查询/维护解耦与 CPU/CUDA 适配的源码；0.7.0 普通 wheel 在 Python 3.14 完整回归 255 项通过、无跳过，共用客户端升级与最终实际结果沿该进度维护。自动维护随业务结束停止，积压只提醒；正常浮点差异按等价处理。阵列业务事项仍留其项目。
 
 用户已选择 MIT，[0.6.4 许可补丁](https://github.com/YS-Pan/basePack/releases/tag/v0.6.4) 已发布，GitHub 仓库识别为 MIT；源码、独立包许可证和元数据同步，定向构建/安装及附件下载校验通过，详见 [发布结果](github-publish-result.md#mit-许可补丁-064)。0.6.3 原标签和附件保留，项目记忆不上传。
 

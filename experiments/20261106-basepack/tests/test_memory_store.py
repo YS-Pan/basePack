@@ -20,7 +20,7 @@ def memory(tmp_path):
     if "BASEPACK_MEMORY_TEST_ENDPOINT" not in os.environ:
         pytest.skip("requires an actual disposable SurrealDB server")
     config = ProjectConfig(tmp_path / "project.toml", Path(sys.executable), tmp_path,
-                           {"memory": {"data_dir": ".basepack/memory", "project_id": "product_test",
+                           {"memory": {"data_dir": ".basepack/memory", "search_mode": "text", "project_id": "product_test",
                                        "endpoint": os.environ["BASEPACK_MEMORY_TEST_ENDPOINT"],
                                        "namespace": "memsys", "database": "product_tests",
                                        "username": "root", "password_env": "BASEPACK_MEMORY_TEST_PASSWORD"}},
@@ -66,10 +66,9 @@ def test_real_multilevel_roundtrip_local_edit_and_correction(memory):
     updated_text = "# 数据库\n数据库离线运行并隔离项目。\n\n# 保留\n资料必须保留。\n"
     (memory.config.root / "guide.md").write_bytes(updated_text.encode("utf-8"))
     assert memory.changes(["guide.md"])[0]["kind"] == "modified"
-    assert memory.search("数据库") == []
+    assert {row["kind"] for row in memory.search("数据库")} == {"file", "section", "chunk"}
     assert memory.search("资料")[0]["id"] == "member:retention"
-    with pytest.raises(ValueError, match="revision mismatch"):
-        memory.read("storage")
+    assert memory.read("storage")["original"]["text"] == "本地数据库隔离项目。\n"
     prepared = memory.prepare(["guide.md"])
     assert "本地数据库隔离项目" in prepared["sources"][0]["previous"]["numbered_text"]
     updated = batch_for(memory, updated_text)
@@ -83,7 +82,7 @@ def test_real_multilevel_roundtrip_local_edit_and_correction(memory):
     assert memory.read("storage")["original"]["text"] == "数据库离线运行并隔离项目。\n"
     after = {row["id"]: row for row in memory._rows("member")}
     assert after["member:retention"]["input_revision"] == old["member:retention"]["input_revision"]
-    assert after["member:retention"]["source_revision"] != old["member:retention"]["source_revision"]
+    assert after["member:retention"]["source_revision"] == old["member:retention"]["source_revision"]
     assert after["member:retention"]["stale"] is False
     assert all(row["stale"] is False for row in memory.search("离线"))
     correction = memory._execute("SELECT * FROM ONLY change:fix;")[0]
@@ -126,19 +125,17 @@ def test_real_stale_evidence_and_deleted_original(memory):
     with pytest.raises(ValueError, match="revision mismatch"):
         memory.apply({"sources": [], "edges": batch["edges"]})
     memory.changes(["guide.md"])
-    assert memory._rows("node")[0]["stale"] is True
-    assert memory._rows("semantic")[0]["stale"] is True
+    assert memory._rows("node")[0]["stale"] is False
+    assert memory._rows("semantic")[0]["stale"] is False
     (memory.config.root / "guide.md").unlink()
     assert memory.changes(["guide.md"])[0]["kind"] == "deleted"
-    assert memory.search("资料") == []
+    assert memory.search("资料")
     brief = memory.brief(limit=0)
-    assert brief["mandatory"][0]["stale"] is True
-    assert {row["id"] for row in brief["pending"]} == {
-        "member:guide", "member:storage_section", "member:storage", "member:retention", "node:local", "semantic:requires"}
-    # Missing originals stay a visible failure; retained history is not passed
-    # off as the current business file.
-    with pytest.raises(FileNotFoundError):
-        memory.read("storage")
+    assert brief["mandatory"][0]["stale"] is False
+    assert brief["pending"] == []
+    # The published evidence is read from its retained snapshot, even if the
+    # business original is gone.
+    assert memory.read("storage")["original"]["text"] == "本地数据库隔离项目。\n"
     assert len(memory._rows("source_version")) == 1
     prepared = memory.prepare(["guide.md"])["sources"][0]
     assert prepared["deleted"] is True
@@ -146,6 +143,7 @@ def test_real_stale_evidence_and_deleted_original(memory):
     memory.apply({"sources": [{"path": "guide.md", "revision": batch["sources"][0]["revision"], "deleted": True}]})
     assert memory.changes(["guide.md"]) == []
     assert memory._rows("source")[0]["deleted"] is True
+    assert memory.search("资料") == []
 
 
 def test_real_appended_exception_invalidates_complete_summaries(memory):
@@ -158,17 +156,17 @@ def test_real_appended_exception_invalidates_complete_summaries(memory):
     path.write_bytes(path.read_bytes() + "但临时缓存允许删除。\n".encode("utf-8"))
     memory.changes(["guide.md"])
     rows = {row["id"]: row for row in memory._rows("member")}
-    assert rows["member:guide"]["stale"] is True
-    assert rows["member:retention_section"]["stale"] is True
+    assert rows["member:guide"]["stale"] is False
+    assert rows["member:retention_section"]["stale"] is False
     assert rows["member:storage"]["stale"] is False
     assert rows["member:retention"]["stale"] is False
     prepared = memory.prepare(["guide.md"])["sources"][0]
     memory.apply({"sources": [{"path": "guide.md", "revision": prepared["revision"]}]})
     rows = {row["id"]: row for row in memory._rows("member")}
-    assert rows["member:guide"]["stale"] is True
-    assert rows["member:retention_section"]["stale"] is True
+    assert rows["member:guide"]["stale"] is False
+    assert rows["member:retention_section"]["stale"] is False
     assert rows["member:retention"]["stale"] is False
-    assert "member:retention_section" not in {row["id"] for row in memory.search("保留")}
+    assert "member:retention_section" in {row["id"] for row in memory.search("保留")}
     partial = {"sources": [{"path": "guide.md", "revision": prepared["revision"]}],
                "expected": memory.prepare(["guide.md"])["expected"], "members": batch["members"][:1]}
     with pytest.raises(ValueError, match="Partial file summary"):

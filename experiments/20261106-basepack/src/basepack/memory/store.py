@@ -13,7 +13,7 @@ from urllib.request import Request, urlopen
 from uuid import uuid4
 
 from basepack.project.config import ProjectConfig
-from .content import SourceContent, detect_changes, numbered_text, read_member, read_source, reading_units
+from .content import SourceContent, _project_path, detect_changes, numbered_text, read_source, reading_units
 from .images import IMAGE_SUFFIXES, ImageSource, read_image, retain_image
 
 
@@ -87,7 +87,8 @@ class Memory:
         if check_project:
             sql = (f"IF meta:project.project_id != {_sql(connection['project_id'])} "
                    "{ THROW 'Memory database belongs to another project or is not initialized'; };\n" + sql)
-        request = Request(connection["endpoint"].rstrip("/") + "/sql", sql.encode("utf-8"), {
+        body = sql.encode("utf-8")
+        request = Request(connection["endpoint"].rstrip("/") + "/sql", body, {
             "Authorization": "Basic " + b64encode(credential.encode()).decode(),
             "surreal-ns": connection["namespace"], "surreal-db": connection["database"],
             "Accept": "application/json", "Content-Type": "text/plain; charset=utf-8",
@@ -97,6 +98,10 @@ class Memory:
                 statements = json.load(response)
         except HTTPError as error:
             error.add_note(error.read().decode("utf-8"))
+            if error.code == 413:
+                error.add_note(f"SQL request body: {len(body)} bytes; server capacity is unknown. "
+                               "Split the work into smaller manual batches, retain prepare's expected versions "
+                               "and each batch's atomicity, and read relation endpoints at their accepted versions.")
             raise
         errors = [statement["result"] for statement in statements if statement["status"] != "OK"]
         if errors:
@@ -127,6 +132,11 @@ class Memory:
 
     def prepare(self, paths: list[str]) -> dict:
         """Supply explicit new/old originals and existing knowledge for one reading."""
+        for path in paths:
+            if _project_path(self.config.root.resolve(), path).is_dir():
+                raise ValueError(f"prepare --paths accepts files, not directories: {path}. "
+                                 "Enumerate and select files first (PowerShell: Get-ChildItem -File); "
+                                 "pass their project-relative paths to --paths.")
         known = {source["path"]: source for source in self._rows("source")}
         members = self._rows("member")
         prepared = []
@@ -253,12 +263,15 @@ class Memory:
                 f"UPDATE node SET stale=true, knowledge_revision={_sql(uuid4().hex)} WHERE basis.*.member CONTAINSANY {refs};",
                 f"UPDATE semantic SET stale=true, knowledge_revision={_sql(uuid4().hex)} WHERE basis.*.member CONTAINSANY {refs} OR in IN {refs} OR out IN {refs} OR in IN {nodes} OR out IN {nodes};"]
 
-    def apply(self, batch: dict) -> dict:
+    def apply(self, batch: dict, *, control: str | None = None, timeout: float = 600) -> dict:
         """Check exact source revisions, then accept one agent batch atomically.
 
         Unmentioned records and edges survive. Accepted chunk text comes from the
         original, never from generated prose. Corrections retain actual old data.
         """
+        if control:
+            from .maintenance import check
+            check(control)
         for index, item in enumerate(batch.get("members", [])):
             if item["kind"] in {"file", "section", "chunk"}:
                 missing = [field for field in ("start_line", "end_line") if field not in item]
@@ -335,19 +348,16 @@ class Memory:
         affected.update(existing[_record(value).key]["id"] for value in batch.get("delete_members", []))
         affected = self._expand_affected(affected, before_members)
         context = batch.get("context", {})
-        statements.extend(self._invalidate_sql(affected, "source_changed", context))
+        # Source changes alone do not withdraw published knowledge. Explicit
+        # retirement does invalidate active knowledge that depends on it.
+        retired = self._affected({path: source for path, source in current.items() if source is None}, before_members)
+        retired.update(existing[_record(value).key]["id"] for value in batch.get("delete_members", []))
+        retired = self._expand_affected(retired, before_members)
+        statements.extend(self._invalidate_sql(retired, "retired", context))
         for path, source in current.items():
             if source is None:
                 statements.append(f"UPDATE member SET retired=true, knowledge_revision={_sql(uuid4().hex)} "
                                   f"WHERE source={_sql(_record(by_path[path]['id']))};")
-        # Rebind unchanged siblings without changing their representation input.
-        accepted = {_record(value["id"]).key for value in batch.get("members", [])}
-        for member in before_members:
-            if (not member["retired"] and member["path"] in current and member["id"] not in affected
-                    and _record(member["id"]).key not in accepted):
-                statements.append(f"UPDATE {_sql(_record(member['id']))} SET source_revision={_sql(current[member['path']].revision)}, source_version={_sql(versions[member['path']])};")
-                existing[_record(member["id"]).key] = {**member,
-                    "source_revision": current[member["path"]].revision, "source_version": versions[member["path"]]}
         submitted = {}
         for item in batch.get("members", []):
             source = current[item["path"]]
@@ -384,6 +394,12 @@ class Memory:
                               "raw_revision": _digest(raw), "input_revision": _input_revision(title, text),
                               "embedding_kind": "text"})
             submitted[_record(item["id"]).key] = value
+        if submitted and self.config.memory_search_mode in {"vector", "hybrid"}:
+            from .candidate_vectors import encode_candidates
+            records = [_record(item["id"]) for item in batch.get("members", [])]
+            old_vectors = self._execute(f"SELECT * FROM member WHERE id IN {_sql(records)};")[0]
+            encode_candidates(self, submitted, {_record(row["id"]).key: row for row in old_vectors},
+                              timeout=timeout, control=control)
         def basis(ids):
             result = []
             for value in ids:
@@ -394,12 +410,16 @@ class Memory:
                         raise ValueError(f"Evidence must be reread and accepted: {member['id']}")
                     source = self._load_source(member["path"], member["kind"])
                     if source.revision != member["source_revision"]:
-                        raise ValueError(f"Evidence source revision mismatch for {member['path']}")
+                        unchanged = (not isinstance(source, ImageSource) and
+                                     _digest(_original(source, member["start_line"], member["end_line"])) == member["raw_revision"])
+                        if not unchanged:
+                            raise ValueError(f"Evidence source revision mismatch for {member['path']}")
                 result.append({"member": _record(value), "input_revision": member["input_revision"],
                                "knowledge_revision": member["knowledge_revision"],
                                "description_revision": member.get("description_revision"),
                                "source_version": _record(member["source_version"]) if isinstance(member["source_version"], str) else member["source_version"],
-                               "start_line": member["start_line"], "end_line": member["end_line"]})
+                               "start_line": member["start_line"], "end_line": member["end_line"],
+                               "locator": member.get("locator")})
             return result
 
         writes = []
@@ -443,10 +463,38 @@ class Memory:
             target = _record(correction["target"])
             # The snapshot precedes all accepts in the transaction.
             statements.insert(1, f"CREATE {_sql(_record(correction['id'], 'change'))} SET operation='correction', target={_sql(target)}, reason={_sql(correction['reason'])}, previous=(SELECT * OMIT embedding FROM ONLY {_sql(target)}), at=time::now(), context={_sql(context)};")
+        # A correction without a replacement marks the known error unavailable.
+        for correction in batch.get("corrections", []):
+            target = _record(correction["target"])
+            if target in {_record(item["id"], table) for table, key in
+                          [("member", "members"), ("node", "nodes"), ("semantic", "edges")]
+                          for item in batch.get(key, [])}:
+                continue
+            if target.table == "member":
+                correction_affected = self._expand_affected({existing[target.key]["id"]}, before_members)
+                statements.extend(self._invalidate_sql(correction_affected, "correction", context))
+                retired.update(correction_affected)
+            else:
+                statements.append(f"UPDATE {_sql(target)} SET stale=true, knowledge_revision={_sql(uuid4().hex)};")
+                if target.table == "node":
+                    statements.append(f"UPDATE semantic SET stale=true, knowledge_revision={_sql(uuid4().hex)} WHERE in={_sql(target)} OR out={_sql(target)};")
         statements.append("COMMIT;")
+        # Encoding may take time; never publish a candidate from a changed original.
+        for expected in batch["sources"]:
+            if expected.get("deleted"):
+                previous = by_id[expected["id"]] if "id" in expected else by_path[expected["path"]]
+                if (self.config.root / previous["path"]).exists():
+                    raise ValueError(f"Deleted source exists again: {previous['path']}")
+            else:
+                source = self._load_source(expected["path"], expected.get("kind"))
+                if source.revision != expected["revision"]:
+                    raise ValueError(f"Source revision mismatch for {source.path}: expected {expected['revision']}, found {source.revision}")
+        if control:
+            from .maintenance import begin_commit
+            begin_commit(control)
         self._execute("\n".join(statements))
         return {"sources": len(current), "members": len(submitted), "nodes": len(batch.get("nodes", [])),
-                "edges": len(batch.get("edges", [])), "invalidated": sorted(affected)}
+                "edges": len(batch.get("edges", [])), "invalidated": sorted(retired)}
 
     def search(self, text: str, *, scope: str = "", limit: int = 10, literal: bool = False) -> list[dict]:
         if literal:
@@ -457,68 +505,91 @@ class Memory:
             match = f"(text @1@ {_sql(text)} OR title @2@ {_sql(text)})"
             score = "search::score(1) + search::score(2)"
         return self._execute(f"SELECT *, source_revision AS revision, {score} AS lexical_score OMIT {_CANDIDATE_OMIT} FROM member "
-                             f"WHERE stale=false AND {match} "
+                             f"WHERE stale=false AND retired!=true AND {match} "
                              f"AND string::starts_with(path, {_sql(scope)}) "
                              f"ORDER BY lexical_score DESC LIMIT {int(limit)};")[0]
 
-    def read(self, member_id: str) -> dict:
+    def read(self, member_id: str, *, source_version: str | None = None,
+             start_line: int | None = None, end_line: int | None = None,
+             locator: dict | None = None) -> dict:
         if _record(member_id).table != "member":
             raise ValueError("read requires a member ID; inspect node/edge evidence via neighbors")
         member = self._execute(f"SELECT * OMIT embedding FROM ONLY {_sql(_record(member_id))};")[0]
         if member is None:
             raise ValueError(f"Member not found: {member_id}")
-        if member["kind"] == "image":
-            snapshot = self.config.memory_dir / member["asset"]
-            if sha256(snapshot.read_bytes()).hexdigest() != member["source_revision"]:
+        version = source_version or member["source_version"]
+        snapshot = self._execute(f"SELECT * FROM ONLY {_sql(_record(version, 'source_version'))};")[0]
+        if snapshot is None:
+            raise ValueError(f"Source snapshot not found: {version}")
+        if _record(snapshot["source"]) != _record(member["source"]):
+            raise ValueError(f"Source snapshot does not belong to member {member_id}: {version}")
+        source = self._execute(f"SELECT * FROM ONLY {_sql(_record(snapshot['source']))};")[0]
+        if source is None:
+            raise ValueError(f"Snapshot source not found: {snapshot['source']}")
+        path, revision = source["path"], snapshot["revision"]
+        if snapshot["kind"] == "image":
+            asset = self.config.memory_dir / snapshot["asset"]
+            if sha256(asset.read_bytes()).hexdigest() != revision:
                 raise ValueError(f"Image snapshot revision mismatch for {member_id}")
-            missing = False
-            try:
-                source = read_image(self.config.root, member["path"])
-            except FileNotFoundError:
-                missing = True
-            else:
-                if source.revision != member["source_revision"]:
-                    raise ValueError(f"Image source revision mismatch for {member['path']}")
-            return {"member": member, "original": {"path": member["path"], "revision": member["source_revision"],
-                    "image_path": str(snapshot), "original_missing": missing, "locator": member["locator"]}}
-        original = read_member(self.config.root, member["path"], member["source_revision"],
-                               member["id"], member["start_line"], member["end_line"])
-        return {"member": member, "original": asdict(original)}
+            if locator is None and source_version is None:
+                locator = member.get("locator")
+            return {"member": member, "original": {"path": path, "revision": revision,
+                    "source_version": version, "image_path": str(asset), "locator": locator}}
+        if source_version is None:
+            start_line, end_line = member["start_line"], member["end_line"]
+        elif start_line is None or end_line is None:
+            raise ValueError("Reading an explicit source version requires start_line and end_line")
+        text = snapshot["text"]
+        if sha256(text.encode("utf-8")).hexdigest() != revision:
+            raise ValueError(f"Text snapshot revision mismatch for {member_id}")
+        content = SourceContent(path, revision, len(text.encode("utf-8")), 0, text)
+        return {"member": member, "original": {"member_id": member["id"], "path": path,
+                "revision": revision, "source_version": version, "start_line": start_line,
+                "end_line": end_line, "text": _original(content, start_line, end_line)}}
 
     def neighbors(self, record_id: str, *, include_stale: bool = False) -> dict:
         record = _sql(_record(record_id))
-        fresh = "" if include_stale else " AND stale=false"
+        fresh = "" if include_stale else " AND stale=false AND retired!=true"
         current, children, edges = self._execute(
             f"SELECT * OMIT embedding FROM ONLY {record}; SELECT * OMIT embedding FROM member WHERE parent={record}{fresh}; "
             f"SELECT * FROM semantic WHERE (in={record} OR out={record}){fresh};")
         parent = self._execute(f"SELECT * OMIT embedding FROM ONLY {_sql(_record(current['parent']))};")[0] if current and current.get("parent") else None
-        if parent and parent["stale"] and not include_stale:
+        if parent and (parent["stale"] or parent.get("retired")) and not include_stale:
             parent = None
         return {"record": current, "parent": parent, "children": children, "edges": edges}
 
     def brief(self, task: str = "", *, limit: int = 6) -> dict:
         sources = self.sources()
-        configured_scope = self.connection.get("source_scope", [])
-        scope = list(dict.fromkeys(configured_scope + [source["path"] for source in sources]))
-        changed = self._check_changes(sources, scope, deep=False) if scope else []
-        mandatory, stale_members, stale_nodes, stale_edges, gaps, vector_pending, overview = self._execute(
+        mandatory, stale_members, stale_nodes, stale_edges, gaps, overview = self._execute(
             "SELECT * OMIT embedding FROM member WHERE mandatory=true AND retired!=true; "
             "SELECT id,path,kind FROM member WHERE stale=true AND retired!=true; "
             "SELECT id,kind FROM node WHERE stale=true AND retired!=true; "
             "SELECT id,kind FROM semantic WHERE stale=true AND retired!=true; "
             "SELECT id,path,coverage_gaps AS gaps FROM member WHERE retired!=true AND array::len(coverage_gaps)>0; "
-            "SELECT id,path FROM member WHERE stale=false AND (embedding=NONE OR embedded_revision!=input_revision); "
-            f"SELECT * OMIT embedding FROM member WHERE stale=false AND mandatory=false AND kind IN ['file','section','image'] ORDER BY kind,path LIMIT {int(limit)};")
+            f"SELECT * OMIT embedding FROM member WHERE stale=false AND retired!=true AND mandatory=false AND kind IN ['file','section','image'] ORDER BY kind,path LIMIT {int(limit)};")
+        mode = self.config.memory_search_mode
+        coverage = None
+        related = []
+        if task and limit:
+            if mode == "text":
+                related = self.search(task, limit=limit)
+            else:
+                search = self.vector_search if mode == "vector" else self.hybrid_search
+                result = search(task, limit=limit, include_coverage=True)
+                related, coverage = result["matches"], result["vector_coverage"]
+        elif mode != "text":
+            from basepack.embedding.admin import status
+            from .vectors import vector_coverage
+            identity = status(self.config.machine)["model"]["embedding_identity"]
+            coverage = vector_coverage(self, identity)
         stale = stale_members + stale_nodes + stale_edges
         mandatory_ids = {row["id"] for row in mandatory}
-        related = [row for row in self.search(task, limit=limit) if row["id"] not in mandatory_ids] if task and limit else []
-        # A short project map is an intentional startup channel even when the
-        # current task shares no literal terms with a prerequisite.
+        related = [row for row in related if row["id"] not in mandatory_ids]
         related_limit = max(0, limit - max(1, limit // 3)) if related else 0
         clues = [dict(row, clue_role="related") for row in related[:related_limit]]
         selected_ids = {row["id"] for row in clues}
         clues.extend(dict(row, clue_role="map") for row in overview if row["id"] not in selected_ids)
-        fields = {"id", "kind", "title", "text", "path", "source_revision", "start_line", "end_line",
+        fields = {"id", "kind", "title", "text", "path", "source_revision", "source_version", "start_line", "end_line",
                   "parent", "stale", "retired", "coverage_gaps", "locator", "clue_role"}
         def startup_item(row):
             return {key: value for key, value in row.items() if key in fields}
@@ -527,13 +598,15 @@ class Memory:
                 "mandatory_pending_count": sum(row["stale"] for row in mandatory),
                 "clues": [startup_item(row) for row in clues[:limit]],
                 "pending": stale[:detail_limit], "pending_count": len(stale),
-                "changes": changed[:detail_limit], "change_count": len(changed),
+                "changes": [], "change_count": 0,
                 "sources": [{key: row[key] for key in ("id", "path", "kind", "deleted")} for row in sources[:detail_limit]],
                 "source_count": len(sources),
                 "coverage_gaps": gaps[:detail_limit], "coverage_gaps_count": len(gaps),
-                "vector_pending": vector_pending[:detail_limit], "vector_pending_count": len(vector_pending),
-                "discovery_scope": configured_scope,
-                "change_check": "metadata; unconfigured additions outside registered paths are not checked"}
+                "vector_coverage": coverage,
+                "vector_pending": coverage["pending_members"][:detail_limit] if coverage else [],
+                "vector_pending_count": coverage["pending"] if coverage else None,
+                "discovery_scope": self.connection.get("source_scope", []),
+                "change_check": "not checked by brief; use memory changes for maintenance"}
 
     def sources(self) -> list[dict]:
         """List source metadata for explicit inventory or deep-maintenance sampling."""
@@ -544,26 +617,19 @@ class Memory:
 
     def _check_changes(self, known: list[dict], scope: list[str], *, deep: bool) -> list[dict]:
         changes = detect_changes(self.config.root, [source for source in known if not source.get("deleted")], scope, deep=deep)
-        current = {change.path: None if change.kind == "deleted" else self._load_source(change.path)
-                   for change in changes if change.kind != "added"}
-        if not current:
-            return [asdict(change) for change in changes]
-        members = self._rows("member")
-        affected = self._affected(current, members) & {member["id"] for member in members if not member["stale"]}
-        statements = self._invalidate_sql(affected, "detected_change", {})
-        if statements:
-            self._execute("BEGIN;\n" + "\n".join(statements) + "\nCOMMIT;")
         return [asdict(change) for change in changes]
 
     def embed_members(self, ids: list[str] | None = None, *, timeout: float = 600) -> dict:
         from .vectors import embed_members
         return embed_members(self, ids, timeout=timeout)
 
-    def vector_search(self, text: str, *, scope: str = "", limit: int = 12, timeout: float = 600) -> list[dict]:
+    def vector_search(self, text: str, *, scope: str = "", limit: int = 12, timeout: float = 600,
+                      include_coverage: bool = False):
         from .vectors import vector_search
-        return vector_search(self, text, scope=scope, limit=limit, timeout=timeout)
+        return vector_search(self, text, scope=scope, limit=limit, timeout=timeout, include_coverage=include_coverage)
 
     def hybrid_search(self, text: str, *, scope: str = "", limit: int = 12, timeout: float = 600,
-                      literal: bool = False) -> list[dict]:
+                      literal: bool = False, include_coverage: bool = False):
         from .vectors import hybrid_search
-        return hybrid_search(self, text, scope=scope, limit=limit, timeout=timeout, literal=literal)
+        return hybrid_search(self, text, scope=scope, limit=limit, timeout=timeout, literal=literal,
+                             include_coverage=include_coverage)

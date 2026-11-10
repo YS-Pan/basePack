@@ -31,7 +31,7 @@ def resource_client(tmp_path):
     return client
 
 
-def test_native_capacity_and_check_request_distinguish_total_from_currently_available(resource_client):
+def test_capacity_reports_total_and_currently_available_without_admission(resource_client):
     from basepack.jobs import JobSpec
 
     capacity = resource_client.capacity()
@@ -41,11 +41,10 @@ def test_native_capacity_and_check_request_distinguish_total_from_currently_avai
         "cpus": 0, "memory_mib": 0, "gpus": 0, "Disk": 51200, "SiteGpuMiB": 0}
     spec = JobSpec(executable=sys.executable, cwd=str(resource_client.config.root),
                    cpus=2, memory_mib=2048, gpu_memory_mib=4000)
+    resource_client._ads = lambda *args: pytest.fail("submission must leave capacity matching to Condor")
     resource_client._check_request(spec)
     for key, amount in (("cpus", 13), ("memory_mib", 24577)):
-        with pytest.raises(ValueError, match="exceeds local Condor slot capacity"):
-            resource_client._check_request(JobSpec(**{**spec.__dict__, key: amount}))
-    # The schedd owns GPU resource admission, including over-pool requests.
+        resource_client._check_request(JobSpec(**{**spec.__dict__, key: amount}))
     resource_client._check_request(JobSpec(**{**spec.__dict__, "gpu_memory_mib": 7165}))
 
 
@@ -75,17 +74,19 @@ def test_capacity_omits_resources_without_published_total_and_available(resource
     assert capacity["total"]["SiteGpuMiB"] == 7164
 
 
-def test_check_request_requires_one_local_slot_to_fit_all_requested_resources(resource_client):
+@pytest.mark.parametrize("field", ["cpus", "memory_mib", "disk_mib", "queue_timeout", "run_timeout"])
+def test_request_requires_positive_resource_and_time_values(resource_client, field):
     from basepack.jobs import JobSpec
 
-    slot = resource_client._ads()[0]
-    resource_client._ads = lambda *args: [
-        slot | {"TotalSlotMemory": 1024},
-        slot | {"Name": "slot2@local", "TotalSlotCpus": 1},
-        slot | {"Machine": "another-computer"}]
-    with pytest.raises(ValueError, match="exceeds local Condor slot capacity"):
-        resource_client._check_request(JobSpec(executable=sys.executable,
-            cwd=str(resource_client.config.root), cpus=2, memory_mib=2048))
+    with pytest.raises(ValueError, match=f"{field} must be positive"):
+        resource_client._check_request(JobSpec(executable=sys.executable, **{field: 0}))
+
+
+@pytest.mark.parametrize("field", ["TotalSlotCpus", "Cpus", "TotalSlotMemory", "Memory", "MachineResources", "TotalSlotGPUs", "GPUs"])
+def test_capacity_preserves_missing_required_field_errors(resource_client, field):
+    del resource_client._ads()[0][field]
+    with pytest.raises(KeyError, match=field):
+        resource_client.capacity()
 
 
 def test_cpu_submit_needs_no_gpu_attributes_and_gpu_submit_uses_official_fields(resource_client):
@@ -112,6 +113,7 @@ def test_cpu_submit_needs_no_gpu_attributes_and_gpu_submit_uses_official_fields(
     assert "request_gpus = 0\n" in cpu_submit
     assert "gpus_minimum_memory" not in cpu_submit
     assert resource_client.capacity()["slots"][0]["total"]["gpus"] == 0
+    assert resource_client.capacity()["slots"][0]["available"]["gpus"] == 0
 
 
 def test_submit_reuses_relative_spec_in_each_project_without_changing_it(resource_client, tmp_path):
@@ -218,6 +220,54 @@ def test_uncertain_submit_keeps_original_error_without_submitting_twice(tmp_path
     assert "original submit response lost" in submitted["submit_response_error"]
     saved = json.loads((Path(submitted["job_dir"]) / "submission.json").read_text(encoding="utf-8"))
     assert saved["submit_response_error"] == submitted["submit_response_error"]
+
+
+@pytest.mark.parametrize("lookup_failure", [None, RuntimeError("lookup failed")])
+def test_uncertain_submit_preserves_submit_error_when_token_recovery_fails(resource_client, lookup_failure):
+    from basepack.jobs import JobSpec
+
+    original = subprocess.TimeoutExpired("condor_submit", 25, stderr="lost submit response")
+    calls = []
+
+    def command(name, *args, **kwargs):
+        calls.append(name)
+        raise original
+
+    def ads(*args):
+        if lookup_failure:
+            raise lookup_failure
+        return []
+
+    resource_client._call = command
+    resource_client._ads = ads
+    with pytest.raises(subprocess.TimeoutExpired) as caught:
+        resource_client.submit(JobSpec(executable=sys.executable))
+    assert caught.value is original
+    assert caught.value.__cause__ is lookup_failure
+    assert calls == ["condor_submit"]
+
+
+def test_uncertain_submit_recovers_from_history_by_same_token(resource_client):
+    from basepack.jobs import JobSpec
+
+    calls, queries = [], []
+
+    def command(name, *args, **kwargs):
+        calls.append(name)
+        if name == "condor_submit":
+            raise RuntimeError("submit response lost")
+
+    def ads(name, *args):
+        queries.append((name, args))
+        return [] if name == "condor_q" else [{"ClusterId": 124, "ProcId": 0}]
+
+    resource_client._call = command
+    resource_client._ads = ads
+    submitted = resource_client.submit(JobSpec(executable=sys.executable))
+    assert submitted["job_id"] == "124.0"
+    assert calls == ["condor_submit", "condor_reschedule"]
+    assert [name for name, _ in queries] == ["condor_q", "condor_history"]
+    assert all(f'BasePackSubmissionId == "{submitted["submission_id"]}"' in args for _, args in queries)
 
 
 def test_worker_preserves_windows_argv_and_application_exit(tmp_path):

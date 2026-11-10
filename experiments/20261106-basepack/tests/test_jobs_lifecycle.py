@@ -113,6 +113,90 @@ def test_cleanup_preserves_process_observation_error(client, monkeypatch):
     assert result == {"cleanup_confirmed": False, "cleanup_error": "original process observation failure"}
 
 
+@pytest.mark.parametrize("native", [{}, {"NumJobStarts": 1}, {"NumJobStarts": 0, "JobCurrentStartExecutingDate": 5}])
+def test_cleanup_without_pids_preserves_missing_process_evidence(client, monkeypatch, native):
+    client._ad = lambda job_id: (native, True)
+    monkeypatch.setattr(jobs_client.psutil, "pid_exists", lambda pid: pytest.fail("no PIDs were observed"))
+    result = client._confirm_cleanup("123.0", timeout=0)
+    assert not result["cleanup_confirmed"]
+    assert result["cleanup_scope"] == "condor_history_only"
+    assert "checked_pids" not in result
+    assert "No worker PIDs" in result["cleanup_error"]
+
+
+def test_cleanup_never_started_uses_native_history_without_claiming_pid_checks(client, monkeypatch):
+    client._ad = lambda job_id: ({"NumJobStarts": 0}, True)
+    monkeypatch.setattr(jobs_client.psutil, "pid_exists", lambda pid: pytest.fail("never started"))
+    result = client._confirm_cleanup("123.0", timeout=0)
+    assert result == {"cleanup_confirmed": True, "cleanup_scope": "condor_history_never_started"}
+
+
+def test_cleanup_can_observe_worker_receipt_published_after_cancel(client, monkeypatch):
+    observations = iter([({}, False), ({}, True)])
+    receipts = iter([set(), {21}])
+    client._ad = lambda job_id: next(observations)
+    monkeypatch.setattr(jobs_client, "_worker_pids", lambda ad: next(receipts))
+    monkeypatch.setattr(jobs_client.psutil, "pid_exists", lambda pid: False)
+    monkeypatch.setattr(jobs_client.time, "sleep", lambda _: None)
+    result = client._confirm_cleanup("123.0")
+    assert result["cleanup_confirmed"] and result["checked_pids"] == [21]
+
+
+@pytest.mark.parametrize("native,expected", [
+    ({"CompletionDate": 5, "JobCurrentStartExecutingDate": 8}, (-5, -2, -3)),
+    ({"CompletionDate": 5}, (-5, -5, None)),
+    ({}, (None, None, None)),
+])
+def test_status_keeps_raw_negative_durations_and_missing_times(client, monkeypatch, native, expected):
+    client.encoding = "utf-8"
+    client._ad = lambda job_id: ({"JobStatus": 3, "QDate": 10} | native, True)
+    monkeypatch.setattr(jobs_client, "_terminal_time", lambda ad, encoding: ad.get("CompletionDate"))
+    result = client.status("123.0")
+    assert tuple(result[key] for key in ("elapsed_seconds", "queued_seconds", "running_seconds")) == expected
+
+
+@pytest.mark.parametrize("code,reason,expected", [
+    (46, "超过允许时长", "execution"),
+    (47, "超过执行时长", "execution"),
+    (3, "execution time exceeded in unrelated policy", None),
+    (None, "PeriodicRemove expression evaluated true", None),
+])
+def test_removed_status_uses_structured_timeout_evidence(client, monkeypatch, code, reason, expected):
+    client.encoding = "utf-8"
+    client._ad = lambda job_id: ({"JobStatus": 3, "LastJobStatus": 5, "QDate": 10,
+        "HoldReasonCode": code, "HoldReasonSubCode": 12, "RemoveReason": reason}, True)
+    monkeypatch.setattr(jobs_client, "_terminal_time", lambda *args: None)
+    result = client.status("123.0")
+    assert result["reason"] == reason
+    assert result["hold_reason_code"] == code and result["hold_reason_subcode"] == 12
+    assert result["timeout"] == expected
+
+
+@pytest.mark.parametrize("state", [1, 2, 3])
+def test_past_timeout_hold_does_not_classify_a_later_job_state(client, monkeypatch, state):
+    client.encoding = "utf-8"
+    client._ad = lambda job_id: ({"JobStatus": state, "LastJobStatus": 2, "QDate": 10,
+        "HoldReasonCode": 47}, state == 3)
+    monkeypatch.setattr(jobs_client, "_terminal_time", lambda *args: None)
+    assert client.status("123.0").get("timeout") is None
+
+
+@pytest.mark.parametrize("code,reason,expected", [
+    (47, "执行时间超过限制", "execution"),
+    (3, "execution time mentioned by unrelated hold", None),
+])
+def test_run_preserves_held_reason_and_uses_code_for_timeout(client, code, reason, expected):
+    client.encoding = "utf-8"
+    client.submit = lambda spec: {"job_id": "123.0"}
+    client._ad = lambda job_id: ({"JobStatus": 5, "QDate": 10, "HoldReason": reason,
+        "HoldReasonCode": code, "HoldReasonSubCode": 12}, False)
+    client.cancel = lambda job_id: {"state": "removed", "cleanup_confirmed": True}
+    result = client.run(JobSpec(executable=sys.executable))
+    assert result["original_state"] == "held" and result["reason"] == reason
+    assert result["hold_reason_code"] == code and result["hold_reason_subcode"] == 12
+    assert result.get("timeout") == expected
+
+
 def test_completed_job_cleanup_is_independent_of_unrelated_process_metadata(client, monkeypatch):
     class UnrelatedProcess:
         pid = 999

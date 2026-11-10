@@ -220,10 +220,10 @@ def test_init_contains_project_ai_mapping(ai_config):
     assert describe(ai_config)["ai"] == ai_config.raw["ai"]
 
 
-def test_new_project_has_text_search_and_process_credential_metadata(ai_config):
-    assert ai_config.memory_search_mode == "text"
+def test_new_project_has_vector_search_and_process_credential_metadata(ai_config):
+    assert ai_config.memory_search_mode == "vector"
     result = describe(ai_config)
-    assert result["memory"]["search_mode"] == "text"
+    assert result["memory"]["search_mode"] == "vector"
     assert result["memory"]["password_env"] == "BASEPACK_MEMORY_PASSWORD"
     assert result["memory_password_file"] == str(ai_config.memory_dir / "password.txt")
 
@@ -236,6 +236,24 @@ def test_doctor_defaults_to_core_without_optional_facilities(ai_config):
     assert completed.returncode == 0, completed.stderr
     assert "configured_python_package" in json.loads(completed.stdout)["checks"]
     assert not ai_config.memory_dir.exists()
+
+
+def test_cpu_embedding_doctor_needs_no_gpu_probe(ai_config, monkeypatch, tmp_path):
+    model = tmp_path / "model"
+    (model / "model").mkdir(parents=True)
+    (model / "model.lock.json").write_text("{}", encoding="utf-8")
+    (model / "model/config.json").write_text("{}", encoding="utf-8")
+    ai_config.machine.raw["embedding"] = {"model_root": str(model), "device": "auto"}
+    calls = []
+
+    def package_only(command, **kwargs):
+        calls.append(command)
+        assert command[0] == str(ai_config.python)
+        return str(Path(basepack.__file__))
+
+    monkeypatch.setattr("basepack.project.doctor.subprocess.check_output", package_only)
+    assert doctor(ai_config, "embedding")["checks"]["embedding_device"] == "auto"
+    assert len(calls) == 1
 
 
 def test_generated_entries_cover_first_setup_and_local_issue_feedback(ai_config):

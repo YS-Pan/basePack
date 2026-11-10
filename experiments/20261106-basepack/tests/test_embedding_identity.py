@@ -30,7 +30,7 @@ def test_runtime_settings_and_model_location_preserve_embedding_identity(options
     expected = identity.embedding_identity(options)
     moved = tmp_path / "移动后 model"
     shutil.copytree(options["model_root"], moved)
-    changed = options | {"model_root": str(moved), "device": "cuda:1", "max_length": 1024,
+    changed = options | {"model_root": str(moved), "device": "cpu", "max_length": 1024,
                          "batch_size": 1, "idle_seconds": 10, "cpu_threads": 1,
                          "gpu_memory_mib": 8000}
     assert identity.embedding_identity(changed) == expected

@@ -5,8 +5,8 @@ from urllib.parse import urlsplit
 
 from litserve import LitAPI, LitServer
 
-from .identity import embedding_identity
-from .qwen3_vl import Qwen3VLEmbedder
+from .identity import DTYPE, embedding_identity
+from .qwen3_vl import Qwen3VLEmbedder, resolve_device
 
 
 class EmbeddingAPI(LitAPI):
@@ -27,11 +27,14 @@ class EmbeddingAPI(LitAPI):
 def serve(machine):
     configured = machine.raw["embedding"]
     options = configured | {"model_root": str(machine.path_value("embedding", "model_root"))}
+    device = resolve_device(configured["device"])
+    options["device"] = str(device)
     endpoint = urlsplit(configured["endpoint"])
     server = LitServer(
-        EmbeddingAPI(options), accelerator="cuda", devices=[int(configured["device"].split(":")[1])],
+        EmbeddingAPI(options), accelerator=device.type,
+        devices=[device.index if device.index is not None else 0] if device.type == "cuda" else 1,
         workers_per_device=1, timeout=configured["queue_timeout"], restart_workers=True,
-        model_metadata={"embedding_identity": embedding_identity(options),
+        model_metadata={"embedding_identity": embedding_identity(options), "device": str(device), "dtype": DTYPE,
                         "basepack": version("basepack"), "litserve": version("litserve"),
                         "sentence_transformers": version("sentence-transformers")},
     )

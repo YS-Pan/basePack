@@ -1,6 +1,6 @@
 # 项目记忆
 
-记忆在本项目的 SurrealDB 中保存文件摘要、章节摘要、原文块、图片描述与定位，并保留层级、原文范围、语义关系和修改依据；图片原字节快照保存在项目记忆目录的 assets 中。宿主订阅 agent 负责智能分块、摘要、识图、建图和评分，数据库执行存储、事务与查询。新项目默认文字检索，无需模型服务；选择图文检索时再由共享服务编码。小文件不必虚造章节。
+记忆在本项目的 SurrealDB 中保存文件摘要、章节摘要、原文块、图片描述与定位，并保留层级、原文范围、语义关系和修改依据；图片原字节快照保存在项目记忆目录的 assets 中。宿主订阅 agent 负责智能分块、摘要、识图、建图和评分，数据库执行存储、事务与查询。新项目默认向量检索并使用共享模型服务；纯文字项目可配置 `memory.search_mode = 'text'`。小文件不必虚造章节。
 
 ## 启用
 
@@ -27,17 +27,25 @@ memory apply --batch '<agent-batch.json>'
 memory changes --scope '资料目录'
 ```
 
+`prepare --paths` 接受文件而非目录。需要处理目录时先枚举文件，再传项目相对路径，例如：`Get-ChildItem -File 资料目录 | ForEach-Object { Resolve-Path -Relative $_.FullName }`，按实际范围选择文件。数据库返回 HTTP 413 时，错误包含实际 SQL 请求字节数；服务容量未知。按来源手动拆成小批，每批保留 prepare 的 expected 和事务原子性，关系两端依据仍需共读。
+
 prepare 时包括本批所用依据与关系两端的材料；它提供新旧编号原文、已有与关联成员、节点、关系及 expected 知识版本，图片返回可打开的原图路径。关联记录的来源原文仍需 read 或扩充 prepare 范围核实。将材料交给订阅 agent，在同次阅读中选择最终块边界并生成摘要、节点和图边；结构备读单元只用于定位。批次 JSON 合同与操作流程在 `memory guide` 返回的已安装 skill 中，源码维护源为 [SKILL.md](../src/basepack/memory/SKILL.md)。
 
-apply 核对来源版本，以及本批改写、退休、更正目标、实际使用的既有依据成员和关系两端的 expected 版本，再原子写入；无关 expected 不阻塞并行，缺 expected 仅允许本批新建记录。原文块由程序按范围取原词，摘要、边界、依据、历史与更正持久保存。旧草稿冲突时重新 prepare、共读后再提交。来源变化使相关块、祖先摘要及依赖关系待更新，失效也刷新知识版本；未变兄弟与兼容向量可复用，文件追加的新内容必须重核完整摘要。部分摘要显式保存 coverage_gaps。接受删除保留旧依据，相关主张按剩余证据重核。再次共读、apply 并查询新结果后，才算完成文字增量维护；使用向量的项目还需完成 embed。深检查使用 `changes --scope <文件或目录> --deep`。
+apply 核对来源版本，以及本批改写、退休、更正目标、实际使用的既有依据成员和关系两端的 expected 版本，再原子写入；无关 expected 不阻塞并行，缺 expected 仅允许本批新建记录。原文块由程序按范围取原词，摘要、边界、依据、历史与更正持久保存。旧草稿冲突时重新 prepare、共读后再提交。原件变化作为待维护信息，已发布知识及其依据快照仍可查询；受影响内容须在维护时共读，未变输入与兼容向量可复用，文件追加的新内容必须重核完整摘要。部分摘要显式保存 coverage_gaps。接受删除保留旧依据，相关主张按剩余证据重核；仅登记更正而未同批替换的错误内容标待核并排除查询。再次共读、apply 并查询新结果后，才算完成增量维护。向量模式在 apply 事务前准备候选编码，内容与匹配向量一起发布。深检查使用 `changes --scope <文件或目录> --deep`。
 
 需要向量时运行 `memory embed`，复用 [共享 embedding](resources.md)，不另外加载模型。文件/章节使用已接受摘要，块使用原文，图片使用原始图片；兼容且输入未变的向量复用。超限保留原错误，交回原阅读 agent 调整分块或摘要，不能静默截断。纯文字项目保持 `[memory] search_mode = 'text'`，维护和正常查询都无需编码。
 
 图片先由视觉 agent 实际打开，描述与 OCR 单独标明，程序按 hash 保留必要原字节快照。必要 PDF 页可由宿主读取/渲染为项目内图片，locator 记录原文件、版本、页与区域；原 PDF 变化时重新核相关页面，不声称自动解析所有 PDF。
 
+## 自动维护与手动维护
+
+宿主有可取消子任务句柄及任务开始、完成事件时，在业务开始时并行启动低优先级维护 worker。worker 以本次任务唯一的控制文件运行 `memory apply --batch <batch.json> --control <control>`；业务完成时宿主运行 `memory stop --control <control>`，再取消该 worker，不等待编码或已进入提交的短事务。stop 先于提交仲裁时，候选不会发布；已发布批次保留。stop 失败时报告原错误并仍取消 worker，不能声称阻止了发布。宿主缺少生命周期能力时，自动维护不可用。
+
+维护按来源合并变化并小批共读；检索 worker 与维护 worker 各自执行。已发现积压较多时最多提醒一次建议另行手动维护，用户明确发起后再执行独立维护，不扫描全库来统计积压。
+
 ## 最小闭环示例
 
-在已完成 init/brief、凭据已加载的干净试用项目执行 [memory_minimal.py](../examples/memory_minimal.py)。它新建四行 UTF-8 的 `memory-example.md`，拒绝覆盖同名文件，并依次 prepare → 生成完整批次 → apply → search/read/neighbors；每个子命令使用 `subprocess.run(check=True)`，apply 失败后即停止。默认文字查询独立于模型服务；首次运行加 `--with-vectors` 则在 apply 后先 embed，再显式做混合查询。该脚本用于检查命令闭环，真实材料的理解与批次制作由宿主 agent 按 skill 完成。
+在已完成 init/brief、凭据已加载的干净试用项目执行 [memory_minimal.py](../examples/memory_minimal.py)。它新建四行 UTF-8 的 `memory-example.md`，拒绝覆盖同名文件，并依次 prepare → 生成完整批次 → apply → search/read/neighbors；每个子命令使用 `subprocess.run(check=True)`，apply 失败后即停止。运行文字示例前将项目 `memory.search_mode` 设为 `text`；首次运行加 `--with-vectors` 则在 apply 后先 embed，再显式做混合查询。该脚本用于检查命令闭环，真实材料的理解与批次制作由宿主 agent 按 skill 完成。
 
 ```powershell
 $python = '<instructions 中的 absolute-python.exe>'
@@ -66,13 +74,13 @@ memory neighbors 'member:<id>'
 memory read 'member:<id>'
 ```
 
-brief 直接提供必须保留的信息、相关线索、来源与覆盖缺口。mandatory 不参加相关性筛选；其中 stale 条目是待核义务，不能当当前事实。search 未传 `--mode` 时读取项目 `[memory].search_mode`；新项目为 `text`，可按所用设施改成 `hybrid` 或 `vector`。显式 `--mode text|hybrid|vector` 覆盖本次查询；hybrid 融合跨层全文与兼容图文向量。选择 hybrid/vector 时，当前知识缺少兼容索引会明确报错，模型失败保留原错；程序不自动退回文字模式。中文全文按词典分词，短词不保证子串召回，编号命中也不等于精确匹配；literal 是显式包含查询。
+brief 直接提供必须保留的信息、相关线索、来源与覆盖缺口。mandatory 不参加相关性筛选；其中 stale 条目是待核义务，不能当当前事实。search 未传 `--mode` 时读取项目 `[memory].search_mode`；新项目为 `vector`，可按所用设施改成 `hybrid` 或 `text`。显式 `--mode text|hybrid|vector` 覆盖本次查询；hybrid 融合跨层全文与兼容图文向量。选择 hybrid/vector 时，当前知识缺少兼容索引会明确报错，模型失败保留原错；程序不自动退回文字模式。中文全文按词典分词，短词不保证子串召回，编号命中也不等于精确匹配；literal 是显式包含查询。
 
-启动快检默认只覆盖已登记原件；在 `[memory]` 配置 `source_scope = ['资料目录', 'README.md']` 后，也检查这些显式范围中的新增文件。brief 报告 changes/pending 时，由当前宿主 agent 在任务预算内维护相关小批，也可与检索合并委托；程序不另起后台 agent。未改原件只查元数据，深查才做完整 hash。任务词未命中时，短项目地图仍提供前提线索。
+brief、search 和 read 只读已发布知识及对应原文快照，不扫描原件或等待维护。`changes --scope` 显式发现已登记来源及指定范围中的变化；未改原件只查元数据，深查才做完整 hash。维护 worker 应将配置的 `source_scope` 作为 `changes --scope` 的显式范围，以发现其中的新文件。任务词未命中时，短项目地图仍提供前提线索。
 
-brief 的状态明细有上限并返回总数，必保留信息不因此省略；vector_pending 报告尚未编码或输入已变的当前成员，模型身份兼容性在实际向量查询时核对。`memory sources` 列完整来源元数据，供手动深维护抽样；抽到的材料与旧图要实际共读，未发现新关系也如实记录。已待核知识不会每次启动重复写相同失效日志。启动由项目指令驱动宿主实际运行 brief，维护由宿主派发订阅 agent，程序没有后台语义工作进程。
+向量查询和 brief 的相关通道报告当前已发布范围的 identity、总数、兼容数和待建范围；缺少兼容向量与真实无命中分别可见。已有 text 库先运行 `memory embed` 补建，完成后将 `memory.search_mode` 改为 `vector`。`memory sources` 列完整来源元数据，供手动深维护抽样；抽到的材料与旧图要实际共读，未发现新关系也如实记录。
 
-read 只接受 member ID；语义 node/edge 经 neighbors 查看依据，再读对应成员。neighbors 默认展开当前关系，历史复核显式加 `--include-stale`。图像 read 将描述与 `original.image_path` 分开；实际打开快照，并报告 original_missing。业务原图缺失时仍可读保留快照；原图已变化或快照缺失时直接报错。
+read 只接受 member ID；语义 node/edge 经 neighbors 查看依据，再读对应成员。neighbors 默认展开当前关系，历史复核显式加 `--include-stale`。图像 read 将描述与 `original.image_path` 分开；实际打开快照。原件变化或缺失时仍读已发布版本的快照；快照缺失或损坏时返回错误。引用旧版本时使用依据里的 source_version 和位置参数。
 
 当前 ID 合同支持字符串与整数 key。无表名前缀时是原始字符串 key；带 `member:`、`node:` 等前缀时是数据库 canonical ID，可直接沿用返回值。字符串 key `123` 与 canonical `member:123` 的数字 key 不同；字符串形式为 ``member:`123` ``。含冒号的 key 使用完整 canonical ID。
 
@@ -91,4 +99,4 @@ if ($LASTEXITCODE -ne 0) { throw "Surreal export failed ($LASTEXITCODE)" }
 if ($LASTEXITCODE -ne 0) { throw "Surreal import failed ($LASTEXITCODE)" }
 ```
 
-原生 CLI 使用 SURREAL_PASS 等环境变量；basepack 使用配置中的 password_env。备份集合包括 export、项目配置、业务原件及 `memory.data_dir` 下的 assets 图片快照（默认 `.basepack/memory/assets/`）；数据库内的摘要、边界、依据、更正和旧文字快照随 export 恢复。新目录保留 project_id，使用自己的数据目录与端口，再核原文定位、图关系和检索。向量可随 export 恢复，也可从保留表示和原图重新 embed，无需重新总结；重编码仍要求业务原件存在且版本一致。运行中的库使用原生 export；复制物理目录须先停写并停止服务。长期备份目的地与保留周期由业务项目确定。
+原生 CLI 使用 SURREAL_PASS 等环境变量；basepack 使用配置中的 password_env。备份集合包括 export、项目配置、业务原件及 `memory.data_dir` 下的 assets 图片快照（默认 `.basepack/memory/assets/`）；数据库内的摘要、边界、依据、更正和旧文字快照随 export 恢复。新目录保留 project_id，使用自己的数据目录与端口，再核原文定位、图关系和检索。向量可随 export 恢复，也可从保留表示和原图重新 embed，无需重新总结；重编码使用已接受表示与保留的图片快照。运行中的库使用原生 export；复制物理目录须先停写并停止服务。长期备份目的地与保留周期由业务项目确定。
