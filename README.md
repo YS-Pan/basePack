@@ -66,4 +66,4 @@ wheel 包含程序、配置与入口模板、记忆 schema 和 `memory guide` �
 
 使用问题先沿自己的项目记录约定保存现象、版本、最小复现条件与处理状态；修复后补验证结果。按 [问题反馈格式](experiments/20261106-basepack/docs/setup-project.md#问题记录与反馈) 形成可复制的 Issue 草稿，去除凭据和私人资料后，由使用者提交到 [GitHub Issues](https://github.com/YS-Pan/basePack/issues)，或明确授权 agent 提交。
 
-当前尚未授予本项目的开源复用许可；公开源码不等于获得复制、修改或再分发授权。第三方依赖和模型遵循各自许可，图文模型声明见 [Qwen 使用声明](experiments/20261106-basepack/src/basepack/embedding/NOTICE.Qwen3-VL-Embedding.txt)。
+当前尚未授予本项目的开源复用许可。第三方依赖和模型遵循各自许可，图文模型声明见 [Qwen 使用声明](experiments/20261106-basepack/src/basepack/embedding/NOTICE.Qwen3-VL-Embedding.txt)。

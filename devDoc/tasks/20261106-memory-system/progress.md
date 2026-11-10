@@ -10,6 +10,8 @@
 
 0.6.2 新增项目模型等级配置，日常默认 tier3，检索默认 tier1；宿主读取配置并负责派工。源码外安装与配置核验见 [变更记录](../../change_log/minor/20261110_113515_project-ai-tiers.md)。本次未重跑数据库全验收，P0–P5 事实仍按下表的条件阅读。
 
+0.6.3 发布准备已交付项目默认检索模式、core 诊断及新进程凭据接续入口，独立环境源码回归 201 项通过；纯净普通安装和两材料真实 agent 增量维护结果见 [发布结果](../20261106-rebuild/github-publish-result.md)。稳定本项目客户端及正式记忆未随发布准备替换；项目记忆留在本机，源码分发不包含它。
+
 2026-11-10 按资源实测维护本仓库自用记忆：保留原三源，新增[环境说明](../../system/environment.md)、[资源模块](../../system/modules/resources.md)和[管理员说明](../../../experiments/20261106-basepack/docs/administrator.md)，本地 source_scope 共6源。资源主题新增34个文件/章节/原文表示、3个知识节点、5条有依据的语义边并完成向量编码；默认混合检索、原文回读及关系展开已验，原3条必保信息保持 current。六源深检查无变化，pending、mandatory_pending、vector_pending均为0。环境旧历史与管理员其它章节保留未覆盖标记，不代表全文件或全仓库入库；本批[原证](../../../artifacts/runs/20261110-resource-docs-memory/verification.json)与本地配置、数据库分别保留。
 
 ## 阶段状态
