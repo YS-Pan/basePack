@@ -6,8 +6,8 @@
 
 - 2026-11-10 首轮检查时，本地为 `main`、HEAD 为 `1567bbd`，尚未配置 remote；目标 GitHub 仓库已公开，默认分支为 `main`，`git ls-remote` 成功且无输出，Release 列表为空。实际推送前重新核对。
 - 首轮初查跟踪 193 个文件，共 914,649 字节；72 次提交的 825 个历史 blob 解压合计 5,319,731 字节，最大 63,666 字节。有限凭据模式扫描未命中；该体积无需 LFS 或重写历史。发布前按最终内容重算。
-- 发布准备已推进 0.6.3，源码、依赖、测试、用户文档及资源 skill 位于 [active 工程](../../../experiments/20261106-basepack/README.md)，根 [skills](../../../skills/) 保存 agent-team 与 file-structure。已有功能及边界沿 [总进度](progress.md) 和 [记忆进度](../20261106-memory-system/progress.md) 阅读。
-- 首轮安装入口的 wheel 占位已补为从仓库开始的完整命令。尚未选择本项目开源许可证，README 明确当前许可状态。
+- 首次发布为 0.6.3，MIT 许可补丁推进 0.6.4，源码、依赖、测试、用户文档及资源 skill 位于 [active 工程](../../../experiments/20261106-basepack/README.md)，根 [skills](../../../skills/) 保存 agent-team 与 file-structure。已有功能及边界沿 [总进度](progress.md) 和 [记忆进度](../20261106-memory-system/progress.md) 阅读。
+- 首轮安装入口的 wheel 占位已补为从仓库开始的完整命令。用户已明确选择 MIT；根许可证与独立包许可证、包元数据和 README 同步，第三方许可原样保留。
 - 外部 agent 视角核查的五项缺口已纳入 0.6.3 实现与文档；独立环境、新聊天与完整新机器部署的实际验收边界分开记录于发布结果，继续按第 4 步完成。
 
 ## 实施顺序

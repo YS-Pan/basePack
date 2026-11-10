@@ -1,6 +1,6 @@
 # 项目记忆实现
 
-0.6.3 源码实现 SurrealDB 上的多层文字、原图向量与语义关系，首建和维护由宿主订阅 reader 同读完成。正式 wheel 与完整行为验收状态见 [专项进度](../../tasks/20261106-memory-system/progress.md)，P0 原生接入证据见 [结果](../../tasks/20261106-memory-system/p0-result.md)，用户流程见 [记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
+0.6.4 源码实现 SurrealDB 上的多层文字、原图向量与语义关系，首建和维护由宿主订阅 reader 同读完成。正式 wheel 与完整行为验收状态见 [专项进度](../../tasks/20261106-memory-system/progress.md)，P0 原生接入证据见 [结果](../../tasks/20261106-memory-system/p0-result.md)，用户流程见 [记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
 
 ## 职责与数据
 

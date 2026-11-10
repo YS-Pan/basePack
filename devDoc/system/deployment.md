@@ -1,6 +1,6 @@
 # 项目配置与部署合同
 
-更新：2026 年 11 月 10 日。当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.6.3。本文维护代码、业务实例、共享设施与升级边界；正式记忆安装状态见 [专项进度](../tasks/20261106-memory-system/progress.md)，共享资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。操作从路线 README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md) 和 [管理员说明](../../experiments/20261106-basepack/docs/administrator.md) 进入。
+更新：2026 年 11 月 10 日。当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.6.4。本文维护代码、业务实例、共享设施与升级边界；正式记忆安装状态见 [专项进度](../tasks/20261106-memory-system/progress.md)，共享资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。操作从路线 README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md) 和 [管理员说明](../../experiments/20261106-basepack/docs/administrator.md) 进入。
 
 ## 位置与责任
 
@@ -65,6 +65,8 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 搬迁先停止该项目库并确认进程退出，再移动完整项目、调整启动 cwd/日志/endpoint，保留 UUID 后复核。在线备份使用原生 export；恢复集合含 export、配置、业务原件与必要 assets。已接受语义与更正必须恢复，向量可以从保留表示重建。长期备份位置和保留周期由业务项目确定，Git 忽略和本机目录不代替备份。
 
 ## 升级与回退
+
+0.6.4 仅补 MIT 许可证和包许可元数据，运行文件与 0.6.3 相同；已有 0.6.3 项目普通更新即可，配置、UUID、数据库及共享服务继续使用。
 
 0.6.3 保持 schema 2 项目和 schema 1 机器配置。已有项目显式补 memory.search_mode，按其现有部署选择 text/hybrid/vector，并用相同 UUID 再执行 memory init 更新接续入口；配置、数据和备份保留。0.6.1 项目升级 0.6.2 时从模板补入 `[ai]` 与等级映射，见 [项目接入](../../experiments/20261106-basepack/docs/setup-project.md#agent-模型等级)。0.6.0 升级保留已有配置、UUID 和记忆数据；0.5.0 项目启用记忆时补当前 memory 字段和新 UUID，再绑定本项目库。共享 embedding 的协议和身份合同未变，兼容服务继续运行，Condor 策略保持。
 

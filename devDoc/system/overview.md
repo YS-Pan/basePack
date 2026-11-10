@@ -1,6 +1,6 @@
 # 系统实现概览
 
-当前唯一 active 路线是 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.6.3。代码、依赖锁、测试、产品文档、示例及随包 skill 位于实验工程；根 devDoc 维护现行实现与活动工作。资源部署基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)，记忆功能与正式安装的实际完成边界见 [专项进度](../tasks/20261106-memory-system/progress.md)。
+当前唯一 active 路线是 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.6.4。代码、依赖锁、测试、产品文档、示例及随包 skill 位于实验工程；根 devDoc 维护现行实现与活动工作。资源部署基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)，记忆功能与正式安装的实际完成边界见 [专项进度](../tasks/20261106-memory-system/progress.md)。
 
 本仓库提供两项可独立使用的 skill：[file-structure](../../skills/file-structure/SKILL.md) 推荐或整理开发文档和实验工程布局；[agent-team](../../skills/agent-team/SKILL.md) 为每项任务选择组织，按完整交付过程判断独立完成、简单协作或清晰分层，并使用宿主已有的订阅 subagent 能力。组织选择与协作已有指令层实现，复杂广读的质量与总成本对照仍见 [专项记录](../tasks/20261106-rebuild/research/agent-team.md)。
 

@@ -1,6 +1,6 @@
 # 项目接入
 
-按根 [安装步骤](../../../README.md#安装轻量客户端) 安装 basepack 0.6.3 客户端；可使用稳定的独立 Python 3.13 环境。文字记忆只需要客户端和每项目独立的 SurrealDB。图文检索再准备共享 embedding，普通重任务再准备 HTCondor，设施来源与安装见 [管理员说明](administrator.md)。
+按根 [安装步骤](../../../README.md#安装轻量客户端) 安装 basepack 0.6.4 客户端；可使用稳定的独立 Python 3.13 环境。文字记忆只需要客户端和每项目独立的 SurrealDB。图文检索再准备共享 embedding，普通重任务再准备 HTCondor，设施来源与安装见 [管理员说明](administrator.md)。
 
 ## 首次接入
 
@@ -118,6 +118,8 @@ if ($LASTEXITCODE -ne 0) { throw "search failed ($LASTEXITCODE)" }
 生成入口还给出当前 memory 目录内的 `serve.ps1`、cwd、日志、`/ready` 检查和恢复步骤。端点不可用时沿该入口检查本项目进程与日志并显式启动，保持同一项目数据库供其它聊天共用。修改 memory 目录或密码文件配置后，下一次加载从 `config show` 读取新位置。
 
 ## 版本升级
+
+0.6.3 → 0.6.4 仅补 MIT 许可证与包许可元数据，普通更新客户端即可；项目格式、配置、UUID 与数据不变，无需重启数据库或模型服务。
 
 0.6.2 → 0.6.3 保持项目 schema 2、机器 schema 1、UUID 和记忆数据。先按 [备份步骤](memory.md#备份与恢复) 保留本项目知识与配置，再安装新客户端，并在已有 `[memory]` 明确补入 `search_mode = 'text'`、`'hybrid'` 或 `'vector'`；程序不会为旧配置静默选择。为入口准备当前 memory 目录下的 `password.txt`，或显式配置 `password_file`。按上面的独立调用示例加载凭据后，重新执行 `memory init`，幂等核 schema/UUID 并刷新 instructions 的记忆激活段；其它正文与业务尾注保留。原入口的通用说明可按 [当前模板](../src/basepack/project/templates/instructions.md) 更新。最后核 `config show`、新 shell 中的 brief 和实际检索；显式 hybrid/vector 失败保留原始错误。
 

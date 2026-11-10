@@ -36,6 +36,8 @@
 
 ## 下一步
 
+用户已选择 MIT，0.6.4 许可补丁的源码、独立包许可证和包元数据已补齐，定向构建与安装检查通过；GitHub 发布接续中，详见 [发布结果](github-publish-result.md#mit-许可补丁-064)。0.6.3 原标签和附件保留。
+
 首次上传 GitHub 已完成：源码推送至 [YS-Pan/basePack](https://github.com/YS-Pan/basePack)，[v0.6.3 开发版](https://github.com/YS-Pan/basePack/releases/tag/v0.6.3) 附普通 wheel 与校验和。源码 201 项回归、纯净安装、真实增量维护、新 shell、新聊天、远端 clone 使用闭环及附件下载校验通过，见 [发布结果](github-publish-result.md)。本项目记忆、数据库、配置、凭据与运行原证均未上传。完整空白 Windows/GPU/Condor 新机部署仍待独立机器验收；项目继续开发，实际使用兼作测试样本。
 
 1. 记忆本轮实施与PPT实测反馈修复均已交付；后续沿 [记忆专项进度](../20261106-memory-system/progress.md) 按实际资料维护。三题业务小对照未见记忆质量优势，完整费用不可核，不宣称成本净收益。

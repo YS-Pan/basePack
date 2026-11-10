@@ -9,7 +9,7 @@
 - 新项目默认 `memory.search_mode = 'text'`，显式 `--mode` 优先；`doctor` 默认 core。已有项目需明确补配置项，按同一 UUID 执行 `memory init` 刷新记忆入口。
 - 生成入口按当前配置定位凭据文件及环境变量，每个新进程重新加载，并定位数据库 launcher、cwd 和日志。原业务正文保留。
 - README 提供从 clone 开始的轻量安装、按能力准备设施和 skills 分发。管理员文档补官方来源、模型固定 revision 下载与锁生成、Condor 首次安装及本机预算；开发试用、问题记录与外部 Issue 草稿入口已落实。
-- 当前未指定本项目的开源许可证，README 明确许可状态；第三方声明保留。项目记忆、数据库、配置、密码、模型与运行原证不随 Git 分发。
+- 首次 0.6.3 发布时尚未选择本项目许可证；此后用户明确选择 MIT，许可补丁见文末 0.6.4 记录。第三方声明保留，项目记忆、数据库、配置、密码、模型与运行原证不随 Git 分发。
 
 ## 实际检查
 
@@ -52,3 +52,11 @@ Release 仅上传上述 58,361 字节 wheel 和 99 字节 `SHA256SUMS.txt`，为
 首次实际推送 `5759cde` 为 203 文件、995,661 字节，GitHub API 完整树未截断，私有数据路径检查为空。远端 clone 也未取得作者的项目记忆。GitHub 附件只来自路线 dist 中明确列出的 wheel 和校验和，未上传本地原证或记忆目录。
 
 原始脚本、日志和回执在本机 `tmp/github-publish-validation/`，已按复核需要选留至 `artifacts/runs/20261110-github-publish/`，这些目录均被 Git 忽略。选留前核对未包含测试凭据；原证包括 source/wheel/new-shell/remote-verification、实际语义批次、评分、回读及问题草稿。当前项目自己的记忆与维护材料仅保留在 `.basepack/`。
+
+## MIT 许可补丁 0.6.4
+
+用户于 2026-11-10 明确选择 MIT。根 [LICENSE](../../../LICENSE) 为项目自有源码、skills 与文档提供许可，独立工程 [LICENSE](../../../experiments/20261106-basepack/LICENSE) 保持相同字节以供包内分发；Qwen 的 Apache 许可及 NOTICE 原样保留。当前适配器调用外部 Sentence Transformers 实现，模型及依赖遵循各自许可。
+
+0.6.4 为许可与元数据补丁，保留已发布 0.6.3 的标签与附件。构建声明采用 SPDX MIT 与三条 License-File，并将 setuptools 下限设为 77.0.3。0.6.4 wheel 为 64,272 字节，SHA256 为 `ef522d809518548ac51e4dcf604a3b72c2f718a870fc7ce052161b1fb50121ef`，发布到 [v0.6.4 开发版](https://github.com/YS-Pan/basePack/releases/tag/v0.6.4)。
+
+定向检查确认根、工程、wheel 和普通安装中的 MIT 全文一致；两份 Qwen 声明在包资源和 dist-info/licenses 中均存在且与 0.6.3 原字节一致。33 个运行包文件与 0.6.3 完全相同，纯净客户端普通安装、pip check、模块 CLI 与 console entry 通过；本次没有重跑此前 201 项功能矩阵或启停数据库/共享服务。当前为已构建并验收、待发布状态。
