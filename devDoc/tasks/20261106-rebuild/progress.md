@@ -36,6 +36,8 @@
 
 ## 下一步
 
+本轮审查已形成[basePack与阵列迁移整改计划](../20261110-rectification/plan.md)：接续已完成扩库，安排工作流收敛、实际客户端补丁交付、prepare/413引导、提供者原话补迁、阵列普通安装及一次小批维护/恢复验证。当前仅完成规划，实施尚未开始。
+
 用户已选择 MIT，[0.6.4 许可补丁](https://github.com/YS-Pan/basePack/releases/tag/v0.6.4) 已发布，GitHub 仓库识别为 MIT；源码、独立包许可证和元数据同步，定向构建/安装及附件下载校验通过，详见 [发布结果](github-publish-result.md#mit-许可补丁-064)。0.6.3 原标签和附件保留，项目记忆不上传。
 
 首次上传 GitHub 已完成：源码推送至 [YS-Pan/basePack](https://github.com/YS-Pan/basePack)，[v0.6.3 开发版](https://github.com/YS-Pan/basePack/releases/tag/v0.6.3) 附普通 wheel 与校验和。源码 201 项回归、纯净安装、真实增量维护、新 shell、新聊天、远端 clone 使用闭环及附件下载校验通过，见 [发布结果](github-publish-result.md)。本项目记忆、数据库、配置、凭据与运行原证均未上传。完整空白 Windows/GPU/Condor 新机部署仍待独立机器验收；项目继续开发，实际使用兼作测试样本。
