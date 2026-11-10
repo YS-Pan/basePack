@@ -1,6 +1,6 @@
 # 资源使用
 
-先读项目 `.basepack/instructions.md` 和实际配置，用其中 runtime.python 启动工具，每次显式传配置绝对路径。以下 `python` 均指该解释器。机器已完成 [首次部署](administrator.md)；新项目先按 [项目接入](setup-project.md) 初始化。
+先读项目 `.basepack/instructions.md` 和实际配置，用其中 runtime.python 启动工具，每次显式传配置绝对路径。以下 `python` 均指该解释器。仅文字记忆见 [记忆使用](memory.md)，无需这些资源设施；本页 embedding 需要共享模型服务，普通重任务需要 HTCondor，两者可分别按 [首次部署](administrator.md) 准备。新项目先按 [项目接入](setup-project.md) 初始化。
 
 ## 共享 embedding
 
@@ -12,7 +12,7 @@ python -m basepack embedding --machine-config '<machine-config>' status
 
 多条输入可重复 `--text`，或用 `--inputs inputs.json` 传 UTF-8 JSON 数组，元素为字符串或 `{"text":"...","image":"<absolute-local-image>"}`。返回 `vectors`、向量语义 `embedding_identity` 和推理 worker 的 `pid`。建库批量输入与单条查询共用一份模型。
 
-每请求 1–8 项，文本每项至多 64 KiB。实际含模板 token 上限由机器 max_length 固定，超限在模型 forward 前报错，原文和图片均不静默截断。每项最多一张静态图，原文件至多 32 MiB、4000 万源像素；预处理按 max_pixels 缩放。本机配置为 2048 token、max_pixels 1048576；纯文本请求内 batch 为 4，含图请求为 1。模型为 Qwen3-VL-Embedding-2B、FP16，输出 2048 维 L2 归一化向量；浮点范数有舍入误差。
+每请求 1–8 项，文本每项至多 64 KiB。实际含模板 token 上限由机器 max_length 固定，超限在模型 forward 前报错，原文和图片均不静默截断。每项最多一张静态图，原文件至多 32 MiB、4000 万源像素；预处理按 max_pixels 缩放。机器模板为 2048 token、max_pixels 1048576、纯文本 batch 4，含图请求 batch 固定为 1；管理员须按目标硬件验证这些负载。模型为 Qwen3-VL-Embedding-2B、FP16，输出 2048 维 L2 归一化向量；浮点范数有舍入误差。
 
 `--timeout` 是客户端连接和读取的等待期限；到期报错，服务端排队或已开始的推理仍可继续。机器配置 `queue_timeout` 是 LitServe 的排队期限，出队时检查；超过期限的请求可能要等前一项推理结束才收到 504。它不限制已经开始的推理。超时或断开不自动重投，也不停止另一项目共用的模型。
 
@@ -34,7 +34,7 @@ result = client.embed(["text"], timeout=120)
 
 ```json
 {
-  "executable": "C:/Program Files/Python313/python.exe",
+  "executable": "<absolute-job-python.exe>",
   "arguments": ["-c", "from pathlib import Path; Path('result.txt').write_text(str(sum(range(1000))))"],
   "cwd": ".",
   "cpus": 1,
@@ -50,7 +50,7 @@ python -m basepack --config '<project-config>' jobs capacity
 python -m basepack --config '<project-config>' jobs run --spec '<project>/job.json'
 ```
 
-`capacity` 只读查询本机父 slot 的总容量与当前剩余量，来源是 HTCondor 实际发布的资源。`cpus`、`memory_mib`、`gpus` 为标准键；`MachineResources` 中其余资源在总量和剩余数量均有发布时，按原名和原生单位展示。本机 `gpus` 表示同卡共享名额。客户端按标准总容量核 CPU/RAM，GPU 申请由 Condor 站点策略判断，当前资源不足时排队。`run` 返回 job ID、终态、应用退出码及 stdout/stderr/event log 定位；应用失败、超时或未确认回收时 CLI 退出 1，原始应用退出码保留在 JSON。检查实际产物内容，应用退出 0 只说明正常退出。轻任务可直接运行，无需全部接入。
+`capacity` 只读查询父 slot 的总容量与当前剩余量，来源是 HTCondor 实际发布的资源。`cpus`、`memory_mib`、`gpus` 为标准键；`MachineResources` 中其余资源在总量和剩余数量均有发布时，按原名和原生单位展示。采用随包单卡策略时，`gpus` 表示同卡共享名额。客户端按标准总容量核 CPU/RAM，GPU 申请由 Condor 站点策略判断，当前资源不足时排队。`run` 返回 job ID、终态、应用退出码及 stdout/stderr/event log 定位；应用失败、超时或未确认回收时 CLI 退出 1，原始应用退出码保留在 JSON。示例应写出内容为 499500 的 result.txt；检查实际内容，应用退出 0 只说明正常退出。轻任务可直接运行，无需全部接入。
 
 `memory_mib`、`disk_mib`、`gpu_memory_mib` 均用 MiB；disk 是执行 scratch 需求，提交前也查项目输出盘容量。GPU 任务增加正的 `gpu_memory_mib`，声明整个应用进程树的峰值，含 CUDA context、框架缓存和 workspace，并自行限制预分配。适配器只将它转换为官方 `request_gpus = 1` 与 `gpus_minimum_memory = <峰值> MB`。Condor 按本站点策略预订显存，并在名额和显存均足够时安排同卡共享。声明额度不等于驱动硬隔离，也不保证多作业加速。保留 Condor 分配的 CUDA_VISIBLE_DEVICES。
 
@@ -63,7 +63,7 @@ gpus_minimum_memory = 3000 MB
 
 `gpus_minimum_memory` 的官方含义仍是设备显存容量下限，原有 `requirements` 和 `require_gpus` 筛选继续生效。本站点额外把它作为作业的显存预订量，由提交节点统一转换；其他 Condor 站点是否采用此约定由当地管理员决定。原生申报须在提交时解析为正数，官方单位 `MB` 表示 MiB、`GB` 表示 GiB，预订量向上取整到整 MiB。依赖执行节点 `TARGET` 的动态表达式不支持。
 
-本站申请 GPU 而省略显存时预订整个普通池，与其他 GPU 作业串行；显式 `undefined`、零、负值、不支持的表达式、超过全池或 `request_gpus > 1` 在提交时拒绝，错误使用官方参数名。资源暂时不足的有效申请排队。节点策略及背景预留由 [管理员](administrator.md#condor-容量与策略) 维护。
+采用随包单卡策略时，申请 GPU 而省略显存会预订整个普通池，与其他 GPU 作业串行；显式 `undefined`、零、负值、不支持的表达式、超过全池或 `request_gpus > 1` 在提交时拒绝，错误使用官方参数名。资源暂时不足的有效申请排队。节点策略及背景预留由 [管理员](administrator.md#condor-容量与策略) 维护。
 
 可用 `environment` 传显式环境。入口按 cpus 提供常用框架线程变量，但 starter 仍可能注入其他线程限制；worker 继承其最终值并记录，应用并行参数由调用者自行设置。Windows 中文、空格、引号与空参数经 UTF-8 任务文件交给随包薄 worker，避免参数数组经过 submit 的有损转换。
 

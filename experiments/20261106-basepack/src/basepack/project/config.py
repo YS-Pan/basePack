@@ -59,6 +59,18 @@ class ProjectConfig:
         return self.data_path("memory", "data_dir")
 
     @property
+    def memory_password_file(self) -> Path:
+        value = self.raw["memory"].get("password_file")
+        return (self.root / value).resolve() if value is not None else self.memory_dir / "password.txt"
+
+    @property
+    def memory_search_mode(self) -> str:
+        mode = self.raw["memory"]["search_mode"]
+        if mode not in ("text", "hybrid", "vector"):
+            raise ValueError(f"Unsupported memory.search_mode: {mode}")
+        return mode
+
+    @property
     def jobs_dir(self) -> Path:
         return self.data_path("jobs", "jobs_dir")
 
@@ -113,7 +125,9 @@ def describe(config: ProjectConfig) -> dict:
         "machine_paths": paths,
     }
     if "memory" in config.raw:
+        result["memory"] = config.raw["memory"]
         result["memory_dir"] = str(config.memory_dir)
+        result["memory_password_file"] = str(config.memory_password_file)
     if "jobs" in config.raw:
         result["jobs_dir"] = str(config.jobs_dir)
     if "ai" in config.raw:

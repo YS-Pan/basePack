@@ -1,6 +1,6 @@
 # basePack 首次上传 GitHub 计划
 
-2026 年 11 月 10 日更新。目标为 [YS-Pan/basePack](https://github.com/YS-Pan/basePack)，接续 [P8 联合交付](plan.md#p8-联合交付与轻量发布)。交付另一位用户的 agent 可在全新 Windows 环境中获取、安装、配置并持续使用的源码，再按需要提供 wheel Release。沿用当前实验目录与根 devDoc 布局；当前仅交付计划，以下实施与验收尚待执行。
+2026 年 11 月 10 日更新。目标为 [YS-Pan/basePack](https://github.com/YS-Pan/basePack)，接续 [P8 联合交付](plan.md#p8-联合交付与轻量发布)。交付另一位用户的 agent 可在全新 Windows 环境中获取、安装、配置并持续使用的源码，再按需要提供 wheel Release。沿用当前实验目录与根 devDoc 布局；用户已授权执行至远端发布，明确当前项目记忆不上传。实际交付与待验条件见 [发布结果](github-publish-result.md)。
 
 ## 当前状态
 

@@ -1,6 +1,6 @@
 # 项目配置与部署合同
 
-更新：2026 年 11 月 10 日。当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.6.2。本文维护代码、业务实例、共享设施与升级边界；正式记忆安装状态见 [专项进度](../tasks/20261106-memory-system/progress.md)，共享资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。操作从路线 README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md) 和 [管理员说明](../../experiments/20261106-basepack/docs/administrator.md) 进入。
+更新：2026 年 11 月 10 日。当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.6.3。本文维护代码、业务实例、共享设施与升级边界；正式记忆安装状态见 [专项进度](../tasks/20261106-memory-system/progress.md)，共享资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。操作从路线 README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md) 和 [管理员说明](../../experiments/20261106-basepack/docs/administrator.md) 进入。
 
 ## 位置与责任
 
@@ -51,6 +51,8 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 | embedding.endpoint | 显式共享 HTTP 地址，本机为 loopback 8765 |
 | memory.endpoint/namespace/database | 显式项目原生数据库；逻辑库不代替物理隔离 |
 | memory.project_id/password_env/source_scope | 随项目保留的 UUID、客户端凭据变量名和可选新增资料检查范围 |
+| memory.search_mode | CLI 未显式传 --mode 时采用的 text/hybrid/vector；新项目默认 text |
+| memory.password_file | 可选密码文件，相对项目根或绝对路径；省略时为实际 memory_dir/password.txt |
 
 机器 embedding 节沿用 R9 endpoint、service_name、queue_timeout 及模型/预算设置。凭据只通过环境交给客户端与原生进程，机器引导及秘密文件不进入源码。project_id 随移动或恢复保留，误连另一身份的库会失败。config show 和 doctor 只作诊断，不能替代真实功能验收。
 
@@ -64,7 +66,7 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 
 ## 升级与回退
 
-0.6.2 保持 schema 2 项目和 schema 1 机器配置；0.6.1 项目升级时显式从模板补入 `[ai]` 与等级映射，见 [项目接入](../../experiments/20261106-basepack/docs/setup-project.md#agent-模型等级)。0.6.0 升级保留已有配置、UUID 和记忆数据；0.5.0 项目启用记忆时补当前 memory 字段和新 UUID，再绑定本项目库。共享 embedding 的协议和身份合同未变，兼容服务继续运行，Condor 策略保持。
+0.6.3 保持 schema 2 项目和 schema 1 机器配置。已有项目显式补 memory.search_mode，按其现有部署选择 text/hybrid/vector，并用相同 UUID 再执行 memory init 更新接续入口；配置、数据和备份保留。0.6.1 项目升级 0.6.2 时从模板补入 `[ai]` 与等级映射，见 [项目接入](../../experiments/20261106-basepack/docs/setup-project.md#agent-模型等级)。0.6.0 升级保留已有配置、UUID 和记忆数据；0.5.0 项目启用记忆时补当前 memory 字段和新 UUID，再绑定本项目库。共享 embedding 的协议和身份合同未变，兼容服务继续运行，Condor 策略保持。
 
 升级保留新旧 wheel、配置和知识备份，核安装来源并在源码外验证受影响流程。底座或知识 schema 变化须验证原生恢复；回退客户端保留项目数据，旧资源版不提供记忆能力。只有服务实现或资源协议确需改变时，才按管理员流程排空、停止并切换相应服务。
 

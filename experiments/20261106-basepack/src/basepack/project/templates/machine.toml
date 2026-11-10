@@ -13,7 +13,7 @@ batch_size = 4
 max_pixels = 1048576
 queue_timeout = 600
 cpu_threads = 2
-# Set from the supported embedding workload; units are MiB.
+# Replace 0 with a measured positive budget in MiB before starting embedding.
 gpu_memory_mib = 0
 
 [htcondor]

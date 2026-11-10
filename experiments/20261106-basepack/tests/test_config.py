@@ -220,6 +220,33 @@ def test_init_contains_project_ai_mapping(ai_config):
     assert describe(ai_config)["ai"] == ai_config.raw["ai"]
 
 
+def test_new_project_has_text_search_and_process_credential_metadata(ai_config):
+    assert ai_config.memory_search_mode == "text"
+    result = describe(ai_config)
+    assert result["memory"]["search_mode"] == "text"
+    assert result["memory"]["password_env"] == "BASEPACK_MEMORY_PASSWORD"
+    assert result["memory_password_file"] == str(ai_config.memory_dir / "password.txt")
+
+
+def test_doctor_defaults_to_core_without_optional_facilities(ai_config):
+    result = doctor(ai_config)
+    assert "configured_python_package" in result["checks"]
+    completed = subprocess.run([sys.executable, "-m", "basepack", "--config", str(ai_config.path), "doctor"],
+                               capture_output=True, text=True, encoding="utf-8", timeout=10)
+    assert completed.returncode == 0, completed.stderr
+    assert "configured_python_package" in json.loads(completed.stdout)["checks"]
+    assert not ai_config.memory_dir.exists()
+
+
+def test_generated_entries_cover_first_setup_and_local_issue_feedback(ai_config):
+    agents = (ai_config.root / "AGENTS.md").read_text(encoding="utf-8")
+    assert "已存在" in agents and "init" in agents
+    instructions = (ai_config.root / ".basepack/instructions.md").read_text(encoding="utf-8")
+    assert "本项目已有约定" in instructions
+    assert "https://github.com/YS-Pan/basePack/issues" in instructions
+    assert "Issue 草稿" in instructions and "用户明确授权" in instructions
+
+
 @pytest.mark.parametrize("options, tier", [({}, "tier3"), ({"purpose": "task"}, "tier3"),
                                           ({"purpose": "retrieval"}, "tier1"), ({"tier": "tier2"}, "tier2")])
 def test_ai_resolves_project_defaults_and_explicit_tier(ai_config, options, tier):

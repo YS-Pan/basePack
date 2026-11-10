@@ -1,6 +1,6 @@
 # 系统实现概览
 
-当前唯一 active 路线是 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.6.2。代码、依赖锁、测试、产品文档、示例及随包 skill 位于实验工程；根 devDoc 维护现行实现与活动工作。资源部署基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)，记忆功能与正式安装的实际完成边界见 [专项进度](../tasks/20261106-memory-system/progress.md)。
+当前唯一 active 路线是 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.6.3。代码、依赖锁、测试、产品文档、示例及随包 skill 位于实验工程；根 devDoc 维护现行实现与活动工作。资源部署基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)，记忆功能与正式安装的实际完成边界见 [专项进度](../tasks/20261106-memory-system/progress.md)。
 
 本仓库提供两项可独立使用的 skill：[file-structure](../../skills/file-structure/SKILL.md) 推荐或整理开发文档和实验工程布局；[agent-team](../../skills/agent-team/SKILL.md) 为每项任务选择组织，按完整交付过程判断独立完成、简单协作或清晰分层，并使用宿主已有的订阅 subagent 能力。组织选择与协作已有指令层实现，复杂广读的质量与总成本对照仍见 [专项记录](../tasks/20261106-rebuild/research/agent-team.md)。
 
@@ -8,7 +8,7 @@
 
 [项目记忆](modules/memory.md) 使用唯一 SurrealDB 基座。一个 member 同时表示文件、实际章节、智能原文块或图片，也是默认检索表示及图节点；另有实体/决定/条件节点和带依据的原生语义边。宿主订阅 agent 同读完成分块、摘要、识图与关系，程序核源与逐记录知识版本后原子接受。多层全文、图文向量、严格回源、语义展开、人工更正及原生恢复共用这份持久知识。
 
-memory init 绑定项目 UUID 并写入随包 skill 和 brief 的宿主入口。brief 快检已登记原件及 source_scope，交付必保留内容、项目地图、相关线索与缺口；宿主据此维护任务内小批，不依赖后台语义进程或另购 LLM API。变化按范围、包含和依据失效，未变表示可复用；默认 hybrid 直接检索所有粒度，缺兼容向量明确报错，text 模式可独立运行。
+memory init 绑定项目 UUID 并写入随包 skill 和 brief 的宿主入口，包含新进程凭据加载、实际数据库启动材料及使用问题记录入口。brief 快检已登记原件及 source_scope，交付必保留内容、项目地图、相关线索与缺口；宿主据此维护任务内小批，不依赖后台语义进程或另购 LLM API。变化按范围、包含和依据失效，未变表示可复用。CLI 未传检索模式时读取项目 memory.search_mode，新项目默认 text；图文项目选择 hybrid/vector，缺设施或兼容向量保留原错。doctor 默认 core，模型与 Condor 显式选查。
 
 机器级 embedding 由 Sentence Transformers 编码、LitServe 管理请求与单推理 worker、Shawl 托管 Windows 服务进程树。模型在服务 setup 时加载并常驻；EmbeddingClient 只通过配置中的 HTTP endpoint 调用，客户端等待结束不会中断共享推理。模型、预处理和归一化决定 embedding_identity，记忆按该身份与实际编码输入版本过滤和重建向量；客户端安装路径变化不改变语义空间。接口与生命周期边界见 [资源模块](modules/resources.md)。
 

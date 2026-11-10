@@ -8,7 +8,7 @@ import subprocess
 from .config import ProjectConfig, describe
 
 
-def doctor(config: ProjectConfig, facility: str = "all") -> dict:
+def doctor(config: ProjectConfig, facility: str = "core") -> dict:
     result = describe(config)
     checks = {}
     for name, path in {"python": config.python, "project_root": config.root,

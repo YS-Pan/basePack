@@ -15,7 +15,8 @@ def register_commands(subparsers):
     actions["search"].add_argument("--scope", default="")
     actions["search"].add_argument("--limit", type=int, default=12)
     actions["search"].add_argument("--literal", action="store_true", help="Case-insensitive substring search in stored titles/text")
-    actions["search"].add_argument("--mode", choices=["hybrid", "text", "vector"], default="hybrid")
+    actions["search"].add_argument("--mode", choices=["hybrid", "text", "vector"],
+                                 help="Override memory.search_mode from the project config")
     actions["search"].add_argument("--timeout", type=float, default=600)
     actions["embed"].add_argument("--ids", nargs="+", help="Member IDs; otherwise index current representations")
     actions["embed"].add_argument("--timeout", type=float, default=600)
@@ -54,9 +55,10 @@ def dispatch(args, config):
         elif action == "embed":
             result = memory.embed_members(args.ids, timeout=args.timeout)
         elif action == "search":
-            if args.mode == "text":
+            mode = args.mode if args.mode is not None else config.memory_search_mode
+            if mode == "text":
                 result = memory.search(args.text, scope=args.scope, limit=args.limit, literal=args.literal)
-            elif args.mode == "vector":
+            elif mode == "vector":
                 result = memory.vector_search(args.text, scope=args.scope, limit=args.limit, timeout=args.timeout)
             else:
                 result = memory.hybrid_search(args.text, scope=args.scope, limit=args.limit,
@@ -82,18 +84,37 @@ def _activate(config):
     existing = path.read_text(encoding="utf-8")
     start, end = "<!-- basepack-memory:start -->", "<!-- basepack-memory:end -->"
     python = str(config.python).replace("'", "''")
-    project_config = config.path.relative_to(config.root).as_posix().replace("'", "''")
+    project_config = str(config.path).replace("'", "''")
     skill = Path(__file__).with_name("SKILL.md").resolve().as_posix()
     section = f"""{start}
-记忆已在本项目启用。开始或接续任务时，读取启动信息：
+记忆已在本项目启用。每个新的 PowerShell 进程先执行下面整段：从当前配置读取实际目录、凭据文件和 password_env，加载到当前进程后读取启动信息；无需部署 shell 的变量、函数或工作目录。密码原文只从本地文件读取，不输出。
 
 ```powershell
-& '{python}' -m basepack --config '{project_config}' memory brief --task '<当前任务>'
+$ErrorActionPreference = 'Stop'
+$OutputEncoding = [Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = $OutputEncoding
+$basepackPython = '{python}'
+$basepackConfig = '{project_config}'
+$basepackJson = & $basepackPython -X utf8 -m basepack --config $basepackConfig config show
+if ($LASTEXITCODE -ne 0) {{ throw "Cannot load project config ($LASTEXITCODE)" }}
+$basepackInfo = $basepackJson | ConvertFrom-Json
+$basepackPython = $basepackInfo.runtime_python
+[Environment]::SetEnvironmentVariable($basepackInfo.memory.password_env, [IO.File]::ReadAllText($basepackInfo.memory_password_file), 'Process')
+& $basepackPython -X utf8 -m basepack --config $basepackConfig memory brief --task '<当前任务>'
+if ($LASTEXITCODE -ne 0) {{ throw "memory brief failed ($LASTEXITCODE)" }}
 ```
+
+后续命令复用本进程的 `$basepackPython` 和 `$basepackConfig`；新进程重新执行整段。密码文件由可选 `memory.password_file` 指定（相对项目根或绝对路径），省略时为当前 `memory_dir/password.txt`。项目搬迁后更新本段配置绝对路径，或用新配置重新执行 `memory init` 刷新本段。
+
+本项目数据库的 launcher 为 `$basepackInfo.memory_dir/serve.ps1`，cwd 为该 `memory_dir`，日志为其中 `logs/surreal.stdout.log` 与 `logs/surreal.stderr.log`。先检查配置 endpoint 的 `/ready`；不可用时查日志，并由项目维护者显式启动该 launcher，以该目录为 cwd。保持同项目多聊天共用的进程，避免并行启动同一 store。首次准备、独立调用验证和故障处理见 [数据库部署](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/administrator.md#项目-surrealdb)，原生导出、原件与 assets 的恢复集合见 [备份恢复](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/memory.md#备份与恢复)。
+
+`memory search` 未传 `--mode` 时采用当前配置 `memory.search_mode`；新项目为 `text`，图文项目显式配置 `hybrid` 或 `vector`。显式 `--mode` 优先；设施或兼容向量缺失保留原错。
 
 直接保留当前 mandatory 信息；stale=true 的内容只作待核，不当作当前事实。brief 会快检已登记原件与配置的 source_scope；出现 changes/pending 时，在当前任务预算内共读并维护必要小批，余项明确交接。可将维护和检索合并为一次 worker 委托，交付实际证据与缺口；多轮检索、筛选与重排派工前，用同一命令前缀运行 `config ai --purpose retrieval` 解析项目档位。按 [记忆流程](<{skill}>) 执行。
 {end}"""
-    if start in existing:
+    if start in existing or end in existing:
+        if existing.count(start) != 1 or existing.count(end) != 1:
+            raise ValueError("Invalid basepack memory entry markers in instructions.md")
         before, _, tail = existing.partition(start)
         closing = tail.index(end)
         after = tail[closing + len(end):]

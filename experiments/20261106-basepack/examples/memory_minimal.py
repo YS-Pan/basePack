@@ -52,7 +52,7 @@ batch_path.write_text(json.dumps(batch, ensure_ascii=False, indent=2), encoding=
 run("apply", "--batch", str(batch_path))
 if args.with_vectors:
     run("embed", "--ids", "example-file", "example-section", "example-chunk")
-    run("search", "--text", "项目数据库")
+    run("search", "--text", "项目数据库", "--mode", "hybrid")
 else:
     run("search", "--text", "项目数据库", "--mode", "text", "--literal")
 run("read", "member:`example-chunk`")

@@ -1,12 +1,12 @@
 # 项目记忆
 
-记忆在本项目的 SurrealDB 中保存文件摘要、章节摘要、原文块、图片描述与定位，并保留层级、原文范围、语义关系和修改依据；图片原字节快照保存在项目记忆目录的 assets 中。宿主订阅 agent 负责智能分块、摘要、识图、建图和评分；已有共享服务编码图文，数据库执行存储、事务与混合查询。小文件不必虚造章节。
+记忆在本项目的 SurrealDB 中保存文件摘要、章节摘要、原文块、图片描述与定位，并保留层级、原文范围、语义关系和修改依据；图片原字节快照保存在项目记忆目录的 assets 中。宿主订阅 agent 负责智能分块、摘要、识图、建图和评分，数据库执行存储、事务与查询。新项目默认文字检索，无需模型服务；选择图文检索时再由共享服务编码。小文件不必虚造章节。
 
 ## 启用
 
 按 [项目接入](setup-project.md#启用记忆) 先选独立目录、endpoint 和 UUID，再按 [项目 SurrealDB](administrator.md#项目-surrealdb) 启动并在独立调用核 ready/init/brief。同项目多聊天复用服务，另一个项目使用自己的物理目录、端口及 UUID；通用 exe 和模型可共用。服务在查询期间保持运行。前台排错可在普通用户终端直接执行同一个 serve.ps1，其 cwd 与 endpoint 仍来自目标配置。
 
-普通 init 只生成配置和入口；memory init 才安装 schema 并绑定 UUID、增加记忆启动指令。误连其它 UUID 的库会失败。每个调用进程加载 password_env 指定的凭据，使用项目 instructions 中的 Python 与显式配置。已有旧配置启用记忆时补齐当前 memory 字段；只用资源工具无需记忆数据库。
+普通 init 只生成配置和入口；memory init 才安装 schema 并绑定 UUID、增加记忆启动指令。误连其它 UUID 的库会失败。每个新进程按 [凭据与接续步骤](setup-project.md#凭据与新-shell-接续) 从当前配置取得密码变量名与密码文件并加载，不依赖上一次部署 shell；使用 instructions 中的 Python 与显式配置。已有配置升级时补齐当前 memory 字段并重新 memory init 刷新记忆入口；只用资源工具无需记忆数据库。
 
 ## 首建与维护
 
@@ -24,21 +24,20 @@ function memory {
 memory prepare --paths '说明.md' '决定.md' --output '<reading.json>'
 # 阅读 prepare 输出，写出 agent-batch.json 后继续。
 memory apply --batch '<agent-batch.json>'
-memory embed
 memory changes --scope '资料目录'
 ```
 
 prepare 时包括本批所用依据与关系两端的材料；它提供新旧编号原文、已有与关联成员、节点、关系及 expected 知识版本，图片返回可打开的原图路径。关联记录的来源原文仍需 read 或扩充 prepare 范围核实。将材料交给订阅 agent，在同次阅读中选择最终块边界并生成摘要、节点和图边；结构备读单元只用于定位。批次 JSON 合同与操作流程在 `memory guide` 返回的已安装 skill 中，源码维护源为 [SKILL.md](../src/basepack/memory/SKILL.md)。
 
-apply 核对来源版本，以及本批改写、退休、更正目标、实际使用的既有依据成员和关系两端的 expected 版本，再原子写入；无关 expected 不阻塞并行，缺 expected 仅允许本批新建记录。原文块由程序按范围取原词，摘要、边界、依据、历史与更正持久保存。旧草稿冲突时重新 prepare、共读后再提交。来源变化使相关块、祖先摘要及依赖关系待更新，失效也刷新知识版本；未变兄弟与兼容向量可复用，文件追加的新内容必须重核完整摘要。部分摘要显式保存 coverage_gaps。接受删除保留旧依据，相关主张按剩余证据重核。再次共读、apply、embed 并查询新结果后，才算完成增量维护；深检查使用 `changes --scope <文件或目录> --deep`。
+apply 核对来源版本，以及本批改写、退休、更正目标、实际使用的既有依据成员和关系两端的 expected 版本，再原子写入；无关 expected 不阻塞并行，缺 expected 仅允许本批新建记录。原文块由程序按范围取原词，摘要、边界、依据、历史与更正持久保存。旧草稿冲突时重新 prepare、共读后再提交。来源变化使相关块、祖先摘要及依赖关系待更新，失效也刷新知识版本；未变兄弟与兼容向量可复用，文件追加的新内容必须重核完整摘要。部分摘要显式保存 coverage_gaps。接受删除保留旧依据，相关主张按剩余证据重核。再次共读、apply 并查询新结果后，才算完成文字增量维护；使用向量的项目还需完成 embed。深检查使用 `changes --scope <文件或目录> --deep`。
 
-embed 复用 [共享 embedding](resources.md)，不另外加载模型。文件/章节使用已接受摘要，块使用原文，图片使用原始图片；兼容且输入未变的向量复用。超限保留原错误，交回原阅读 agent 调整分块或摘要，不能静默截断。仅文字试用可暂不编码，并显式使用 search 的 text 模式。
+需要向量时运行 `memory embed`，复用 [共享 embedding](resources.md)，不另外加载模型。文件/章节使用已接受摘要，块使用原文，图片使用原始图片；兼容且输入未变的向量复用。超限保留原错误，交回原阅读 agent 调整分块或摘要，不能静默截断。纯文字项目保持 `[memory] search_mode = 'text'`，维护和正常查询都无需编码。
 
 图片先由视觉 agent 实际打开，描述与 OCR 单独标明，程序按 hash 保留必要原字节快照。必要 PDF 页可由宿主读取/渲染为项目内图片，locator 记录原文件、版本、页与区域；原 PDF 变化时重新核相关页面，不声称自动解析所有 PDF。
 
 ## 最小闭环示例
 
-在已完成 init/brief、凭据已加载的干净试用项目执行 [memory_minimal.py](../examples/memory_minimal.py)。它新建四行 UTF-8 的 `memory-example.md`，拒绝覆盖同名文件，并依次 prepare → 生成完整批次 → apply → search/read/neighbors；每个子命令使用 `subprocess.run(check=True)`，apply 失败后即停止。默认文字查询独立于模型服务；首次运行加 `--with-vectors` 则在 apply 后先 embed，再做默认混合查询。
+在已完成 init/brief、凭据已加载的干净试用项目执行 [memory_minimal.py](../examples/memory_minimal.py)。它新建四行 UTF-8 的 `memory-example.md`，拒绝覆盖同名文件，并依次 prepare → 生成完整批次 → apply → search/read/neighbors；每个子命令使用 `subprocess.run(check=True)`，apply 失败后即停止。默认文字查询独立于模型服务；首次运行加 `--with-vectors` 则在 apply 后先 embed，再显式做混合查询。该脚本用于检查命令闭环，真实材料的理解与批次制作由宿主 agent 按 skill 完成。
 
 ```powershell
 $python = '<instructions 中的 absolute-python.exe>'
@@ -67,7 +66,7 @@ memory neighbors 'member:<id>'
 memory read 'member:<id>'
 ```
 
-brief 直接提供必须保留的信息、相关线索、来源与覆盖缺口。mandatory 不参加相关性筛选；其中 stale 条目是待核义务，不能当当前事实。search 默认融合跨层全文与向量，`--mode text` / `--mode vector` 可单独查询。当前范围有知识却没有兼容索引时，明确提示先 embed 或选择 text；模型失败保留原错。中文全文按词典分词，短词不保证子串召回，编号命中也不等于精确匹配；literal 是显式包含查询。
+brief 直接提供必须保留的信息、相关线索、来源与覆盖缺口。mandatory 不参加相关性筛选；其中 stale 条目是待核义务，不能当当前事实。search 未传 `--mode` 时读取项目 `[memory].search_mode`；新项目为 `text`，可按所用设施改成 `hybrid` 或 `vector`。显式 `--mode text|hybrid|vector` 覆盖本次查询；hybrid 融合跨层全文与兼容图文向量。选择 hybrid/vector 时，当前知识缺少兼容索引会明确报错，模型失败保留原错；程序不自动退回文字模式。中文全文按词典分词，短词不保证子串召回，编号命中也不等于精确匹配；literal 是显式包含查询。
 
 启动快检默认只覆盖已登记原件；在 `[memory]` 配置 `source_scope = ['资料目录', 'README.md']` 后，也检查这些显式范围中的新增文件。brief 报告 changes/pending 时，由当前宿主 agent 在任务预算内维护相关小批，也可与检索合并委托；程序不另起后台 agent。未改原件只查元数据，深查才做完整 hash。任务词未命中时，短项目地图仍提供前提线索。
 

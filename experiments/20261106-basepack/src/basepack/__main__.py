@@ -20,7 +20,7 @@ def main():
     selection.add_argument("--purpose", choices=["task", "retrieval"], default="task")
     selection.add_argument("--tier", choices=["tier1", "tier2", "tier3", "tier4"])
     check = sub.add_parser("doctor", help="Read-only facility checks")
-    check.add_argument("--facility", choices=["core", "embedding", "condor", "all"], default="all")
+    check.add_argument("--facility", choices=["core", "embedding", "condor", "all"], default="core")
     from .embedding.cli import register_commands as embedding_commands
     embedding_commands(sub)
     from .jobs.cli import register_commands as job_commands

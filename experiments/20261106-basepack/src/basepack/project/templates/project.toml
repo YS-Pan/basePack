@@ -29,6 +29,7 @@ reasoning_effort = 'ultra'
 
 [memory]
 data_dir = '.basepack/memory'
+search_mode = 'text'
 project_id = '$memory_project_id'
 # Run a separate local server for this project's data; choose its port here.
 endpoint = 'http://127.0.0.1:18080'
@@ -36,6 +37,8 @@ namespace = 'basepack'
 database = 'memory'
 username = 'root'
 password_env = 'BASEPACK_MEMORY_PASSWORD'
+# Optional secret file, absolute or relative to project root; otherwise data_dir/password.txt.
+# password_file = '.basepack/memory/password.txt'
 # Optional files/directories for discovering additions; otherwise check registered paths.
 source_scope = []
 

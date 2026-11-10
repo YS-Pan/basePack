@@ -10,6 +10,7 @@
 - 实施记忆系统时读 [计划](devDoc/tasks/20261106-memory-system/plan.md) 与 [进度](devDoc/tasks/20261106-memory-system/progress.md)；修改资源工具时读 [当前实现](devDoc/system/modules/resources.md) 与 [部署合同](devDoc/system/deployment.md)，历史交付见 [R9 结果](devDoc/archive/20261107-resource-coordination/r9-result.md)。
 - 核实旧项目或共享设施时按主题读 [调研依据](devDoc/tasks/20261106-rebuild/research/sources.md) 和 [近期历史](devDoc/tasks/20261106-rebuild/legacy-history.md)，按需深入原证。
 - 目标仓库为 [YS-Pan/basePack](https://github.com/YS-Pan/basePack)；发布前按产品状态编写面向使用者的 README 和使用文档。
+- basePack 仍在开发，实际使用同时作为测试样本。发现使用问题时，在所属任务进度记录现象、版本、必要复现条件与处理状态，修复后补验证；无所属任务的问题先记入 [总进度](devDoc/tasks/20261106-rebuild/progress.md)。外部项目沿使用者已有记录约定，并按 [反馈格式](experiments/20261106-basepack/docs/setup-project.md#问题记录与反馈) 形成 Issue 草稿，由用户提交或明确授权 agent 提交。
 - 新建、调整或归档开发文档时读 [文档维护约定](devDoc/documentation.md)。
 - 推荐、设计或整理项目文件结构时使用 [file-structure](skills/file-structure/SKILL.md)。
 - 每项任务开始或接续时应用 [agent-team](skills/agent-team/SKILL.md) 的组织判断；当前上下文已有有效规则时直接复用。
@@ -35,5 +36,5 @@
 - Git 保存源码、skills、短文档和小样例；模型、虚拟环境、项目数据库、缓存、密钥及大型运行产物留在仓库外或忽略目录中。
 
 <!-- basepack:start -->
-开始或接续本项目任务时，读取 [.basepack/instructions.md](.basepack/instructions.md)。
+开始或接续本项目任务时，若本机已有 [.basepack/instructions.md](.basepack/instructions.md)，读取该入口；新检出尚无入口时，按 [README](README.md#安装轻量客户端) 安装并完成 [项目接入](experiments/20261106-basepack/docs/setup-project.md)。本机配置、凭据和记忆通过本项目接入或备份恢复，不随源码分发。
 <!-- basepack:end -->
