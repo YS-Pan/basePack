@@ -7,7 +7,7 @@ import pytest
 
 from basepack.memory.store import _Record, _record, _sql
 from basepack.project.config import load_machine_config
-from test_memory_store import batch_for, memory
+from test_memory_store import batch_for, memory, real_memory
 
 
 @pytest.mark.parametrize(("value", "key"), [
@@ -106,7 +106,6 @@ def special_id_chunks(memory):
 
 def test_real_special_id_vector_write_reuse_and_concurrent_change(memory, monkeypatch):
     from basepack.memory import vectors
-    memory.config = replace(memory.config, machine=replace(memory.config.machine, raw={"embedding": {"endpoint": "http://unused.invalid"}}))
     ids = special_id_chunks(memory)
     identity = "deterministic-record-id-regression"
     monkeypatch.setattr(vectors, "status", lambda _: {"model": {"embedding_identity": identity}})
@@ -131,12 +130,13 @@ def test_real_special_id_vector_write_reuse_and_concurrent_change(memory, monkey
     assert all(row.get("embedding") is None for row in memory._execute("SELECT embedding FROM member;")[0])
 
 
-def test_real_shared_service_encodes_special_ids(memory):
+def test_real_shared_service_encodes_special_ids(real_memory):
     if "BASEPACK_MEMORY_TEST_MACHINE" not in os.environ:
         pytest.skip("requires an explicit existing shared embedding service")
+    memory = real_memory
     memory.config = replace(memory.config, machine=load_machine_config(os.environ["BASEPACK_MEMORY_TEST_MACHINE"]))
     ids = special_id_chunks(memory)
-    assert set(memory.embed_members(ids)["embedded"]) == set(ids)
+    assert set(memory.embed_members(ids)["reused"]) == set(ids)
     assert set(memory.embed_members(ids)["reused"]) == set(ids)
     assert {row["id"] for row in memory.hybrid_search("项目数据库隔离", limit=10)} == set(ids)
     assert all(memory.read(value)["original"]["text"].startswith("项目数据库") for value in ids)

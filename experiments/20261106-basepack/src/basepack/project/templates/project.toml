@@ -29,6 +29,7 @@ reasoning_effort = 'ultra'
 
 [memory]
 data_dir = '.basepack/memory'
+# Retrieval mode: 'vector' or 'hybrid'; hybrid also supports --literal matching.
 search_mode = 'vector'
 project_id = '$memory_project_id'
 # Run a separate local server for this project's data; choose its port here.

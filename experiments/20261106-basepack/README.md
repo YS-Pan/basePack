@@ -1,10 +1,10 @@
 # basePack
 
-`20261106-basepack` 是当前唯一 active 工程，源码版本为 0.7.0，面向 Windows、Python 3.13+。每个项目在自己的 `.basepack/` 保存配置、知识、原文依据和作业记录；通用程序与模型可以共用。首次安装从根 [README](../../README.md#安装轻量客户端) 的 clone、venv 和源码安装命令开始。
+`20261106-basepack` 是当前唯一 active 工程，源码版本为 0.7.1，面向 Windows、Python 3.13+。每个项目在自己的 `.basepack/` 保存配置、知识、原文依据和作业记录；通用程序与模型可以共用。首次安装从根 [README](../../README.md#安装轻量客户端) 的 clone、venv 和源码安装命令开始。
 
 本项目自有源码与文档采用 [MIT 许可证](LICENSE)，与根许可证内容一致；第三方许可声明随包保留。
 
-记忆使用 SurrealDB 4，文件摘要、实际章节、智能原文块及图片均可直接检索和作为图节点。宿主订阅 agent 同读完成分块、摘要、识图、关系与评分；程序核原文版本并原子发布内容与匹配向量。search、brief 和 read 只读已发布知识及其依据快照；维护通过独立 worker 推进，业务结束时停止未发布工作。新项目默认 vector，可按需要显式选择 text 或 hybrid。实际交付见 [整改进度](../../devDoc/tasks/20261110-rectification/progress.md)。
+记忆使用 SurrealDB 4，文件摘要、实际章节、智能原文块及图片均可直接检索和作为图节点。宿主订阅 agent 同读完成分块、摘要、识图、关系与评分；程序核原文版本并原子发布内容与匹配向量。search、brief 和 read 只读已发布知识及其依据快照；维护通过独立 worker 推进，业务结束时停止未发布工作。新项目默认 vector，可按需要显式选择 hybrid；记忆统一使用共享向量能力。实际交付见 [整改进度](../../devDoc/tasks/20261110-rectification/progress.md)。
 
 basePack 仍在开发，实际使用同时作为测试样本。使用问题沿自己的项目约定记录，并按 [反馈格式](docs/setup-project.md#问题记录与反馈) 形成可提交的 Issue 草稿。
 
@@ -12,7 +12,7 @@ basePack 仍在开发，实际使用同时作为测试样本。使用问题沿�
 
 | 使用路径 | 设施与入口 |
 | --- | --- |
-| 无模型的文字记忆 | 轻量客户端、每项目独立 SurrealDB，显式配置 text；[项目接入](docs/setup-project.md) → [数据库部署](docs/administrator.md#项目-surrealdb) → [记忆使用](docs/memory.md) |
+| 项目记忆 | 轻量客户端、每项目独立 SurrealDB 与 CPU/CUDA 共享编码服务；[项目接入](docs/setup-project.md) → [数据库部署](docs/administrator.md#项目-surrealdb) → [记忆使用](docs/memory.md) |
 | 图文向量 / 混合检索 | 再准备固定模型与 CPU/CUDA 共享服务；[管理员说明](docs/administrator.md) → [资源使用](docs/resources.md) |
 | 普通重任务 | 再准备 HTCondor 单机 pool 与本站容量配置；[管理员说明](docs/administrator.md) → [作业使用](docs/resources.md) |
 | 独立 skills | [根 README 的安装与发现步骤](../../README.md#独立-skills)；无需 Python、数据库或模型 |
@@ -33,7 +33,7 @@ basePack 仍在开发，实际使用同时作为测试样本。使用问题沿�
 & $python -m basepack --config '<absolute-project>/.basepack/config.toml' memory brief --task '当前任务'
 ```
 
-启用后每个新 shell 沿 `.basepack/instructions.md` 重新加载凭据并读取 brief。纯文字路径保持 `[memory] search_mode = 'text'`；`memory search` 未传 `--mode` 时使用该值，显式 `--mode` 覆盖单次调用。完整 prepare/apply/search/read/neighbors 闭环见 [记忆示例](docs/memory.md#最小闭环示例)。项目配置、凭据、数据库和知识保持本地，不随 Git 分发。
+启用后每个新 shell 沿 `.basepack/instructions.md` 重新加载凭据并读取 brief。`memory.search_mode` 为 vector 或 hybrid；`memory search` 未传 `--mode` 时使用配置值。编号、文件名等精确查找使用 `--mode hybrid --literal`。完整 prepare/apply/search/read/neighbors 闭环见 [记忆示例](docs/memory.md#最小闭环示例)。项目配置、凭据、数据库和知识保持本地，不随 Git 分发。
 
 项目也可单独使用资源工具，无需启用记忆：
 

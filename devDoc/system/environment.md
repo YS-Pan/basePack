@@ -8,6 +8,10 @@
 
 选留证据现统一位于根 `artifacts/runs/`。前次临时材料整理的映射为 `artifacts/runs/tmp-reorganization-20261108/moves.json`，本次位置映射为 `artifacts/runs/20261109-project-layout/moves.json`；原始回执及下文历史路径保留当时含义，结合两轮映射回查长期副本，tmp 内容按可清除处理。
 
+## 2026-11-10 0.7.1 整改与安装
+
+稳定客户端已普通升级为0.7.1，源码外完整CPU依赖的Python3.14.10环境全套266项通过、无跳过；轻客户端3.13/3.14与CPU/CUDA实际图文、索引复用的条件见[整改结果](../tasks/20261110-rectification/result.md)。三个已接入项目保留UUID，兼容向量全部复用后切为vector，七表所有字段不变。生成凭据入口在无继承变量的新NoProfile PowerShell和其它cwd中实过。共享0.5.0模型服务、机器配置与Condor策略保持原实例。
+
 ## 当前资源查询与执行边界（2026-11-10）
 
 0.6.3 发布准备已在独立轻量客户端、全新下载的 SurrealDB 和临时数据目录验证，源码 201 项通过、无跳过；新 shell 使用生成入口的实际结果与独立新机资源部署待验范围见 [发布结果](../tasks/20261106-rebuild/github-publish-result.md)。稳定客户端仍为下述已安装版本，正式项目数据库与共享模型服务沿用原实例；本次发布准备没有替换它们。

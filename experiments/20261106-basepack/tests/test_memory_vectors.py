@@ -16,7 +16,7 @@ import pytest
 
 from basepack.project.config import load_machine_config
 from basepack.memory.store import Memory
-from test_memory_store import batch_for, memory
+from test_memory_store import batch_for, real_memory
 
 
 def visual_fixture(path: Path):
@@ -43,17 +43,18 @@ def visual_fixture(path: Path):
                      + chunk(b"IDAT", zlib.compress(b"".join(rows))) + chunk(b"IEND", b""))
 
 
-def test_real_shared_multilevel_vectors_image_and_identity(memory, tmp_path):
+def test_real_shared_multilevel_vectors_image_and_identity(real_memory, tmp_path):
     if "BASEPACK_MEMORY_TEST_MACHINE" not in os.environ:
         pytest.skip("requires explicit existing shared embedding machine config")
+    memory = real_memory
     memory.config = replace(memory.config, machine=load_machine_config(os.environ["BASEPACK_MEMORY_TEST_MACHINE"]))
     batch = batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n")
     memory.apply(batch)
     assert memory.vector_search("数据库", scope="missing/") == []
-    with pytest.raises(ValueError, match="No compatible memory vectors"):
-        memory.hybrid_search("数据库")
     encoded = memory.embed_members()
-    assert set(encoded["embedded"]) == {"member:guide", "member:storage_section", "member:storage", "member:retention"}
+    assert set(encoded["reused"]) == {"member:guide", "member:storage_section", "member:storage", "member:retention"}
+    assert encoded["embedded"] == []
+    assert memory.hybrid_search("数据库")
     hits = memory.vector_search("How does the local database separate projects?", limit=4)
     assert {row["kind"] for row in hits} == {"file", "section", "chunk"}
     assert all(row["embedded_revision"] == row["input_revision"] for row in hits)
@@ -71,8 +72,8 @@ def test_real_shared_multilevel_vectors_image_and_identity(memory, tmp_path):
     changed["members"] = changed["members"][:1]
     changed["members"][0]["text"] = "项目数据库必须支持离线隔离，资料必须保留。"
     memory.apply(changed)
-    assert "member:guide" not in {row["id"] for row in memory.vector_search("数据库", limit=10)}
-    assert memory.embed_members(["guide"])["embedded"] == ["member:guide"]
+    assert "member:guide" in {row["id"] for row in memory.vector_search("数据库", limit=10)}
+    assert memory.embed_members(["guide"])["reused"] == ["member:guide"]
     memory._execute("UPDATE member:storage SET embedding_identity='another-model-same-dimensions';")
     assert "member:storage" not in {row["id"] for row in memory.vector_search("数据库", limit=10)}
     memory.embed_members(["storage"])
@@ -87,7 +88,7 @@ def test_real_shared_multilevel_vectors_image_and_identity(memory, tmp_path):
                                 "locator": {"page": None, "region": None}}]}
     memory.apply(image_batch)
     image_encoded = memory.embed_members(["shapes"])
-    assert image_encoded["embedded"] == ["member:shapes"]
+    assert image_encoded["reused"] == ["member:shapes"]
     visual_hits = memory.vector_search("A red triangle beside a blue square on white background", limit=5)
     assert visual_hits[0]["id"] == "member:shapes"
     assert visual_hits[0]["embedding_kind"] == "image"
@@ -103,9 +104,10 @@ def test_real_shared_multilevel_vectors_image_and_identity(memory, tmp_path):
     assert "member:retention" in {row["id"] for row in hybrid}
 
 
-def test_real_native_restore_and_rebuild_from_retained_text_and_pixels(memory, tmp_path):
+def test_real_native_restore_and_rebuild_from_retained_text_and_pixels(real_memory, tmp_path):
     if not {"BASEPACK_MEMORY_TEST_MACHINE", "BASEPACK_MEMORY_TEST_SURREAL"} <= os.environ.keys():
         pytest.skip("requires an existing shared model and native SurrealDB executable")
+    memory = real_memory
     memory.config = replace(memory.config, machine=load_machine_config(os.environ["BASEPACK_MEMORY_TEST_MACHINE"]))
     batch = batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n")
     memory.apply(batch)
@@ -152,23 +154,24 @@ def test_real_native_restore_and_rebuild_from_retained_text_and_pixels(memory, t
     assert "member:shapes" not in {row["id"] for row in restored.vector_search("red triangle", limit=10)}
 
 
-def test_real_file_and_section_token_overflow_keeps_accepted_knowledge(memory, tmp_path):
+def test_real_file_and_section_token_overflow_preserves_previous_publication(real_memory, tmp_path):
     if "BASEPACK_MEMORY_TEST_MACHINE" not in os.environ:
         pytest.skip("requires an explicit existing shared model")
+    memory = real_memory
     memory.config = replace(memory.config, machine=load_machine_config(os.environ["BASEPACK_MEMORY_TEST_MACHINE"]))
     batch = batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n")
+    memory.apply(batch)
+    before = memory._execute("SELECT * FROM member ORDER BY id;")[0]
+    batch["expected"] = memory.prepare(["guide.md"])["expected"]
     long_summary = "维护条件必须保留。" * 500
     batch["members"][0]["text"] = long_summary
     batch["members"][1]["text"] = long_summary
-    memory.apply(batch)
     with pytest.raises(HTTPError) as failure:
-        memory.embed_members(["guide", "storage_section"])
+        memory.apply(batch)
     error = failure.value
     assert error.code == 500
-    members = memory._execute("SELECT id,text,embedding FROM member WHERE id IN [member:guide,member:storage_section];")[0]
-    assert all(row["text"] == long_summary and row.get("embedding") is None for row in members)
+    assert memory._execute("SELECT * FROM member ORDER BY id;")[0] == before
     (tmp_path / "overflow-evidence.json").write_text(json.dumps({
         "summary_bytes_each": len(long_summary.encode("utf-8")), "http_status": error.code,
-        "original_error": str(error), "notes": error.__notes__, "accepted_summary_preserved": True,
-        "partial_vectors_written": False,
+        "original_error": str(error), "accepted_knowledge_preserved": True, "partial_vectors_written": False,
     }, ensure_ascii=False, indent=2), encoding="utf-8")

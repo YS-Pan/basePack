@@ -1,6 +1,6 @@
 # 记忆整改结果
 
-2026-11-10，源码版本以本轮提交为准；普通 wheel、跨设备及宿主生命周期核验由整合工作继续。测试使用隔离临时数据库，不访问正式项目数据库。
+2026-11-10，源码版本以本轮提交为准。以下保留0.7.0分支证据；后续0.7.1删除独立text的结果见末节，普通安装和跨设备结果由整合工作记录。分支测试使用隔离临时数据库，不访问正式项目数据库。
 
 ## 当前证据
 
@@ -10,3 +10,9 @@
 - 宿主维护入口使用任务独有 control 文件同步停止与提交资格；候选编码及版本核对在事务前，内容和匹配向量同批提交。实际宿主探针在 19141 隔离库让 worker 阻塞于编码，业务侧 stop 在 226 ms 返回且不等待编码；`interrupt_agent` 返回前状态为 running。随后释放编码并读取，仍为旧已发布证据，worker 进程已不存在。控制结果与查询记录位于 `tmp/rectification-memory/host-probe/stop-result.json`、`after.json`，脚本为同目录 `host_probe.py`；独立 SurrealDB 4 的维护与发布回归 17 项通过，覆盖编码阻塞时 stop/原件变化不发布、内容向量同事务及复用、changes 与新接受交错、仅登记更正和退役；完整产品回归由整合继续。
 
 隔离测试服务为 `tmp/rectification-memory/start-test-surreal.ps1` 所启动的临时内存实例，结果不涉及正式数据库或共享服务。工具模型、token 和费用不可核；未进行 skill 测试或对照。
+
+## 0.7.1 接续
+
+删除独立text配置、CLI和发布分支，只保留vector/hybrid。hybrid字面查询包含路径、标题与正文，词法命中优先于语义补充；vector配literal明确报错。关系引用按basis的source_version及原位置回读，稳定成员ID的当前内容不替代旧依据。
+
+源码CLI/config67项通过；使用确定性编码器和真实隔离SurrealDB的记忆全组124项通过、4项真实模型待显式设施。随后主owner在完整Python3.14.10环境普通安装0.7.1 wheel，源码目录外全套266项通过、无跳过，含四项真实共享模型/原生恢复。旧库迁移及最终入口核验见[安装结果](installation-result.md)，原证与完整条件见[整改结果](result.md)。没有测试engineering-judgment的效果。

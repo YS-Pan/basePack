@@ -28,6 +28,8 @@ def test_memory_activation_preserves_business_text_and_updates_one_local_entry(t
     assert "--config $basepackConfig memory brief" in updated
     assert "[记忆流程](<" in updated
     assert "memory.search_mode" in updated
+    assert "`hybrid --literal`" in updated
+    assert "`vector --literal` 明确拒绝" in updated
     assert "memory_dir/serve.ps1" in updated
     assert "logs/surreal.stderr.log" in updated
 
@@ -56,9 +58,9 @@ def _search_args(*options):
 
 
 @pytest.mark.parametrize("configured, explicit, expected", [
-    ("text", None, "text"), ("hybrid", None, "hybrid"), ("vector", None, "vector"),
-    ("hybrid", "text", "text"), ("text", "vector", "vector"), ("vector", "hybrid", "hybrid"),
-    (None, "text", "text"), ("typo", "text", "text"),
+    ("hybrid", None, "hybrid"), ("vector", None, "vector"),
+    ("hybrid", "vector", "vector"), ("vector", "hybrid", "hybrid"),
+    ("text", "vector", "vector"), (None, "hybrid", "hybrid"), ("typo", "hybrid", "hybrid"),
 ])
 def test_search_uses_project_mode_and_explicit_override(tmp_path, monkeypatch, configured, explicit, expected):
     machine = tmp_path / "machine.toml"
@@ -73,9 +75,6 @@ def test_search_uses_project_mode_and_explicit_override(tmp_path, monkeypatch, c
         def __init__(self, config):
             pass
 
-        def search(self, *args, **kwargs):
-            return "text"
-
         def hybrid_search(self, *args, **kwargs):
             return "hybrid"
 
@@ -87,7 +86,7 @@ def test_search_uses_project_mode_and_explicit_override(tmp_path, monkeypatch, c
     assert dispatch(_search_args(*options), config) == (expected, 0)
 
 
-@pytest.mark.parametrize("configured, error", [(None, KeyError), ("typo", ValueError)])
+@pytest.mark.parametrize("configured, error", [(None, KeyError), ("typo", ValueError), ("text", ValueError)])
 def test_default_search_requires_a_valid_explicit_project_setting(tmp_path, configured, error):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
@@ -98,6 +97,41 @@ def test_default_search_requires_a_valid_explicit_project_setting(tmp_path, conf
         config.raw["memory"]["search_mode"] = configured
     with pytest.raises(error, match="search_mode"):
         dispatch(_search_args(), config)
+
+
+def test_text_search_mode_is_not_a_cli_option():
+    with pytest.raises(SystemExit) as error:
+        _search_args("--mode", "text")
+    assert error.value.code == 2
+
+
+@pytest.mark.parametrize("explicit", [False, True])
+def test_vector_search_rejects_literal_before_retrieving(tmp_path, monkeypatch, explicit):
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    config = load_project_config(init_project(tmp_path / "project", machine))
+    monkeypatch.setattr("basepack.memory.store.Memory.vector_search",
+                        lambda *args, **kwargs: pytest.fail("vector search accepted --literal"))
+    options = ["--mode", "vector"] if explicit else []
+    with pytest.raises(ValueError, match="--literal requires --mode hybrid"):
+        dispatch(_search_args("--literal", *options), config)
+
+
+def test_hybrid_search_passes_literal_to_lexical_retrieval(tmp_path, monkeypatch):
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    config = load_project_config(init_project(tmp_path / "project", machine))
+    config.raw["memory"]["search_mode"] = "hybrid"
+    calls = []
+
+    def hybrid(self, text, **kwargs):
+        calls.append((text, kwargs))
+        return "matches"
+
+    monkeypatch.setattr("basepack.memory.store.Memory.hybrid_search", hybrid)
+    assert dispatch(_search_args("--literal"), config) == ("matches", 0)
+    assert calls == [("项目数据库", {"scope": "", "limit": 12, "timeout": 600,
+                                  "literal": True, "include_coverage": True})]
 
 
 def _activation_bootstrap(config):

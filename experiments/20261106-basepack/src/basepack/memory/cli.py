@@ -18,8 +18,8 @@ def register_commands(subparsers):
     actions["search"].add_argument("--text", required=True)
     actions["search"].add_argument("--scope", default="")
     actions["search"].add_argument("--limit", type=int, default=12)
-    actions["search"].add_argument("--literal", action="store_true", help="Case-insensitive substring search in stored titles/text")
-    actions["search"].add_argument("--mode", choices=["hybrid", "text", "vector"],
+    actions["search"].add_argument("--literal", action="store_true", help="With hybrid: prioritize case-insensitive path/title/text substring matches")
+    actions["search"].add_argument("--mode", choices=["hybrid", "vector"],
                                  help="Override memory.search_mode from the project config")
     actions["search"].add_argument("--timeout", type=float, default=600)
     actions["embed"].add_argument("--ids", nargs="+", help="Member IDs; otherwise index current representations")
@@ -69,9 +69,9 @@ def dispatch(args, config):
             result = memory.embed_members(args.ids, timeout=args.timeout)
         elif action == "search":
             mode = args.mode if args.mode is not None else config.memory_search_mode
-            if mode == "text":
-                result = memory.search(args.text, scope=args.scope, limit=args.limit, literal=args.literal)
-            elif mode == "vector":
+            if mode == "vector":
+                if args.literal:
+                    raise ValueError("--literal requires --mode hybrid; vector mode does not support literal matching.")
                 result = memory.vector_search(args.text, scope=args.scope, limit=args.limit, timeout=args.timeout,
                                               include_coverage=True)
             else:
@@ -124,7 +124,7 @@ if ($LASTEXITCODE -ne 0) {{ throw "memory brief failed ($LASTEXITCODE)" }}
 
 本项目数据库的 launcher 为 `$basepackInfo.memory_dir/serve.ps1`，cwd 为该 `memory_dir`，日志为其中 `logs/surreal.stdout.log` 与 `logs/surreal.stderr.log`。先检查配置 endpoint 的 `/ready`；不可用时查日志，并由项目维护者显式启动该 launcher，以该目录为 cwd。保持同项目多聊天共用的进程，避免并行启动同一 store。首次准备、独立调用验证和故障处理见 [数据库部署](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/administrator.md#项目-surrealdb)，原生导出、原件与 assets 的恢复集合见 [备份恢复](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/memory.md#备份与恢复)。
 
-`memory search` 未传 `--mode` 时采用当前配置 `memory.search_mode`；新项目为 `vector`；纯文字项目可显式配置 `text`，也可选择 `hybrid`。显式 `--mode` 优先；设施或兼容向量缺失保留原错。
+`memory search` 未传 `--mode` 时采用当前配置 `memory.search_mode`；仅支持 `vector`（新项目默认）或 `hybrid`。`hybrid --literal` 优先返回路径、标题或正文的精确子串命中，`lexical_rank` 标明词法命中；无此字段的是语义补充。`vector --literal` 明确拒绝。显式 `--mode` 优先；旧 `text` 配置须改为 `vector` 或 `hybrid`，设施或兼容向量缺失保留原错。
 
 直接保留 mandatory 信息；stale=true 的内容只作待核，不当作当前事实。brief、search 和 read 读取已发布知识及其依据快照，不扫描或维护来源。宿主支持可取消子任务与任务开始/完成事件时，并行启动低优先级维护 worker，业务完成时停止该任务的维护；缺少这些能力时说明自动维护不可用。多轮检索、筛选与重排前用同一命令前缀运行 `config ai --purpose retrieval` 解析项目档位。按 [记忆流程](<{skill}>) 执行。
 {end}"""

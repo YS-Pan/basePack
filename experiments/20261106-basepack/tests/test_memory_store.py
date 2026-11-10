@@ -5,6 +5,7 @@ BASEPACK_MEMORY_TEST_ENDPOINT and BASEPACK_MEMORY_TEST_PASSWORD to run.
 """
 
 from copy import deepcopy
+from hashlib import sha256
 import os
 from pathlib import Path
 import sys
@@ -15,12 +16,28 @@ from basepack.memory.store import Memory
 from basepack.project.config import MachineConfig, ProjectConfig
 
 
-@pytest.fixture
-def memory(tmp_path):
+EMBEDDING_IDENTITY = "deterministic-memory-tests-v1"
+
+
+def deterministic_vector(value):
+    payload = Path(value["image"]).read_bytes() if isinstance(value, dict) else value.encode("utf-8")
+    return [1.0 + byte / 255 for byte in sha256(payload).digest()[:8]]
+
+
+class DeterministicEmbeddingClient:
+    def __init__(self, machine):
+        pass
+
+    def embed(self, inputs, *, timeout):
+        return {"embedding_identity": EMBEDDING_IDENTITY,
+                "vectors": [deterministic_vector(value) for value in inputs]}
+
+
+def _memory(tmp_path):
     if "BASEPACK_MEMORY_TEST_ENDPOINT" not in os.environ:
         pytest.skip("requires an actual disposable SurrealDB server")
     config = ProjectConfig(tmp_path / "project.toml", Path(sys.executable), tmp_path,
-                           {"memory": {"data_dir": ".basepack/memory", "search_mode": "text", "project_id": "product_test",
+                           {"memory": {"data_dir": ".basepack/memory", "search_mode": "vector", "project_id": "product_test",
                                        "endpoint": os.environ["BASEPACK_MEMORY_TEST_ENDPOINT"],
                                        "namespace": "memsys", "database": "product_tests",
                                        "username": "root", "password_env": "BASEPACK_MEMORY_TEST_PASSWORD"}},
@@ -29,6 +46,24 @@ def memory(tmp_path):
     memory.install_schema()
     memory._execute("DELETE semantic; DELETE node; DELETE member; DELETE source_version; DELETE source; DELETE change;")
     return memory
+
+
+@pytest.fixture
+def memory(tmp_path, monkeypatch):
+    from basepack.embedding import admin
+    from basepack.memory import candidate_vectors, vectors
+
+    for module in (candidate_vectors, vectors):
+        monkeypatch.setattr(module, "EmbeddingClient", DeterministicEmbeddingClient)
+        monkeypatch.setattr(module, "status", lambda _: {"model": {"embedding_identity": EMBEDDING_IDENTITY}})
+    monkeypatch.setattr(admin, "status", lambda _: {"model": {"embedding_identity": EMBEDDING_IDENTITY}})
+    return _memory(tmp_path)
+
+
+@pytest.fixture
+def real_memory(tmp_path):
+    """The shared-model checks must use the actual configured service."""
+    return _memory(tmp_path)
 
 
 def batch_for(memory, text):
@@ -49,6 +84,28 @@ def batch_for(memory, text):
     ], "nodes": [{"id": "local", "kind": "decision", "text": "采用本地数据库", "evidence": ["storage"]}],
             "edges": [{"id": "requires", "in": "node:local", "out": "member:storage", "kind": "depends",
                        "text": "决定依赖项目隔离", "evidence": ["storage"]}]}
+
+
+@pytest.mark.parametrize("mode", ["vector", "hybrid"])
+def test_publication_always_contains_matching_vectors(memory, mode):
+    memory.config.raw["memory"]["search_mode"] = mode
+    memory.apply(batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n"))
+    rows = memory._execute("SELECT * FROM member;")[0]
+    assert len(rows) == 4
+    assert all(row["embedding_identity"] == EMBEDDING_IDENTITY
+               and row["embedded_revision"] == row["input_revision"]
+               and row["embedding"] == deterministic_vector(row["title"] + "\n" + row["text"])
+               for row in rows)
+    assert len(memory.embed_members()["reused"]) == 4
+
+
+def test_legacy_text_mode_rejects_publication_before_database_access(tmp_path):
+    config = ProjectConfig(tmp_path / "project.toml", Path(sys.executable), tmp_path,
+                           {"memory": {"search_mode": "text"}}, MachineConfig(tmp_path / "machine.toml", {}))
+    memory = Memory(config)
+    memory._execute = lambda *args, **kwargs: pytest.fail("invalid mode touched the database")
+    with pytest.raises(ValueError, match="search_mode.*(vector|hybrid)"):
+        memory.apply({"sources": []})
 
 
 def test_real_multilevel_roundtrip_local_edit_and_correction(memory):

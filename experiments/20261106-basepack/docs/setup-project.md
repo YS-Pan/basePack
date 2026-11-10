@@ -1,6 +1,6 @@
 # 项目接入
 
-按根 [安装步骤](../../../README.md#安装轻量客户端) 安装轻量客户端。文字检索需要每项目独立的 SurrealDB；向量检索和图文编码另需共享 embedding，普通重任务另需 HTCondor。设施由机器维护者按 [管理员说明](administrator.md) 准备。
+按根 [安装步骤](../../../README.md#安装轻量客户端) 安装轻量客户端。项目记忆需要每项目独立的 SurrealDB 和共享 embedding 模型服务；普通重任务需要 HTCondor。设施由机器维护者按 [管理员说明](administrator.md) 准备。
 
 ## 首次接入
 
@@ -12,16 +12,7 @@ $project = '<absolute-project>'
 $machineConfig = '<absolute-machine-config>'
 ```
 
-已有机器配置时沿用该文件。只用文字检索可在本地应用数据目录新建最小机器配置，后续将项目 `search_mode` 选为 `text`：
-
-```powershell
-$machineDir = Join-Path $env:LOCALAPPDATA 'basePack'
-New-Item -ItemType Directory -Force -Path $machineDir | Out-Null
-$machineConfig = Join-Path $machineDir 'text-only.toml'
-New-Item -ItemType File -Path $machineConfig -Value 'schema_version = 1' -ErrorAction Stop | Out-Null
-```
-
-需要额外设施时，按管理员说明添加对应节。完整机器模板可从已安装包读取：
+已有机器配置时沿用该文件。启用记忆前，由管理员配置其中的共享模型路径、服务 endpoint 和所选 CPU/CUDA 后端。完整机器模板可从已安装包读取：
 
 ```powershell
 & $python -c "from basepack.project.init import template; print(template('machine.toml'))"
@@ -46,7 +37,7 @@ bp --config $config doctor
 
 项目配置使用 schema 2，机器配置使用 schema 1，字段见 [项目模板](../src/basepack/project/templates/project.toml)。每次调用显式传配置路径；`runtime.python` 与 `runtime.machine_config` 使用绝对路径，项目数据目录在本项目 `.basepack/` 内。自定义配置可传 `--config-name .basepack/config/local.toml`。init 生成入口，不启动设施或创建数据库。
 
-按所用能力运行 `doctor --facility embedding` 或 `doctor --facility condor`，随后各做 [一次编码或小作业](resources.md)。doctor 报错时按原始路径、模型或认证错误修正对应设施。
+启用记忆前运行 `doctor --facility embedding`，并按下节完成记忆读写；只用普通重任务时运行 `doctor --facility condor` 和 [一次小作业](resources.md#普通重任务)。doctor 报错时按原始路径、模型或认证错误修正对应设施。
 
 共享模型的健康与身份可独立查询：
 
@@ -68,7 +59,7 @@ bp --config $config config ai --tier tier2
 
 ## 启用记忆
 
-在 `memory init` 前核项目配置的 `[memory]`，选定本项目独立的 `data_dir`、`endpoint`，保留 init 生成的 `project_id`。新项目默认 `search_mode = 'vector'`，先准备共享编码服务；只用文字检索时显式改为 `text`，也可选 `hybrid`。search 与 brief 的任务相关推荐使用项目检索模式，`search --mode` 只覆盖本次查询。
+在 `memory init` 前核项目配置的 `[memory]`，选定本项目独立的 `data_dir`、`endpoint`，保留 init 生成的 `project_id`。新项目默认 `search_mode = 'vector'`，也可选 `hybrid`；两者都需要共享编码服务。search 与 brief 的任务相关推荐使用项目检索模式，`search --mode` 只覆盖本次查询。
 
 默认端口 18080 被占用时修改新项目 endpoint。两个项目可共用程序和共享模型服务，分别使用：
 
@@ -117,11 +108,21 @@ if ($LASTEXITCODE -ne 0) { throw "search failed ($LASTEXITCODE)" }
 
 成功时 brief 和 search 返回已发布知识及其依据。缺少凭据时核密码文件和变量名；连接失败时按生成入口检查本项目 `serve.ps1`、cwd 与日志并显式启动数据库。同项目多聊天共用数据库，聊天结束后保持运行。修改 memory 目录或密码文件配置后，下次加载会读取新位置。
 
+查编号、文件名或指定原文片段时使用 `memory search --mode hybrid --literal --text '<查找内容>'`：在 title、text 和 path 中做不区分大小写的子串查找，精确匹配优先，以 lexical_rank 标记，随后附语义候选。vector 模式不接受 `--literal`；模型或向量缺失时按原始错误修复设施或补建。
+
 ## 版本升级
 
 先按 [备份步骤](memory.md#备份与恢复) 保留知识、配置和原件恢复集合，再由客户端维护者安装新包。已有配置保持 schema 2、机器 schema 1 和原 UUID。
 
-升级到 0.7.0 后，在新 shell 加载凭据并执行 `memory init`，核 schema/UUID 并刷新查询与维护入口，然后运行代表性 brief、search 和 read。已有 text 项目保持 text；要切换向量检索，先按 [向量补建](memory.md) 运行 `memory embed`，完成后再把 `search_mode` 改为 `vector`。模型身份变化按相同流程补建兼容向量，错误保留原始信息。
+升级到 0.7.1 前先确认共享模型服务可用。旧 text 项目用显式 vector 查询核已发布活跃范围的向量覆盖：
+
+```powershell
+bp --config $config memory search --mode vector --text '<代表性主题>'
+```
+
+`vector_coverage` 的 total 与 compatible 相等且 pending 为 0 时，直接复用索引，将配置 `search_mode` 改为 `vector` 或 `hybrid`。有缺口或没有兼容向量时先运行 `memory embed` 补建，再查询确认覆盖；其 pending 还可能包含待语义维护的旧 stale 项，以查询返回的已发布活跃范围为切换条件。模型身份变化也按此补建，不回退到纯文字模式。
+
+安装新包后在新 shell 加载凭据并执行 `memory init`，核 schema/UUID 并刷新查询与维护入口，然后运行代表性 brief、search 和 read。
 
 旧配置缺少 `search_mode` 时明确补入所选模式；缺少 `[ai]` 时从 [项目模板](../src/basepack/project/templates/project.toml) 补入等级。密码文件使用当前 memory 目录的 `password.txt` 或显式 `password_file`。资源服务升级与回滚见 [管理员说明](administrator.md#升级与回滚)。
 

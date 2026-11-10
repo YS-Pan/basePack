@@ -23,9 +23,9 @@ For memory discovery, delegate the question, project scope and content budget on
 
 That worker owns all needed search rounds, evidence reads, scoring and ranking, then returns usable content and sources:
 
-1. Run `search --text <terms>` using the project's `memory.search_mode` across file/section summaries, original chunks and images. New projects default to `vector`; `hybrid` combines text and compatible vectors, and `vector` queries only compatible vectors. An explicit `--mode text|hybrid|vector` overrides the project setting. Existing 0.6.2 projects must add this setting explicitly before default search; keep missing configuration and facility errors visible. Chinese segmentation is not substring matching; use `--literal --mode text` for case-insensitive substrings in stored titles/text, including identifiers or missed proper names.
-2. Use `neighbors <id>` to expand current parents, children and semantic edges; `--include-stale` is explicit historical inspection. Follow evidence member IDs and use `read <member-id>` to verify original ranges and conditions. For images, actually open `original.image_path`; distinguish the saved description from image evidence. Read the retained snapshot for the member’s accepted source version; a missing snapshot fails. Structural links differ from semantic claims. Read content before scoring.
-3. Write a JSON array of actual candidates with `id`, `kind`, `path`, `revision`, `start_line`, `end_line`, `title`, `text`, numeric `score` and a short reason. Use a common 0–100 relevance scale; a lexical/vector score is not an agent score.
+1. Run `search --text <terms>` using the project's `memory.search_mode` across file/section summaries, original chunks and images. New projects default to `vector`; `hybrid` combines text and compatible vectors. An explicit `--mode vector|hybrid` overrides the project setting. For identifiers, filenames or an intact phrase, use `--mode hybrid --literal`: case-insensitive substrings in path/title/text rank before semantic-only supplements, and direct matches carry `lexical_rank`. Read the results to check the intended meaning. `vector --literal` fails; choose hybrid explicitly. Keep missing configuration, model and compatible-index errors visible.
+2. Use `read <member-id>` for a directly selected member, and `neighbors <id>` to expand current parents, children and semantic edges; `--include-stale` is explicit historical inspection. For each semantic claim, follow its `basis`: read every cited `member` with that item's `--source-version`, and its `--start-line`/`--end-line` for text or `--locator` JSON when present for images. For example, `read <basis.member> --source-version <basis.source_version> --start-line <basis.start_line> --end-line <basis.end_line>`. Verify conditions in the returned `original`; the accompanying `member` is the current record. A stable member ID may have been updated, so its current summary, source version or line range cannot substitute for the relation's saved evidence. For images, actually open `original.image_path` and distinguish descriptions from image evidence. A missing snapshot fails. Structural links differ from semantic claims. Read content before scoring.
+3. Write a JSON array of actual candidates with `id`, `kind`, `path`, `revision`, `source_version`, `start_line`, `end_line`, `title`, `text`, numeric `score` and a short reason. For original evidence, copy the locators, revision and text from the verified `original`; identify summaries as summaries. Use a common 0–100 relevance scale; a lexical/vector score is not an agent score.
 4. Run `rank --input <scored.json> --budget <text-characters>`. Return the selected content, source locators and unresolved gaps. Budget omissions retain reading pointers; whole evidence is not silently truncated. The working agent may read more freely.
 
 Record the selected tier and actual model when available; do not invent usage or price. Keep intermediates under this project's `.basepack/memory/`, uniquely named per batch so concurrent chats do not overwrite each other's work.
@@ -37,7 +37,7 @@ The ID contract supports string and integer keys. An ID without a table prefix i
 1. Run `changes --scope <explicit-files-or-directories>` after edits or when checking freshness. Fast checks use metadata; `--deep` hashes originals when needed. Pass the configured `memory.source_scope` explicitly as the scope to discover new files in declared directories. `sources` gives the full metadata inventory for explicit maintenance.
 2. Run `prepare --paths <affected-files-and-related-material> --output <reading.json>`, including the material used as evidence and at both relation endpoints. Read the new/old numbered originals and `neighborhood.members` with relevant neighbors; use `read` or extend prepare paths to verify additional originals. Reading units are location hints. Decide the final semantic chunk boundaries, file/section summaries, knowledge nodes and semantic edges during this same reading, including conditions and evidence. Preserve original wording inside chunks.
 3. Write one batch and run `apply --batch <batch.json>`. Reuse stable IDs for unchanged members. The program checks source and knowledge versions, prepares required candidate vectors, then publishes records, relations and matching vectors in one transaction; snapshots and corrections are retained. A source changed during the work requires another reading of that batch; preserve actual errors.
-4. Search/read the published knowledge using the configured mode and check its evidence. Report uncovered ranges and discovered backlog. For an existing text project moving to vectors, run `embed` to build vectors for published members, then set `memory.search_mode = 'vector'`. Compatible unchanged vectors are reused.
+4. Search/read the published knowledge using the configured mode and check its evidence. Report uncovered ranges and discovered backlog. Before upgrading a project configured with `search_mode = 'text'`, use its existing client to run `embed` as needed, then query with `search --mode vector` and confirm published vector coverage has `total = compatible` and `pending = 0`. Compatible unchanged vectors are reused. Then change the configuration to `vector` or `hybrid` and upgrade the client. If the new client is already installed, `embed` and explicit `search --mode vector` still support preparing and checking coverage before switching the configuration.
 
 Batch fields:
 
@@ -49,9 +49,9 @@ Batch fields:
 - `delete_members`, `delete_nodes`, `delete_edges`: explicit IDs retired by this batch. `corrections`: `{id, target, reason}`; the program captures the previous record.
 - `context`: actual available `chat`, `turn`, `root_chat`; leave unavailable fields absent.
 
-### Minimal text batch
+### Minimal batch
 
-Use an initialized disposable project with credentials already loaded and `memory.search_mode = 'text'`. This standalone example creates exactly four UTF-8 lines. Choose a fresh work directory and source filename; the file/section/chunk ranges are inclusive, all parents and evidence exist in the same batch, and chunk text comes from the original. The example summaries describe this fixed source; actual material requires the same reading and judgment described above.
+Use an initialized disposable project with credentials already loaded, the configured shared embedding service available, and `memory.search_mode` set to `vector` or `hybrid`. This standalone example creates exactly four UTF-8 lines. Choose a fresh work directory and source filename; the file/section/chunk ranges are inclusive, all parents and evidence exist in the same batch, and chunk text comes from the original. The example summaries describe this fixed source; actual material requires the same reading and judgment described above.
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -68,7 +68,7 @@ function memory {
 New-Item -ItemType Directory -Path $work | Out-Null
 $source = Join-Path $projectRoot 'memory-example.md'
 New-Item -ItemType File -Path $source | Out-Null
-[IO.File]::WriteAllText($source, "# 试用说明`n## 约定`n试用问题留在开发记录。`n项目数据库按项目隔离。`n", [Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText($source, "# 试用说明`n## 约定`n试用问题 A-17 留在开发记录。`n项目数据库按项目隔离。`n", [Text.UTF8Encoding]::new($false))
 $reading = Join-Path $work 'reading.json'
 $batch = Join-Path $work 'batch.json'
 memory prepare --paths 'memory-example.md' --output $reading
@@ -85,7 +85,7 @@ batch = {
     "members": [
         {"id": "example-file", "kind": "file", "path": path, "parent": None,
          "start_line": 1, "end_line": 4, "title": "试用说明",
-         "text": "试用问题留在开发记录；项目数据库按项目隔离。", "evidence": ["member:`example-chunk`"]},
+         "text": "试用问题 A-17 留在开发记录；项目数据库按项目隔离。", "evidence": ["member:`example-chunk`"]},
         {"id": "example-section", "kind": "section", "path": path, "parent": "member:`example-file`",
          "start_line": 2, "end_line": 4, "title": "约定",
          "text": "保留试用记录，并使用独立项目数据库。", "evidence": ["member:`example-chunk`"]},
@@ -97,12 +97,13 @@ Path(sys.argv[2]).write_text(json.dumps(batch, ensure_ascii=False, indent=2), en
 '@ | & $python -X utf8 - $reading $batch
 if ($LASTEXITCODE -ne 0) { throw "Batch creation failed ($LASTEXITCODE)" }
 memory apply --batch $batch
-memory search --text '项目数据库' --mode text --literal
+memory search --text 'A-17' --mode hybrid --literal
+memory search --text 'memory-example.md' --mode hybrid --literal
 memory read 'member:`example-chunk`'
 memory neighbors 'member:`example-section`'
 ```
 
-With the configured shared embedding service, continue with `memory embed --ids example-file example-section example-chunk`, then `memory search --text '项目数据库' --mode hybrid` and ``memory read 'member:`example-chunk`'``. Set `memory.search_mode = 'vector'` when vectors should be the project default. The function above stops on any failed dependency. A text member missing start_line/end_line reports its batch position, member ID and field; correct the input and rerun. Failed batches leave no partial database writes.
+Apply encodes the candidate members before publishing them with matching vectors. The function above stops on any failed dependency, including model errors. A text member missing start_line/end_line reports its batch position, member ID and field; correct the input and rerun. Failed batches leave no partial database writes.
 
 For broad maintenance, use a tier2 coordinator and at most four tier1 readers per coordinator. Resolve each role through the project tier mapping. Merge cross-worker candidates and read both ends together before accepting a relation. Batch review is optional. Deep maintenance may revisit old or randomly selected material to seek missed relations; do not claim every pair was examined.
 
@@ -110,4 +111,4 @@ For a manual deep pass, use `sources`, sample distinct materials within the decl
 
 Back up with SurrealDB's native export and restore into a separate project directory. Include this project's configuration, original documents/images and the assets directory under configured `memory.data_dir`. Database exports preserve explicitly stored knowledge/history; rebuilding vectors uses the accepted representations and retained image snapshots.
 
-The shared embedding service encodes text as title plus accepted text, and images as original image bytes. Descriptions do not substitute for image vectors. `embedding_identity` and input revisions gate compatibility; equal dimensions do not. A missing compatible index is an explicit error: index accepted members or choose text mode. Preserve service errors; do not retry or truncate silently. Over-limit representations return to the same reader to adjust semantic boundaries/summaries while retaining their coverage and exceptions. A timeout only ends waiting and does not cancel shared inference.
+The shared embedding service encodes text as title plus accepted text, and images as original image bytes. Descriptions do not substitute for image vectors. `embedding_identity` and input revisions gate compatibility; equal dimensions do not. A missing compatible index is an explicit error: index accepted members with `embed`. Model errors stop publication or retrieval with their original details. Over-limit representations return to the same reader to adjust semantic boundaries/summaries while retaining their coverage and exceptions. A timeout only ends waiting and does not cancel shared inference.

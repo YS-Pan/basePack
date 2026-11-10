@@ -1,6 +1,6 @@
 # 项目记忆
 
-记忆在本项目的 SurrealDB 中保存文件摘要、章节摘要、原文块、图片描述与定位，并保留层级、原文范围、语义关系和修改依据；图片原字节快照保存在项目记忆目录的 assets 中。宿主订阅 agent 负责智能分块、摘要、识图、建图和评分，数据库执行存储、事务与查询。新项目默认向量检索并使用共享模型服务；纯文字项目可配置 `memory.search_mode = 'text'`。小文件不必虚造章节。
+记忆在本项目的 SurrealDB 中保存文件摘要、章节摘要、原文块、图片描述与定位，并保留层级、原文范围、语义关系和修改依据；图片原字节快照保存在项目记忆目录的 assets 中。宿主订阅 agent 负责智能分块、摘要、识图、建图和评分，数据库执行存储、事务与查询。记忆使用共享模型服务，支持 `vector` 与 `hybrid`，新项目默认 `vector`。小文件不必虚造章节。
 
 ## 启用
 
@@ -33,7 +33,7 @@ prepare 时包括本批所用依据与关系两端的材料；它提供新旧编
 
 apply 核对来源版本，以及本批改写、退休、更正目标、实际使用的既有依据成员和关系两端的 expected 版本，再原子写入；无关 expected 不阻塞并行，缺 expected 仅允许本批新建记录。原文块由程序按范围取原词，摘要、边界、依据、历史与更正持久保存。旧草稿冲突时重新 prepare、共读后再提交。原件变化作为待维护信息，已发布知识及其依据快照仍可查询；受影响内容须在维护时共读，未变输入与兼容向量可复用，文件追加的新内容必须重核完整摘要。部分摘要显式保存 coverage_gaps。接受删除保留旧依据，相关主张按剩余证据重核；仅登记更正而未同批替换的错误内容标待核并排除查询。再次共读、apply 并查询新结果后，才算完成增量维护。向量模式在 apply 事务前准备候选编码，内容与匹配向量一起发布。深检查使用 `changes --scope <文件或目录> --deep`。
 
-需要向量时运行 `memory embed`，复用 [共享 embedding](resources.md)，不另外加载模型。文件/章节使用已接受摘要，块使用原文，图片使用原始图片；兼容且输入未变的向量复用。超限保留原错误，交回原阅读 agent 调整分块或摘要，不能静默截断。纯文字项目保持 `[memory] search_mode = 'text'`，维护和正常查询都无需编码。
+新内容由 apply 使用 [共享 embedding](resources.md) 编码；已有内容补建或重建索引时运行 `memory embed`，不另外加载模型。文件/章节使用已接受摘要，块使用原文，图片使用原始图片；兼容且输入未变的向量复用。超限保留原错误，交回原阅读 agent 调整分块或摘要，不能静默截断。模型不可用时停止本批发布或查询，并保留原错误。
 
 图片先由视觉 agent 实际打开，描述与 OCR 单独标明，程序按 hash 保留必要原字节快照。必要 PDF 页可由宿主读取/渲染为项目内图片，locator 记录原文件、版本、页与区域；原 PDF 变化时重新核相关页面，不声称自动解析所有 PDF。
 
@@ -45,7 +45,7 @@ apply 核对来源版本，以及本批改写、退休、更正目标、实际�
 
 ## 最小闭环示例
 
-在已完成 init/brief、凭据已加载的干净试用项目执行 [memory_minimal.py](../examples/memory_minimal.py)。它新建四行 UTF-8 的 `memory-example.md`，拒绝覆盖同名文件，并依次 prepare → 生成完整批次 → apply → search/read/neighbors；每个子命令使用 `subprocess.run(check=True)`，apply 失败后即停止。运行文字示例前将项目 `memory.search_mode` 设为 `text`；首次运行加 `--with-vectors` 则在 apply 后先 embed，再显式做混合查询。该脚本用于检查命令闭环，真实材料的理解与批次制作由宿主 agent 按 skill 完成。
+在已完成 init/brief、凭据已加载且共享模型服务可用的干净试用项目执行 [memory_minimal.py](../examples/memory_minimal.py)。配置 `memory.search_mode` 为 `vector` 或 `hybrid`。它新建四行 UTF-8 的 `memory-example.md`，拒绝覆盖同名文件，并依次 prepare → 生成完整批次 → apply（含编码）→ 按编号和文件名查询 → read/neighbors；每个子命令使用 `subprocess.run(check=True)`，apply 失败后即停止。该脚本用于检查命令闭环，真实材料的理解与批次制作由宿主 agent 按 skill 完成。
 
 ```powershell
 $python = '<instructions 中的 absolute-python.exe>'
@@ -62,25 +62,34 @@ if ($LASTEXITCODE -ne 0) { throw "memory example failed ($LASTEXITCODE)" }
 | `example-section` / section | 2–4 | ``member:`example-file` `` | ``member:`example-chunk` `` |
 | `example-chunk` / chunk | 3–4 | ``member:`example-section` `` | 空 |
 
-随包 [skill](../src/basepack/memory/SKILL.md#minimal-text-batch) 也保留不依赖仓库文件的完整批次例子。文字成员缺起止行字段会报告批次位置、成员 ID 与字段；不存在的 read 目标会明确报出 ID。修正输入后重新运行，失败批次没有部分写入；保留原错误，不继续下游命令。
+随包 [skill](../src/basepack/memory/SKILL.md#minimal-batch) 也保留不依赖仓库文件的完整批次例子。文字成员缺起止行字段会报告批次位置、成员 ID 与字段；不存在的 read 目标会明确报出 ID。修正输入后重新运行，失败批次没有部分写入；保留原错误，不继续下游命令。
 
 ## 启动与检索
 
 ```powershell
 memory brief --task '当前任务'
 memory search --text '主题'
-memory search --text 'A-17' --mode text --literal
+memory search --text 'A-17' --mode hybrid --literal
+memory search --text 'memory-example.md' --mode hybrid --literal
 memory neighbors 'member:<id>'
 memory read 'member:<id>'
 ```
 
-brief 直接提供必须保留的信息、相关线索、来源与覆盖缺口。mandatory 不参加相关性筛选；其中 stale 条目是待核义务，不能当当前事实。search 未传 `--mode` 时读取项目 `[memory].search_mode`；新项目为 `vector`，可按所用设施改成 `hybrid` 或 `text`。显式 `--mode text|hybrid|vector` 覆盖本次查询；hybrid 融合跨层全文与兼容图文向量。选择 hybrid/vector 时，当前知识缺少兼容索引会明确报错，模型失败保留原错；程序不自动退回文字模式。中文全文按词典分词，短词不保证子串召回，编号命中也不等于精确匹配；literal 是显式包含查询。
+brief 直接提供必须保留的信息、相关线索、来源与覆盖缺口。mandatory 不参加相关性筛选；其中 stale 条目是待核义务，不能当当前事实。search 未传 `--mode` 时读取项目 `[memory].search_mode`；新项目为 `vector`。显式 `--mode vector|hybrid` 覆盖本次查询；hybrid 融合跨层全文与兼容图文向量。当前知识缺少兼容索引会明确报错，模型失败保留原错。
+
+编号、文件名和需保留完整字符的短语使用 `--mode hybrid --literal`：在路径、标题和正文中做大小写无关的子串匹配，直接命中排在语义补充结果前，并带 `lexical_rank`。它按完整字符段匹配，区别于分词全文查询；结果仍可包含语义补充，引用前须 read 核实。`vector --literal` 会报错，需显式选择 hybrid。
 
 brief、search 和 read 只读已发布知识及对应原文快照，不扫描原件或等待维护。`changes --scope` 显式发现已登记来源及指定范围中的变化；未改原件只查元数据，深查才做完整 hash。维护 worker 应将配置的 `source_scope` 作为 `changes --scope` 的显式范围，以发现其中的新文件。任务词未命中时，短项目地图仍提供前提线索。
 
-向量查询和 brief 的相关通道报告当前已发布范围的 identity、总数、兼容数和待建范围；缺少兼容向量与真实无命中分别可见。已有 text 库先运行 `memory embed` 补建，完成后将 `memory.search_mode` 改为 `vector`。`memory sources` 列完整来源元数据，供手动深维护抽样；抽到的材料与旧图要实际共读，未发现新关系也如实记录。
+向量查询和 brief 的相关通道报告当前已发布范围的 identity、总数、兼容数和待建范围；缺少兼容向量与真实无命中分别可见。升级旧 `search_mode = 'text'` 项目时，先用原客户端按需运行 `memory embed`，再以 `memory search --mode vector --text '<代表主题>'` 核已发布覆盖的 `total = compatible` 且 `pending = 0`；然后将配置改为 `vector` 或 `hybrid` 并升级客户端。若已安装新客户端，仍可先运行 `embed` 和显式 `search --mode vector` 检查覆盖，再切换配置。旧值与 `--mode text` 均不再支持。`memory sources` 列完整来源元数据，供手动深维护抽样；抽到的材料与旧图要实际共读，未发现新关系也如实记录。
 
-read 只接受 member ID；语义 node/edge 经 neighbors 查看依据，再读对应成员。neighbors 默认展开当前关系，历史复核显式加 `--include-stale`。图像 read 将描述与 `original.image_path` 分开；实际打开快照。原件变化或缺失时仍读已发布版本的快照；快照缺失或损坏时返回错误。引用旧版本时使用依据里的 source_version 和位置参数。
+read 只接受 member ID；语义 node/edge 经 neighbors 查看 `basis`，按每项的 `member`、`source_version` 和具体位置核实依据。文字使用：
+
+```powershell
+memory read '<basis.member>' --source-version '<basis.source_version>' --start-line <basis.start_line> --end-line <basis.end_line>
+```
+
+图片传同一 `source_version` 及存在的 `--locator '<basis.locator 的 JSON>'`，实际打开 `original.image_path`。引用的是 read 返回的 `original`；同时返回的 `member` 是当前记录，stable ID 更新后的当前摘要或行范围不能替代关系保存的旧依据。neighbors 默认展开当前关系，历史复核显式加 `--include-stale`。原件变化或缺失时仍读已发布版本的快照；快照缺失或损坏时返回错误。
 
 当前 ID 合同支持字符串与整数 key。无表名前缀时是原始字符串 key；带 `member:`、`node:` 等前缀时是数据库 canonical ID，可直接沿用返回值。字符串 key `123` 与 canonical `member:123` 的数字 key 不同；字符串形式为 ``member:`123` ``。含冒号的 key 使用完整 canonical ID。
 

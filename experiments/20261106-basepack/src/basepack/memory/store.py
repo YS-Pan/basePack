@@ -269,6 +269,7 @@ class Memory:
         Unmentioned records and edges survive. Accepted chunk text comes from the
         original, never from generated prose. Corrections retain actual old data.
         """
+        self.config.memory_search_mode
         if control:
             from .maintenance import check
             check(control)
@@ -394,7 +395,7 @@ class Memory:
                               "raw_revision": _digest(raw), "input_revision": _input_revision(title, text),
                               "embedding_kind": "text"})
             submitted[_record(item["id"]).key] = value
-        if submitted and self.config.memory_search_mode in {"vector", "hybrid"}:
+        if submitted:
             from .candidate_vectors import encode_candidates
             records = [_record(item["id"]) for item in batch.get("members", [])]
             old_vectors = self._execute(f"SELECT * FROM member WHERE id IN {_sql(records)};")[0]
@@ -497,8 +498,9 @@ class Memory:
                 "edges": len(batch.get("edges", [])), "invalidated": sorted(retired)}
 
     def search(self, text: str, *, scope: str = "", limit: int = 10, literal: bool = False) -> list[dict]:
+        """Return lexical candidates for hybrid retrieval."""
         if literal:
-            match = (f"string::contains(string::lowercase(title + '\\n' + text), "
+            match = (f"string::contains(string::lowercase(path + '\\n' + title + '\\n' + text), "
                      f"string::lowercase({_sql(text)}))")
             score = "0.0"
         else:
@@ -559,6 +561,7 @@ class Memory:
         return {"record": current, "parent": parent, "children": children, "edges": edges}
 
     def brief(self, task: str = "", *, limit: int = 6) -> dict:
+        mode = self.config.memory_search_mode
         sources = self.sources()
         mandatory, stale_members, stale_nodes, stale_edges, gaps, overview = self._execute(
             "SELECT * OMIT embedding FROM member WHERE mandatory=true AND retired!=true; "
@@ -567,17 +570,13 @@ class Memory:
             "SELECT id,kind FROM semantic WHERE stale=true AND retired!=true; "
             "SELECT id,path,coverage_gaps AS gaps FROM member WHERE retired!=true AND array::len(coverage_gaps)>0; "
             f"SELECT * OMIT embedding FROM member WHERE stale=false AND retired!=true AND mandatory=false AND kind IN ['file','section','image'] ORDER BY kind,path LIMIT {int(limit)};")
-        mode = self.config.memory_search_mode
         coverage = None
         related = []
         if task and limit:
-            if mode == "text":
-                related = self.search(task, limit=limit)
-            else:
-                search = self.vector_search if mode == "vector" else self.hybrid_search
-                result = search(task, limit=limit, include_coverage=True)
-                related, coverage = result["matches"], result["vector_coverage"]
-        elif mode != "text":
+            search = self.vector_search if mode == "vector" else self.hybrid_search
+            result = search(task, limit=limit, include_coverage=True)
+            related, coverage = result["matches"], result["vector_coverage"]
+        else:
             from basepack.embedding.admin import status
             from .vectors import vector_coverage
             identity = status(self.config.machine)["model"]["embedding_identity"]

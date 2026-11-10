@@ -87,7 +87,7 @@ def vector_search(memory, text, *, scope="", limit=12, timeout=600, include_cove
     coverage = vector_coverage(memory, identity, scope=scope)
     if not coverage["compatible"]:
         raise ValueError("No compatible memory vectors in scope: not indexed, embedding_identity changed, "
-                         "or embedded_revision differs from input_revision. Run memory embed or search --mode text. "
+                         "or embedded_revision differs from input_revision. Run memory embed to rebuild them. "
                          f"Query identity: {identity}; pending: {coverage['pending']}")
     candidates = memory._execute(
         "SELECT *, source_revision AS revision, "
@@ -109,5 +109,6 @@ def hybrid_search(memory, text, *, scope="", limit=12, timeout=600, literal=Fals
             row.update({key: value for key, value in candidate.items() if key in {"distance", "lexical_score"}})
             row[name] = rank
             row["rrf_score"] += 1 / (60 + rank)
-    matches = sorted(combined.values(), key=lambda row: (-row["rrf_score"], row["id"]))[:limit]
+    matches = sorted(combined.values(), key=lambda row: (literal and "lexical_rank" not in row,
+                                                        -row["rrf_score"], row["id"]))[:limit]
     return {"matches": matches, "vector_coverage": result["vector_coverage"]} if include_coverage else matches

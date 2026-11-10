@@ -50,9 +50,9 @@ def test_unchanged_start_reads_metadata_without_loading_all_member_bodies(memory
     assert memory.brief(limit=0)["changes"] == []
 
 
-def test_unmatched_task_still_receives_short_project_map_without_opaque_versions(memory):
+def test_startup_receives_short_project_map_without_opaque_versions(memory):
     memory.apply(batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n"))
-    result = memory.brief("完全未出现在原文的任务词")
+    result = memory.brief()
     assert result["clues"]
     assert all(row["clue_role"] == "map" for row in result["clues"])
     assert "basis" not in result["mandatory"][0]

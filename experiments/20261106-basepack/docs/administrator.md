@@ -1,6 +1,6 @@
 # 机器部署与维护
 
-本页供 Windows x64 机器维护者安装和管理共享设施。先安装轻量客户端，再准备所用能力：文字检索需要每项目独立的 SurrealDB；向量检索和图文编码需要共享模型服务；普通重任务需要 HTCondor。项目使用者从 [项目接入](setup-project.md) 开始。
+本页供 Windows x64 机器维护者安装和管理共享设施。先安装轻量客户端；项目记忆需要每项目独立的 SurrealDB 和共享 embedding 模型服务，普通重任务需要 HTCondor。项目使用者从 [项目接入](setup-project.md) 开始。
 
 ## 官方来源与能力选择
 
@@ -41,7 +41,7 @@ uv pip install --python $python '<basepack-wheel>'
 & $python -s -c "import basepack; print(basepack.__file__)"
 ```
 
-共享模型服务使用独立、稳定的纯净环境。选择一个依赖分支，按工程锁安装，再安装普通包：
+记忆的 vector 与 hybrid 检索都需要共享模型服务。服务使用独立、稳定的纯净环境，选择一个依赖分支，按工程锁安装，再安装普通包：
 
 | 后端 | embeddingExtra | 机器 device |
 | --- | --- | --- |
@@ -142,7 +142,7 @@ launcher 绑定所选 loopback endpoint；执行账户须能读写项目目录�
 
 ## 首次准备图文模型
 
-向量检索与图文编码使用同一 Qwen3-VL-Embedding-2B 模型，CPU 和 CUDA 都采用 FP16。机器配置 `device = 'auto'` 在 PyTorch 可用 CUDA 时选择 `cuda:0`，否则选择 CPU；也可显式设为 `cpu` 或 `cuda:0`。CPU 不要求 NVIDIA 工具或 GPU 预算。CUDA 需要与锁定 cu128 wheel 兼容的驱动及下文显存预算。实际加载或 OOM 失败时按原始错误调整设备、预算或支持负载。
+记忆检索与图文编码使用同一 Qwen3-VL-Embedding-2B 模型，CPU 和 CUDA 都采用 FP16。机器配置 `device = 'auto'` 在 PyTorch 可用 CUDA 时选择 `cuda:0`，否则选择 CPU；也可显式设为 `cpu` 或 `cuda:0`。CPU 不要求 NVIDIA 工具或 GPU 预算。CUDA 需要与锁定 cu128 wheel 兼容的驱动及下文显存预算。实际加载或 OOM 失败时按原始错误调整设备、预算或支持负载。
 
 将模型放仓库外的稳定共享目录，选定一个新目录作为机器配置的 model_root。运行 [准备脚本](../examples/prepare_embedding_model.py)：它只编排官方 `hf download`、`hf cache verify` 和本机锁文件生成；下载与恢复由官方工具负责，校验失败直接保留原错。
 
@@ -303,7 +303,7 @@ Shawl 的 log-dir 保存包装器和服务输出。`status` 使用 `/health` 和
 
 ## 升级与回滚
 
-保留旧 wheel、机器配置和各项目 [恢复集合](memory.md#备份与恢复)，待共用客户端的调用结束后普通安装新包，核实际 Python 和导入位置。0.7.0 项目入口与检索迁移见 [项目升级](setup-project.md#版本升级)。本轮共享 embedding 的 HTTP 协议与语义身份保持兼容，已有服务可继续运行；客户端升级不要求重启模型或 Condor。
+保留旧 wheel、机器配置和各项目 [恢复集合](memory.md#备份与恢复)，待共用客户端的调用结束后普通安装新包，核实际 Python 和导入位置。0.7.1 项目入口与检索迁移见 [项目升级](setup-project.md#版本升级)。共享 embedding 的 HTTP 协议与语义身份保持兼容，已有服务可继续运行；客户端升级不要求重启模型或 Condor。
 
 更新共享模型服务时先暂停请求，经 SCM 停止并确认进程树回收，再更新独立环境和配置，启动后执行所选后端的一次编码冒烟。模型、精度或前处理合同改变时按新 identity 补建项目向量；设备或路径变化可复用同身份索引。改变 Condor 容量按上节排空和重启 startd，修改提交规则按影响重载 schedd。
 

@@ -66,7 +66,9 @@ class ProjectConfig:
     @property
     def memory_search_mode(self) -> str:
         mode = self.raw["memory"]["search_mode"]
-        if mode not in ("text", "hybrid", "vector"):
+        if mode == "text":
+            raise ValueError("memory.search_mode='text' is no longer supported; set it to 'vector' or 'hybrid'.")
+        if mode not in ("hybrid", "vector"):
             raise ValueError(f"Unsupported memory.search_mode: {mode}")
         return mode
 

@@ -3,8 +3,8 @@ from types import SimpleNamespace
 import pytest
 
 from basepack.memory import vectors
-from basepack.memory.store import Memory
-from test_memory_store import memory
+from basepack.memory.store import Memory, _sql
+from test_memory_store import deterministic_vector, memory
 
 
 class FakeMemory:
@@ -47,16 +47,19 @@ def test_vector_search_reports_missing_identity_instead_of_silent_text_fallback(
         vectors.vector_search(FakeMemory([]), "task", include_coverage=True)
 
 
-def test_brief_uses_configured_vector_related_and_does_not_scan(monkeypatch):
-    config = SimpleNamespace(memory_search_mode="vector", raw={"memory": {"source_scope": ["docs"]}})
+@pytest.mark.parametrize("mode", ["vector", "hybrid"])
+def test_brief_uses_configured_related_and_does_not_scan(mode):
+    config = SimpleNamespace(memory_search_mode=mode, raw={"memory": {"source_scope": ["docs"]}})
     memory = Memory(config)
     memory.sources = lambda: []
     memory._execute = lambda sql: [[], [], [], [], [], []]
     memory._check_changes = lambda *args, **kwargs: pytest.fail("brief scanned sources")
     coverage = {"identity": "same-model", "total": 2, "compatible": 1, "pending": 1,
                 "pending_members": [{"id": "member:b", "path": "b.md"}]}
-    memory.vector_search = lambda task, **kwargs: {"matches": [{"id": "member:a", "title": "related"}],
-                                                  "vector_coverage": coverage}
+    for name in ("vector_search", "hybrid_search"):
+        setattr(memory, name, lambda *args, **kwargs: pytest.fail("brief used the wrong search mode"))
+    setattr(memory, mode + "_search", lambda task, **kwargs: {
+        "matches": [{"id": "member:a", "title": "related"}], "vector_coverage": coverage})
     memory.search = lambda *args, **kwargs: pytest.fail("brief fell back to text")
     result = memory.brief("semantic task", limit=6)
     assert result["clues"][0]["id"] == "member:a"
@@ -65,19 +68,17 @@ def test_brief_uses_configured_vector_related_and_does_not_scan(monkeypatch):
     assert result["changes"] == []
 
 
-def test_text_library_rebuild_reports_coverage_and_reuses_published_input(memory, monkeypatch):
+def test_vector_rebuild_reports_coverage_and_reuses_published_input(memory):
     from test_memory_store import batch_for
 
-    memory.config.raw["memory"]["search_mode"] = "text"
     batch = batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n")
     memory.apply(batch)
+    assert len(memory.embed_members()["reused"]) == 4
+    memory._execute("UPDATE member SET embedding=NONE, embedding_identity=NONE, embedded_revision=NONE;")
     (memory.config.root / "guide.md").write_text("原件已有新变化，已发布知识仍可补建。\n", encoding="utf-8")
-    monkeypatch.setattr(vectors, "status", lambda _: {"model": {"embedding_identity": "same-model"}})
-    monkeypatch.setattr(vectors, "EmbeddingClient", FakeClient)
     first = memory.embed_members(["storage"])
     assert first["embedded"] == ["member:storage"]
     assert len(first["pending"]) == 3
-    memory.config.raw["memory"]["search_mode"] = "vector"
     partial = memory.vector_search("数据库", include_coverage=True)
     assert partial["vector_coverage"]["total"] == 4
     assert partial["vector_coverage"]["compatible"] == 1
@@ -89,8 +90,35 @@ def test_text_library_rebuild_reports_coverage_and_reuses_published_input(memory
     memory._execute("UPDATE member:storage SET embedding_identity='different-model';")
     coverage = memory.vector_search("数据库", include_coverage=True)["vector_coverage"]
     assert (coverage["compatible"], coverage["pending"]) == (3, 1)
-    monkeypatch.setattr("basepack.embedding.admin.status", lambda _: {"model": {"embedding_identity": "same-model"}})
     assert memory.brief()["vector_pending_count"] == 1
     assert memory.embed_members()["embedded"] == ["member:storage"]
     memory._execute("UPDATE member:storage SET embedding=NONE;")
     assert memory.embed_members()["embedded"] == ["member:storage"]
+
+
+@pytest.mark.parametrize("query", ["docs/ADR-0042.md", "ADR-0042.md", "0042"])
+def test_hybrid_literal_prioritizes_path_filename_and_identifier_matches(memory, query):
+    from test_memory_store import batch_for
+
+    memory.apply(batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n"))
+    path = memory.config.root / "docs" / "ADR-0042.md"
+    path.parent.mkdir()
+    path.write_text("归档决定的原文依据。\n", encoding="utf-8")
+    prepared = memory.prepare(["docs/ADR-0042.md"])
+    memory.apply({"sources": [{"path": "docs/ADR-0042.md", "revision": prepared["sources"][0]["revision"]}],
+                  "expected": prepared["expected"], "members": [
+                      {"id": "zz_archive", "kind": "chunk", "path": "docs/ADR-0042.md", "title": "归档条目",
+                       "start_line": 1, "end_line": 1}]})
+    # The literal match falls outside the vector limit. Its RRF score ties the
+    # first semantic-only hit, whose ID would sort earlier without literal priority.
+    vector = deterministic_vector(query)
+    memory._execute(f"UPDATE member SET embedding={_sql(vector)}; "
+                    f"UPDATE member:zz_archive SET embedding={_sql([-value for value in vector])};")
+    hits = memory.hybrid_search(query, literal=True, limit=3)
+    assert hits[0]["id"] == "member:zz_archive"
+    assert hits[0]["lexical_rank"] == 1
+    assert "vector_rank" not in hits[0]
+    supplements = hits[1:]
+    assert supplements
+    assert hits[0]["rrf_score"] == supplements[0]["rrf_score"]
+    assert all("vector_rank" in row and "lexical_rank" not in row for row in supplements)

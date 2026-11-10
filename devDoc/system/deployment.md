@@ -1,6 +1,6 @@
 # 项目配置与部署合同
 
-更新：2026 年 11 月 10 日。当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.7.0。本文维护代码、业务实例、共享设施与升级边界；正式记忆安装状态见 [专项进度](../tasks/20261106-memory-system/progress.md)，共享资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。操作从路线 README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md) 和 [管理员说明](../../experiments/20261106-basepack/docs/administrator.md) 进入。
+更新：2026 年 11 月 10 日。当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.7.1。本文维护代码、业务实例、共享设施与升级边界；正式记忆安装状态见 [专项进度](../tasks/20261106-memory-system/progress.md)，共享资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。操作从路线 README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md) 和 [管理员说明](../../experiments/20261106-basepack/docs/administrator.md) 进入。
 
 ## 位置与责任
 
@@ -15,7 +15,7 @@
 | 运行托管与日志 | 共享模型沿用 Shawl/SCM；项目库可由普通用户手动启动，也可选管理员 SCM；日志分别保存 |
 | 普通作业容量与策略 | HTCondor 独立安装并唯一维护 |
 
-本机共享服务沿 R9 使用 `C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe` 与 `D:/AgentTools/state/basepack/embedding/logs/`。SurrealDB 4.0.0 exe 位于 `D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`，项目各自保存数据库。本机 0.6.2 客户端普通安装在稳定的 `D:/AgentTools/envs/basepack-client/`，系统 Python 与 0.5.0 共享模型环境保持原状；图文依赖仍在共享环境；0.6 客户端升级不要求重启兼容的 0.5 模型服务。这些是本机位置，公共代码通过配置定位设施；实测见 [环境说明](environment.md)。
+本机共享服务沿 R9 使用 `C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe` 与 `D:/AgentTools/state/basepack/embedding/logs/`。SurrealDB 4.0.0 exe 位于 `D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`，项目各自保存数据库。本机客户端普通安装在稳定的 `D:/AgentTools/envs/basepack-client/`，系统 Python 与 0.5.0 共享模型环境保持原状；图文依赖仍在共享环境；当前客户端升级不要求重启兼容的 0.5 模型服务。这些是本机位置，公共代码通过配置定位设施；实测见 [环境说明](environment.md)。
 
 根 file-structure、agent-team、engineering-judgment 独立维护，resources skill 归 active 实验，memory skill 随包安装并由 memory guide 定位。开发环境、构建缓存和夹具在根 tmp，交付及回滚 wheel 在实验 dist，选留原证在根 artifacts/runs；寿命见 [文档约定](../documentation.md)。
 
@@ -51,7 +51,7 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 | embedding.endpoint | 显式共享 HTTP 地址，本机为 loopback 8765 |
 | memory.endpoint/namespace/database | 显式项目原生数据库；逻辑库不代替物理隔离 |
 | memory.project_id/password_env/source_scope | 随项目保留的 UUID、客户端凭据变量名和可选新增资料检查范围 |
-| memory.search_mode | CLI 未显式传 --mode 时采用的 text/hybrid/vector；新项目默认 vector |
+| memory.search_mode | CLI 未显式传 --mode 时采用的 hybrid/vector；新项目默认 vector |
 | memory.password_file | 可选密码文件，相对项目根或绝对路径；省略时为实际 memory_dir/password.txt |
 
 机器 embedding 节沿用 R9 endpoint、service_name、queue_timeout 及模型/预算设置。凭据只通过环境交给客户端与原生进程，机器引导及秘密文件不进入源码。project_id 随移动或恢复保留，误连另一身份的库会失败。config show 和 doctor 只作诊断，不能替代真实功能验收。
@@ -66,7 +66,7 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 
 ## 升级与回退
 
-0.7.0 将查询与维护分离：查询读取已发布内容及依据快照，维护候选在所选模式的向量准备好后原子发布。知识表与项目/机器配置 schema 保持现有格式；升级保留 UUID、数据及显式检索模式，运行 memory init 刷新 schema 和生成入口。已有 text 项目先保持 text；需要默认向量时补建完成后显式切换。新项目默认 vector。
+0.7.0 将查询与维护分离：查询读取已发布内容及依据快照，维护候选在所选模式的向量准备好后原子发布。知识表与项目/机器配置 schema 保持现有格式；升级保留 UUID、数据及显式检索模式，运行 memory init 刷新 schema 和生成入口。0.7.1 删除独立 text 模式；旧 text 项目复用或补齐兼容向量后切换 vector/hybrid，保留知识、ID 和来源。新项目默认 vector。
 
 轻客户端要求 Python >=3.13，CPU/CUDA 模型依赖由各自 extra 选择。共享 embedding 的协议和语义身份未变，现有 0.5.0 CUDA 服务可继续运行；CPU 服务按自动设备选择启动，保持相同模型与 FP16。Condor 继续维护准入和排队，capacity 只作观测。更老项目缺少检索模式或 `[ai]` 时按[项目接入](../../experiments/20261106-basepack/docs/setup-project.md#版本升级)补齐。
 

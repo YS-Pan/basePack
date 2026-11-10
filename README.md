@@ -4,13 +4,13 @@ basePack 为 agent 提供项目局部记忆、共享计算资源协调，以及�
 
 | 能力 | 用途 | 按需准备 |
 | --- | --- | --- |
-| 项目记忆 | 保存摘要、原文块、图片与关系，查询已发布知识，独立维护更新 | Python 3.13+ 客户端、每项目独立的 SurrealDB 4；text 模式无需模型 |
+| 项目记忆 | 保存摘要、原文块、图片与关系，查询已发布知识，独立维护更新 | Python 3.13+ 客户端、每项目独立的 SurrealDB 4、CPU/CUDA 共享编码服务 |
 | 资源协调 | 多项目复用图文 embedding，提交和查询普通重任务 | 编码服务支持 CPU/CUDA；作业使用 HTCondor |
 | agent-team | 按任务选择单人、直接协作或分层团队 | 支持 skills 与订阅 agent 的宿主 |
 | file-structure | 按内容职责和生命周期建议项目布局 | 支持 skills 的宿主 |
 | engineering-judgment | 判断设计、错误处理、兼容和操作流程中的契约、职责与必要负担 | 支持 skills 的宿主 |
 
-当前源码为 **0.7.0 开发版**，面向 Windows、Python 3.13+。理解材料、建图和评分由宿主订阅 agent 完成，basePack 不要求另配 LLM API。安装和使用按所选功能准备设施，开发验证与环境记录见 [整改进度](devDoc/tasks/20261110-rectification/progress.md)。
+当前源码为 **0.7.1 开发版**，面向 Windows、Python 3.13+。理解材料、建图和评分由宿主订阅 agent 完成，basePack 不要求另配 LLM API。安装和使用按所选功能准备设施，开发验证与环境记录见 [整改进度](devDoc/tasks/20261110-rectification/progress.md)。
 
 **basePack 当前仍处于开发过程中，现阶段的实际使用同时作为测试样本。应记录使用过程中遇到的问题，作为后续改进的依据。**
 
@@ -27,15 +27,16 @@ $python = (Resolve-Path '.venv/Scripts/python.exe').Path
 & $python -c "from importlib.metadata import version; print(version('basepack'))"
 ```
 
-Python 包在 `experiments/20261106-basepack`，从仓库根安装时需指定该目录。以上只安装轻量客户端；使用文字记忆、通用 skills 时无需安装模型依赖。这个虚拟环境随当前 clone 保存，移动或删除它后应在新位置重建客户端并更新项目入口。
+Python 包在 `experiments/20261106-basepack`，从仓库根安装时需指定该目录。以上只安装轻量客户端；项目记忆通过配置连接共享模型服务，模型依赖装在服务环境中。通用 skills 可独立使用。这个虚拟环境随当前 clone 保存，移动或删除它后应在新位置重建客户端并更新项目入口。
 
 历史发布包可从 [GitHub Releases](https://github.com/YS-Pan/basePack/releases) 获取；本轮源码的普通 wheel 构建见 [路线 README](experiments/20261106-basepack/README.md#开发检查与构建)。已有项目先按 [升级步骤](experiments/20261106-basepack/docs/setup-project.md#版本升级) 备份并更新入口。
 
-## 先试文字记忆
+## 启用项目记忆
 
-1. 按 [项目接入](experiments/20261106-basepack/docs/setup-project.md) 创建最小机器配置，为自己的项目运行 `init`。新项目默认 `vector`；先试无模型的文字路径时，显式设 `memory.search_mode = 'text'`。`doctor` 默认只检查 core。
-2. 按 [项目 SurrealDB](experiments/20261106-basepack/docs/administrator.md#项目-surrealdb) 安装数据库，为该项目选择独立目录、端口和密码，启动后检查 `/ready`。无需 embedding 或 HTCondor。
-3. 按 [凭据加载步骤](experiments/20261106-basepack/docs/setup-project.md#凭据与新-shell-接续) 运行 `memory init`、`memory brief`，再执行 [最小读写闭环](experiments/20261106-basepack/docs/memory.md#最小闭环示例)。启用后，新 shell 和新聊天沿生成的 `AGENTS.md → .basepack/instructions.md` 入口加载凭据并接续。
+1. 按 [项目接入](experiments/20261106-basepack/docs/setup-project.md) 创建最小机器配置，为自己的项目运行 `init`。新项目默认 `vector`，也可选择 `hybrid`。`doctor` 默认只检查 core。
+2. 按 [项目 SurrealDB](experiments/20261106-basepack/docs/administrator.md#项目-surrealdb) 安装数据库，为该项目选择独立目录、端口和密码，启动后检查 `/ready`。
+3. 按 [共享模型部署](experiments/20261106-basepack/docs/administrator.md) 准备 CPU 或 CUDA 编码服务，在机器配置中填写 endpoint，完成一条编码冒烟。记忆不要求 HTCondor。
+4. 按 [凭据加载步骤](experiments/20261106-basepack/docs/setup-project.md#凭据与新-shell-接续) 运行 `memory init`、`memory brief`，再执行 [最小读写闭环](experiments/20261106-basepack/docs/memory.md#最小闭环示例)。启用后，新 shell 和新聊天沿生成的 `AGENTS.md → .basepack/instructions.md` 入口加载凭据并接续。
 
 各项目的配置、知识、数据库、密码与本机入口保存在各自的忽略目录中，**项目记忆不随本仓库源码分发**。新 clone 通过 `init` 生成自己的配置；恢复已有知识时使用对应项目的备份。
 

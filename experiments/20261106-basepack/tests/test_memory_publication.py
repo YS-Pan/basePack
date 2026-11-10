@@ -32,7 +32,6 @@ def test_candidate_not_published_after_stop_or_source_change(memory, tmp_path, m
     memory.apply(batch_for(memory, '# 数据库\n旧条件。\n\n# 保留\n资料必须保留。\n'))
     batch = batch_for(memory, '# 数据库\n新条件。\n\n# 保留\n资料必须保留。\n')
     old = deepcopy(memory.read('storage')['member'])
-    memory.config.raw['memory']['search_mode'] = 'vector'
     ready, release = Event(), Event()
     monkeypatch.setattr(candidate_vectors, 'status', lambda _: {'model': {'embedding_identity': 'same'}})
 
@@ -72,7 +71,6 @@ def test_candidate_not_published_after_stop_or_source_change(memory, tmp_path, m
 def test_candidate_vectors_are_published_together_and_reused(memory, monkeypatch):
     memory.apply(batch_for(memory, '# 数据库\n旧条件。\n\n# 保留\n资料必须保留。\n'))
     batch = batch_for(memory, '# 数据库\n新条件。\n\n# 保留\n资料必须保留。\n')
-    memory.config.raw['memory']['search_mode'] = 'vector'
     calls = []
     monkeypatch.setattr(candidate_vectors, 'status', lambda _: {'model': {'embedding_identity': 'same'}})
 

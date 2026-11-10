@@ -11,7 +11,6 @@ from basepack.project.config import load_project_config
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--config", required=True)
-parser.add_argument("--with-vectors", action="store_true", help="Use the configured shared embedding service")
 args = parser.parse_args()
 project = load_project_config(args.config)
 cli = [str(project.python), "-X", "utf8", "-m", "basepack", "--config", str(project.path), "memory"]
@@ -25,7 +24,7 @@ def run(*arguments):
 # Exclusive creation protects any existing business file with this name.
 source_path = "memory-example.md"
 with (project.root / source_path).open("x", encoding="utf-8", newline="\n") as stream:
-    stream.write("# 试用说明\n## 约定\n试用问题留在开发记录。\n项目数据库按项目隔离。\n")
+    stream.write("# 试用说明\n## 约定\n试用问题 A-17 留在开发记录。\n项目数据库按项目隔离。\n")
 
 work = project.memory_dir / ("example-" + uuid4().hex)
 work.mkdir(parents=True)
@@ -40,7 +39,7 @@ batch = {
     "members": [
         {"id": "example-file", "kind": "file", "path": source_path, "parent": None,
          "start_line": 1, "end_line": 4, "title": "试用说明",
-         "text": "试用问题留在开发记录；项目数据库按项目隔离。", "evidence": ["member:`example-chunk`"]},
+         "text": "试用问题 A-17 留在开发记录；项目数据库按项目隔离。", "evidence": ["member:`example-chunk`"]},
         {"id": "example-section", "kind": "section", "path": source_path, "parent": "member:`example-file`",
          "start_line": 2, "end_line": 4, "title": "约定",
          "text": "保留试用记录，并使用独立项目数据库。", "evidence": ["member:`example-chunk`"]},
@@ -50,11 +49,8 @@ batch = {
 }
 batch_path.write_text(json.dumps(batch, ensure_ascii=False, indent=2), encoding="utf-8")
 run("apply", "--batch", str(batch_path))
-if args.with_vectors:
-    run("embed", "--ids", "example-file", "example-section", "example-chunk")
-    run("search", "--text", "项目数据库", "--mode", "hybrid")
-else:
-    run("search", "--text", "项目数据库", "--mode", "text", "--literal")
+run("search", "--text", "A-17", "--mode", "hybrid", "--literal")
+run("search", "--text", source_path, "--mode", "hybrid", "--literal")
 run("read", "member:`example-chunk`")
 run("neighbors", "member:`example-section`")
 print(f"UTF-8 reading and batch: {work}", flush=True)
