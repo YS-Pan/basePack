@@ -24,6 +24,8 @@ Shawl 1.9.0 由 Windows 服务管理器启动，在 Condor 作业树之外拥有
 
 HTCondor 是普通容量与策略权威。`capacity` 读取实际父 slot 的总量和剩余量：标准 CPU/RAM/GPU 映射为 cpus/memory_mib/gpus；其他 MachineResources 在总量和剩余均发布时按原名和单位展示。客户端按实际 CPU/RAM 总量检查请求能否容纳，当前剩余不足由 Condor 排队；项目配置不镜像普通额度。
 
+容量与队列查询的认证边界、正常用户上下文复核、实时 startd 配额及设备/进程核对见[管理员说明](../../../experiments/20261106-basepack/docs/administrator.md#安装与执行账户)及其[容量与策略](../../../experiments/20261106-basepack/docs/administrator.md#condor-容量与策略)。
+
 GPU JobSpec 只生成官方 `request_gpus = 1` 和 `gpus_minimum_memory = <峰值> MB`。schedd 的 JOB_TRANSFORM 根据站点策略生成内部显存申请并追加匹配条件，保留原 Requirements、RequireGPUs 和硬件筛选。CPU 作业不做 GPU 转换。本站省略原生显存声明时预订全池；非法、超池和多 GPU 申请由提交规则拒绝，规则对所有标准提交端一致，详见管理员说明。
 
 背景服务与普通作业共享物理 GPU，以固定预留协调。共享令牌和显存记账不提供显存硬隔离，应用须按申报控制实际峰值；WDDM 下单进程 CUDA free 不能代表全卡余量，动态 free 不参与准入。
@@ -34,4 +36,4 @@ run 管理排队与执行时限，并写入 Condor 原生策略；wait 只观察
 
 ## 验证入口
 
-功能结果、联合 GPU 场景和进程回收以资源进度指向的原证为准，测试数量不替代实际验收。运行原证按批次选留于根 `artifacts/runs/`；历史 R8 的取消、空闲退出与私有 RPC 证据只适用于当时实现，见 [R8 结果](../../archive/20261107-resource-coordination/maintenance-result.md)。
+当前资源查询边界、正常用户 CPU 作业与 GPU/共享 embedding 并存复核见[运行环境](../environment.md)及其原证；GPU 并存的证据范围以该页说明为准。功能结果和进程回收按实际业务结果核验，测试数量不替代验收。运行原证按批次选留于根 `artifacts/runs/`；历史 R8 的取消、空闲退出与私有 RPC 证据只适用于当时实现，见 [R8 结果](../../archive/20261107-resource-coordination/maintenance-result.md)。

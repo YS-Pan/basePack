@@ -8,6 +8,12 @@
 
 选留证据现统一位于根 `artifacts/runs/`。前次临时材料整理的映射为 `artifacts/runs/tmp-reorganization-20261108/moves.json`，本次位置映射为 `artifacts/runs/20261109-project-layout/moves.json`；原始回执及下文历史路径保留当时含义，结合两轮映射回查长期副本，tmp 内容按可清除处理。
 
+## 当前资源查询与执行边界（2026-11-10）
+
+最新双上下文复查仍为：受限 agent 沙箱中的 `condor_status` 成功、`condor_q -json` 以 `AUTHENTICATE:1005` 失败；相同配置在正常用户上下文两者均成功，队列为空。沙箱内 Windows NTSSPI 认证限制仍在，不能把正常用户路径验收通过写成该限制已修复，也不能由容量查询成功推断队列认证成功。对照原证为 `artifacts/runs/20261110-condor-auth-context/`。
+
+正常用户路径已分别通过下述 CPU `14348.0` 和 GPU/embedding 并存 `14350.0` 的实际提交、执行、输出与回收验收。提交端使用正常用户安全上下文，作业执行端仍是 `condor-slot1_1`。日常认证诊断与实时资源核查按 [管理员说明](../../experiments/20261106-basepack/docs/administrator.md#安装与执行账户)；本机配置、服务和认证政策未因本次故障调整。旧 yadof 材料只提供宿主权限、拓扑与凭据排查经验，本次查阅未找到同款 SSPI 修复案例，不承接其可选认证策略。
+
 ## 2026-11-10 0.6.2 GPU 作业与共享 embedding 并存复核
 
 正常用户上下文使用稳定 0.6.2 客户端提交 GPU 作业 `14350.0`，申请 1 CPU、2048 MiB RAM、1 个同卡 GPU 名额及 2048 MiB 显存。应用复用系统 Python 的 torch 2.10.0+cu128，以 `condor-slot1_1` 在 CUDA 上执行 256×256 全一矩阵乘法；30 轮计算后的全矩阵最大误差为 0，元素和为 16777216，结果文件回传，退出码 0。

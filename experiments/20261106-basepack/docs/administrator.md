@@ -29,7 +29,7 @@ uv pip install --python $servicePython --no-deps '<basepack-wheel>'
 
 项目只绑定 Python 和机器配置，代码通过正常安装使用。开发 editable 与普通 wheel 在同一解释器中只保留一种有效安装，构建入口和交付包位置见 [路线 README](../README.md)。机器模板通过 `from basepack.project.init import template` 读取，项目接入见 [说明](setup-project.md)。
 
-CondorClient 使用机器配置的 bin_dir/config_file，向原生命令显式传 CONDOR_CONFIG。受限 sandbox 的 Windows SSPI 认证可能失败；保留原错误，在正常用户上下文复核，不因此改认证政策。
+CondorClient 使用机器配置的 bin_dir/config_file，向原生命令显式传 CONDOR_CONFIG。容量查询 `condor_status` 与队列查询 `condor_q` 分别核验；前者成功不能证明后者可用。受限 sandbox 的 Windows SSPI 认证可能失败；保留原错误，使用获准的正常用户上下文和同一配置复核，认证政策按站点合同维护。查询上下文与作业执行账户分别核对：正常用户查询不等于启用作业 `run_as_owner = True`，普通作业仍按站点配置使用 slot 账户。
 
 ## 项目 SurrealDB
 
@@ -115,6 +115,8 @@ basePack 和原生用户都提交官方 `request_gpus = 1`、`gpus_minimum_memor
 本站要求显存申请在提交时可解析为正数；MB 为 MiB、GB 为 GiB，内部整数额度向上取整。省略显存时预订整池；显式 undefined、零、负值、依赖 TARGET 的动态表达式、超池或多 GPU 申请会被拒绝。有效申请在资源不足时排队。规则对本 schedd 的所有标准提交端生效。字段的设备容量筛选含义保留，累计预订来自本站策略，详见 [官方提交字段](https://htcondor.readthedocs.io/en/25.x/man-pages/htcondor-jdl.html) 和 [原生转换](https://htcondor.readthedocs.io/en/25.x/admin-manual/ap-policy-configuration.html)。
 
 `jobs capacity` 显示父 slot 总量与剩余量，额外 MachineResources 仅在两种数值均发布时按原名、原生单位显示。客户端只检查 CPU/RAM 总量；GPU 拒绝、排队和终态由 Condor 决定。申报量不提供显存硬隔离，也不承诺吞吐提升；应用须限制线程和框架实际峰值，保留 Condor 的 CUDA_VISIBLE_DEVICES。
+
+短作业的 collector 快照可能滞后。需要核对运行中分配与结束后额度恢复时，从 `condor_config_val STARTD_ADDRESS_FILE` 指向文件的首行取得实际地址，再用 `condor_status -direct <address> -json` 查询 startd；保留查询时刻和父子 slot。GPU 的 AssignedGPUs 可为短 UUID，需与 CUDA_VISIBLE_DEVICES 全 UUID 按前缀及原生 DeviceUuid 交叉核对。命令成功不等于作业完成或回收：同时核业务结果、Condor 终态、已知作业进程退出和额度恢复；Windows venv 可形成 worker → redirector → payload 进程链，应检查实际 payload PID。
 
 改变 CPU、slot 定义、GPU 名额或资源总量时，暂停新提交、排空作业并平稳重启 startd，再核实际发布容量；reconfig 不会重建已有 slot。只改变提交规则时按影响重载 schedd。本站配置机制及历史实测见 [R6 结果](../../../devDoc/archive/20261107-resource-coordination/native-condor.md) 和 [R7 结果](../../../devDoc/archive/20261107-resource-coordination/standard-submit-result.md)。
 
