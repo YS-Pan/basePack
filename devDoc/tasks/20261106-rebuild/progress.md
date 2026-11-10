@@ -31,11 +31,13 @@
 
 ## 阻碍与待核
 
-- array reconstruct 的 0.6.2 迁移只复制了两项 skill 原件，缺少 `.agents/skills` 发现入口；当前 init/core doctor 同样不覆盖技能安装与发现验收。已完成版本、时间与隔离复现调查，修复待实施，见[调查记录及 Issue 草稿](research/array-skill-discovery.md)。
+- array reconstruct 的 0.6.2 迁移只复制了两项 skill 原件，缺少 `.agents/skills` 发现入口；当前 init/core doctor 同样不覆盖技能安装与发现验收。调查见[记录及 Issue 草稿](research/array-skill-discovery.md)，接入修复与后续简化已纳入[修改计划](../20261110-onboarding-simplification/plan.md)，尚未实施。
 - 文件结构建议已有独立 skill；真实大项目迁移、未来布局及记忆读取效果继续按实际任务验证，记忆自用验收见 [独立任务](../20261106-memory-system/plan.md#devdoc-自用与读取轮数)。
 - 分层协作已有指令层初版，[P7](plan.md#p7-分层-agent-组织) 仍需真实广读任务的能力与成果质量对照。主上下文、团队总用量和耗时单独记录，允许增加用量换取质量提升。
 
 ## 下一步
+
+已根据两段讨论制定[接入闭环与运行简化计划](../20261110-onboarding-simplification/plan.md)，状态见[专项进度](../20261110-onboarding-simplification/progress.md)：所选技能安装/发现、可信本机免认证、无配置工具命令、失用接口与有限编码去重。以已交付 0.7.1 为基线，本轮仅规划，现行认证和外部项目保持原状。
 
 独立 [engineering-judgment skill](../../../skills/engineering-judgment/SKILL.md) 已编写、保留并接入，见[交付结果](../20261110-engineering-judgment/result.md)。按用户最新要求取消技能测试与按收益去留，效果在长期真实使用中观察；源码和入口已提交 f8bb5b2。
 
