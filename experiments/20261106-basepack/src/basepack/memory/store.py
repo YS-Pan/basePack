@@ -185,6 +185,7 @@ class Memory:
                 "instruction": "Read originals together. Choose semantic boundaries, summaries, and evidenced relations in one batch; reading_units are structural hints only."}
 
     def _affected(self, current: dict[str, SourceContent | ImageSource | None], members: list[dict]) -> set[str]:
+        members = [member for member in members if not member["retired"]]
         affected = set()
         # An insertion just beyond an old summary range can expand its scope
         # while leaving every old covered line byte-for-byte unchanged.
@@ -227,11 +228,13 @@ class Memory:
     @staticmethod
     def _expand_affected(affected: set[str], members: list[dict]) -> set[str]:
         # Containment and accepted summary evidence are both real dependencies.
+        members = [member for member in members if not member["retired"]]
+        current_ids = {member["id"] for member in members}
         while True:
             expanded = affected | {member["id"] for member in members if any(
                 basis["member"] in affected for basis in member.get("basis", []))}
             expanded |= {member["parent"] for member in members
-                         if member["id"] in affected and member.get("parent")}
+                         if member["id"] in affected and member.get("parent") in current_ids}
             if expanded == affected:
                 return affected
             affected = expanded
@@ -340,7 +343,8 @@ class Memory:
         # Rebind unchanged siblings without changing their representation input.
         accepted = {_record(value["id"]).key for value in batch.get("members", [])}
         for member in before_members:
-            if member["path"] in current and member["id"] not in affected and _record(member["id"]).key not in accepted:
+            if (not member["retired"] and member["path"] in current and member["id"] not in affected
+                    and _record(member["id"]).key not in accepted):
                 statements.append(f"UPDATE {_sql(_record(member['id']))} SET source_revision={_sql(current[member['path']].revision)}, source_version={_sql(versions[member['path']])};")
                 existing[_record(member["id"]).key] = {**member,
                     "source_revision": current[member["path"]].revision, "source_version": versions[member["path"]]}
