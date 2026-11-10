@@ -27,6 +27,7 @@ htmlcov/
 # Machine-local discovery links; sources stay in root or experiment skills/.
 /.agents/skills/file-structure/
 /.agents/skills/agent-team/
+/.agents/skills/engineering-judgment/
 /.agents/skills/resources/
 /models/
 /weights/
