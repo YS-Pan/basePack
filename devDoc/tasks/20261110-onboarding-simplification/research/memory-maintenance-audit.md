@@ -1,0 +1,98 @@
+# memory modified、426 待核与自动维护调查
+
+2026-11-10（北京时间）。调查对象为上一轮计划任务的维护 worker；生产基线为普通安装 0.7.1。正式库仅只读取证，本次不清理积压、不改源码或运行配置。
+
+## 结论
+
+1. **Git 干净与 memory modified 同时出现是正常的。** 两者比较基线不同。本次进度文件确有尚未进入记忆的实质内容，不能凭 Git 干净或正文不含当前任务名称排除维护。
+2. **上一轮没有实际推进自动维护，主要是主 agent 派工及 worker 判断错误。** 主 agent 额外限定“属于本业务的小量变化”，并允许发现大积压后汇报退出；worker 没比较新旧记忆版本便排除了 modified。它主动完成在先，主 agent 收尾 stop/interrupt 在后，没有程序报错、资源争用或 stop 抢先阻止发布的证据。
+3. **426 是知识对象数，不是文件数。** 当前快照为 339 个 stale member、9 个 stale node、78 条 stale semantic；成员涉及 32 个来源。所有426项最后一次失效均可追到旧版 `detected_change` 日志，0.7.1 升级保留这些状态。
+4. **现行维护说明还存在两处缺口。** 自动维护段没有明确把历史积压纳入小批接续，具体步骤主要从 changes 开始；旧专项计划仍留有“当前任务的小批变化”措辞。另有来源版本前移后维护候选可能消失的独立盲区，不能用 changes/pending 清零证明语义维护完成。
+
+## 1．三种比较基线
+
+| 信号 | 比较内容 | 不能推出的结论 |
+| --- | --- | --- |
+| Git 工作区无差异 | 工作文件相对索引、提交的状态 | 记忆库已吸收该提交 |
+| `memory changes` 的 modified | 磁盘文件相对数据库 source 中的 size/mtime；deep 还比较 SHA256 | fast 输出已证明正文变了，或必须重做全部知识 |
+| `brief.pending_count` | 非退役的 stale member + node + semantic | 待维护文件数、待补向量数或最新文件变化数 |
+
+[detect_changes](../../../../experiments/20261106-basepack/src/basepack/memory/content.py)（133–180行）不读 Git。fast 返回 revision=null，属于待核变化线索；deep 即使 hash 相同，也可能因 mtime 不同继续返回 modified 并附真实 hash，供复用判断。纯文件复现还确认：同大小同 mtime 的实际改写可被 fast 漏过，deep 能发现。这是已说明的快检取舍，不是本次文件的成因。
+
+本次具体证据：数据库为 `devDoc/tasks/20261106-rebuild/progress.md` 保存的来源大小7956字节、mtime为14:21:08；原 worker 看到的磁盘文件为9085字节、mtime为20:21:49，但未运行 deep 或 prepare。当前数据库保存 hash 为 `7cfbcf…`。与上一轮开始前的 Git 提交 `8fa500d` 比较，正文已包含“两项→三项通用技能”、技能发现调查和0.7.1整改结果等差异，与当时业务直接相关。该差异早于上一轮计划提交 `fae6a73`，不是事后新增计划造成的倒推。
+
+本轮进一步取得当前磁盘 hash 与旧来源 hash 不同，且去除换行差异后正文仍不同。因此本例不是单纯时间戳或 CRLF/LF 变化。详见选留原证中的 `before-prior-task-diff.txt`、`selected-source-versions.json`、`capture.json`。
+
+## 2．426 的构成、来源和影响
+
+20:40:44 的只读快照，配置声明86个 source_scope 项，数据库登记207个来源：
+
+| 项目 | 实测 |
+| --- | --- |
+| brief 待核知识 | 426 = 339 member + 9 node + 78 semantic |
+| stale member 的来源去重 | 32个；339项所在来源当前均有内容变化 |
+| 成员总量 | 1533 = 1191个当前可用 + 339个待核 + 3个退役 |
+| 已发布向量覆盖 | 当前可用1191项全部兼容，vector pending=0 |
+| 声明范围文件检查 | 39个已登记来源正文变化，40个新增；fast/deep 数量相同，39项均有真实 hash 差异 |
+| 当前 fresh member 相对已接受 source 的版本落后 | 0项 |
+
+这里的39/40是本轮取证时点的数据，不是上一轮 worker 实际检查到的数量。期间另一个聊天更新并提交了记忆专项进度；该工作保留，不归入本次调查的改动。
+
+[brief](../../../../experiments/20261106-basepack/src/basepack/memory/store.py)（566–608行）三表合计待核对象，默认只显示少量明细；node/semantic 无直接路径时要沿 basis/端点归并来源。它不扫描原件，`changes=[]/change_count=0` 是恒定占位，`change_check` 明确说明未检查。
+
+[vector_coverage](../../../../experiments/20261106-basepack/src/basepack/memory/vectors.py)（67–76行）只统计 stale=false 的非退役成员。因此“待编码0”表示1191项当前可用知识的向量齐全，339项待核成员已被排除在普通检索/覆盖统计外；不能据此称整库维护完成。`memory embed` 的 pending 数组又包含 stale，字段名称相似但范围不同。
+
+对2314条 change 元数据及受影响 ID 的只读追踪覆盖了全部426项：其最后一次失效操作均为 `detected_change`，发生于16:43:36、19:46:57、19:47:18、19:54:25和20:03:41，分别覆盖当前仍待核的5、35、12、341、33项。历史事件之间可能重复，本文按每项最后事件去重。日志 context 为空，不能追认具体由哪个旧聊天发起。
+
+旧0.6.2的变化检查/brief会使知识 stale；0.7.0 删除该查询副作用。已有[安装结果](../../20261110-rectification/installation-result.md)明确七表逐字段保持、未恢复 stale。本次实态与该迁移边界一致。自动维护若只按新增文件或 Git 未提交状态找工作，会把这些既有待核对象留下；重新 embed 也不会代替语义重核。
+
+## 3．上一轮为何没有维护
+
+原派工的额外限制包括“若有小量且属于本任务的变更可 prepare/同读/分块/应用”“任务计划尚在撰写，勿等待计划生成”“若全局有已知大积压，只一次汇报数量并回”。这不是产品要求的完整自动维护职责，主 agent 将其过度缩成了一次性业务相关性检查。
+
+原 worker 本次复盘确认：只对指定进度文件运行 fast changes；随后看 Git 无差异、正文未出现 onboarding、新计划目录不存在，便直接退出。没有取得旧 snapshot/diff，没有 prepare、候选 batch 或 apply；工具没有因故障中断。它无法证明来源没有变化，也无法据此判定变化与业务无关。
+
+主 agent 后续确实执行了任务 control 的 stop，再 interrupt，但宿主返回 worker 已 completed。因此上一轮[进度](../progress.md)应表述为“worker 提前完成，收尾发送 stop 并尝试取消”，不能把收尾控制文件当作维护实际运行的证明。这里不是 stop 功能故障；独立 worker 被派出也不等于已完成理解、建图和发布。
+
+用户原意见[整改规划聊天](codex://threads/01a1c426-c1dd-73f1-a88f-a0e75ffc2f8d)，turn `01a1c529-35ae-7042-a161-2a788dded6d8`：自动维护在业务任务开始时开始、业务完成后尽快结束，不延长业务；积压较多可建议手动维护，不能自行启动独立手动维护。[现行整改计划](../../20261110-rectification/plan.md)（60–80行）要求任务存续期间小批推进、按来源合并 changes/pending/候选。
+
+**“积压只提醒”限制的是擅自开启独立深维护及为清零延长业务，不是禁止自动 worker 利用业务时间接续已有小批。** 这是结合原话和现行计划的解释。不能保证每次业务都有足够时间完成一批；但本次未作新旧比较就以 Git/关键词排除工作，是明确的判断错误。
+
+现行随包 [memory skill](../../../../experiments/20261106-basepack/src/basepack/memory/SKILL.md)（16、37–40行）没有“只维护本业务新文件”的硬门槛；提交 `461e45b` 已删除旧的 affect-the-task/合并检索维护措辞。旧[记忆计划](../../20261106-memory-system/plan.md)第90行的“当前任务的小批变化”以及整改表格中的“积压只提醒”简写仍容易误导。具体维护步骤也缺少 stale 节点/边如何按依据归源并恢复的说明。
+
+## 4．额外发现：来源已接受不等于语义已维护
+
+[apply](../../../../experiments/20261106-basepack/src/basepack/memory/store.py)（310–340行）对 batch.sources 推进 source 元数据及 snapshot；只有显式提交的成员、节点、边被接受为 fresh。来源可作为其他关系的依据一并提交，不能据“来源被接受”推断该来源的全部摘要已更新。
+
+纯文件实验使用真实 apply 的 SQL 编译逻辑、stub 数据库执行，证实 sources-only 批次可推进来源基准；之后 deep changes=[]，未提及的成员仍绑定旧 snapshot。现有[原生测试源码](../../../../experiments/20261106-basepack/tests/test_memory_store.py)（206–230行）也明确允许追加例外后只接受来源、旧“没有例外”摘要仍 fresh 且可检索；测试名仍写 invalidates，已与断言不符。
+
+随后用普通 wheel 0.7.1、本机 SurrealDB 4.0.0、真实共享 embedding 做原生复现，未 stub 数据库或编码。使用独立项目、内存库和 `127.0.0.1:8439`，一次执行约6.18秒：
+
+| 操作 | 实际结果 |
+| --- | --- |
+| 发布“资料必须永久保留，没有例外”，再在原文追加缓存例外，仅接受 sources | deep changes=[]、知识 pending=0、vector pending=0；旧“没有例外”摘要仍 fresh，hybrid literal 可检索到 |
+| prepare 后同批重交2成员、1节点、1边 | 摘要及决定包含例外，pending=0；旧 source_version 的原文仍可明确版本回读 |
+| 用现有 `_invalidate_sql` 显式注入旧版 detected_change（测试模拟） | 2成员＋1节点＋1边变 stale，pending=4 |
+| 仅检查 changes、接受 sources 或 embed | changes=[]，pending 仍为4；embed 没有修复语义状态 |
+| 只重交节点与边，未重交 stale 依据 | 明确拒绝 `Evidence must be reread and accepted: member:clause` |
+| 同批重交已阅读的成员及依赖节点/边 | pending 回到0，表示、依据和关系可读 |
+
+临时进程 PID17704 已退出、其端口已关闭，机器配置 hash 前后相同；Windows显式终止返回码1属于该测试进程的回收方式，不是实验断言失败。完整结果 `native-20261110-204751/native-result.json` 为 passed=true。
+
+该盲区尚未在本次正式库中发现实例，当前1191个 fresh member 相对已接受来源无版本落后。它是可触发的维护完成信号盲区，不是426项的已证成因。保留旧发布知识是既定查询合同，需要改的是让未重核范围仍可被维护发现，不能恢复查询时写 stale 的旧机制。原生小样例同时证明当前接口能够正确重核和恢复这种依赖链，不能据本次426项反推库已不可恢复。
+
+## 5．建议接续的最小修正
+
+1. **派工先纠偏。** 在声明 scope 及已发现候选内按来源选小批，可含旧积压；业务相关性用于优先级。modified 先比较记忆旧版与当前原件，Git 只用于代码提交管理。有候选就推进到可判断是否接受的一步；无候选、资源争用、真实失败或任务 stop 时按实际原因返回。
+2. **就近澄清维护 skill。** 明确“历史小批可自动接续，数量多只建议另开手动深维护”；维护输入合并 changes、已有 pending 及未完成候选，沿 basis/端点归并来源。修正旧计划中的失用门槛，保持一个现行合同。无需新增后台平台、固定清零指标或多层审核。
+3. **报告用明确单位和真实生命周期。** 区分来源变化、知识待核、向量缺口及未扫描范围；worker 只检查就退出时明确报0批，不以 stop 成功、Git 干净或向量 pending=0代替功能验收。上一轮计划C已有删除 brief 恒空/重复字段的安排，本次增加相应误读证据。
+4. **保住未重核范围的可发现性。** 先以“追加例外＋sources-only”反例明确维护发现预期，再用已有 source/member/basis 版本与范围实现最小修正。仅版本不同不能一律判错：未变兄弟和固定历史依据允许保留旧 snapshot。不能用更新 source 元数据或批量 stale=false 冒充语义维护。
+5. **以一小批验证闭环。** 用隔离库中的旧版来源失效成员、节点和边，展示 changes为空仍可发现待核；经真实同读、重交依赖和必要边后按内容及证据确认恢复。正式426项的全面维护仍是单独任务，本次调研不将其清零。
+
+## 实际检查、原证与限制
+
+已读现行与安装实现、相关调用/测试、旧提交、原用户规划及worker复盘；四个关键安装文件与源码 SHA256 相同。正式库读取 brief、sources、三表待核和 change 审计；扫描声明范围并核 hash，无 apply/embed/清状态/重启正式库。
+
+选留原证位于根 `artifacts/runs/20261110-memory-maintenance-investigation/`：`capture.json/brief.json` 为取证快照，`history.json/publication.json` 为失效追踪及当前发布分布，两个 selected/before-prior-task diff 为原进度版本比较，`file-reproduction.json/source-only-planned.sql` 为纯文件与SQL捕获实验，`native-20261110-204751/` 为原生行为、批次和回收回执，配套 `.py` 为脚本快照。分支原报告按当时范围保留，其中源码报告最初未执行原生库；后续以本文整合结论和原生回执为准。
+
+只读脚本按原执行条件写入根 `tmp/20261110-memory-maintenance-investigation/`；原生实验使用独立临时目录/端口，收尾核其所属进程退出。本次为保留现场不启动正式库写入维护，也不修改安装或共享服务；这不是自动维护已经修好的验收。未运行完整产品测试、全库修复或成本评测；主上下文及团队用量不可核，记为未知。

@@ -11,9 +11,15 @@
 
 ## 检查与边界
 
-本轮仅写计划及进度入口，不修改源码、安装、配置、正式数据库、外部项目或项目纲领。实际完成 UTF-8、相对链接/锚点、围栏和 Git 差异检查；未运行产品测试或技能试验。
+首轮仅写计划及进度入口，不修改源码、安装、配置、正式数据库、外部项目或项目纲领。实际完成 UTF-8、相对链接/锚点、围栏和 Git 差异检查；当时未运行产品测试或技能试验。
 
-后台 tier1 维护 worker（`gpt-6-luna / max`）只检查相关来源，未 apply。brief 当时显示 426 项知识待维护，已提醒另行发起手动维护，不将历史积压清零作为计划交付条件。控制文件为 `.basepack/memory/controls/20261110-plan-onboarding-simplification.json`，业务结束发送 stop 并结束 worker；正式数据库保持运行。
+后台 tier1 维护 worker（`gpt-6-luna / max`）只检查指定来源，未 prepare/apply，随后自行完成。brief 当时显示426项待核知识；主 agent 提醒另行手动维护，但额外按本业务归属限域以及 worker 按 Git/关键词排除 modified 的判断有误。业务收尾为 `.basepack/memory/controls/20261110-plan-onboarding-simplification.json` 发送 stop 并尝试 interrupt，宿主返回 worker 已完成，不能据此声称当时仍有维护运行。正式数据库保持运行。
+
+## 接续调查：modified 与自动维护遗漏
+
+用户质疑后完成[深入调查](research/memory-maintenance-audit.md)：Git干净与记忆modified使用不同基线，原进度文件确有实质内容未入记忆。426为339成员、9节点、78关系，成员涉及32来源；全部426项最后失效均追到旧detected_change，升级未恢复状态。主派工限制与worker过早排除是本次未推进维护的直接原因，现行/遗留文档另有歧义及缺失步骤。
+
+另以普通0.7.1、独立SurrealDB内存库与真实embedding复现：sources-only可使changes归零而旧摘要尚未重核；模拟旧stale后，changes/来源接受/embed均不清语义待核，正确重交成员及依赖能恢复。临时库进程和端口已关闭，正式库只读取证。源码与安装文件一致、纯文件复现、原生小闭环和文档检查通过；未改源码、配置、正式数据或清理426项。修正建议见调查第5节，尚未实施。
 
 ## 下一步
 
