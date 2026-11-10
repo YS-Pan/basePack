@@ -14,7 +14,9 @@ def template(name: str) -> str:
 
 
 def init_project(root: str | Path, machine_config: str | Path,
-                 config_name: str = ".basepack/config.toml") -> Path:
+                 config_name: str = ".basepack/config.toml", *, codex_project_id: str = "",
+                 codex_other_project_roots: list[str] | None = None,
+                 codex_registry_complete: bool = False) -> Path:
     root = Path(root).resolve()
     machine_config = Path(machine_config).resolve(strict=True)
     config = (root / config_name).resolve()
@@ -35,6 +37,10 @@ def init_project(root: str | Path, machine_config: str | Path,
         machine_config=json.dumps(str(machine_config), ensure_ascii=False),
         root=json.dumps(Path(os.path.relpath(root, config.parent)).as_posix(), ensure_ascii=False),
         memory_project_id=str(uuid4()),
+        codex_project_id=json.dumps(codex_project_id, ensure_ascii=False),
+        codex_other_project_roots=json.dumps([str(Path(path).resolve())
+                                            for path in codex_other_project_roots or []], ensure_ascii=False),
+        codex_registry_complete=str(codex_registry_complete).lower(),
     )
     _write_project_entry(root, config, Path(sys.executable))
     config.write_text(text, encoding="utf-8")

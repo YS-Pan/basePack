@@ -1,8 +1,11 @@
 """Read versioned originals and prepare line-addressed material for an agent."""
 
+from bisect import bisect_left
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 from hashlib import sha256
+from itertools import accumulate
 from os import scandir, stat_result
 from pathlib import Path
 import re
@@ -27,13 +30,14 @@ class ReadingUnit:
 
 
 @dataclass(frozen=True)
-class MemberContent:
-    member_id: str
-    path: str
-    revision: str
+class LineAnchor:
+    """An exact complete-line candidate, with offsets in the original new text."""
+
     start_line: int
     end_line: int
-    text: str
+    start: int
+    end: int
+    context_match: bool
 
 
 @dataclass(frozen=True)
@@ -115,19 +119,85 @@ def reading_units(source: SourceContent) -> list[ReadingUnit]:
     return units
 
 
-def read_member(root: str | Path, path: str, revision: str, member_id: str,
-                start_line: int, end_line: int) -> MemberContent:
-    """Read the inclusive range chosen by an agent, preserving its stable ID."""
-    source = read_source(root, path)
-    if source.revision != revision:
-        raise ValueError(f"Source revision mismatch for {source.path}: "
-                         f"expected {revision}, found {source.revision}")
-    lines = source.text.splitlines(keepends=True)
-    if not 1 <= start_line <= end_line <= len(lines):
-        raise ValueError(f"Invalid line range {start_line}:{end_line} for "
-                         f"{source.path} ({len(lines)} lines)")
-    return MemberContent(member_id, source.path, source.revision, start_line, end_line,
-                         "".join(lines[start_line - 1:end_line]))
+def comparison_text(text: str) -> str:
+    """Normalize only CRLF to LF, never the stored original or its byte hash."""
+    return text.replace("\r\n", "\n")
+
+
+def line_changes(before: str, after: str) -> list[tuple[str, int, int, int, int]]:
+    """Return difflib opcodes over complete lines with CRLF/LF equivalence.
+
+    All opcode coordinates are 0-based, half-open line indexes. Equal blocks
+    provide position evidence, including for repeated lines, not uniqueness.
+    """
+    old_lines = [comparison_text(line) for line in before.splitlines(keepends=True)]
+    new_lines = [comparison_text(line) for line in after.splitlines(keepends=True)]
+    return SequenceMatcher(None, old_lines, new_lines, autojunk=False).get_opcodes()
+
+
+def mapped_line_range(changes: Iterable[tuple[str, int, int, int, int]],
+                      start_line: int, end_line: int) -> tuple[int, int] | None:
+    """Map a 1-based inclusive old range wholly contained in one equal block."""
+    if not 1 <= start_line <= end_line:
+        raise ValueError(f"Invalid line range {start_line}:{end_line}")
+    for operation, old_start, old_end, new_start, _ in changes:
+        if operation == "equal" and old_start <= start_line - 1 and end_line <= old_end:
+            offset = new_start - old_start
+            return start_line + offset, end_line + offset
+    return None
+
+
+def literal_spans(text: str, quote: str, *, prefix: str = "",
+                  suffix: str = "") -> list[tuple[int, int]]:
+    """Find all literal quote spans, including overlaps, with adjacent context.
+
+    Coordinates are Python character indexes, 0-based and half-open. Callers
+    choose the comparison view; this primitive performs no normalization.
+    """
+    if not quote:
+        raise ValueError("Quote must not be empty")
+    pattern = (r"(?=" + re.escape(prefix) + r"(?P<quote>" + re.escape(quote)
+               + r")" + re.escape(suffix) + r")")
+    return [match.span("quote") for match in re.finditer(pattern, text)]
+
+
+def locate_lines(before: str, after: str, start_line: int, end_line: int, *,
+                 context_chars: int = 64) -> list[LineAnchor]:
+    """Locate an old complete-line quote in the new CRLF/LF comparison view.
+
+    Keep every exact candidate whose boundaries are complete original lines;
+    full adjacent context is evidence on each candidate, never a filter that
+    hides an exact quote after surrounding edits. Returned line numbers are
+    1-based inclusive and character offsets address the unmodified ``after``.
+    This proves text/position only; callers resolve ambiguity and dependencies.
+    """
+    old_lines = before.splitlines(keepends=True)
+    if not 1 <= start_line <= end_line <= len(old_lines):
+        raise ValueError(f"Invalid line range {start_line}:{end_line} "
+                         f"({len(old_lines)} lines)")
+    if context_chars < 0:
+        raise ValueError("context_chars must be nonnegative")
+    old_lines = [comparison_text(line) for line in old_lines]
+    old_offsets = list(accumulate(map(len, old_lines), initial=0))
+    old_view = "".join(old_lines)
+    start, end = old_offsets[start_line - 1], old_offsets[end_line]
+    quote = old_view[start:end]
+    prefix = old_view[max(0, start - context_chars):start]
+    suffix = old_view[end:end + context_chars]
+
+    new_lines = after.splitlines(keepends=True)
+    raw_offsets = list(accumulate(map(len, new_lines), initial=0))
+    normalized_lines = [comparison_text(line) for line in new_lines]
+    offsets = list(accumulate(map(len, normalized_lines), initial=0))
+    new_view = "".join(normalized_lines)
+    contextual = set(literal_spans(new_view, quote, prefix=prefix, suffix=suffix))
+    candidates = []
+    for start, end in literal_spans(new_view, quote):
+        first, last = bisect_left(offsets, start), bisect_left(offsets, end)
+        if offsets[first] == start and offsets[last] == end:
+            candidates.append(LineAnchor(first + 1, last, raw_offsets[first],
+                                         raw_offsets[last], (start, end) in contextual))
+    return candidates
 
 
 def detect_changes(root: str | Path, sources: Iterable[Mapping], scope: Iterable[str],

@@ -1,8 +1,8 @@
 # 资源工具
 
-本页描述 active 路线 [20261106-basepack](../../../experiments/20261106-basepack/README.md) 的资源模块职责与合同。0.7.0 客户端兼容已有 0.5.0 共享 embedding 服务；安装与升级边界见 [部署合同](../deployment.md)，资源部署、预算和验收基线见 [R9 结果](../../archive/20261107-resource-coordination/r9-result.md)。产品操作见 [资源使用](../../../experiments/20261106-basepack/docs/resources.md)，服务安装与维护见 [管理员说明](../../../experiments/20261106-basepack/docs/administrator.md)。
+本页描述 active 路线 [20261106-basepack](../../../experiments/20261106-basepack/README.md) 的资源模块职责与合同。0.8.0 客户端兼容已有 0.5.0 共享 embedding 服务；安装与升级边界见 [部署合同](../deployment.md)，资源部署、预算和验收基线见 [R9 结果](../../archive/20261107-resource-coordination/r9-result.md)。产品操作见 [资源使用](../../../experiments/20261106-basepack/docs/resources.md)，服务安装与维护见 [管理员说明](../../../experiments/20261106-basepack/docs/administrator.md)。
 
-[project/config.py](../../../experiments/20261106-basepack/src/basepack/project/config.py) 唯一解析项目 schema 2 与机器 schema 1 配置；各功能按需读取自身节，实例数据统一在项目 `.basepack/`。0.6.2 保持既有 schema，项目使用 agent 配置时需补入 `[ai]`；更老的 schema 1 项目先用保留的 0.4.0 迁移。本模块不维护记忆索引、图或数据库。
+[project/config.py](../../../experiments/20261106-basepack/src/basepack/project/config.py) 唯一解析项目 schema 2 与机器 schema 1 配置；各功能按需读取自身节，实例数据统一在项目 `.basepack/`。0.6.2 保持既有 schema，项目使用 agent 配置时需补入 `[ai]`；更老的 schema 1 项目先用保留的 0.4.0 迁移。本模块不维护记忆索引、图或数据库。机器配置不再保留无消费者的 `[shared].state_dir`；embedding 的日志路径由 SCM/Shawl 服务定义显式指定，作业材料仍使用项目 `[jobs].jobs_dir`，不因此搬迁现有日志。
 
 ## 共享 embedding
 

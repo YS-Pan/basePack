@@ -15,7 +15,7 @@ def test_prepare_rejects_directory_before_database_access(tmp_path):
         memory.prepare(["资料.png"])
 
 
-def test_sql_413_reports_actual_request_size_and_keeps_original_error(monkeypatch):
+def test_sql_413_reports_actual_request_size_and_keeps_original_error():
     received = []
 
     class Handler(BaseHTTPRequestHandler):
@@ -32,9 +32,7 @@ def test_sql_413_reports_actual_request_size_and_keeps_original_error(monkeypatc
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        monkeypatch.setenv("TEST_MEMORY_PASSWORD", "test")
-        connection = {"endpoint": f"http://127.0.0.1:{server.server_port}", "username": "root",
-                      "password_env": "TEST_MEMORY_PASSWORD", "namespace": "ns", "database": "db",
+        connection = {"endpoint": f"http://127.0.0.1:{server.server_port}", "namespace": "ns", "database": "db",
                       "project_id": "project"}
         memory = Memory(SimpleNamespace(raw={"memory": connection}))
         with pytest.raises(HTTPError) as failure:

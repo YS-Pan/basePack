@@ -1,8 +1,5 @@
 schema_version = 1
 
-[shared]
-state_dir = 'state/basepack'
-
 [embedding]
 endpoint = 'http://127.0.0.1:8765'
 service_name = 'BasepackEmbedding'

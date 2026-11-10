@@ -1,6 +1,302 @@
+import json
+import os
+
 import pytest
 
 from test_memory_store import batch_for, memory
+
+
+def test_maintenance_reuses_semantics_for_line_endings_and_preserves_old_snapshot(memory, monkeypatch):
+    from basepack.memory import candidate_vectors
+
+    original = '# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n'
+    batch = batch_for(memory, original)
+    batch['nodes'].append({'id': 'archive', 'kind': 'decision', 'text': '保留资料', 'evidence': ['retention']})
+    batch['edges'].append({'id': 'node_link', 'in': 'node:local', 'out': 'node:archive',
+                           'kind': 'depends', 'text': '两项要求', 'evidence': ['storage', 'retention']})
+    memory.apply(batch)
+    old = memory.read('storage')['member']['source_version']
+    calls = []
+    embed = candidate_vectors.EmbeddingClient.embed
+
+    def counted(self, inputs, *, timeout):
+        calls.extend(inputs)
+        return embed(self, inputs, timeout=timeout)
+
+    monkeypatch.setattr(candidate_vectors.EmbeddingClient, 'embed', counted)
+    (memory.config.root / 'guide.md').write_bytes(original.replace('\n', '\r\n').encode('utf-8'))
+    result = memory.maintain(['guide.md'])
+    assert result['mechanical_batches'] == 1
+    assert not result['needs_semantic']
+    assert len(calls) == 2  # only the two raw chunks changed; summaries were reused
+    assert memory.read('storage')['original']['text'].endswith('\r\n')
+    assert memory.read('storage', source_version=old, start_line=2, end_line=2)['original']['text'].endswith('\n')
+    node = memory.neighbors('node:local')['record']
+    edges = memory.neighbors('node:local')['edges']
+    assert not node['stale'] and {edge['id'] for edge in edges} == {'semantic:requires', 'semantic:node_link'}
+    assert all(not edge['stale'] for edge in edges)
+    assert node['basis'][0]['source_version'] == old
+    assert all(basis['source_version'] == old for edge in edges for basis in edge['basis'])
+    assert not memory.maintain(['guide.md'])['needs_semantic']
+    assert len(calls) == 2
+
+
+def test_maintenance_finds_unaccepted_summary_after_source_only_acceptance(memory):
+    original = '# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n'
+    memory.apply(batch_for(memory, original))
+    (memory.config.root / 'guide.md').write_bytes((original + '例外：缓存可删除。\n').encode('utf-8'))
+    prepared = memory.prepare(['guide.md'])
+    memory.apply({'sources': [{'path': 'guide.md', 'revision': prepared['sources'][0]['revision']}]})
+    assert memory.changes(['guide.md'], deep=True) == []
+    result = memory.maintain(['guide.md'])
+    report = json.loads(open(result['receipt'], encoding='utf-8').read())
+    assert result['needs_semantic']
+    source = report['semantic'][0]
+    assert 'member:guide' in {row['id'] for row in source['members']}
+    assert 'member:storage' not in {row['id'] for row in source['members']}
+    assert '缓存可删除' in source['versions'][0]['changes'][0]['new_text']
+
+
+def test_uncovered_addition_survives_chunk_reuse_and_source_advance(memory):
+    path = memory.config.root / 'notes.md'
+    path.write_bytes(b'old requirement\n')
+    source = memory.prepare(['notes.md'])['sources'][0]
+    memory.apply({'sources': [{'path': 'notes.md', 'revision': source['revision']}],
+                  'members': [{'id': 'one', 'kind': 'chunk', 'path': 'notes.md',
+                               'start_line': 1, 'end_line': 1}]})
+    path.write_bytes(b'old requirement\n\nnew requirement\n')
+    first = memory.maintain(['notes.md'])
+    # Another valid caller may accept only the source metadata. The old member
+    # remains evidence of the uncovered difference after that baseline moves.
+    prepared = memory.prepare(['notes.md'])
+    memory.apply({'sources': [{'path': 'notes.md', 'revision': prepared['sources'][0]['revision']}]})
+    second = memory.maintain(['notes.md'])
+    assert first['reused_chunks'] == 1
+    assert first['needs_semantic'] and second['needs_semantic']
+    assert memory.changes(['notes.md'], deep=True) == []
+    material = json.loads(open(second['receipt'], encoding='utf-8').read())
+    assert 'new requirement' in material['semantic'][0]['uncovered_ranges'][0]['text']
+
+    prepared = memory.prepare(['notes.md'])
+    # A partial semantic acceptance may itself move the last old member to the
+    # new version without accepting the newly added text.
+    memory.apply({'sources': [{'path': 'notes.md', 'revision': prepared['sources'][0]['revision']}],
+                  'expected': prepared['expected'], 'members': [
+                      {'id': 'one', 'kind': 'chunk', 'path': 'notes.md', 'start_line': 1, 'end_line': 1}]})
+    assert memory.changes(['notes.md'], deep=True) == []
+    assert memory.maintain(['notes.md'])['needs_semantic']
+    prepared = memory.prepare(['notes.md'])
+    memory.apply({'sources': [{'path': 'notes.md', 'revision': prepared['sources'][0]['revision']}],
+                  'expected': prepared['expected'], 'members': [
+                      {'id': 'two', 'kind': 'chunk', 'path': 'notes.md', 'start_line': 2, 'end_line': 3}]})
+    assert not memory.maintain(['notes.md'])['needs_semantic']
+
+
+@pytest.mark.parametrize('retire', [False, True])
+def test_source_without_active_knowledge_remains_discoverable(memory, retire):
+    path = memory.config.root / 'notes.md'
+    path.write_bytes(b'new requirement\n')
+    source = memory.prepare(['notes.md'])['sources'][0]
+    batch = {'sources': [{'path': 'notes.md', 'revision': source['revision']}]}
+    if retire:
+        batch['members'] = [{'id': 'one', 'kind': 'chunk', 'path': 'notes.md', 'start_line': 1, 'end_line': 1}]
+    memory.apply(batch)
+    if retire:
+        expected = memory.prepare(['notes.md'])['expected']
+        memory.apply({'sources': [], 'expected': expected, 'delete_members': ['one']})
+    assert memory.changes(['notes.md'], deep=True) == []
+    for _ in range(2):
+        result = memory.maintain(['notes.md'])
+        material = json.loads(open(result['receipt'], encoding='utf-8').read())
+        assert result['needs_semantic']
+        assert material['semantic'][0]['reason'] == 'no_active_knowledge'
+
+
+def test_current_file_acceptance_does_not_flag_fixed_old_relation_basis(memory):
+    original = '# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n'
+    memory.apply(batch_for(memory, original))
+    old = memory.read('storage')['member']['source_version']
+    changed = original + '例外：缓存可以删除。\n'
+    update = batch_for(memory, changed)
+    update['members'][0]['end_line'] = 6
+    update['members'][0]['text'] = '本地隔离；资料须保留，但缓存可以删除。'
+    update.pop('nodes')
+    update.pop('edges')
+    memory.apply(update)
+    result = memory.maintain(['guide.md'])
+    assert not result['needs_semantic']
+    assert memory.neighbors('node:local')['record']['basis'][0]['source_version'] == old
+    assert memory.neighbors('node:local')['edges'][0]['basis'][0]['source_version'] == old
+
+
+def test_source_only_then_first_partial_acceptance_keeps_uncovered_text(memory):
+    path = memory.config.root / 'notes.md'
+    path.write_bytes(b'old\n')
+    prepared = memory.prepare(['notes.md'])
+    memory.apply({'sources': [{'path': 'notes.md', 'revision': prepared['sources'][0]['revision']}]})
+    path.write_bytes(b'old\nnew\n')
+    prepared = memory.prepare(['notes.md'])
+    memory.apply({'sources': [{'path': 'notes.md', 'revision': prepared['sources'][0]['revision']}],
+                  'members': [{'id': 'one', 'kind': 'chunk', 'path': 'notes.md', 'start_line': 1, 'end_line': 1}]})
+    for _ in range(2):
+        result = memory.maintain(['notes.md'])
+        report = json.loads(open(result['receipt'], encoding='utf-8').read())
+        assert result['needs_semantic']
+        assert report['semantic'][0]['uncovered_ranges'][0]['text'] == 'new\n'
+
+
+def test_multiple_partial_versions_keep_earlier_uncovered_text(memory):
+    path = memory.config.root / 'notes.md'
+    path.write_bytes(b'old\n')
+    prepared = memory.prepare(['notes.md'])
+    memory.apply({'sources': [{'path': 'notes.md', 'revision': prepared['sources'][0]['revision']}],
+                  'members': [{'id': 'one', 'kind': 'chunk', 'path': 'notes.md', 'start_line': 1, 'end_line': 1}]})
+    path.write_bytes(b'old\nX\n')
+    prepared = memory.prepare(['notes.md'])
+    memory.apply({'sources': [{'path': 'notes.md', 'revision': prepared['sources'][0]['revision']}],
+                  'expected': prepared['expected'], 'members': [
+                      {'id': 'one', 'kind': 'chunk', 'path': 'notes.md', 'start_line': 1, 'end_line': 1}]})
+    path.write_bytes(b'old\nX\nY\n')
+    prepared = memory.prepare(['notes.md'])
+    memory.apply({'sources': [{'path': 'notes.md', 'revision': prepared['sources'][0]['revision']}],
+                  'expected': prepared['expected'], 'members': [
+                      {'id': 'one', 'kind': 'chunk', 'path': 'notes.md', 'start_line': 1, 'end_line': 1},
+                      {'id': 'two', 'kind': 'chunk', 'path': 'notes.md', 'start_line': 3, 'end_line': 3}]})
+    for _ in range(2):
+        result = memory.maintain(['notes.md'])
+        report = json.loads(open(result['receipt'], encoding='utf-8').read())
+        assert report['semantic'][0]['uncovered_ranges'][0]['text'] == 'X\n'
+
+
+@pytest.mark.parametrize('addition', [b'\n', b' \n', b'  indented\n'])
+def test_uncovered_whitespace_and_indentation_remain_pending(memory, addition):
+    path = memory.config.root / 'notes.md'
+    path.write_bytes(b'old\n')
+    prepared = memory.prepare(['notes.md'])
+    memory.apply({'sources': [{'path': 'notes.md', 'revision': prepared['sources'][0]['revision']}],
+                  'members': [{'id': 'one', 'kind': 'chunk', 'path': 'notes.md', 'start_line': 1, 'end_line': 1}]})
+    path.write_bytes(b'old\n' + addition)
+    for _ in range(2):
+        result = memory.maintain(['notes.md'])
+        report = json.loads(open(result['receipt'], encoding='utf-8').read())
+        assert report['semantic'][0]['uncovered_ranges'][0]['text'] == addition.decode()
+    prepared = memory.prepare(['notes.md'])
+    memory.apply({'sources': [{'path': 'notes.md', 'revision': prepared['sources'][0]['revision']}],
+                  'expected': prepared['expected'], 'members': [
+                      {'id': 'summary', 'kind': 'file', 'path': 'notes.md', 'start_line': 1, 'end_line': 2,
+                       'text': 'Accepted full source.'}]})
+    assert not memory.maintain(['notes.md'])['needs_semantic']
+
+
+def test_metadata_refresh_does_not_restore_correction(memory):
+    original = '# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n'
+    memory.apply(batch_for(memory, original))
+    prepared = memory.prepare(['guide.md'])
+    memory.apply({'sources': [], 'expected': prepared['expected'], 'corrections': [
+        {'id': 'known_error', 'target': 'member:storage', 'reason': '已知错误'}]})
+    source = memory.config.root / 'guide.md'
+    os.utime(source, ns=(source.stat().st_atime_ns, source.stat().st_mtime_ns + 1_000_000))
+    result = memory.maintain(['guide.md'])
+    assert result['mechanical_batches'] == 1
+    assert result['needs_semantic']
+    assert memory.read('storage')['member']['stale'] is True
+
+
+def test_maintenance_reports_moved_lines_and_section_end_insertion(memory, monkeypatch):
+    from basepack.memory import candidate_vectors
+
+    original = '# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n'
+    memory.apply(batch_for(memory, original))
+    changed = '前言。\n' + original.replace('\n\n# 保留', '\n例外：临时库可共享。\n\n# 保留')
+    (memory.config.root / 'guide.md').write_bytes(changed.encode('utf-8'))
+    calls = []
+    embed = candidate_vectors.EmbeddingClient.embed
+    monkeypatch.setattr(candidate_vectors.EmbeddingClient, 'embed',
+                        lambda self, inputs, *, timeout: (calls.extend(inputs), embed(self, inputs, timeout=timeout))[1])
+    result = memory.maintain(['guide.md'])
+    report = json.loads(open(result['receipt'], encoding='utf-8').read())
+    source = report['semantic'][0]
+    assert 'member:storage_section' in {row['id'] for row in source['members']}
+    assert 'node:local' in {row['id'] for row in source['related_nodes']}
+    assert 'semantic:requires' in {row['id'] for row in source['related_edges']}
+    moved = {row['id']: row['new_lines'] for row in source['line_mappings']}
+    assert moved['member:storage'] == [3, 3]
+    assert report['reused_chunks'] == ['member:retention']
+    assert memory.read('retention')['original']['start_line'] == 7
+    assert not calls
+    assert memory.changes(['guide.md'], deep=True) == []
+    assert memory.maintain(['guide.md'])['needs_semantic']
+
+
+def test_same_chunk_under_another_heading_needs_semantic_review(memory):
+    original = '# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n'
+    memory.apply(batch_for(memory, original))
+    changed = '# 数据库\n本地数据库隔离项目。\n资料必须保留。\n\n# 保留\n'
+    (memory.config.root / 'guide.md').write_bytes(changed.encode('utf-8'))
+    result = memory.maintain(['guide.md'])
+    source = json.loads(open(result['receipt'], encoding='utf-8').read())['semantic'][0]
+    assert 'member:retention' in {row['id'] for row in source['members']}
+
+
+def test_stopped_maintenance_does_not_publish_or_advance_source(memory):
+    from basepack.memory.maintenance import MaintenanceStopped, stop
+
+    original = '# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n'
+    memory.apply(batch_for(memory, original))
+    revision = memory.sources()[0]['revision']
+    (memory.config.root / 'guide.md').write_bytes(original.replace('\n', '\r\n').encode('utf-8'))
+    control = memory.config.root / 'stopped'
+    stop(control)
+    with pytest.raises(MaintenanceStopped):
+        memory.maintain(['guide.md'], control=str(control))
+    assert memory.sources()[0]['revision'] == revision
+
+
+def test_mechanical_publish_rejects_concurrent_knowledge_correction(memory, monkeypatch):
+    original = '# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n'
+    memory.apply(batch_for(memory, original))
+    source = memory.config.root / 'guide.md'
+    source.write_bytes(original.replace('\n', '\r\n').encode('utf-8'))
+    apply = memory.apply
+
+    def concurrent(batch, **kwargs):
+        expected = memory.prepare(['guide.md'])['expected']
+        apply({'sources': [], 'expected': expected, 'corrections': [
+            {'id': 'racing_error', 'target': 'member:storage', 'reason': '并发更正'}]})
+        return apply(batch, **kwargs)
+
+    monkeypatch.setattr(memory, 'apply', concurrent)
+    with pytest.raises(RuntimeError, match='Knowledge revision changed'):
+        memory.maintain(['guide.md'])
+    assert memory.read('storage')['member']['stale'] is True
+
+
+def test_mechanical_publish_rejects_concurrent_original_change(memory, monkeypatch):
+    original = '# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n'
+    memory.apply(batch_for(memory, original))
+    source = memory.config.root / 'guide.md'
+    source.write_bytes(original.replace('\n', '\r\n').encode('utf-8'))
+    revision = memory.sources()[0]['revision']
+    apply = memory.apply
+
+    def concurrent(batch, **kwargs):
+        source.write_bytes((original + '并发补充。\n').encode('utf-8'))
+        return apply(batch, **kwargs)
+
+    monkeypatch.setattr(memory, 'apply', concurrent)
+    with pytest.raises(ValueError, match='Source revision mismatch'):
+        memory.maintain(['guide.md'])
+    assert memory.sources()[0]['revision'] == revision
+
+
+def test_brief_reports_codex_capability_without_collection(memory):
+    assert memory.brief(limit=0)['codex_collection']['status'] == 'unavailable'
+    memory.connection['codex'] = {'project_id': 'project', 'registry_complete': False}
+    assert memory.brief(limit=0)['codex_collection']['status'] == 'registry_incomplete'
+    memory.connection['codex']['registry_complete'] = True
+    state = memory.brief(limit=0)['codex_collection']
+    assert state['status'] == 'not_checked'
+    assert 'does not collect' in state['note']
 
 
 def test_task_start_detects_scoped_addition_without_claiming_it_understood(memory):
@@ -10,7 +306,7 @@ def test_task_start_detects_scoped_addition_without_claiming_it_understood(memor
     incoming.mkdir()
     (incoming / "new.md").write_text("新增例外需要实际阅读。\n", encoding="utf-8")
     brief = memory.brief(limit=0)
-    assert brief["changes"] == []
+    assert "changes" not in brief
     assert memory.changes(["incoming"])[0]["path"] == "incoming/new.md"
     assert memory.changes(["incoming"])[0]["kind"] == "added"
     assert brief["source_count"] == 1
@@ -23,7 +319,7 @@ def test_task_start_checks_registered_originals_outside_new_discovery_scope(memo
     memory.connection["source_scope"] = ["incoming"]
     source = memory.config.root / "guide.md"
     source.write_bytes(source.read_bytes() + "\n新增例外。\n".encode("utf-8"))
-    assert memory.brief()["changes"] == []
+    assert "changes" not in memory.brief()
     assert memory.changes(["guide.md"])[0]["path"] == "guide.md"
 
 
@@ -47,7 +343,7 @@ def test_unchanged_start_reads_metadata_without_loading_all_member_bodies(memory
         return original_rows(table)
 
     monkeypatch.setattr(memory, "_rows", rows)
-    assert memory.brief(limit=0)["changes"] == []
+    assert "changes" not in memory.brief(limit=0)
 
 
 def test_startup_receives_short_project_map_without_opaque_versions(memory):

@@ -1,6 +1,5 @@
 import argparse
-from hashlib import sha256
-import os
+from pathlib import Path
 import subprocess
 
 import pytest
@@ -30,7 +29,7 @@ def test_memory_activation_preserves_business_text_and_updates_one_local_entry(t
     assert "memory.search_mode" in updated
     assert "`hybrid --literal`" in updated
     assert "`vector --literal` 明确拒绝" in updated
-    assert "memory_dir/serve.ps1" in updated
+    assert f"{config.memory_dir.as_posix()}/serve.ps1" in updated
     assert "logs/surreal.stderr.log" in updated
 
 
@@ -131,7 +130,7 @@ def test_hybrid_search_passes_literal_to_lexical_retrieval(tmp_path, monkeypatch
     monkeypatch.setattr("basepack.memory.store.Memory.hybrid_search", hybrid)
     assert dispatch(_search_args("--literal"), config) == ("matches", 0)
     assert calls == [("项目数据库", {"scope": "", "limit": 12, "timeout": 600,
-                                  "literal": True, "include_coverage": True})]
+                                  "literal": True})]
 
 
 def _activation_bootstrap(config):
@@ -141,50 +140,67 @@ def _activation_bootstrap(config):
     return command.split("& $basepackPython -X utf8 -m basepack --config $basepackConfig memory brief", 1)[0]
 
 
-@pytest.mark.parametrize("password_file", [None, "relative", "absolute"])
-def test_generated_bootstrap_reads_current_config_in_fresh_shell_from_other_cwd(tmp_path, password_file):
+def test_generated_bootstrap_loads_config_in_fresh_shell_from_other_cwd(tmp_path):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
     project = tmp_path / "中文 user's project-🚀"
     config = load_project_config(init_project(project, machine, ".basepack/deep/config.toml"))
     _activate(config)
     bootstrap = _activation_bootstrap(config)
-    secret = "  本地凭据 ' $pw 🚀  "
-    config_text = config.path.read_text(encoding="utf-8").replace(".basepack/memory", ".basepack/新 memory")
-    config_text = config_text.replace("password_env = 'BASEPACK_MEMORY_PASSWORD'", "password_env = 'BASEPACK_FRESH_TEST_PASSWORD'")
-    expected_file = project / ".basepack/新 memory/password.txt"
-    if password_file is not None:
-        expected_file = (project / "secrets/密码.txt" if password_file == "relative" else tmp_path / "external 密码.txt")
-        value = expected_file.relative_to(project).as_posix() if password_file == "relative" else expected_file.as_posix()
-        config_text = config_text.replace("[memory]\n", f"[memory]\npassword_file = '{value}'\n")
-    expected_file.parent.mkdir(parents=True, exist_ok=True)
-    expected_file.write_text(secret, encoding="utf-8")
-    config.path.write_text(config_text, encoding="utf-8")
-    old_file = project / ".basepack/memory/password.txt"
-    old_file.parent.mkdir(parents=True)
-    old_file.write_text("obsolete secret", encoding="utf-8")
-    check = ("& $basepackPython -X utf8 -c \"import hashlib,os,sys; "
-             "assert hashlib.sha256(os.environ['BASEPACK_FRESH_TEST_PASSWORD'].encode()).hexdigest() == sys.argv[1]; "
-             "print('loaded')\" '" + sha256(secret.encode()).hexdigest() + "'\n"
-             "if ($LASTEXITCODE -ne 0) { throw 'Credential verification failed' }\n"
-             "$basepackInfo.memory_dir\n")
-    env = os.environ | {"BASEPACK_MEMORY_PASSWORD": "obsolete environment"}
-    env.pop("BASEPACK_FRESH_TEST_PASSWORD", None)
-    result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", bootstrap + check],
-                            cwd=tmp_path.parent, env=env, capture_output=True, text=True, encoding="utf-8", timeout=20)
+    assert "password" not in bootstrap.lower()
+    result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+                             bootstrap + "Write-Output $basepackConfig"],
+                            cwd=tmp_path.parent, capture_output=True, text=True, encoding="utf-8", timeout=20)
     assert result.returncode == 0, result.stderr
-    assert result.stdout.splitlines() == ["loaded", str(project / ".basepack/新 memory")]
-    assert secret not in result.stdout + result.stderr
+    assert result.stdout.strip() == str(config.path)
 
 
-def test_generated_bootstrap_stops_before_memory_when_secret_file_is_missing(tmp_path):
+def test_maintain_defaults_to_project_scope_and_passes_control(tmp_path, monkeypatch):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
     config = load_project_config(init_project(tmp_path / "project", machine))
-    _activate(config)
-    bootstrap = _activation_bootstrap(config)
-    result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", bootstrap + "Write-Output 'continued'"],
-                            cwd=tmp_path.parent, capture_output=True, text=True, encoding="utf-8", timeout=20)
-    assert result.returncode != 0
-    assert "continued" not in result.stdout
-    assert "password.txt" in result.stderr
+    config.raw["memory"]["source_scope"] = ["docs"]
+    calls = []
+    monkeypatch.setattr("basepack.memory.store.Memory.maintain",
+                        lambda self, scope, **kwargs: calls.append((scope, kwargs)) or {"needs_semantic": 0})
+    parser = argparse.ArgumentParser()
+    register_commands(parser.add_subparsers(dest="command"))
+    args = parser.parse_args(["memory", "maintain", "--control", "task.control"])
+    result, status = dispatch(args, config)
+    assert status == 0 and result["needs_semantic"] == 0
+    assert result["codex"]["status"] == "binding_unavailable"
+    assert calls == [(["docs"], {"control": "task.control", "timeout": 600})]
+
+
+def test_codex_registry_is_used_for_maintenance_scope(tmp_path, monkeypatch):
+    import json
+    from basepack.memory.cli import _collect_codex
+    from basepack.memory import codex, codex_binding
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    config = load_project_config(init_project(tmp_path / "project", machine))
+    registry = tmp_path / "registry.json"
+    registry.write_text(json.dumps({"project_id": "host-project", "registry_complete": True,
+                                    "other_project_roots": []}), encoding="utf-8")
+    source = config.memory_dir / "codex" / "thread.txt"
+    class Client:
+        def __init__(self, executable): pass
+        def close(self): pass
+    monkeypatch.setattr(codex, "AppServer", Client)
+    monkeypatch.setattr(codex, "list_threads", lambda client, control: [{"id": "thread"}])
+    monkeypatch.setattr(codex_binding, "discover_binding", lambda *args: {"gaps": []})
+    monkeypatch.setattr(codex_binding, "classify_threads", lambda *args: {
+        "matched": [{"id": "thread"}],
+        "excluded": [{"thread": {"id": "other", "preview": "other project private text"}, "reason": "outside"}],
+        "unresolved": [], "gaps": []})
+    seen = []
+    def collect(*args, **kwargs):
+        seen.append(kwargs['project_binding'])
+        return {"paths": [str(source)], "gaps": [], "threads": []}
+    monkeypatch.setattr(codex, "collect_codex", collect)
+    result = _collect_codex(config, registry, control="task.control")
+    assert result["paths"] == [".basepack/memory/codex/thread.txt"]
+    assert result["discovered"] == 1
+    assert seen == [{"gaps": []}]
+    assert Path(result["receipt"]).is_file()
+    assert "other project private text" not in Path(result["receipt"]).read_text(encoding="utf-8")

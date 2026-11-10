@@ -26,6 +26,9 @@ def test_read_published_snapshot_and_old_basis_after_member_reuse(memory):
                            start_line=basis["start_line"], end_line=basis["end_line"])["original"]
     assert original["text"] == "本地数据库隔离项目。\n"
     assert original["source_version"] == basis["source_version"]
+    path.unlink()
+    assert memory.read(basis["member"], source_version=basis["source_version"],
+                       start_line=basis["start_line"], end_line=basis["end_line"])["original"] == original
     parser = argparse.ArgumentParser()
     register_commands(parser.add_subparsers(dest="command"))
     args = parser.parse_args(["memory", "read", basis["member"], "--source-version", basis["source_version"],
@@ -84,3 +87,41 @@ def test_retired_records_are_not_returned_even_without_stale_flag(memory):
     assert "member:storage" not in {row["id"] for row in memory.search("数据库")}
     assert memory.neighbors("node:local")["edges"] == []
     assert memory.neighbors("node:local", include_stale=True)["edges"][0]["id"] == "semantic:requires"
+
+
+def test_codex_message_identity_and_text_survive_source_update_in_saved_snapshot(memory):
+    from basepack.memory.codex import _render
+
+    thread_id = "01a1c5dc-af1a-7fa2-87a6-654370d72307"
+    path = memory.config.memory_dir / "codex" / f"{thread_id}.txt"
+    path.parent.mkdir(parents=True)
+    source_path = path.relative_to(memory.config.root).as_posix()
+
+    def publish(text):
+        rows = [{"turnId": "turn-1", "item": {"id": "item-1", "type": "userMessage",
+                                                "content": [{"type": "text", "text": text}]}}]
+        payload = _render("project", {"id": thread_id}, rows, memory.config.memory_dir, None)[0]
+        path.write_bytes(payload)
+        prepared = memory.prepare([source_path])
+        source = prepared["sources"][0]
+        memory.apply({"sources": [{"path": source_path, "revision": source["revision"]}],
+                      "expected": prepared["expected"], "members": [
+                          {"id": "chat-evidence", "kind": "chunk", "path": source_path,
+                           "title": "用户要求", "start_line": 2, "end_line": 2}]})
+        return memory.read("chat-evidence")["original"]
+
+    old = publish("原要求：保留证据 🚀")
+    updated = publish("修订要求：另外保留备份")
+    assert updated["chat_locations"][0]["text"] == "修订要求：另外保留备份"
+    assert updated["source_version"] != old["source_version"]
+    path.unlink()
+    original = memory.read("chat-evidence", source_version=old["source_version"],
+                           start_line=old["start_line"], end_line=old["end_line"])["original"]
+    assert original == old
+    loc, = original["chat_locations"]
+    assert (loc["chat_url"], loc["thread_id"], loc["turn_id"], loc["item_id"], loc["part"]) == (
+        f"codex://threads/{thread_id}", thread_id, "turn-1", "item-1", 0)
+    assert loc["role"] == "user"
+    assert loc["text"] == "原要求：保留证据 🚀"
+    assert loc["part_byte_start"] == 0
+    assert loc["part_byte_end"] == len(loc["text"].encode("utf-8"))

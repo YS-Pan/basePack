@@ -1,22 +1,22 @@
 # basePack
 
-basePack 为 agent 提供项目局部记忆、共享计算资源协调，以及可独立使用的协作和文件结构技能。
+basePack gives agents project-local memory, shared compute coordination, and independent skills for collaboration, file organization, and engineering decisions.
 
-| 能力 | 用途 | 按需准备 |
+| Capability | Purpose | Requirements |
 | --- | --- | --- |
-| 项目记忆 | 保存摘要、原文块、图片与关系，查询已发布知识，独立维护更新 | Python 3.13+ 客户端、每项目独立的 SurrealDB 4、CPU/CUDA 共享编码服务 |
-| 资源协调 | 多项目复用图文 embedding，提交和查询普通重任务 | 编码服务支持 CPU/CUDA；作业使用 HTCondor |
-| agent-team | 按任务选择单人、直接协作或分层团队 | 支持 skills 与订阅 agent 的宿主 |
-| file-structure | 按内容职责和生命周期建议项目布局 | 支持 skills 的宿主 |
-| engineering-judgment | 判断设计、错误处理、兼容和操作流程中的契约、职责与必要负担 | 支持 skills 的宿主 |
+| Project memory | Store summaries, source excerpts, images, and relations; query published knowledge and maintain it separately | Python 3.13+ client, a separate SurrealDB 4 instance per project, and a shared CPU/CUDA embedding service |
+| Resource coordination | Reuse text/image embedding across projects and submit ordinary heavy jobs | CPU/CUDA embedding service; HTCondor for jobs |
+| agent-team | Choose solo work, direct collaboration, or layered teams for each task | A host with skills and subscription-based agents |
+| file-structure | Organize project files by purpose and lifecycle | A host with skills |
+| engineering-judgment | Judge contracts, responsibilities, compatibility, and the work passed to users | A host with skills |
 
-当前源码为 **0.7.1 开发版**，面向 Windows、Python 3.13+。理解材料、建图和评分由宿主订阅 agent 完成，basePack 不要求另配 LLM API。安装和使用按所选功能准备设施，开发验证与环境记录见 [整改进度](devDoc/tasks/20261110-rectification/progress.md)。
+The current source is **0.8.0 development candidate**, for Windows and Python 3.13+. The host's subscription-based agents understand material, build relations, and score results; basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability. Current delivery evidence and remaining verification are recorded in the [onboarding progress](devDoc/tasks/20261110-onboarding-simplification/progress.md).
 
-**basePack 当前仍处于开发过程中，现阶段的实际使用同时作为测试样本。应记录使用过程中遇到的问题，作为后续改进的依据。**
+**basePack is under development. Real use also serves as testing; record problems so they can inform subsequent fixes.**
 
-## 安装轻量客户端
+## Install the lightweight client
 
-先安装 Git 与 Python 3.13 或 3.14，在 PowerShell 中执行（示例使用 3.13）：
+Install Git and Python 3.13 or 3.14, then run in PowerShell (this example uses 3.13):
 
 ```powershell
 git clone https://github.com/YS-Pan/basePack.git
@@ -27,48 +27,44 @@ $python = (Resolve-Path '.venv/Scripts/python.exe').Path
 & $python -c "from importlib.metadata import version; print(version('basepack'))"
 ```
 
-Python 包在 `experiments/20261106-basepack`，从仓库根安装时需指定该目录。以上只安装轻量客户端；项目记忆通过配置连接共享模型服务，模型依赖装在服务环境中。通用 skills 可独立使用。这个虚拟环境随当前 clone 保存，移动或删除它后应在新位置重建客户端并更新项目入口。
+The Python package lives in `experiments/20261106-basepack`; include that directory when installing from the repository root. These commands install the lightweight client. Project memory connects to a shared model service whose dependencies belong in its service environment. General skills can be used independently. This virtual environment belongs to the current clone; after moving or deleting it, recreate the client and update project instructions.
 
-历史发布包可从 [GitHub Releases](https://github.com/YS-Pan/basePack/releases) 获取；本轮源码的普通 wheel 构建见 [路线 README](experiments/20261106-basepack/README.md#开发检查与构建)。已有项目先按 [升级步骤](experiments/20261106-basepack/docs/setup-project.md#版本升级) 备份并更新入口。
+Older packages are available from [GitHub Releases](https://github.com/YS-Pan/basePack/releases). To build a normal wheel from the current source, see the [route README](experiments/20261106-basepack/README.md#development-checks-and-builds). For an existing project, follow the [upgrade steps](experiments/20261106-basepack/docs/setup-project.md#版本升级) to back up its data and refresh its entry point.
 
-## 启用项目记忆
+## Enable project memory
 
-1. 按 [项目接入](experiments/20261106-basepack/docs/setup-project.md) 创建最小机器配置，为自己的项目运行 `init`。新项目默认 `vector`，也可选择 `hybrid`。`doctor` 默认只检查 core。
-2. 按 [项目 SurrealDB](experiments/20261106-basepack/docs/administrator.md#项目-surrealdb) 安装数据库，为该项目选择独立目录、端口和密码，启动后检查 `/ready`。
-3. 按 [共享模型部署](experiments/20261106-basepack/docs/administrator.md) 准备 CPU 或 CUDA 编码服务，在机器配置中填写 endpoint，完成一条编码冒烟。记忆不要求 HTCondor。
-4. 按 [凭据加载步骤](experiments/20261106-basepack/docs/setup-project.md#凭据与新-shell-接续) 运行 `memory init`、`memory brief`，再执行 [最小读写闭环](experiments/20261106-basepack/docs/memory.md#最小闭环示例)。启用后，新 shell 和新聊天沿生成的 `AGENTS.md → .basepack/instructions.md` 入口加载凭据并接续。
+1. Follow [project setup](experiments/20261106-basepack/docs/setup-project.md) to create a minimal machine configuration and run `init` for your project. New projects default to `vector`; `hybrid` is also available. The default `doctor` checks core facilities.
+2. Follow [project SurrealDB setup](experiments/20261106-basepack/docs/administrator.md#项目-surrealdb) to review the candidate's trusted-local boundary, select a separate directory and explicit loopback IP/port, start it without authentication, and check `/ready`.
+3. Follow [shared model deployment](experiments/20261106-basepack/docs/administrator.md) to prepare a CPU or CUDA embedding service, set its endpoint in the machine configuration, and verify one embedding request. Memory does not require HTCondor.
+4. Follow the [new-shell steps](experiments/20261106-basepack/docs/setup-project.md#新-shell-接续), run `memory init` and `memory brief`, then complete the [minimal read/write workflow](experiments/20261106-basepack/docs/memory.md#最小闭环示例). New shells and chats follow the generated `AGENTS.md → .basepack/instructions.md` entry to run a brief directly, with no password file or environment variable.
 
-各项目的配置、知识、数据库、密码与本机入口保存在各自的忽略目录中，**项目记忆不随本仓库源码分发**。新 clone 通过 `init` 生成自己的配置；恢复已有知识时使用对应项目的备份。
+**The candidate grants database administration to local clients. A malicious web page can also write through a simple POST to the loopback endpoint; CORS does not prevent it, and the project UUID only prevents accidental connections. Adoption of this candidate remains pending; existing production instances have not migrated.** Review the [deployment boundary](experiments/20261106-basepack/docs/administrator.md#项目-surrealdb) before enabling memory.
 
-## 独立 skills
+In Codex, the generated host instructions obtain the project binding and registered roots for chat collection. Independent maintenance preflight collects available persisted chat text and compares sources before handing remaining semantic work to an agent. Missing binding, uncertain ownership, or unavailable content remain explicit coverage gaps; see [chat setup](experiments/20261106-basepack/docs/setup-project.md#codex-项目聊天接入).
 
-[agent-team](skills/agent-team/SKILL.md)、[file-structure](skills/file-structure/SKILL.md) 和 [engineering-judgment](skills/engineering-judgment/SKILL.md) 可以独立使用，无需安装 Python 包或数据库。将需要的完整技能目录复制到目标项目的 `.agents/skills/`。在本仓库根执行以下命令，目标项目应尚无对应同名技能：
+Each project's configuration, knowledge, database, and local entry point stay in that project's ignored directories. **Project memory is not distributed with this source repository.** A new clone creates its own configuration through `init`; recover existing knowledge from that project's backup.
 
-```powershell
-$repo = (Get-Location).Path
-$skillRoot = Join-Path '<absolute-target-project>' '.agents/skills'
-New-Item -ItemType Directory -Force -Path $skillRoot | Out-Null
-Copy-Item -LiteralPath (Join-Path $repo 'skills/agent-team') -Destination $skillRoot -Recurse
-Copy-Item -LiteralPath (Join-Path $repo 'skills/file-structure') -Destination $skillRoot -Recurse
-Copy-Item -LiteralPath (Join-Path $repo 'skills/engineering-judgment') -Destination $skillRoot -Recurse
-Get-ChildItem -LiteralPath $skillRoot -Filter SKILL.md -Recurse
-```
+## Independent skills
 
-可明确要求读取对应的 `SKILL.md`，或用 `$agent-team`、`$file-structure`、`$engineering-judgment` 调用。其它宿主使用其技能安装方式。本仓库开发机的 `.agents/skills` 联接指向 Git 中的 `skills/` 维护源。engineering-judgment 保留独立使用，效果通过长期真实反馈维护。
+Choose only the skills you need. [agent-team](skills/agent-team/SKILL.md), [file-structure](skills/file-structure/SKILL.md), and [engineering-judgment](skills/engineering-judgment/SKILL.md) need no Python package or database. The [resources skill](experiments/20261106-basepack/skills/resources/SKILL.md) guides use of configured resource tools.
 
-wheel 包含程序、配置与入口模板、记忆 schema 和 `memory guide` 定位的记忆 skill；三项通用 skills、[资源 skill](experiments/20261106-basepack/skills/resources/SKILL.md) 与仓库示例从源码目录获取。
+Follow the complete [skill installation and discovery procedure](experiments/20261106-basepack/docs/setup-project.md#独立-skills-安装与发现): copy each complete directory into the target project's `.agents/skills/`, or create a junction to existing project-owned originals. Check references and the host's actual project-scoped skill list. Reuse correct installations; preserve conflicting user skills and report them. `init` and core `doctor` do not install or verify independent skills.
 
-## 文档与反馈
+Invoke a discovered skill by name, such as `$agent-team`, or explicitly ask the agent to read its `SKILL.md`. Other hosts use their own skill installation mechanism. Local ignored junctions must be recreated after a fresh checkout. This repository's development junctions point to its tracked skill sources. Engineering judgment remains independently usable and is maintained through real feedback.
 
-| 入口 | 内容 |
+The wheel includes the program, configuration and entry templates, memory schema, and the memory skill located by `memory guide`. The three general skills, resources skill, and repository examples come from the matching source checkout. Wheel-only users can obtain these directories without reinstalling the client.
+
+## Documentation and feedback
+
+| Entry | Contents |
 | --- | --- |
-| [路线 README](experiments/20261106-basepack/README.md) | 按能力使用、开发、构建和测试 |
-| [项目接入](experiments/20261106-basepack/docs/setup-project.md) | 配置、凭据、新 shell 接续、升级和移动 |
-| [记忆使用](experiments/20261106-basepack/docs/memory.md) | 首建、检索、小批维护和备份 |
-| [资源使用](experiments/20261106-basepack/docs/resources.md) | 图文 embedding、HTCondor 作业与 Python API |
-| [管理员说明](experiments/20261106-basepack/docs/administrator.md) | 所需设施的官方来源、安装、服务和容量配置 |
-| [AGENTS.md](AGENTS.md)、[实现概览](devDoc/system/overview.md) | 参与开发的规则与实现入口 |
+| [Route README](experiments/20261106-basepack/README.md) | Capabilities, development, builds, and tests |
+| [Project setup](experiments/20261106-basepack/docs/setup-project.md) | Configuration, new shells, upgrades, relocation, and skill discovery |
+| [Memory guide](experiments/20261106-basepack/docs/memory.md) | Initial knowledge, retrieval, small-batch maintenance, and backup |
+| [Resource guide](experiments/20261106-basepack/docs/resources.md) | Text/image embedding, HTCondor jobs, and Python APIs |
+| [Administrator guide](experiments/20261106-basepack/docs/administrator.md) | Official facility sources, installation, services, and capacity |
+| [AGENTS.md](AGENTS.md), [implementation overview](devDoc/system/overview.md) | Development rules and current implementation |
 
-使用问题先沿自己的项目记录约定保存现象、版本、最小复现条件与处理状态；修复后补验证结果。按 [问题反馈格式](experiments/20261106-basepack/docs/setup-project.md#问题记录与反馈) 形成可复制的 Issue 草稿，去除凭据和私人资料后，由使用者提交到 [GitHub Issues](https://github.com/YS-Pan/basePack/issues)，或明确授权 agent 提交。
+Record problems using your project's existing conventions: symptoms, version, minimal reproduction conditions, and status; add verification after a fix. Use the [issue format](experiments/20261106-basepack/docs/setup-project.md#问题记录与反馈) to draft an issue, remove credentials and private material, then submit it to [GitHub Issues](https://github.com/YS-Pan/basePack/issues) yourself or explicitly authorize an agent to submit it.
 
-本项目自有源码、skills 和文档采用 [MIT 许可证](LICENSE)。第三方依赖和模型遵循各自许可，图文模型声明见 [Qwen 使用声明](experiments/20261106-basepack/src/basepack/embedding/NOTICE.Qwen3-VL-Embedding.txt)。
+This project's own source, skills, and documentation use the [MIT license](LICENSE). Third-party dependencies and models retain their own licenses; see the [Qwen notice](experiments/20261106-basepack/src/basepack/embedding/NOTICE.Qwen3-VL-Embedding.txt).

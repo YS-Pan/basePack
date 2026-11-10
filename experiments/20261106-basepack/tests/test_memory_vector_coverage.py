@@ -31,11 +31,11 @@ class FakeClient:
         return {"embedding_identity": "same-model", "vectors": [[1.0, 0.0] for _ in inputs]}
 
 
-def test_vector_search_exposes_partial_compatible_coverage_without_changing_python_list(monkeypatch):
+def test_vector_search_exposes_partial_compatible_coverage(monkeypatch):
     monkeypatch.setattr(vectors, "EmbeddingClient", FakeClient)
     memory = FakeMemory(["member:a"])
-    assert vectors.vector_search(memory, "task") == [{"id": "member:a", "path": "a.md"}]
-    result = vectors.vector_search(memory, "task", include_coverage=True)
+    result = vectors.vector_search(memory, "task")
+    assert result["matches"] == [{"id": "member:a", "path": "a.md"}]
     assert result["vector_coverage"] == {"identity": "same-model", "total": 2, "compatible": 1,
                                          "pending": 1, "pending_members": [{"id": "member:b", "path": "b.md"}]}
     assert "ORDER BY distance ASC, id ASC" in memory.queries[-1]
@@ -44,7 +44,7 @@ def test_vector_search_exposes_partial_compatible_coverage_without_changing_pyth
 def test_vector_search_reports_missing_identity_instead_of_silent_text_fallback(monkeypatch):
     monkeypatch.setattr(vectors, "EmbeddingClient", FakeClient)
     with pytest.raises(ValueError, match="No compatible memory vectors.*pending: 2"):
-        vectors.vector_search(FakeMemory([]), "task", include_coverage=True)
+        vectors.vector_search(FakeMemory([]), "task")
 
 
 @pytest.mark.parametrize("mode", ["vector", "hybrid"])
@@ -64,8 +64,8 @@ def test_brief_uses_configured_related_and_does_not_scan(mode):
     result = memory.brief("semantic task", limit=6)
     assert result["clues"][0]["id"] == "member:a"
     assert result["vector_coverage"] == coverage
-    assert result["vector_pending_count"] == 1
-    assert result["changes"] == []
+    assert "vector_pending_count" not in result
+    assert "changes" not in result
 
 
 def test_vector_rebuild_reports_coverage_and_reuses_published_input(memory):
@@ -79,18 +79,18 @@ def test_vector_rebuild_reports_coverage_and_reuses_published_input(memory):
     first = memory.embed_members(["storage"])
     assert first["embedded"] == ["member:storage"]
     assert len(first["pending"]) == 3
-    partial = memory.vector_search("数据库", include_coverage=True)
+    partial = memory.vector_search("数据库")
     assert partial["vector_coverage"]["total"] == 4
     assert partial["vector_coverage"]["compatible"] == 1
     assert partial["vector_coverage"]["pending"] == 3
-    assert memory.brief("数据库")["vector_pending_count"] == 3
+    assert memory.brief("数据库")["vector_coverage"]["pending"] == 3
     assert len(memory.embed_members()["embedded"]) == 3
-    assert memory.vector_search("数据库", include_coverage=True)["vector_coverage"]["pending"] == 0
+    assert memory.vector_search("数据库")["vector_coverage"]["pending"] == 0
     assert memory.embed_members()["pending"] == []
     memory._execute("UPDATE member:storage SET embedding_identity='different-model';")
-    coverage = memory.vector_search("数据库", include_coverage=True)["vector_coverage"]
+    coverage = memory.vector_search("数据库")["vector_coverage"]
     assert (coverage["compatible"], coverage["pending"]) == (3, 1)
-    assert memory.brief()["vector_pending_count"] == 1
+    assert memory.brief()["vector_coverage"]["pending"] == 1
     assert memory.embed_members()["embedded"] == ["member:storage"]
     memory._execute("UPDATE member:storage SET embedding=NONE;")
     assert memory.embed_members()["embedded"] == ["member:storage"]
@@ -114,7 +114,7 @@ def test_hybrid_literal_prioritizes_path_filename_and_identifier_matches(memory,
     vector = deterministic_vector(query)
     memory._execute(f"UPDATE member SET embedding={_sql(vector)}; "
                     f"UPDATE member:zz_archive SET embedding={_sql([-value for value in vector])};")
-    hits = memory.hybrid_search(query, literal=True, limit=3)
+    hits = memory.hybrid_search(query, literal=True, limit=3)["matches"]
     assert hits[0]["id"] == "member:zz_archive"
     assert hits[0]["lexical_rank"] == 1
     assert "vector_rank" not in hits[0]

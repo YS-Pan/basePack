@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from basepack.memory.content import (
-    detect_changes, numbered_text, read_member, read_source, reading_units,
+    detect_changes, numbered_text, read_source, reading_units,
 )
 
 
@@ -17,7 +17,7 @@ def write_source(root, path, data):
     return target
 
 
-def test_original_bytes_line_units_and_agent_selected_range(tmp_path):
+def test_original_bytes_and_line_units(tmp_path):
     raw = "# 项目\r\n\r\n第一段。\r\n仍是同段。\r\n\r\n## 条件\r\n例外不可省略。".encode("utf-8")
     path = write_source(tmp_path, "资料 空格/决定.md", raw)
     source = read_source(tmp_path, "资料 空格/决定.md")
@@ -30,30 +30,13 @@ def test_original_bytes_line_units_and_agent_selected_range(tmp_path):
         ("heading", 1, 1), ("paragraph", 3, 4), ("heading", 6, 6), ("paragraph", 7, 7)]
     assert reading_units(source)[1].text == "第一段。\r\n仍是同段。\r\n"
     assert numbered_text(source).startswith("1: # 项目\r\n2: \r\n3: 第一段。\r\n")
-    # The agent may choose a range crossing the mechanical preparation units.
-    member = read_member(tmp_path, source.path, source.revision, "稳定块:决定", 4, 7)
-    assert member.member_id == "稳定块:决定"
-    assert (member.start_line, member.end_line) == (4, 7)
-    assert member.text == "仍是同段。\r\n\r\n## 条件\r\n例外不可省略。"
 
 
-def test_revision_mismatch_and_missing_original_are_not_hidden(tmp_path):
+def test_missing_original_is_not_hidden(tmp_path):
     path = write_source(tmp_path, "source.md", b"old\n")
-    source = read_source(tmp_path, "source.md")
-    path.write_bytes(b"new\n")
-    with pytest.raises(ValueError, match="Source revision mismatch"):
-        read_member(tmp_path, source.path, source.revision, "stable", 1, 1)
     path.unlink()
     with pytest.raises(FileNotFoundError):
-        read_member(tmp_path, source.path, source.revision, "stable", 1, 1)
-
-
-@pytest.mark.parametrize("start,end", [(0, 1), (-1, 1), (2, 1), (1, 3)])
-def test_invalid_agent_ranges_fail(tmp_path, start, end):
-    write_source(tmp_path, "source.md", b"one\ntwo")
-    source = read_source(tmp_path, "source.md")
-    with pytest.raises(ValueError, match="Invalid line range"):
-        read_member(tmp_path, source.path, source.revision, "stable", start, end)
+        read_source(tmp_path, "source.md")
 
 
 def test_empty_and_invalid_utf8_sources(tmp_path):
@@ -62,8 +45,6 @@ def test_empty_and_invalid_utf8_sources(tmp_path):
     assert source.revision == sha256(b"").hexdigest()
     assert reading_units(source) == []
     assert numbered_text(source) == ""
-    with pytest.raises(ValueError, match="0 lines"):
-        read_member(tmp_path, "empty", source.revision, "stable", 1, 1)
     write_source(tmp_path, "invalid", b"\xff")
     with pytest.raises(UnicodeDecodeError):
         read_source(tmp_path, "invalid")
@@ -75,9 +56,9 @@ def test_project_move_preserves_relative_identity_and_revision(tmp_path):
     source = read_source(original, "资料/来源.md")
     moved = tmp_path / "搬移 项目"
     original.rename(moved)
-    member = read_member(moved, source.path, source.revision, "stable-id", 2, 2)
-    assert (member.path, member.member_id, member.revision, member.text) == (
-        "资料/来源.md", "stable-id", source.revision, "第二行")
+    restored = read_source(moved, source.path)
+    assert (restored.path, restored.revision, restored.text) == (
+        "资料/来源.md", source.revision, "第一行\n第二行")
 
 
 def test_sources_and_scope_cannot_leave_project(tmp_path):

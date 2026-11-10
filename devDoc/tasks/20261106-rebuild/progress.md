@@ -31,13 +31,13 @@
 
 ## 阻碍与待核
 
-- array reconstruct 的 0.6.2 迁移只复制了两项 skill 原件，缺少 `.agents/skills` 发现入口；当前 init/core doctor 同样不覆盖技能安装与发现验收。调查见[记录及 Issue 草稿](research/array-skill-discovery.md)，接入修复与后续简化已纳入[修改计划](../20261110-onboarding-simplification/plan.md)，尚未实施。
+- array reconstruct 原遗漏的两项 skill 发现入口已按本轮计划补齐，官方 `skills/list` 返回两项 `scope=repo`、`errors=[]`，外部 main 提交 `931634e`。完整目录、引用、冲突与发现核验已纳入产品接入说明；init/core doctor 的职责仍不等同于技能安装与发现验收，见[调查接续](research/array-skill-discovery.md)与[文档结果](../20261110-onboarding-simplification/documentation-result.md)。
 - 文件结构建议已有独立 skill；真实大项目迁移、未来布局及记忆读取效果继续按实际任务验证，记忆自用验收见 [独立任务](../20261106-memory-system/plan.md#devdoc-自用与读取轮数)。
 - 分层协作已有指令层初版，[P7](plan.md#p7-分层-agent-组织) 仍需真实广读任务的能力与成果质量对照。主上下文、团队总用量和耗时单独记录，允许增加用量换取质量提升。
 
 ## 下一步
 
-已综合相关讨论维护[接入、记忆维护与运行简化计划](../20261110-onboarding-simplification/plan.md)，状态见[专项进度](../20261110-onboarding-simplification/progress.md)：优先E脚本处理机械变化及历史待核接续、F默认纳入所属Codex project聊天；保留技能发现、本机免认证方案、接口清理与有限编码去重，并增加两份英文README及锚点修正。以已交付0.7.1为基线，产品修改待实施；正式认证迁移、外部项目写入不由本次计划维护直接执行。
+已执行[接入、记忆维护与运行简化计划](../20261110-onboarding-simplification/plan.md)，形成0.8.0本地候选：E脚本先处理机械变化并保留跨任务未读范围，F接入所属Codex项目的受支持聊天读取、归属核验及精确回源，C接口清理与两份英文README已完成；D按净维护收益保留必要编码重复。普通wheel全套354项通过，端到端与实际覆盖范围由[专项进度](../20261110-onboarding-simplification/progress.md)接续。免认证隔离恢复成功，但浏览器实证CORS不能阻止跨源简单POST写库，正式采用待用户取舍；共用客户端和正式三库保持0.7.1运行合同，未推送或发布候选。
 
 独立 [engineering-judgment skill](../../../skills/engineering-judgment/SKILL.md) 已编写、保留并接入，见[交付结果](../20261110-engineering-judgment/result.md)。按用户最新要求取消技能测试与按收益去留，效果在长期真实使用中观察；源码和入口已提交 f8bb5b2。
 

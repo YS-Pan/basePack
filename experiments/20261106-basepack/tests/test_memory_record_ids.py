@@ -116,7 +116,7 @@ def test_real_special_id_vector_write_reuse_and_concurrent_change(memory, monkey
     monkeypatch.setattr(vectors.EmbeddingClient, "embed", encode)
     assert set(memory.embed_members(ids)["embedded"]) == set(ids)
     assert set(memory.embed_members(ids)["reused"]) == set(ids)
-    assert {row["id"] for row in memory.hybrid_search("隔离", limit=10)} == set(ids)
+    assert {row["id"] for row in memory.hybrid_search("隔离", limit=10)["matches"]} == set(ids)
     memory._execute("UPDATE member SET embedding=NONE, embedded_revision=NONE;")
     target = next(row for row in memory._rows("member") if row["id"] == "member:`brief-order`")
 
@@ -138,7 +138,7 @@ def test_real_shared_service_encodes_special_ids(real_memory):
     ids = special_id_chunks(memory)
     assert set(memory.embed_members(ids)["reused"]) == set(ids)
     assert set(memory.embed_members(ids)["reused"]) == set(ids)
-    assert {row["id"] for row in memory.hybrid_search("项目数据库隔离", limit=10)} == set(ids)
+    assert {row["id"] for row in memory.hybrid_search("项目数据库隔离", limit=10)["matches"]} == set(ids)
     assert all(memory.read(value)["original"]["text"].startswith("项目数据库") for value in ids)
 
 

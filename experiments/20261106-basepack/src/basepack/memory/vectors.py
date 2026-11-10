@@ -76,11 +76,11 @@ def vector_coverage(memory, identity, *, scope="") -> dict:
             "pending": len(missing), "pending_members": missing}
 
 
-def vector_search(memory, text, *, scope="", limit=12, timeout=600, include_coverage=False):
+def vector_search(memory, text, *, scope="", limit=12, timeout=600):
     scope_filter = f"stale=false AND retired!=true AND string::starts_with(path, {_sql(scope)})"
     if not memory._execute(f"SELECT VALUE id FROM member WHERE {scope_filter} LIMIT 1;")[0]:
         result = {"matches": [], "vector_coverage": {"identity": None, "total": 0, "compatible": 0, "pending": 0, "pending_members": []}}
-        return result if include_coverage else result["matches"]
+        return result
     result = EmbeddingClient(memory.config.machine).embed([text], timeout=timeout)
     identity = result["embedding_identity"]
     vector = _sql(result["vectors"][0])
@@ -96,12 +96,12 @@ def vector_search(memory, text, *, scope="", limit=12, timeout=600, include_cove
         "AND embedded_revision=input_revision AND embedding!=NONE "
         f"ORDER BY distance ASC, id ASC LIMIT {int(limit)};")[0]
     result = {"matches": candidates, "vector_coverage": coverage}
-    return result if include_coverage else candidates
+    return result
 
 
-def hybrid_search(memory, text, *, scope="", limit=12, timeout=600, literal=False, include_coverage=False):
+def hybrid_search(memory, text, *, scope="", limit=12, timeout=600, literal=False):
     lexical = memory.search(text, scope=scope, limit=limit, literal=literal)
-    result = vector_search(memory, text, scope=scope, limit=limit, timeout=timeout, include_coverage=True)
+    result = vector_search(memory, text, scope=scope, limit=limit, timeout=timeout)
     combined = {}
     for name, candidates in [("lexical_rank", lexical), ("vector_rank", result["matches"])]:
         for rank, candidate in enumerate(candidates, 1):
@@ -111,4 +111,4 @@ def hybrid_search(memory, text, *, scope="", limit=12, timeout=600, literal=Fals
             row["rrf_score"] += 1 / (60 + rank)
     matches = sorted(combined.values(), key=lambda row: (literal and "lexical_rank" not in row,
                                                         -row["rrf_score"], row["id"]))[:limit]
-    return {"matches": matches, "vector_coverage": result["vector_coverage"]} if include_coverage else matches
+    return {"matches": matches, "vector_coverage": result["vector_coverage"]}

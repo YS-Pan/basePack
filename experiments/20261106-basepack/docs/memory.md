@@ -4,9 +4,9 @@
 
 ## 启用
 
-按 [项目接入](setup-project.md#启用记忆) 先选独立目录、endpoint 和 UUID，再按 [项目 SurrealDB](administrator.md#项目-surrealdb) 启动并在独立调用核 ready/init/brief。同项目多聊天复用服务，另一个项目使用自己的物理目录、端口及 UUID；通用 exe 和模型可共用。服务在查询期间保持运行。前台排错可在普通用户终端直接执行同一个 serve.ps1，其 cwd 与 endpoint 仍来自目标配置。
+本文描述 0.8.0 候选，是否采用免认证边界仍待最终决定。按 [项目接入](setup-project.md#启用记忆) 先选独立目录、显式回环 endpoint 和 UUID，再按 [项目 SurrealDB](administrator.md#项目-surrealdb) 核风险后启动，在独立调用核 ready/init/brief。该候选允许本机客户端及可触达回环端点的恶意网页写库，CORS 不阻止简单 POST；UUID 只防误连。同项目多聊天复用服务，另一个项目使用自己的物理目录、端口及 UUID；通用 exe 和模型可共用。服务在查询期间保持运行。前台排错可在普通用户终端直接执行同一个 serve.ps1，其 cwd 与 endpoint 仍来自目标配置。
 
-普通 init 只生成配置和入口；memory init 才安装 schema 并绑定 UUID、增加记忆启动指令。误连其它 UUID 的库会失败。每个新进程按 [凭据与接续步骤](setup-project.md#凭据与新-shell-接续) 从当前配置取得密码变量名与密码文件并加载，不依赖上一次部署 shell；使用 instructions 中的 Python 与显式配置。已有配置升级时补齐当前 memory 字段并重新 memory init 刷新记忆入口；只用资源工具无需记忆数据库。
+普通 init 只生成配置和入口；memory init 才安装 schema 并绑定 UUID、增加记忆启动指令。误连其它 UUID 的库会失败。每个新进程按 [新 shell 接续](setup-project.md#新-shell-接续) 直接使用 instructions 中的 Python 与显式配置运行 brief，无需密码环境变量或密码文件，不依赖上一次部署 shell。已有配置升级时补齐当前 memory 字段并重新 memory init 刷新记忆入口；只用资源工具无需记忆数据库。
 
 ## 首建与维护
 
@@ -39,13 +39,35 @@ apply 核对来源版本，以及本批改写、退休、更正目标、实际�
 
 ## 自动维护与手动维护
 
-宿主有可取消子任务句柄及任务开始、完成事件时，在业务开始时并行启动低优先级维护 worker。worker 以本次任务唯一的控制文件运行 `memory apply --batch <batch.json> --control <control>`；业务完成时宿主运行 `memory stop --control <control>`，再取消该 worker，不等待编码或已进入提交的短事务。stop 先于提交仲裁时，候选不会发布；已发布批次保留。stop 失败时报告原错误并仍取消 worker，不能声称阻止了发布。宿主缺少生命周期能力时，自动维护不可用。
+宿主有独立工具任务、可取消子任务句柄及任务开始/完成事件时，业务开始后并行运行确定性预检，业务无需等待：
 
-维护按来源合并变化并小批共读；检索 worker 与维护 worker 各自执行。已发现积压较多时最多提醒一次建议另行手动维护，用户明确发起后再执行独立维护，不扫描全库来统计积压。
+```powershell
+memory maintain --control '<本任务唯一control>' --output '<maintenance-summary.json>'
+```
+
+默认使用项目 `source_scope`，`--scope <文件或目录> ...` 可覆盖本轮范围。预检先按 [Codex 绑定](setup-project.md#codex-项目聊天接入) 采集本次可取得的持久化聊天截点，再比较登记来源、声明范围及旧成员实际接受版本。Git 干净仍可能有尚未接受的原文。`changes` 提供显式变化查看，`maintain` 才负责机械更新与语义交接；查询不调用两者。
+
+程序直接处理原字节 hash 相同的元数据变化、完整正文仅 CRLF/LF 变化，以及有唯一定位且上下文可确认未变的原文块。完整回执保留机械批次、旧/新行映射、变化片段、受影响成员与关系；换行归一只用于比较，快照仍按真实原字节保存。编码输入及身份未变才复用向量；实际输入变化按现有 apply 合同编码。已有 stale、更正、退役或语义证据不足的范围保留待核，局部文字相同不表示父级摘要或关系均有效。
+
+预检简报返回 `mechanical_batches`、`reused_chunks`、`semantic_sources`、`pending_relations`、`needs_semantic`、本地 `receipt` 路径和 `codex` 采集状态。`needs_semantic=false` 时不创建语义维护 worker；为 true 时只把必要变化、受影响摘要/关系及回读入口一次交给订阅 worker，按来源接续小批。worker 按需展开新旧原文，通过 prepare/expected/apply 原子发布。部分机械批次已经完成，其余未接受范围仍跨任务可发现。
+
+采集与语义发布使用同一任务 control。worker 的 `memory apply --batch <batch.json> --control <control>` 沿用该控制文件；业务完成时宿主运行无需配置的 `memory stop --control <control>`，再取消该任务 worker，不等待编码或已进入提交的短事务。stop 先于提交仲裁时，候选不会发布；已采集原文和已发布批次保留，下次继续未接受范围。stop 失败保留原错并仍取消 worker，不能据此声称阻止发布。宿主缺少生命周期能力时说明自动维护不可用。
+
+自动小批可接续既有积压，任务相关性只影响优先级。积压较多时可提醒用户另行发起手动深维护，不设置停用自动维护的数量阈值，也不承诺任务结束前清完历史。手动深维护由用户发起，沿同一流程更全面共读旧材料与关系。检索 worker 和维护 worker 各自执行。
+
+## 聊天来源与精确回读
+
+Codex 维护采集真实用户消息与可取得的助手文字，保留 thread/turn/item/part 身份和角色；系统、AGENTS、hook 与工具元数据不冒充用户 prompt。同一线程分页内重复的 turn/item 按身份去重，内容冲突保留错误；人类有意重复发送仍是不同消息。跨线程不按文字去重，完整继承身份尚未证实。每次以已捕获的持久化消息截点分页，当前任务中新增长度下次接续。采集只更新受管原件，不表示已经阅读、总结或发布知识。
+
+受管聊天原文保存在 `memory.data_dir/codex/<thread>.txt`，版本 hash 属于该导出的真实 UTF-8 字节。接受后沿现有 source_version 保存快照；`read` 的 `original.chat_locations` 从所选已核快照返回聊天链接、thread/turn/item/part、UTF-8 字节范围及本次读取的正文交集，生成头与分隔符不当作人类原文。旧已发布版本可在原聊天续写或修订后继续核实。
+
+可读取且格式受支持的 `localImage` 按内容 hash 复制到 `memory.data_dir/codex-attachments/`，作为独立图片原件进入同一维护范围；采集回执保留 chat part 身份，语义 worker 实际打开图片，并将该身份作为 locator 接受。缺失或不支持的附件留 gap；真实聊天附件仍未验，不能据模拟 PNG 回归宣称全部附件可用。
+
+当前宿主列表中的部分项目/父子字段缺失时依项目根与 worktree 证据归属；显式 subagent 引用须以直接 thread/read 返回的父级身份核对且无项目冲突，才递归采集。无法确认的范围明确留 gap。附件不可取时、引用的 subagent 未能列出或读取时也保留缺口，不按不存在退役旧知识。完整分叉/继承身份、附件原件及全部聊天覆盖仍未完成真实验收；采集回执、语义待核与向量覆盖分别检查，`pending=0` 不等于全部聊天已接受。
 
 ## 最小闭环示例
 
-在已完成 init/brief、凭据已加载且共享模型服务可用的干净试用项目执行 [memory_minimal.py](../examples/memory_minimal.py)。配置 `memory.search_mode` 为 `vector` 或 `hybrid`。它新建四行 UTF-8 的 `memory-example.md`，拒绝覆盖同名文件，并依次 prepare → 生成完整批次 → apply（含编码）→ 按编号和文件名查询 → read/neighbors；每个子命令使用 `subprocess.run(check=True)`，apply 失败后即停止。该脚本用于检查命令闭环，真实材料的理解与批次制作由宿主 agent 按 skill 完成。
+在已完成 init/brief 且共享模型服务可用的干净试用项目执行 [memory_minimal.py](../examples/memory_minimal.py)。配置 `memory.search_mode` 为 `vector` 或 `hybrid`。它新建四行 UTF-8 的 `memory-example.md`，拒绝覆盖同名文件，并依次 prepare → 生成完整批次 → apply（含编码）→ 按编号和文件名查询 → read/neighbors；每个子命令使用 `subprocess.run(check=True)`，apply 失败后即停止。该脚本用于检查命令闭环，真实材料的理解与批次制作由宿主 agent 按 skill 完成。
 
 ```powershell
 $python = '<instructions 中的 absolute-python.exe>'
@@ -64,6 +86,8 @@ if ($LASTEXITCODE -ne 0) { throw "memory example failed ($LASTEXITCODE)" }
 
 随包 [skill](../src/basepack/memory/SKILL.md#minimal-batch) 也保留不依赖仓库文件的完整批次例子。文字成员缺起止行字段会报告批次位置、成员 ID 与字段；不存在的 read 目标会明确报出 ID。修正输入后重新运行，失败批次没有部分写入；保留原错误，不继续下游命令。
 
+`memory guide`、`memory rank --input <scored.json> --budget <字符数>` 和 `memory stop --control <control>` 只处理自身输入，无需项目配置；其余记忆动作仍须显式 `--config`。评分文件或控制文件错误保留原始信息。
+
 ## 启动与检索
 
 ```powershell
@@ -79,7 +103,9 @@ brief 直接提供必须保留的信息、相关线索、来源与覆盖缺口�
 
 编号、文件名和需保留完整字符的短语使用 `--mode hybrid --literal`：在路径、标题和正文中做大小写无关的子串匹配，直接命中排在语义补充结果前，并带 `lexical_rank`。它按完整字符段匹配，区别于分词全文查询；结果仍可包含语义补充，引用前须 read 核实。`vector --literal` 会报错，需显式选择 hybrid。
 
-brief、search 和 read 只读已发布知识及对应原文快照，不扫描原件或等待维护。`changes --scope` 显式发现已登记来源及指定范围中的变化；未改原件只查元数据，深查才做完整 hash。维护 worker 应将配置的 `source_scope` 作为 `changes --scope` 的显式范围，以发现其中的新文件。任务词未命中时，短项目地图仍提供前提线索。
+`search` 的 CLI 与 Python 接口统一返回 `{matches, vector_coverage}`；Python 调用方从 `matches` 读取候选，不再接收裸列表或使用 `include_coverage`。brief 保留知识 pending、`coverage_gaps`、`change_check` 与 `vector_coverage`，删除恒空 `changes/change_count` 和重复 `vector_pending/vector_pending_count`。
+
+brief、search 和 read 只读已发布知识及对应原文快照，不扫描原件或等待维护。`changes --scope` 显式发现已登记来源及指定范围中的变化；未改原件只查元数据，深查才做完整 hash。独立 `maintain` 默认使用配置的 `source_scope` 发现新文件，并接续已有来源及未接受范围。任务词未命中时，短项目地图仍提供前提线索。
 
 向量查询和 brief 的相关通道报告当前已发布范围的 identity、总数、兼容数和待建范围；缺少兼容向量与真实无命中分别可见。升级旧 `search_mode = 'text'` 项目时，先用原客户端按需运行 `memory embed`，再以 `memory search --mode vector --text '<代表主题>'` 核已发布覆盖的 `total = compatible` 且 `pending = 0`；然后将配置改为 `vector` 或 `hybrid` 并升级客户端。若已安装新客户端，仍可先运行 `embed` 和显式 `search --mode vector` 检查覆盖，再切换配置。旧值与 `--mode text` 均不再支持。`memory sources` 列完整来源元数据，供手动深维护抽样；抽到的材料与旧图要实际共读，未发现新关系也如实记录。
 
@@ -102,10 +128,10 @@ memory read '<basis.member>' --source-version '<basis.source_version>' --start-l
 使用原生 export 写文件：
 
 ```powershell
-& $surreal export --endpoint '<endpoint>' --username '<username>' --namespace '<namespace>' --database '<database>' '<backup.surql>'
+& $surreal export --endpoint '<endpoint>' --namespace '<namespace>' --database '<database>' '<backup.surql>'
 if ($LASTEXITCODE -ne 0) { throw "Surreal export failed ($LASTEXITCODE)" }
-& $surreal import --endpoint '<新目录服务的 endpoint>' --username '<username>' --namespace '<namespace>' --database '<database>' '<backup.surql>'
+& $surreal import --endpoint '<新目录服务的 endpoint>' --namespace '<namespace>' --database '<database>' '<backup.surql>'
 if ($LASTEXITCODE -ne 0) { throw "Surreal import failed ($LASTEXITCODE)" }
 ```
 
-原生 CLI 使用 SURREAL_PASS 等环境变量；basepack 使用配置中的 password_env。备份集合包括 export、项目配置、业务原件及 `memory.data_dir` 下的 assets 图片快照（默认 `.basepack/memory/assets/`）；数据库内的摘要、边界、依据、更正和旧文字快照随 export 恢复。新目录保留 project_id，使用自己的数据目录与端口，再核原文定位、图关系和检索。向量可随 export 恢复，也可从保留表示和原图重新 embed，无需重新总结；重编码使用已接受表示与保留的图片快照。运行中的库使用原生 export；复制物理目录须先停写并停止服务。长期备份目的地与保留周期由业务项目确定。
+以下命令用于候选免认证库，无需 username 或密码环境变量。既有认证库的迁移前导出沿原版本配置执行，保留回退凭据，不混用新旧客户端。备份集合包括 export、项目配置、业务原件、受管 Codex 导出、codex-attachments 原件与定位回执及 `memory.data_dir` 下的 assets 图片快照（默认 `.basepack/memory/assets/`）；数据库内的摘要、边界、依据、更正和旧文字快照随 export 恢复。新目录保留 project_id，使用自己的数据目录与端口，再核原文定位、图关系和检索。向量可随 export 恢复，也可从保留表示和原图重新 embed，无需重新总结；重编码使用已接受表示与保留的图片快照。运行中的库使用原生 export；复制物理目录须先停写并停止服务。长期备份目的地与保留周期由业务项目确定。

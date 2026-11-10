@@ -2,10 +2,12 @@
 
 from dataclasses import dataclass
 from importlib import metadata
+from ipaddress import ip_address
 import json
 from pathlib import Path
 import sys
 import tomllib
+from urllib.parse import urlsplit
 
 
 def _read(path: Path, schema_version: int) -> dict:
@@ -31,10 +33,6 @@ class MachineConfig:
     def path_value(self, section: str, key: str) -> Path:
         return (self.path.parent / self.raw[section][key]).resolve()
 
-    @property
-    def state_dir(self) -> Path:
-        return self.path_value("shared", "state_dir")
-
 
 @dataclass(frozen=True)
 class ProjectConfig:
@@ -57,11 +55,6 @@ class ProjectConfig:
     @property
     def memory_dir(self) -> Path:
         return self.data_path("memory", "data_dir")
-
-    @property
-    def memory_password_file(self) -> Path:
-        value = self.raw["memory"].get("password_file")
-        return (self.root / value).resolve() if value is not None else self.memory_dir / "password.txt"
 
     @property
     def memory_search_mode(self) -> str:
@@ -95,6 +88,18 @@ def load_project_config(path: str | Path) -> ProjectConfig:
     python = _absolute(raw["runtime"]["python"], "runtime.python")
     machine_path = _absolute(raw["runtime"]["machine_config"], "runtime.machine_config")
     root = (path.parent / raw["project"]["root"]).resolve()
+    if "memory" in raw:
+        endpoint = urlsplit(raw["memory"]["endpoint"])
+        try:
+            loopback = ip_address(endpoint.hostname or "").is_loopback
+        except ValueError as error:
+            raise ValueError("memory.endpoint must use an explicit loopback IP address") from error
+        if (endpoint.scheme not in ("http", "https") or endpoint.username is not None
+                or endpoint.password is not None or endpoint.path not in ("", "/")
+                or endpoint.query or endpoint.fragment
+                or not loopback):
+            raise ValueError("memory.endpoint must be an HTTP(S) URL with an explicit loopback IP address")
+        endpoint.port  # Validate the optional port at the configuration boundary.
     return ProjectConfig(path, python, root, raw, load_machine_config(machine_path))
 
 
@@ -113,8 +118,6 @@ def installation() -> dict:
 def describe(config: ProjectConfig) -> dict:
     machine = config.machine
     paths = {}
-    if "shared" in machine.raw:
-        paths["state_dir"] = str(machine.state_dir)
     for section, keys in {"embedding": ["model_root"], "htcondor": ["bin_dir", "config_file"]}.items():
         if section in machine.raw:
             paths[section] = {key: str(machine.path_value(section, key)) for key in keys}
@@ -129,7 +132,6 @@ def describe(config: ProjectConfig) -> dict:
     if "memory" in config.raw:
         result["memory"] = config.raw["memory"]
         result["memory_dir"] = str(config.memory_dir)
-        result["memory_password_file"] = str(config.memory_password_file)
     if "jobs" in config.raw:
         result["jobs_dir"] = str(config.jobs_dir)
     if "ai" in config.raw:

@@ -1,7 +1,7 @@
 """Opt-in integration checks against an actual local SurrealDB server.
 
-The namespace/database are disposable. Start a native server, then set
-BASEPACK_MEMORY_TEST_ENDPOINT and BASEPACK_MEMORY_TEST_PASSWORD to run.
+The namespace/database are disposable. Start an unauthenticated loopback server,
+then set BASEPACK_MEMORY_TEST_ENDPOINT to run.
 """
 
 from copy import deepcopy
@@ -39,8 +39,7 @@ def _memory(tmp_path):
     config = ProjectConfig(tmp_path / "project.toml", Path(sys.executable), tmp_path,
                            {"memory": {"data_dir": ".basepack/memory", "search_mode": "vector", "project_id": "product_test",
                                        "endpoint": os.environ["BASEPACK_MEMORY_TEST_ENDPOINT"],
-                                       "namespace": "memsys", "database": "product_tests",
-                                       "username": "root", "password_env": "BASEPACK_MEMORY_TEST_PASSWORD"}},
+                                       "namespace": "memsys", "database": "product_tests"}},
                            MachineConfig(tmp_path / "machine.toml", {}))
     memory = Memory(config)
     memory.install_schema()

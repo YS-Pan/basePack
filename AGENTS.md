@@ -37,5 +37,5 @@
 - Git 保存源码、skills、短文档和小样例；模型、虚拟环境、项目数据库、缓存、密钥及大型运行产物留在仓库外或忽略目录中。
 
 <!-- basepack:start -->
-开始或接续本项目任务时，若本机已有 [.basepack/instructions.md](.basepack/instructions.md)，读取该入口；新检出尚无入口时，按 [README](README.md#安装轻量客户端) 安装并完成 [项目接入](experiments/20261106-basepack/docs/setup-project.md)。本机配置、凭据和记忆通过本项目接入或备份恢复，不随源码分发。
+开始或接续本项目任务时，若本机已有 [.basepack/instructions.md](.basepack/instructions.md)，读取该入口；新检出尚无入口时，按 [README](README.md#install-the-lightweight-client) 安装并完成 [项目接入](experiments/20261106-basepack/docs/setup-project.md)。本机配置、凭据和记忆通过本项目接入或备份恢复，不随源码分发。
 <!-- basepack:end -->

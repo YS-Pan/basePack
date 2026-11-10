@@ -13,7 +13,7 @@ from basepack.project.init import init_project, template
 
 def test_two_projects_and_subdirectory_config(tmp_path, monkeypatch):
     machine = tmp_path / "machine.toml"
-    machine.write_text("schema_version=1\n[shared]\nstate_dir='state/basepack'\n", encoding="utf-8")
+    machine.write_text("schema_version=1\n", encoding="utf-8")
     projects = [tmp_path / "项目 A", tmp_path / "项目 B"]
     configs = [init_project(root, machine, ".basepack/config/deep/basepack.toml") for root in projects]
     monkeypatch.chdir(tmp_path.parent)
@@ -26,7 +26,7 @@ def test_two_projects_and_subdirectory_config(tmp_path, monkeypatch):
     assert loaded[0].raw["memory"]["project_id"] != loaded[1].raw["memory"]["project_id"]
     assert "resources" not in loaded[0].raw
     assert describe(loaded[0])["jobs_dir"] == str(projects[0] / ".basepack/jobs")
-    assert loaded[0].machine.state_dir == tmp_path / "state/basepack"
+    assert describe(loaded[0])["machine_paths"] == {}
     assert ".basepack/instructions.md" in (projects[0] / "AGENTS.md").read_text(encoding="utf-8")
     instructions = (projects[0] / ".basepack/instructions.md").read_text(encoding="utf-8")
     assert ".basepack/config/deep/basepack.toml" in instructions
@@ -220,12 +220,106 @@ def test_init_contains_project_ai_mapping(ai_config):
     assert describe(ai_config)["ai"] == ai_config.raw["ai"]
 
 
-def test_new_project_has_vector_search_and_process_credential_metadata(ai_config):
+def test_new_project_has_vector_search_without_credentials_or_shared_state(ai_config):
     assert ai_config.memory_search_mode == "vector"
     result = describe(ai_config)
     assert result["memory"]["search_mode"] == "vector"
-    assert result["memory"]["password_env"] == "BASEPACK_MEMORY_PASSWORD"
-    assert result["memory_password_file"] == str(ai_config.memory_dir / "password.txt")
+    assert not {"username", "password_env", "password_file"} & result["memory"].keys()
+    assert "memory_password_file" not in result
+    assert "[shared]" not in template("machine.toml")
+    assert "state_dir" not in template("machine.toml")
+    assert result["memory"]["codex"] == {
+        "project_id": "", "other_project_roots": [], "registry_complete": False}
+
+
+def test_init_cli_saves_host_codex_binding_without_changing_basepack_uuid(tmp_path):
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    project = tmp_path / "project"
+    other = tmp_path / "other 用户's 🚀"
+    result = subprocess.run([sys.executable, "-m", "basepack", "init", "--project-root", str(project),
+                             "--machine-config", str(machine), "--codex-project-id", "host-project-id",
+                             "--codex-other-project-root", str(other), "--codex-registry-complete"],
+                            capture_output=True, text=True, encoding="utf-8", timeout=10)
+    assert result.returncode == 0, result.stderr
+    config = load_project_config(json.loads(result.stdout)["project_config"])
+    assert config.raw["memory"]["codex"] == {
+        "project_id": "host-project-id", "other_project_roots": [str(other.resolve())],
+        "registry_complete": True}
+    assert config.raw["memory"]["project_id"] != "host-project-id"
+
+
+@pytest.mark.parametrize("endpoint", ["http://127.0.0.1:18080", "http://127.0.0.2:8000/",
+                                      "http://[::1]:18080", "https://127.0.0.1"])
+def test_memory_endpoint_accepts_explicit_loopback_only(ai_config, endpoint):
+    ai_config.path.write_text(ai_config.path.read_text(encoding="utf-8").replace(
+        "http://127.0.0.1:18080", endpoint), encoding="utf-8")
+    assert load_project_config(ai_config.path).raw["memory"]["endpoint"] == endpoint
+
+
+@pytest.mark.parametrize("endpoint", ["http://0.0.0.0:18080", "http://192.168.1.2:18080",
+                                      "http://[::]:18080", "http://[2001:db8::1]:18080",
+                                      "http://localhost:18080", "http://example.com",
+                                      "http://127.0.0.1.example.com", "http://127.0.0.1@192.168.1.2",
+                                      "http://root:secret@127.0.0.1", "file://127.0.0.1",
+                                      "http://127.0.0.1/sql", "http://127.0.0.1?target=remote",
+                                      "http://127.0.0.1#fragment"])
+def test_memory_endpoint_rejects_remote_aliases_and_credentials(ai_config, endpoint):
+    ai_config.path.write_text(ai_config.path.read_text(encoding="utf-8").replace(
+        "http://127.0.0.1:18080", endpoint), encoding="utf-8")
+    with pytest.raises(ValueError, match="loopback"):
+        load_project_config(ai_config.path)
+
+
+@pytest.mark.parametrize("configured", [False, True])
+@pytest.mark.parametrize("action", ["guide", "rank", "stop"])
+def test_memory_tools_run_without_loading_project_configuration(tmp_path, configured, action):
+    command = [sys.executable, "-m", "basepack"]
+    if configured:
+        invalid_config = tmp_path / "broken.toml"
+        invalid_config.write_text("invalid = [", encoding="utf-8")
+        command += ["--config", str(invalid_config)]
+    command += ["memory", action]
+    control = tmp_path / "control"
+    if action == "rank":
+        scored = tmp_path / "scored.json"
+        scored.write_text(json.dumps([{"id": "evidence", "text": "actual body", "score": 90,
+                                       "kind": "chunk", "path": "source.md", "revision": "v1",
+                                       "start_line": 1, "end_line": 1}]), encoding="utf-8")
+        command += ["--input", str(scored)]
+    elif action == "stop":
+        command += ["--control", str(control)]
+    result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", timeout=10)
+    assert result.returncode == 0, result.stderr
+    data = json.loads(result.stdout)
+    if action == "guide":
+        assert Path(data["skill"]).is_file()
+    elif action == "rank":
+        assert data["items"][0]["text"] == "actual body"
+    else:
+        assert data == {"stopped": True}
+        assert control.read_bytes() == b"S"
+
+
+@pytest.mark.parametrize("action, option", [("rank", "--input"), ("stop", "--control")])
+def test_memory_tools_preserve_bad_input_errors_without_config(tmp_path, action, option):
+    bad = tmp_path / "bad-input"
+    if action == "rank":
+        bad.write_text("not json", encoding="utf-8")
+    else:
+        bad.mkdir()
+    result = subprocess.run([sys.executable, "-m", "basepack", "memory", action, option, str(bad)],
+                            capture_output=True, text=True, encoding="utf-8", timeout=10)
+    assert result.returncode != 0
+    assert ("JSONDecodeError" if action == "rank" else "PermissionError") in result.stderr
+    assert "--config is required" not in result.stderr
+
+
+def test_project_memory_actions_still_require_explicit_config():
+    result = subprocess.run([sys.executable, "-m", "basepack", "memory", "brief"],
+                            capture_output=True, text=True, encoding="utf-8", timeout=10)
+    assert result.returncode == 2
+    assert "--config is required" in result.stderr
 
 
 def test_doctor_defaults_to_core_without_optional_facilities(ai_config):

@@ -1,6 +1,6 @@
 # 项目记忆实现
 
-0.7.1 源码实现 SurrealDB 上的多层文字、原图向量与语义关系，首建和维护由宿主订阅 reader 同读完成。正式 wheel 与完整行为验收状态见 [专项进度](../../tasks/20261106-memory-system/progress.md)，P0 原生接入证据见 [结果](../../tasks/20261106-memory-system/p0-result.md)，用户流程见 [记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
+0.8.0 源码实现 SurrealDB 上的多层文字、原图向量与语义关系，首建和维护由宿主订阅 reader 同读完成。正式 wheel 与完整行为验收状态见 [专项进度](../../tasks/20261106-memory-system/progress.md)，P0 原生接入证据见 [结果](../../tasks/20261106-memory-system/p0-result.md)，用户流程见 [记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
 
 ## 职责与数据
 
@@ -18,7 +18,7 @@ prepare 时包括本批所用依据与关系两端的材料，取得同读的新
 
 退役成员不再触发当前原文失效、不作为父级传播桥，也不被未变兄弟重绑定改写历史版本；活跃但待核的表示仍参与真实依赖传播，显式复活继续核 expected。修复来源与当时的原生回归见[记录](../../change_log/minor/20261110_145550_fix-retired-memory-invalidation.md)，当前安装状态沿专项进度核实。
 
-hybrid 的文字通道使用原生标题/正文全文，literal 对 path/title/text 做大小写无关的包含匹配，并使直接命中排在语义补充前；返回的 lexical_rank 标识直接命中。literal 只用于 hybrid，vector 下明确报错。read 以 member ID 和可选的依据版本、位置回读保留的原文或原图快照；核语义关系时必须沿 basis 的 source_version 与文字范围或图片 locator 回读 original，stable ID 的当前 member 不能替换已保存的旧依据。快照缺失或损坏直接失败。neighbors 默认过滤 stale 的父子/语义展开，历史复核显式 include_stale。
+vector/hybrid 的 Python 与 CLI 检索统一返回 `matches` 和 `vector_coverage`；hybrid 的文字通道使用原生标题/正文全文，literal 对 path/title/text 做大小写无关的包含匹配，并使直接命中排在语义补充前；返回的 lexical_rank 标识直接命中。literal 只用于 hybrid，vector 下明确报错。read 以 member ID 和可选的依据版本、位置回读保留的原文或原图快照；核语义关系时必须沿 basis 的 source_version 与文字范围或图片 locator 回读 original，stable ID 的当前 member 不能替换已保存的旧依据。快照缺失或损坏直接失败。neighbors 默认过滤 stale 的父子/语义展开，历史复核显式 include_stale。
 
 记录 ID 的单一转换入口统一原始字符串 key 与底座返回的规范 ID，保留数字 key 的类型及字符串转义；同一身份同时用于 SQL 与 Python 的 expected/依据集合比较。有限解码只覆盖现行字符串/整数合同，底座仍通过原生 type::record 构造记录。缺少文字成员起止行时，apply 在写入前报出成员、批次位置及字段；不存在的 read 目标明确报错。输入方式与最小批次见用户流程及随包 skill。
 
@@ -26,8 +26,12 @@ brief、search 和 read 只读取已发布状态及其依据版本，不扫描�
 
 向量绑定实际输入版本及 embedding_identity；仅支持 vector/hybrid，默认 vector。search 和 brief 的相关通道报告已发布范围内相同 identity 的兼容与待建数量；缺少兼容向量时明确报错，真实空范围与空命中保持可辨。旧 text 配置须先改为 vector 或 hybrid，再 embed 补建索引；CPU/CUDA 的相同语义 identity 共用向量。apply 先准备候选向量，并在同一短事务发布内容和匹配向量；模型失败保留原错误并停止本批，不发布无匹配向量的内容。输入版本与 identity 未变化的向量可复用。
 
-宿主提供开始/完成事件与可取消子任务时，可独立启动低优先级小批维护。`apply --control` 和 `stop --control` 使用任务独有控制文件同步仲裁：停止先到则不提交，已获得提交资格的事务完成或回滚；停止失败保留错误且仍取消 worker。控制不终止共享服务或已开始的共享推理，迟到结果不被采用。缺少宿主能力时不可宣称自动生命周期已启用。
+`memory maintain` 先以配置的声明范围及已有来源进行深比较，处理可证明的机械等价并写入项目 memory 目录下的完整回执；余下语义候选按来源归并，供宿主订阅 worker 接续。历史 stale 不能仅因最后一次事件为 detected_change 就恢复。宿主提供开始/完成事件与可取消子任务时，可异步启动预检和低优先级小批维护，业务不等待。`apply --control` 和 `stop --control` 使用任务独有控制文件同步仲裁：停止先到则不提交，已获得提交资格的事务完成或回滚；停止失败保留错误且仍取消 worker。控制不终止共享服务或已开始的共享推理，迟到结果不被采用。缺少宿主能力时不可宣称自动生命周期已启用。
 
 [selection.py](../../../experiments/20261106-basepack/src/basepack/memory/selection.py) 按真实 worker 分数排序，去重复身份/原文覆盖，按文字预算交付完整内容与省略入口；词法距离不冒充 agent 分数。已安装 [skill](../../../experiments/20261106-basepack/src/basepack/memory/SKILL.md) 驱动一次检索委托，宿主按 `config ai --purpose retrieval` 的结果派工（默认 tier1），没有模型 API 或后台 agent。
 
-memory init 安装原生 schema 并绑定项目 UUID，同时在项目 instructions 加入 brief 与已安装 skill 入口；普通 init 不建库。新进程按生成入口从当前配置取得 password_env 和实际密码文件，再加载进程环境；memory.password_file 可选，省略时采用当前 memory_dir/password.txt 的公开约定。入口同时定位本项目 launcher、cwd 和日志；凭据内容不写入生成文本。数据库进程必须按项目独立物理目录启动，多聊天共用该进程。绑定核查防止误连另一项目；数据路径的实际归属仍须部署命令正确配置。
+memory init 安装原生 schema 并绑定项目 UUID，同时在项目 instructions 加入 brief 与已安装 skill 入口；普通 init 不建库。新进程按生成入口直接使用显式配置读取 brief；本地数据库不使用密码，配置只接受回环 endpoint。入口同时定位本项目 launcher、cwd 和日志。数据库进程必须按项目独立物理目录启动，多聊天共用该进程。绑定核查防止误连另一项目；数据路径的实际归属仍须部署命令正确配置。
+
+## Codex 来源边界
+
+`maintain` 可读取宿主提供的项目 ID 和完整注册项目根目录清单，或使用配置的绑定；缺少绑定时报告不可用并继续文件维护。采集通过 Codex App Server 受支持的线程与消息分页，显式项目 ID 优先；缺失 ID 时以项目根目录及 Git worktree/common-dir 判断归属，其他注册根冲突或无法取得 cwd 留待核。采集的受管 UTF-8 文件进入同一维护路径，采集不等于语义接受；历史来源、附件、继承身份与精确回源仍按实际能力和验收结果报告。查询不触发采集。

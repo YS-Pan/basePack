@@ -50,12 +50,12 @@ def test_real_shared_multilevel_vectors_image_and_identity(real_memory, tmp_path
     memory.config = replace(memory.config, machine=load_machine_config(os.environ["BASEPACK_MEMORY_TEST_MACHINE"]))
     batch = batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n")
     memory.apply(batch)
-    assert memory.vector_search("数据库", scope="missing/") == []
+    assert memory.vector_search("数据库", scope="missing/")["matches"] == []
     encoded = memory.embed_members()
     assert set(encoded["reused"]) == {"member:guide", "member:storage_section", "member:storage", "member:retention"}
     assert encoded["embedded"] == []
-    assert memory.hybrid_search("数据库")
-    hits = memory.vector_search("How does the local database separate projects?", limit=4)
+    assert memory.hybrid_search("数据库")["matches"]
+    hits = memory.vector_search("How does the local database separate projects?", limit=4)["matches"]
     assert {row["kind"] for row in hits} == {"file", "section", "chunk"}
     assert all(row["embedded_revision"] == row["input_revision"] for row in hits)
     assert all("embedding" not in row for row in hits)
@@ -72,10 +72,10 @@ def test_real_shared_multilevel_vectors_image_and_identity(real_memory, tmp_path
     changed["members"] = changed["members"][:1]
     changed["members"][0]["text"] = "项目数据库必须支持离线隔离，资料必须保留。"
     memory.apply(changed)
-    assert "member:guide" in {row["id"] for row in memory.vector_search("数据库", limit=10)}
+    assert "member:guide" in {row["id"] for row in memory.vector_search("数据库", limit=10)["matches"]}
     assert memory.embed_members(["guide"])["reused"] == ["member:guide"]
     memory._execute("UPDATE member:storage SET embedding_identity='another-model-same-dimensions';")
-    assert "member:storage" not in {row["id"] for row in memory.vector_search("数据库", limit=10)}
+    assert "member:storage" not in {row["id"] for row in memory.vector_search("数据库", limit=10)["matches"]}
     memory.embed_members(["storage"])
     image_path = tmp_path / "shapes.png"
     visual_fixture(image_path)
@@ -89,7 +89,7 @@ def test_real_shared_multilevel_vectors_image_and_identity(real_memory, tmp_path
     memory.apply(image_batch)
     image_encoded = memory.embed_members(["shapes"])
     assert image_encoded["reused"] == ["member:shapes"]
-    visual_hits = memory.vector_search("A red triangle beside a blue square on white background", limit=5)
+    visual_hits = memory.vector_search("A red triangle beside a blue square on white background", limit=5)["matches"]
     assert visual_hits[0]["id"] == "member:shapes"
     assert visual_hits[0]["embedding_kind"] == "image"
     original = memory.read("shapes")["original"]
@@ -99,7 +99,7 @@ def test_real_shared_multilevel_vectors_image_and_identity(real_memory, tmp_path
     image_batch["expected"] = memory.prepare(["shapes.png"])["expected"]
     memory.apply(image_batch)
     assert memory.embed_members(["shapes"])["reused"] == ["member:shapes"]
-    hybrid = memory.hybrid_search("资料", limit=5)
+    hybrid = memory.hybrid_search("资料", limit=5)["matches"]
     assert all("rrf_score" in row and "embedding" not in row for row in hybrid)
     assert "member:retention" in {row["id"] for row in hybrid}
 
@@ -121,10 +121,9 @@ def test_real_native_restore_and_rebuild_from_retained_text_and_pixels(real_memo
                              "kind": "illustrates", "text": "测试图与项目决定在同库共存", "evidence": ["shapes"]}]})
     memory.embed_members()
     before = {table: memory._execute(f"SELECT * FROM {table} ORDER BY id;")[0]
-              for table in ["member", "node", "semantic", "source", "source_version", "change"]}
+              for table in ["meta", "member", "node", "semantic", "source", "source_version", "change"]}
     export = tmp_path.parent / (tmp_path.name + "_backup.surql")
-    arguments = ["--endpoint", memory.connection["endpoint"], "--username", memory.connection["username"],
-                 "--password", os.environ[memory.connection["password_env"]], "--namespace", "memsys"]
+    arguments = ["--endpoint", memory.connection["endpoint"], "--namespace", memory.connection["namespace"]]
     executable = os.environ["BASEPACK_MEMORY_TEST_SURREAL"]
     subprocess.run([executable, "export", *arguments, "--database", "product_tests", str(export)],
                    check=True, capture_output=True, text=True)
@@ -146,12 +145,12 @@ def test_real_native_restore_and_rebuild_from_retained_text_and_pixels(real_memo
     with pytest.raises(ValueError, match="No compatible memory vectors"):
         restored.vector_search("数据库")
     assert len(restored.embed_members()["embedded"]) == 5
-    assert restored.vector_search("A red triangle next to a blue square", limit=1)[0]["id"] == "member:shapes"
+    assert restored.vector_search("A red triangle next to a blue square", limit=1)["matches"][0]["id"] == "member:shapes"
     assert len(restored.neighbors("shapes")["edges"]) == 1
     retired = restored.prepare(["shapes.png"])
     restored.apply({"sources": [], "expected": retired["expected"], "delete_members": ["shapes"]})
     assert restored.embed_members([])["pending"] == []
-    assert "member:shapes" not in {row["id"] for row in restored.vector_search("red triangle", limit=10)}
+    assert "member:shapes" not in {row["id"] for row in restored.vector_search("red triangle", limit=10)["matches"]}
 
 
 def test_real_file_and_section_token_overflow_preserves_previous_publication(real_memory, tmp_path):

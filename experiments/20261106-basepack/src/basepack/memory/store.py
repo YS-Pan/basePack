@@ -1,11 +1,9 @@
 """Project memory actions over native SurrealDB records and transactions."""
 
-from base64 import b64encode
 from dataclasses import asdict, dataclass
 from difflib import SequenceMatcher
 from hashlib import sha256
 import json
-import os
 from pathlib import Path
 import re
 from urllib.error import HTTPError
@@ -83,13 +81,11 @@ class Memory:
 
     def _execute(self, sql: str, *, check_project: bool = True) -> list:
         connection = self.connection
-        credential = f"{connection['username']}:{os.environ[connection['password_env']]}"
         if check_project:
             sql = (f"IF meta:project.project_id != {_sql(connection['project_id'])} "
                    "{ THROW 'Memory database belongs to another project or is not initialized'; };\n" + sql)
         body = sql.encode("utf-8")
         request = Request(connection["endpoint"].rstrip("/") + "/sql", body, {
-            "Authorization": "Basic " + b64encode(credential.encode()).decode(),
             "surreal-ns": connection["namespace"], "surreal-db": connection["database"],
             "Accept": "application/json", "Content-Type": "text/plain; charset=utf-8",
         })
@@ -545,9 +541,13 @@ class Memory:
         if sha256(text.encode("utf-8")).hexdigest() != revision:
             raise ValueError(f"Text snapshot revision mismatch for {member_id}")
         content = SourceContent(path, revision, len(text.encode("utf-8")), 0, text)
-        return {"member": member, "original": {"member_id": member["id"], "path": path,
-                "revision": revision, "source_version": version, "start_line": start_line,
-                "end_line": end_line, "text": _original(content, start_line, end_line)}}
+        original = {"member_id": member["id"], "path": path, "revision": revision,
+                    "source_version": version, "start_line": start_line, "end_line": end_line,
+                    "text": _original(content, start_line, end_line)}
+        if (self.config.root / path).resolve().parent == (self.config.memory_dir / "codex").resolve():
+            from .codex_locator import message_locations
+            original["chat_locations"] = message_locations(text, start_line, end_line)
+        return {"member": member, "original": original}
 
     def neighbors(self, record_id: str, *, include_stale: bool = False) -> dict:
         record = _sql(_record(record_id))
@@ -570,11 +570,10 @@ class Memory:
             "SELECT id,kind FROM semantic WHERE stale=true AND retired!=true; "
             "SELECT id,path,coverage_gaps AS gaps FROM member WHERE retired!=true AND array::len(coverage_gaps)>0; "
             f"SELECT * OMIT embedding FROM member WHERE stale=false AND retired!=true AND mandatory=false AND kind IN ['file','section','image'] ORDER BY kind,path LIMIT {int(limit)};")
-        coverage = None
         related = []
         if task and limit:
             search = self.vector_search if mode == "vector" else self.hybrid_search
-            result = search(task, limit=limit, include_coverage=True)
+            result = search(task, limit=limit)
             related, coverage = result["matches"], result["vector_coverage"]
         else:
             from basepack.embedding.admin import status
@@ -593,17 +592,21 @@ class Memory:
         def startup_item(row):
             return {key: value for key, value in row.items() if key in fields}
         detail_limit = max(20, limit)
+        codex = self.connection.get("codex", {})
+        project_id = codex.get("project_id")
+        codex_collection = {"project_id": project_id,
+                            "status": ("not_checked" if project_id and codex.get("registry_complete") else
+                                       "registry_incomplete" if project_id else "unavailable"),
+                            "note": "Brief does not collect chats. Discovery and collection do not mean semantic acceptance or vector coverage."}
         return {"mandatory": [startup_item(row) for row in mandatory],
                 "mandatory_pending_count": sum(row["stale"] for row in mandatory),
                 "clues": [startup_item(row) for row in clues[:limit]],
                 "pending": stale[:detail_limit], "pending_count": len(stale),
-                "changes": [], "change_count": 0,
                 "sources": [{key: row[key] for key in ("id", "path", "kind", "deleted")} for row in sources[:detail_limit]],
                 "source_count": len(sources),
                 "coverage_gaps": gaps[:detail_limit], "coverage_gaps_count": len(gaps),
                 "vector_coverage": coverage,
-                "vector_pending": coverage["pending_members"][:detail_limit] if coverage else [],
-                "vector_pending_count": coverage["pending"] if coverage else None,
+                "codex_collection": codex_collection,
                 "discovery_scope": self.connection.get("source_scope", []),
                 "change_check": "not checked by brief; use memory changes for maintenance"}
 
@@ -614,6 +617,11 @@ class Memory:
     def changes(self, scope: list[str], *, deep: bool = False) -> list[dict]:
         return self._check_changes(self.sources(), scope, deep=deep)
 
+    def maintain(self, scope: list[str], *, control: str | None = None, timeout: float = 600) -> dict:
+        """Run deterministic maintenance and retain the semantic handoff."""
+        from .maintenance import maintain
+        return maintain(self, scope, control=control, timeout=timeout)
+
     def _check_changes(self, known: list[dict], scope: list[str], *, deep: bool) -> list[dict]:
         changes = detect_changes(self.config.root, [source for source in known if not source.get("deleted")], scope, deep=deep)
         return [asdict(change) for change in changes]
@@ -622,13 +630,11 @@ class Memory:
         from .vectors import embed_members
         return embed_members(self, ids, timeout=timeout)
 
-    def vector_search(self, text: str, *, scope: str = "", limit: int = 12, timeout: float = 600,
-                      include_coverage: bool = False):
+    def vector_search(self, text: str, *, scope: str = "", limit: int = 12, timeout: float = 600):
         from .vectors import vector_search
-        return vector_search(self, text, scope=scope, limit=limit, timeout=timeout, include_coverage=include_coverage)
+        return vector_search(self, text, scope=scope, limit=limit, timeout=timeout)
 
     def hybrid_search(self, text: str, *, scope: str = "", limit: int = 12, timeout: float = 600,
-                      literal: bool = False, include_coverage: bool = False):
+                      literal: bool = False):
         from .vectors import hybrid_search
-        return hybrid_search(self, text, scope=scope, limit=limit, timeout=timeout, literal=literal,
-                             include_coverage=include_coverage)
+        return hybrid_search(self, text, scope=scope, limit=limit, timeout=timeout, literal=literal)
