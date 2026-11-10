@@ -8,6 +8,14 @@
 
 选留证据现统一位于根 `artifacts/runs/`。前次临时材料整理的映射为 `artifacts/runs/tmp-reorganization-20261108/moves.json`，本次位置映射为 `artifacts/runs/20261109-project-layout/moves.json`；原始回执及下文历史路径保留当时含义，结合两轮映射回查长期副本，tmp 内容按可清除处理。
 
+## 2026-11-10 0.6.2 GPU 作业与共享 embedding 并存复核
+
+正常用户上下文使用稳定 0.6.2 客户端提交 GPU 作业 `14350.0`，申请 1 CPU、2048 MiB RAM、1 个同卡 GPU 名额及 2048 MiB 显存。应用复用系统 Python 的 torch 2.10.0+cu128，以 `condor-slot1_1` 在 CUDA 上执行 256×256 全一矩阵乘法；30 轮计算后的全矩阵最大误差为 0，元素和为 16777216，结果文件回传，退出码 0。
+
+startd 直接查询和队列/事件原证一致：运行时普通池剩 11 CPU/22528 MiB RAM/3 个 GPU 名额/5116 MiB 显存，动态 slot 分得申请的全部配额；结束后恢复 12/24576/4/7164，动态 slot 为 0，已知 worker/应用进程消失且 scratch 删除。作业前、中、后 embedding 分别处理 1/4/1 条文本，均返回有限、近单位范数的 2048 维向量，worker PID 2948 和语义身份不变。中间请求完整处于 GPU 作业运行区间，包含 7 个同步 CUDA matmul 区间；未观测服务内部 forward，不据此声称物理 kernel 同时执行或吞吐提升。本次不验最大负载、显存硬隔离、取消或超时。
+
+首轮 `14349.0` 因验收脚本误把 Condor 短 UUID 与 CUDA 完整 UUID 作全等比较而提前结束，确认该作业回收后才提交成功轮；设备通过 UUID 前缀、原生事件完整 DeviceUuid 与 nvidia-smi 全 UUID 交叉核对。未改机器/Condor 配置或重启共享服务，相关配置 hash 前后一致。成功原证为 `artifacts/runs/20261110-condor-gpu-embedding-verified/verification.json`，首轮失败与回收记录为 `artifacts/runs/20261110-condor-gpu-embedding/first-attempt.json`。WDDM 的进程列表未枚举这些跨账户 CUDA 进程，不用它单独证明回收；回收结论来自已知 PID、原生终态、scratch 和直接 slot 查询。
+
 ## 2026-11-10 0.6.2 正常用户 CPU 作业复核
 
 受限进程的 `condor_q` 出现 NTSSPI 握手失败；相同配置在正常用户上下文通过队列查询、WRITE 认证及 Condor doctor。随后从源码外工作目录，以稳定 0.6.2 客户端实际提交作业 `14348.0`，申请 1 CPU、512 MiB RAM、64 MiB scratch，不申请 GPU。输入脚本传入 Condor scratch，实际账户为 `condor-slot1_1`；平方和结果 `333328333350000` 经 `result.json` 回传，stdout、事件日志及原生 history 一致，退出码 0。
