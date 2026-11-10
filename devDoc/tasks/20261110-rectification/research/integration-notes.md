@@ -39,8 +39,10 @@
 
 专项入口存在偏差：随包 `src/basepack/memory/SKILL.md:105` 的广维护仍指向日常默认tier3。计划只修该分发指令和实际派工优先级，不重写通用agent-team的日常默认，也不改项目纲领。
 
-## CPU与排序的一致性设计
+## CPU互用与用户最新数值取舍
 
 当前编码器和服务均强制CUDA（`embedding/qwen3_vl.py:37`、`embedding/service.py:32`）；identity包含FP16/pooling等语义（`embedding/identity.py:9`）。新项目默认text，brief的related直接走文字search（`memory/store.py:517`）；vector查询只要求存在一条兼容向量且仅按distance截K（`memory/vectors.py:71`）。CPU、新默认入口、完整性状态和稳定排序需一起整改。
 
-[PyTorch复现说明](https://docs.pytorch.org/docs/2.15/notes/randomness.html)指出CPU/GPU执行即使相同随机种子仍可能不同。由此推断：同模型/维度/精度、相似度取整或同分按ID，均不足以保证任意近同分及K边界完全同序。计划保留用户的四组合一致目标，把数值规范、跨设备identity和必要规范计算作为开发期设计；先用小样找到可达方案及成本，再做该能力验收。不能凭少量平均误差就合并identity，也不能把设备选择或text回退隐藏起来。
+[PyTorch数值说明](https://docs.pytorch.org/docs/2.15/notes/numerical_accuracy.html)解释了运算顺序与设备实现导致的浮点差异。按[浮点格式](https://docs.nvidia.com/deeplearning/tensorrt/latest/inference-library/accuracy-considerations.html)推算，接近1时FP32相邻数间距约`1.19e-7`，FP16约`9.77e-4`；这是数值格式尺度，不是整个Qwen模型或余弦相似度误差上限，本项目未取得跨设备模型误差实测。
+
+用户随后明确，同模型、同精度下预期不大的误差按没有差别处理。工程判断是：正常稳定推理的细小舍入差异通常无需作为产品区别，几乎同分候选的排序变化可接受。因此最新计划覆盖原反馈的严格同序要求，保留模型/前处理/精度等语义合同和跨设备索引复用；删除规范重算、分桶和近同分/K边界四组合矩阵。开发只用少量实际资料验证跨设备互查、语义依据、正确引用和基本数值；遇到明显退化再修真实问题，不为正常浮点误差扩大工程。
