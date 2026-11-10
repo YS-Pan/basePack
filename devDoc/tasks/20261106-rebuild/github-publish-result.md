@@ -59,4 +59,4 @@ Release 仅上传上述 58,361 字节 wheel 和 99 字节 `SHA256SUMS.txt`，为
 
 0.6.4 为许可与元数据补丁，保留已发布 0.6.3 的标签与附件。构建声明采用 SPDX MIT 与三条 License-File，并将 setuptools 下限设为 77.0.3。0.6.4 wheel 为 64,272 字节，SHA256 为 `ef522d809518548ac51e4dcf604a3b72c2f718a870fc7ce052161b1fb50121ef`，发布到 [v0.6.4 开发版](https://github.com/YS-Pan/basePack/releases/tag/v0.6.4)。
 
-定向检查确认根、工程、wheel 和普通安装中的 MIT 全文一致；两份 Qwen 声明在包资源和 dist-info/licenses 中均存在且与 0.6.3 原字节一致。33 个运行包文件与 0.6.3 完全相同，纯净客户端普通安装、pip check、模块 CLI 与 console entry 通过；本次没有重跑此前 201 项功能矩阵或启停数据库/共享服务。当前为已构建并验收、待发布状态。
+定向检查确认根、工程、wheel 和普通安装中的 MIT 全文一致；两份 Qwen 声明在包资源和 dist-info/licenses 中均存在且与 0.6.3 原字节一致。33 个运行包文件与 0.6.3 完全相同，纯净客户端普通安装、pip check、模块 CLI 与 console entry 通过；本次没有重跑此前 201 项功能矩阵或启停数据库/共享服务。已于北京时间 2026-11-10 14:19 发布，tag 指向 `0566e76`；GitHub 已识别仓库许可证为 MIT。wheel 与 99 字节校验和重新下载后均与本机已验收附件一致；原证选留于本机 `artifacts/runs/20261110-github-publish/license-064/`，项目记忆仍未上传。
