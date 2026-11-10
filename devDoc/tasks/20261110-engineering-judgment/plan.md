@@ -95,3 +95,5 @@ flowchart TB
 - [avoid-overdefensive-programming](https://github.com/aravelo7/codex-agent-skills/blob/main/skills/avoid-overdefensive-programming/SKILL.md)：借鉴失败可见和职责判断；不引入其逐项报告要求。
 
 上述原文已在前序调研中读取；尚未证明这些原则组成的新技能能改善本项目任务，实际效果由阶段 2 验证。
+
+2026 年 11 月 10 日补充的[现成方案与有效性复核](research/feasibility.md)记录官方工作流示例、现成反馈技能和正反实证。当前建议先检验相对已有项目规则的新增收益；技能尚未实施，主方案未因调研自动变更。
