@@ -31,6 +31,7 @@
 
 ## 阻碍与待核
 
+- array reconstruct 的 0.6.2 迁移只复制了两项 skill 原件，缺少 `.agents/skills` 发现入口；当前 init/core doctor 同样不覆盖技能安装与发现验收。已完成版本、时间与隔离复现调查，修复待实施，见[调查记录及 Issue 草稿](research/array-skill-discovery.md)。
 - 文件结构建议已有独立 skill；真实大项目迁移、未来布局及记忆读取效果继续按实际任务验证，记忆自用验收见 [独立任务](../20261106-memory-system/plan.md#devdoc-自用与读取轮数)。
 - 分层协作已有指令层初版，[P7](plan.md#p7-分层-agent-组织) 仍需真实广读任务的能力与成果质量对照。主上下文、团队总用量和耗时单独记录，允许增加用量换取质量提升。
 
