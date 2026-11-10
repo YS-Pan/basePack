@@ -28,6 +28,8 @@ $python = (Resolve-Path '.venv/Scripts/python.exe').Path
 
 Python 包在 `experiments/20261106-basepack`，从仓库根安装时需指定该目录。以上只安装轻量客户端；使用文字记忆、通用 skills 时无需安装模型依赖。这个虚拟环境随当前 clone 保存，移动或删除它后应在新位置重建客户端并更新项目入口。
 
+也可从 [0.6.3 开发版](https://github.com/YS-Pan/basePack/releases/tag/v0.6.3) 下载普通 wheel 和 `SHA256SUMS.txt`，在选定客户端环境安装。已有项目先按 [升级步骤](experiments/20261106-basepack/docs/setup-project.md#版本升级) 备份并补齐配置。
+
 ## 先试文字记忆
 
 1. 按 [项目接入](experiments/20261106-basepack/docs/setup-project.md) 创建最小机器配置，为自己的项目运行 `init`。新项目的 `memory.search_mode = 'text'`，`doctor` 默认只检查 core。
