@@ -19,12 +19,12 @@ Choose solo work, a few directly managed collaborators, clear coordinator-worker
 
 Revise the choice when new scope, evidence, dependencies, or actual workload changes its basis. When uncertainty prevents a useful whole-task judgment, use bounded exploration to clarify the work before choosing its continuing organization. Run ready, independent work in parallel; sequence dependent work and leave spare capacity when useful.
 
-- Match available models and reasoning effort to difficulty. Lower-cost models may handle broad reading and extraction; use sufficient capability for complex execution, synthesis, and decisions. Honor user preferences and select concrete models through host parameters or role configuration.
-- Use the tools' actual delegation, nesting, context, and model controls. Report missing required capabilities and preserve original tool errors. Distinguish a prepared brief from a task that actually ran.
+- When the project defines a tier mapping, choose among `tier1` through `tier4`. Routine work starts with its configured default (`tier3` by default); adjust the tier to difficulty and honor user preferences. Read the mapping before dispatch. In a basePack project, use the Python and explicit config from `.basepack/instructions.md`: `python -m basepack --config <project-config> config ai` resolves the routine default; `config ai --tier tier2` resolves an explicit choice. Pass the returned `model` and `reasoning_effort` explicitly through host parameters.
+- In projects without a tier mapping, select from the host's actual capabilities and user preferences; basePack is optional. Use actual delegation, nesting, context, and model controls. If a required mapping or capability is unavailable, report it and preserve original tool errors; model substitution or tier changes must be explicit. Distinguish a prepared brief from a task that actually ran.
 
 ## Delegate a complete brief
 
-Start a new topic with a self-contained brief and explicitly select clean history (`fork_turns="none"` where supported). Include task-relevant binding constraints in the brief itself. Inherit history when the task needs it; reuse the same worker for related follow-up.
+Start a new topic with a self-contained brief and explicitly select clean history (`fork_turns="none"` where supported). Include task-relevant context and binding constraints in the brief itself; reuse the same worker for related follow-up.
 
 ```text
 Goal and use: required result, completion criteria, and the decision or stage it feeds.

@@ -79,7 +79,7 @@ read 只接受 member ID；语义 node/edge 经 neighbors 查看依据，再读�
 
 任务已知少量文件时，启动 brief 后可以直接批量读取；需要发现位置、未点名前提或跨材料依据时，再用记忆检索。父级摘要用于补背景或条件，选证据时避免重复已选原文块。
 
-工作 agent 可只委托一次，让 worker 完成检索、父子/语义展开、原文核实和评分，再用 `rank --input <scored.json> --budget <文字字符数>` 排序交付实际内容。词法分数与 agent 分数不同。超预算证据保留补读入口，不静默截掉条件；工作 agent 仍可自由补读。
+工作 agent 可只委托一次，使用 [项目配置](setup-project.md#agent-模型等级) 的检索等级（默认 tier1），让 worker 完成多轮检索、父子/语义展开、原文核实和评分，再用 `rank --input <scored.json> --budget <文字字符数>` 排序交付实际内容。词法分数与 agent 分数不同。超预算证据保留补读入口，不静默截掉条件；工作 agent 仍可自由补读。
 
 ## 备份与恢复
 

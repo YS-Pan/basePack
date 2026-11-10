@@ -1,10 +1,10 @@
 # 系统实现概览
 
-当前唯一 active 路线是 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.6.1。代码、依赖锁、测试、产品文档、示例及随包 skill 位于实验工程；根 devDoc 维护现行实现与活动工作。资源部署基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)，记忆功能与正式安装的实际完成边界见 [专项进度](../tasks/20261106-memory-system/progress.md)。
+当前唯一 active 路线是 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.6.2。代码、依赖锁、测试、产品文档、示例及随包 skill 位于实验工程；根 devDoc 维护现行实现与活动工作。资源部署基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)，记忆功能与正式安装的实际完成边界见 [专项进度](../tasks/20261106-memory-system/progress.md)。
 
 本仓库提供两项可独立使用的 skill：[file-structure](../../skills/file-structure/SKILL.md) 推荐或整理开发文档和实验工程布局；[agent-team](../../skills/agent-team/SKILL.md) 为每项任务选择组织，按完整交付过程判断独立完成、简单协作或清晰分层，并使用宿主已有的订阅 subagent 能力。组织选择与协作已有指令层实现，复杂广读的质量与总成本对照仍见 [专项记录](../tasks/20261106-rebuild/research/agent-team.md)。
 
-`basepack` 的公共入口包括项目 `init`、`config show`、`doctor`，项目 `memory`，共享图文 `embed` 及普通重任务 `jobs`。项目接入源码和模板统一在 [project/](../../experiments/20261106-basepack/src/basepack/project)，[config.py](../../experiments/20261106-basepack/src/basepack/project/config.py) 唯一解析配置。项目使用 schema 2 的 `.basepack/config.toml` 和 `.basepack/instructions.md`，根 AGENTS 只保留短指针；机器格式保持 schema 1。当前客户端兼容原 schema 2 与 0.5.0 embedding 服务，部署与旧格式迁移见 [部署合同](deployment.md)。
+`basepack` 的公共入口包括项目 `init`、`config show`、`config ai`、`doctor`，项目 `memory`，共享图文 `embed` 及普通重任务 `jobs`。项目接入源码和模板统一在 [project/](../../experiments/20261106-basepack/src/basepack/project)，[config.py](../../experiments/20261106-basepack/src/basepack/project/config.py) 唯一解析配置。`config ai` 按项目配置解析 tier 对应的模型与推理强度；宿主读取结果并在派工时实际传递，程序不自行调用模型。日常默认 tier3，检索、筛选和重排序默认 tier1；配置和命令见 [项目接入](../../experiments/20261106-basepack/docs/setup-project.md#agent-模型等级)。项目使用 schema 2 的 `.basepack/config.toml` 和 `.basepack/instructions.md`，根 AGENTS 只保留短指针；机器格式保持 schema 1，旧项目需补入 AI 配置。客户端兼容 0.5.0 embedding 服务，部署与旧格式迁移见 [部署合同](deployment.md)。
 
 [项目记忆](modules/memory.md) 使用唯一 SurrealDB 基座。一个 member 同时表示文件、实际章节、智能原文块或图片，也是默认检索表示及图节点；另有实体/决定/条件节点和带依据的原生语义边。宿主订阅 agent 同读完成分块、摘要、识图与关系，程序核源与逐记录知识版本后原子接受。多层全文、图文向量、严格回源、语义展开、人工更正及原生恢复共用这份持久知识。
 

@@ -10,6 +10,7 @@
 
 ## 已完成
 
+- 0.6.2 已交付项目模型等级配置及 `config ai`，并普通安装至稳定客户端；源码外核验和测试范围见 [变更记录](../../change_log/minor/20261110_113515_project-ai-tiers.md)。
 - 已形成项目纲领、[简短实施计划](plan.md)、[旧项目近期历史](legacy-history.md) 和 [精选调研](research/sources.md)。
 - 开发文档已集中到 `devDoc/`；README 的介绍与入口已合入根目录 AGENTS.md，重建材料集中在本目录。组织变化见 [变更记录](../../change_log/major/20261106_232701_organize-dev-docs.md)。
 - 文档维护规则、术语、现行结构与环境说明已补齐，交接与调研结论索引已完善；实际结果和检查见 [文档整理结果](result.md)。

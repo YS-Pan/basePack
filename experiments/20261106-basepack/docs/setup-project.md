@@ -1,6 +1,6 @@
 # 项目接入
 
-在选定 Python 环境普通安装 basepack 0.6.1 客户端；可使用稳定的独立环境，无需写入系统 Python。按 [部署说明](administrator.md) 只准备所需设施：多项目共用 embedding，普通重任务使用 Condor，记忆使用每项目独立的 SurrealDB 数据目录与进程。文字记忆可以独立使用。随包机器模板可这样读取：
+在选定 Python 环境普通安装 basepack 0.6.2 客户端；可使用稳定的独立环境，无需写入系统 Python。按 [部署说明](administrator.md) 只准备所需设施：多项目共用 embedding，普通重任务使用 Condor，记忆使用每项目独立的 SurrealDB 数据目录与进程。文字记忆可以独立使用。随包机器模板可这样读取：
 
 ```powershell
 python -c "from basepack.project.init import template; print(template('machine.toml'))"
@@ -41,13 +41,26 @@ jobs_dir = '.basepack/jobs'
 
 runtime 的两个路径必须是绝对路径。project.root 相对项目配置文件；`[jobs].jobs_dir` 与可选 `[memory].data_dir` 相对项目根，并位于 `.basepack/` 内。机器相对路径以机器文件所在目录为基准。各功能只读取自身必需节：只用 embedding 无需 memory 或 Condor 配置，只用 jobs 无需模型配置。init 不预建数据库或作业目录。
 
-`config show` 返回两份配置位置、Python、包版本/安装模式/包根及已配置路径，仅用于诊断。`doctor --facility core|embedding|condor|all` 只读检查设施；首次接入或设施变化时使用，实际推理与作业结果另行验收。
+`config show` 返回两份配置位置、Python、包版本/安装模式/包根、已配置路径及 agent 模型等级映射。`doctor --facility core|embedding|condor|all` 只读检查设施；首次接入或设施变化时使用，实际推理与作业结果另行验收。
 
 Python 入口为 `basepack.project.config.load_project_config`、`load_machine_config`、ProjectConfig 和 MachineConfig。embedding 使用 `EmbeddingClient(project.machine)`，普通作业使用 `CondorClient(project)`，具体调用见 [资源使用](resources.md)。共享机器管理不需要项目配置：
 
 ```powershell
 python -m basepack embedding --machine-config '<absolute-machine-config>' status
 ```
+
+## Agent 模型等级
+
+项目配置 `[ai]` 中 `default_tier` 默认 `tier3`，`retrieval_tier` 默认 `tier1`；`[ai.tiers.tier1]` 至 `[ai.tiers.tier4]` 分别维护 `model` 和 `reasoning_effort`。初始值以 [项目模板](../src/basepack/project/templates/project.toml) 为准，可按宿主可用模型调整。已有项目配置升级时，从模板补入 `[ai]` 和各等级。
+
+```powershell
+bp --config '<absolute-project>/.basepack/config.toml' config show
+bp --config '<absolute-project>/.basepack/config.toml' config ai
+bp --config '<absolute-project>/.basepack/config.toml' config ai --purpose retrieval
+bp --config '<absolute-project>/.basepack/config.toml' config ai --tier tier2
+```
+
+`config ai` 默认查询日常用途（等同 `--purpose task`），也可查询 `--purpose retrieval` 或显式等级；多轮检索、筛选和重排序使用检索用途。宿主读取结果后向其 agent 派工接口实际传入 `model` 和 `reasoning_effort`；basepack 不自行调用模型。
 
 ## 启用记忆
 
@@ -69,6 +82,8 @@ bp --config '<absolute-project>/.basepack/config.toml' memory brief --task '当�
 memory init 才安装 schema、绑定数据库身份，并把 brief 与已安装 skill 的入口加入项目 instructions；普通 init 不启动服务、不建库。误连另一 UUID 的库会失败，保留 UUID 随本项目移动与恢复。由宿主实际读取并执行入口，才会取得启动信息。首建、混合检索、任务内小批维护与恢复见 [记忆使用](memory.md)。配置 source_scope 后，启动快检也发现声明范围内的新增文件；默认只检查已登记原件。
 
 ## 版本升级
+
+0.6.1 → 0.6.2 保持项目 schema 2、机器 schema 1 和原有数据；已有项目显式从 [项目模板](../src/basepack/project/templates/project.toml) 补入 `[ai]` 及其等级映射，再用 `config show` 和 `config ai` 核对。
 
 0.6.0 → 0.6.1 保留项目配置、UUID 和记忆数据，先保留旧 wheel 与原生备份，再普通安装新客户端并从源码外核安装位置、read/search 和小批维护。0.5.0 升级也保留 schema 2 项目、schema 1 机器配置及资源数据。已有 0.5.0 embedding 服务的协议与语义身份兼容，可继续运行；本次客户端升级无需停模型。启用记忆的旧配置显式补齐当前 [项目模板](../src/basepack/project/templates/project.toml) 中的 memory 字段，为本项目生成新 UUID，然后运行 memory init。不要复制另一项目的 project_id 或数据库。
 

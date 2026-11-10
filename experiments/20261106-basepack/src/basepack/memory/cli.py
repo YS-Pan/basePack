@@ -91,7 +91,7 @@ def _activate(config):
 & '{python}' -m basepack --config '{project_config}' memory brief --task '<当前任务>'
 ```
 
-直接保留当前 mandatory 信息；stale=true 的内容只作待核，不当作当前事实。brief 会快检已登记原件与配置的 source_scope；出现 changes/pending 时，在当前任务预算内共读并维护必要小批，余项明确交接。可将维护和检索合并为一次 worker 委托，交付实际证据与缺口；按 [记忆流程](<{skill}>) 执行。
+直接保留当前 mandatory 信息；stale=true 的内容只作待核，不当作当前事实。brief 会快检已登记原件与配置的 source_scope；出现 changes/pending 时，在当前任务预算内共读并维护必要小批，余项明确交接。可将维护和检索合并为一次 worker 委托，交付实际证据与缺口；多轮检索、筛选与重排派工前，用同一命令前缀运行 `config ai --purpose retrieval` 解析项目档位。按 [记忆流程](<{skill}>) 执行。
 {end}"""
     if start in existing:
         before, _, tail = existing.partition(start)

@@ -31,6 +31,9 @@ def test_two_projects_and_subdirectory_config(tmp_path, monkeypatch):
     instructions = (projects[0] / ".basepack/instructions.md").read_text(encoding="utf-8")
     assert ".basepack/config/deep/basepack.toml" in instructions
     assert sys.executable in instructions
+    assert "config ai --purpose retrieval" in instructions
+    assert "config ai --tier tier2" in instructions
+    assert "gpt-6" not in instructions
     assert (projects[0] / ".gitignore").read_text(encoding="utf-8") == "/.basepack/\n"
     assert not (projects[0] / ".basepack/memory").exists()
     assert not (projects[0] / ".basepack/jobs").exists()
@@ -158,6 +161,7 @@ def test_embedding_only_configuration_has_no_other_facility_dependencies(tmp_pat
     assert result["machine_paths"] == {"embedding": {"model_root": str(tmp_path / "model")}}
     assert "memory_dir" not in result
     assert "jobs_dir" not in result
+    assert "ai" not in result
     with pytest.raises(KeyError, match="memory"):
         config.memory_dir
     with pytest.raises(KeyError, match="jobs"):
@@ -190,3 +194,113 @@ def test_project_and_machine_schema_are_checked_separately(tmp_path):
     path.write_text(path.read_text(encoding="utf-8").replace("schema_version = 2", "schema_version = 1"), encoding="utf-8")
     with pytest.raises(ValueError, match="schema_version"):
         load_project_config(path)
+
+
+@pytest.fixture
+def ai_config(tmp_path):
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    return load_project_config(init_project(tmp_path / "project", machine))
+
+
+def _config_cli(config, *args):
+    return subprocess.run([sys.executable, "-m", "basepack", "--config", str(config.path), "config", *args],
+                          capture_output=True, text=True, encoding="utf-8", timeout=10)
+
+
+def test_init_contains_project_ai_mapping(ai_config):
+    assert ai_config.raw["ai"] == {
+        "default_tier": "tier3", "retrieval_tier": "tier1", "tiers": {
+            "tier1": {"model": "gpt-6-luna", "reasoning_effort": "max"},
+            "tier2": {"model": "gpt-6.1-terra", "reasoning_effort": "ultra"},
+            "tier3": {"model": "gpt-6.1-sol", "reasoning_effort": "ultra"},
+            "tier4": {"model": "gpt-6-astra", "reasoning_effort": "ultra"},
+        },
+    }
+    assert describe(ai_config)["ai"] == ai_config.raw["ai"]
+
+
+@pytest.mark.parametrize("options, tier", [({}, "tier3"), ({"purpose": "task"}, "tier3"),
+                                          ({"purpose": "retrieval"}, "tier1"), ({"tier": "tier2"}, "tier2")])
+def test_ai_resolves_project_defaults_and_explicit_tier(ai_config, options, tier):
+    assert ai_config.resolve_ai(**options) == {"tier": tier, **ai_config.raw["ai"]["tiers"][tier]}
+
+
+def test_ai_mapping_edits_are_used_on_next_resolution(ai_config):
+    text = ai_config.path.read_text(encoding="utf-8")
+    text = text.replace("default_tier = 'tier3'", "default_tier = 'tier2'")
+    text = text.replace("retrieval_tier = 'tier1'", "retrieval_tier = 'tier4'")
+    text = text.replace("model = 'gpt-6.1-terra'\nreasoning_effort = 'ultra'",
+                        "model = 'project-model'\nreasoning_effort = 'high'")
+    ai_config.path.write_text(text, encoding="utf-8")
+    config = load_project_config(ai_config.path)
+    expected = {"tier": "tier2", "model": "project-model", "reasoning_effort": "high"}
+    assert config.resolve_ai() == expected
+    assert config.resolve_ai(purpose="retrieval")["tier"] == "tier4"
+    result = _config_cli(config, "ai")
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == expected
+
+
+@pytest.mark.parametrize("path, options", [(["ai"], {}), (["ai", "default_tier"], {}),
+                                         (["ai", "retrieval_tier"], {"purpose": "retrieval"}),
+                                         (["ai", "tiers"], {}), (["ai", "tiers", "tier3"], {}),
+                                         (["ai", "tiers", "tier3", "model"], {}),
+                                         (["ai", "tiers", "tier3", "reasoning_effort"], {})])
+def test_ai_missing_configuration_raises_original_key_error(ai_config, path, options):
+    table = ai_config.raw
+    for key in path[:-1]:
+        table = table[key]
+    del table[path[-1]]
+    with pytest.raises(KeyError) as error:
+        ai_config.resolve_ai(**options)
+    assert error.value.args == (path[-1],)
+    describe(ai_config)
+
+
+def test_explicit_ai_tier_does_not_require_purpose_defaults(ai_config):
+    del ai_config.raw["ai"]["default_tier"]
+    del ai_config.raw["ai"]["retrieval_tier"]
+    assert ai_config.resolve_ai(tier="tier2") == {"tier": "tier2", **ai_config.raw["ai"]["tiers"]["tier2"]}
+
+
+@pytest.mark.parametrize("args, tier", [([], "tier3"), (["--purpose", "task"], "tier3"),
+                                       (["--purpose", "retrieval"], "tier1"), (["--tier", "tier2"], "tier2")])
+def test_config_ai_cli(ai_config, args, tier):
+    result = _config_cli(ai_config, "ai", *args)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"tier": tier, **ai_config.raw["ai"]["tiers"][tier]}
+
+
+def test_config_ai_cli_purpose_and_tier_are_mutually_exclusive(ai_config):
+    result = _config_cli(ai_config, "ai", "--purpose", "retrieval", "--tier", "tier2")
+    assert result.returncode == 2
+    assert "not allowed with argument" in result.stderr
+
+
+def test_config_show_cli_includes_project_ai_mapping(ai_config):
+    result = _config_cli(ai_config, "show")
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["ai"] == ai_config.raw["ai"]
+
+
+def test_legacy_project_resource_paths_do_not_require_ai(tmp_path):
+    from basepack.embedding.client import EmbeddingClient
+    from basepack.jobs import CondorClient
+
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n[embedding]\nendpoint='http://127.0.0.1:18081/'\nmodel_root='model'\n"
+                       "[htcondor]\nbin_dir='bin'\nconfig_file='native.conf'\n", encoding="utf-8")
+    project = tmp_path / "project.toml"
+    project.write_text("schema_version=2\n[runtime]\npython=" + json.dumps(sys.executable)
+                       + "\nmachine_config=" + json.dumps(str(machine))
+                       + "\n[project]\nroot='.'\n[jobs]\njobs_dir='.basepack/jobs'\n", encoding="utf-8")
+    config = load_project_config(project)
+    assert "ai" not in describe(config)
+    assert EmbeddingClient(config.machine).endpoint == "http://127.0.0.1:18081"
+    jobs = CondorClient(config)
+    assert jobs.bin_dir == tmp_path / "bin"
+    assert jobs.env["CONDOR_CONFIG"] == str(tmp_path / "native.conf")
+    assert jobs.config.jobs_dir == tmp_path / ".basepack/jobs"
+    with pytest.raises(KeyError, match="ai"):
+        config.resolve_ai()

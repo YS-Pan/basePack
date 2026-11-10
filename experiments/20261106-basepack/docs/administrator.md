@@ -1,6 +1,6 @@
 # 机器部署与维护
 
-本页属于当前 active 路线 [20261106-basepack](../README.md)，说明 0.6.1 客户端、项目 SurrealDB 4 与共享资源设施的部署。面向 Windows、Python 3.13；图文模型使用单张 NVIDIA GPU。机器格式保持 schema 1，项目格式保持 schema 2。资源基线见 [R9 结果](../../../devDoc/archive/20261107-resource-coordination/r9-result.md)，记忆正式安装与试用状态见 [专项进度](../../../devDoc/tasks/20261106-memory-system/progress.md)。
+本页属于当前 active 路线 [20261106-basepack](../README.md)，说明 0.6.2 客户端、项目 SurrealDB 4 与共享资源设施的部署。面向 Windows、Python 3.13；图文模型使用单张 NVIDIA GPU。机器格式保持 schema 1，项目格式保持 schema 2。资源基线见 [R9 结果](../../../devDoc/archive/20261107-resource-coordination/r9-result.md)，记忆正式安装与试用状态见 [专项进度](../../../devDoc/tasks/20261106-memory-system/progress.md)。
 
 ## 安装与执行账户
 
@@ -13,7 +13,7 @@ python -s -c "import basepack; print(basepack.__file__)"
 
 已有目标环境不含 pip 时，用另一个已有 pip 的解释器执行 `python -m pip --python '<target-python.exe>' install --no-user '<basepack-wheel>'`，再由目标解释器核安装来源。本机轻量客户端升级采用该入口并复用已有依赖。
 
-新建共享模型服务时，使用独立、稳定的纯净环境，按工程原生锁准备依赖，再安装普通 wheel。已有兼容的 0.5.0 服务可继续供 0.6.1 客户端使用，本次客户端升级无需重新加载模型：
+新建共享模型服务时，使用独立、稳定的纯净环境，按工程原生锁准备依赖，再安装普通 wheel。已有兼容的 0.5.0 服务可继续供 0.6.2 客户端使用，本次客户端升级无需重新加载模型：
 
 ```powershell
 $env:UV_PROJECT_ENVIRONMENT = '<absolute-shared-service-env>'
@@ -160,6 +160,8 @@ Shawl 的 `add` 创建 Windows 服务，`run` 仅供服务管理器启动；不�
 Shawl 的 log-dir 保存包装器和命令输出；推理异常保留在服务日志。`status` 使用 LitServe 原生 `/health` 和 `/info`；`/info` 的 model 字段包含 embedding_identity 及软件版本。向量身份覆盖模型 revision/文件、Sentence Transformers 版本、FP16、指令、图像预处理和 pooling；路径、线程、批次与等待期限不改变身份。0.5.0 使用新的向量身份，调用方按此处理索引兼容。
 
 ## 升级与回滚
+
+0.6.1 → 0.6.2：项目格式仍为 schema 2，已有项目显式从模板补入 `[ai]` 和等级映射，操作见 [项目接入](setup-project.md#agent-模型等级)。保留原有项目配置、UUID、数据和共享服务。
 
 0.6.0 → 0.6.1：保留旧 wheel、配置、UUID 与原生知识备份，普通安装新客户端，记录 wheel SHA256、实际 Python 和导入位置，再从源码外执行首次接入、特殊 ID、小批维护及恢复。共享 embedding 的 HTTP 协议和 embedding_identity 合同未变，已有 0.5.0 服务继续运行；Condor 策略保持。0.5.0 升级也沿此流程，启用记忆时补齐项目配置。回退客户端时保留项目库，旧 0.5.0 仍只提供资源工具。修改底座或知识 schema 前先保留原生 export，按相应版本验证恢复。
 

@@ -1,6 +1,6 @@
 # 项目配置与部署合同
 
-更新：2026 年 11 月 10 日。当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.6.1。本文维护代码、业务实例、共享设施与升级边界；正式记忆安装状态见 [专项进度](../tasks/20261106-memory-system/progress.md)，共享资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。操作从路线 README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md) 和 [管理员说明](../../experiments/20261106-basepack/docs/administrator.md) 进入。
+更新：2026 年 11 月 10 日。当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.6.2。本文维护代码、业务实例、共享设施与升级边界；正式记忆安装状态见 [专项进度](../tasks/20261106-memory-system/progress.md)，共享资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。操作从路线 README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md) 和 [管理员说明](../../experiments/20261106-basepack/docs/administrator.md) 进入。
 
 ## 位置与责任
 
@@ -15,7 +15,7 @@
 | 运行托管与日志 | 共享模型沿用 Shawl/SCM；项目库可由普通用户手动启动，也可选管理员 SCM；日志分别保存 |
 | 普通作业容量与策略 | HTCondor 独立安装并唯一维护 |
 
-本机共享服务沿 R9 使用 `C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe` 与 `D:/AgentTools/state/basepack/embedding/logs/`。SurrealDB 4.0.0 exe 位于 `D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`，项目各自保存数据库。本机 0.6.1 客户端普通安装在稳定的 `D:/AgentTools/envs/basepack-client/`，系统 Python 与 0.5.0 共享模型环境保持原状；图文依赖仍在共享环境；0.6 客户端升级不要求重启兼容的 0.5 模型服务。这些是本机位置，公共代码通过配置定位设施；实测见 [环境说明](environment.md)。
+本机共享服务沿 R9 使用 `C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe` 与 `D:/AgentTools/state/basepack/embedding/logs/`。SurrealDB 4.0.0 exe 位于 `D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`，项目各自保存数据库。本机 0.6.2 客户端普通安装在稳定的 `D:/AgentTools/envs/basepack-client/`，系统 Python 与 0.5.0 共享模型环境保持原状；图文依赖仍在共享环境；0.6 客户端升级不要求重启兼容的 0.5 模型服务。这些是本机位置，公共代码通过配置定位设施；实测见 [环境说明](environment.md)。
 
 根 file-structure、agent-team 独立维护，resources skill 归 active 实验，memory skill 随包安装并由 memory guide 定位。开发环境、构建缓存和夹具在根 tmp，交付及回滚 wheel 在实验 dist，选留原证在根 artifacts/runs；寿命见 [文档约定](../documentation.md)。
 
@@ -45,6 +45,7 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 | --- | --- |
 | runtime.python、runtime.machine_config | 明确绝对路径 |
 | project.root | 相对项目配置文件 |
+| ai.default_tier、ai.retrieval_tier、ai.tiers | 项目维护用途默认等级及各等级模型和推理强度；宿主读取后派工 |
 | memory.data_dir、jobs.jobs_dir | 相对项目根，受管理数据必须在该项目 .basepack 内 |
 | 机器配置中的相对设施路径 | 相对机器配置文件 |
 | embedding.endpoint | 显式共享 HTTP 地址，本机为 loopback 8765 |
@@ -63,7 +64,7 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 
 ## 升级与回退
 
-0.6.1 继续读取原 schema 2 项目和 schema 1 机器配置。0.6.0 升级保留已有配置、UUID 和记忆数据；0.5.0 项目启用记忆时补当前 memory 字段和新 UUID，再绑定本项目库。共享 embedding 的协议和身份合同未变，兼容服务继续运行，Condor 策略保持。
+0.6.2 保持 schema 2 项目和 schema 1 机器配置；0.6.1 项目升级时显式从模板补入 `[ai]` 与等级映射，见 [项目接入](../../experiments/20261106-basepack/docs/setup-project.md#agent-模型等级)。0.6.0 升级保留已有配置、UUID 和记忆数据；0.5.0 项目启用记忆时补当前 memory 字段和新 UUID，再绑定本项目库。共享 embedding 的协议和身份合同未变，兼容服务继续运行，Condor 策略保持。
 
 升级保留新旧 wheel、配置和知识备份，核安装来源并在源码外验证受影响流程。底座或知识 schema 变化须验证原生恢复；回退客户端保留项目数据，旧资源版不提供记忆能力。只有服务实现或资源协议确需改变时，才按管理员流程排空、停止并切换相应服务。
 

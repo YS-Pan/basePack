@@ -17,14 +17,16 @@ At task start or continuation, run `brief --task <goal>`. Keep current `mandator
 
 When a task names a few known files, read those files together directly after brief. Use memory when locations, relevant prerequisites or cross-material evidence need discovery. Select the shortest useful evidence set; parent summaries add background or missing conditions rather than repeating already selected chunks.
 
-The working agent may delegate the question, project scope and content budget once to a subscription worker. That worker completes retrieval and scoring, then returns usable content and sources:
+For memory discovery, delegate the question, project scope and content budget once to a subscription worker with clean history (`fork_turns="none"` where supported). First resolve the project's retrieval tier with `python -m basepack --config <absolute-config> config ai --purpose retrieval`, using the Python from the project instructions. The default is `tier1`; choose another tier explicitly with `config ai --tier <tier>` when difficulty warrants it. Pass the returned `model` and `reasoning_effort` as explicit host parameters. Report an unavailable mapping or host capability with its original error; any tier change or model substitution must be explicit.
+
+That worker owns all needed search rounds, evidence reads, scoring and ranking, then returns usable content and sources:
 
 1. Run `search --text <terms>` for default hybrid retrieval across file/section summaries, original chunks and images. `--mode text` is the explicit text-only path; `--mode vector` queries only compatible vectors. Chinese segmentation is not substring matching; use `--literal --mode text` for case-insensitive substrings in stored titles/text, including identifiers or missed proper names.
 2. Use `neighbors <id>` to expand current parents, children and semantic edges; `--include-stale` is explicit historical inspection. Follow evidence member IDs and use `read <member-id>` to verify original ranges and conditions. For images, actually open `original.image_path`; distinguish the saved description from image evidence and report original_missing. A missing business original still permits reading its retained snapshot; a changed original or missing snapshot fails. Structural links differ from semantic claims. Read content before scoring.
 3. Write a JSON array of actual candidates with `id`, `kind`, `path`, `revision`, `start_line`, `end_line`, `title`, `text`, numeric `score` and a short reason. Use a common 0–100 relevance scale; a lexical/vector score is not an agent score.
 4. Run `rank --input <scored.json> --budget <text-characters>`. Return the selected content, source locators and unresolved gaps. Budget omissions retain reading pointers; whole evidence is not silently truncated. The working agent may read more freely.
 
-Use a cheaper available worker for routine retrieval. Record its actual model when available; do not invent usage or price. Keep intermediates under this project's `.basepack/memory/`, uniquely named per batch so concurrent chats do not overwrite each other's work.
+Record the selected tier and actual model when available; do not invent usage or price. Keep intermediates under this project's `.basepack/memory/`, uniquely named per batch so concurrent chats do not overwrite each other's work.
 
 The ID contract supports string and integer keys. An ID without a table prefix is a raw string key. A full `member:`/`node:` ID is canonical database syntax; reuse returned IDs unchanged. Raw `123` and canonical `member:123` are different string/integer keys; the canonical string is ``member:`123` ``. Use a full canonical ID for a key containing a colon. A missing read target reports the requested ID and fails.
 
@@ -100,7 +102,7 @@ memory neighbors 'member:`example-section`'
 
 With the configured shared embedding service, continue with `memory embed --ids example-file example-section example-chunk`, then `memory search --text '项目数据库'` and ``memory read 'member:`example-chunk`'``. The function above stops on any failed dependency. A text member missing start_line/end_line reports its batch position, member ID and field; correct the input and rerun. Failed batches leave no partial database writes.
 
-For broad maintenance, use a coordinator and at most four cheaper readers per coordinator. Merge cross-worker candidates and read both ends together before accepting a relation. Batch review is optional. Deep maintenance may revisit old or randomly selected material to seek missed relations; do not claim every pair was examined.
+For broad maintenance, use a coordinator and at most four readers per coordinator. Resolve each role through the project tier mapping: use the routine default (`tier3` by default), adjusting the tier to difficulty. Merge cross-worker candidates and read both ends together before accepting a relation. Batch review is optional. Deep maintenance may revisit old or randomly selected material to seek missed relations; do not claim every pair was examined.
 
 For a manual deep pass, use `sources`, sample distinct materials within the declared scope, then actually read those materials together with their old neighborhood, including `--include-stale` when inspecting history. Record a discovered relation or an honest negative result. Extend the evidence of an existing relation when new material supports it; preserve other valid edges and explicit conditions. After a source disappears, reread remaining evidence before deciding whether a claim survives.
 

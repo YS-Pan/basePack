@@ -7,6 +7,26 @@ machine_config = $machine_config
 [project]
 root = $root
 
+[ai]
+default_tier = 'tier3'
+retrieval_tier = 'tier1'
+
+[ai.tiers.tier1]
+model = 'gpt-6-luna'
+reasoning_effort = 'max'
+
+[ai.tiers.tier2]
+model = 'gpt-6.1-terra'
+reasoning_effort = 'ultra'
+
+[ai.tiers.tier3]
+model = 'gpt-6.1-sol'
+reasoning_effort = 'ultra'
+
+[ai.tiers.tier4]
+model = 'gpt-6-astra'
+reasoning_effort = 'ultra'
+
 [memory]
 data_dir = '.basepack/memory'
 project_id = '$memory_project_id'

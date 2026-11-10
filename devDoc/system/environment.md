@@ -4,9 +4,13 @@
 
 当前唯一 active 路线位于 `experiments/20261106-basepack/`；安装、构建与测试目标均为该实验工程，具体命令见 [路线 README](../../experiments/20261106-basepack/README.md)。从仓库根运行 pytest 时，显式指定实验的 pyproject、tests 和根 `tmp/<task>/pytest` 作为 basetemp。pytest 不保留持久缓存；构建 TEMP/TMP 和隔离验证环境也进入根 tmp。目录寿命见 [文档维护约定](../documentation.md)。
 
-2026-11-09 先前布局迁移只改变开发维护位置；当时系统安装为 0.4.0。其后 R9 形成下节的 0.5.0 共享资源基线，本轮在独立稳定环境安装 0.6.0 客户端并运行项目局部数据库。历史快照按各自条件阅读。
+2026-11-09 先前布局迁移只改变开发维护位置；当时系统安装为 0.4.0。其后 R9 形成下节的 0.5.0 共享资源基线，此后在独立稳定环境安装客户端并运行项目局部数据库。历史快照按各自条件阅读。
 
 选留证据现统一位于根 `artifacts/runs/`。前次临时材料整理的映射为 `artifacts/runs/tmp-reorganization-20261108/moves.json`，本次位置映射为 `artifacts/runs/20261109-project-layout/moves.json`；原始回执及下文历史路径保留当时含义，结合两轮映射回查长期副本，tmp 内容按可清除处理。
+
+## 2026-11-10 0.6.2 项目模型等级配置与安装
+
+稳定客户端 `D:/AgentTools/envs/basepack-client/Scripts/python.exe` 已普通安装 0.6.2 wheel；源码外以 `-I` 核安装位置与 `config show`、`config ai`，33 个包文件与 wheel 字节一致，wheel SHA256 为 `44658d1856e7a635c7f36a656fd06839422858e019af16d1872d7e5324b7aaec`。本项目配置已补入 AI 节。源码全套 137 passed、41 skipped（未提供一次性数据库的集成项）；配置和 activation 专项 41 passed。本次不重跑数据库全验收，历史 P0–P5 与 0.6.1 结果保持各自条件。安装核验回执选留 `artifacts/runs/20261110-ai-tiers/installed-verification.json`；配置与使用见 [项目接入](../../experiments/20261106-basepack/docs/setup-project.md#agent-模型等级)。
 
 ## 2026-11-10 0.6.1 修复与安装
 

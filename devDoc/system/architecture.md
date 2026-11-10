@@ -1,6 +1,6 @@
 # 系统结构与边界
 
-当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.6.1 的公共入口、项目记忆与资源工具。配置和安装合同见 [部署说明](deployment.md)，记忆实际完成边界见 [专项进度](../tasks/20261106-memory-system/progress.md)，资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。文件位置图见 [逻辑框图](diagrams.md)。
+当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.6.2 的公共入口、项目记忆与资源工具。配置和安装合同见 [部署说明](deployment.md)，记忆实际完成边界见 [专项进度](../tasks/20261106-memory-system/progress.md)，资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。文件位置图见 [逻辑框图](diagrams.md)。
 
 ## 当前组成
 
@@ -39,6 +39,7 @@ artifacts/runs/                    选留运行和迁移原证，Git 忽略
 - `file-structure`、`agent-team` 是可独立交付的通用技能。实际 agent 派发、权限和模型能力由宿主提供。
 - 产品代码、模板和资源 skill 各有一个维护源。运行代码通过普通 wheel 安装；业务项目只保存自己的接入配置、数据和产物。
 - 项目显式指定 schema 2 接入配置，绑定运行 Python 和 schema 1 机器配置。project.root 相对项目配置，受管理数据进入该业务项目 `.basepack/`；机器相对路径以机器配置为基准。ProjectConfig 只解析公共绑定，各功能按需读取自身节。
+- 项目 `[ai]` 配置维护 tier1 至 tier4 的模型和推理强度及用途默认值；`config ai` 输出所选配置，宿主负责把 model 和 reasoning_effort 传入派工接口，程序不调用模型。
 - `init` 从安装包模板生成配置和详细 instructions，根 AGENTS 合并短指针；memory init 另行绑定项目 UUID 并写入 brief/skill 的宿主入口。旧格式先经保留的 0.4.0 迁移，当前版本直接读取 schema 2。
 - 项目记忆只用 SurrealDB。member 同时是层级、检索表示与图节点；source_version、change 和必要图像 assets 保存原文依据及更正。source revision、input_revision、knowledge_revision 与 embedding_identity 各管来源、编码输入、并发更正和语义空间。原生事务原子接受，原生 CLI 负责服务、导出与恢复；没有多后端层或自建 MCP。
 - 结构解析只供定位。实际智能块、摘要、识图、关系和评分由宿主订阅 agent 同读完成；脚本验证来源与块范围，变化沿包含及依据使受影响知识待核。brief 做低成本快检并交付启动信息，宿主承担任务内维护与深维护。详细合同见 [记忆模块](modules/memory.md)。

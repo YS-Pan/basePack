@@ -1,6 +1,6 @@
 # 项目记忆实现
 
-0.6.1 源码实现 SurrealDB 上的多层文字、原图向量与语义关系，首建和维护由宿主订阅 reader 同读完成。正式 wheel 与完整行为验收状态见 [专项进度](../../tasks/20261106-memory-system/progress.md)，P0 原生接入证据见 [结果](../../tasks/20261106-memory-system/p0-result.md)，用户流程见 [记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
+0.6.2 源码实现 SurrealDB 上的多层文字、原图向量与语义关系，首建和维护由宿主订阅 reader 同读完成。正式 wheel 与完整行为验收状态见 [专项进度](../../tasks/20261106-memory-system/progress.md)，P0 原生接入证据见 [结果](../../tasks/20261106-memory-system/p0-result.md)，用户流程见 [记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
 
 ## 职责与数据
 
@@ -24,6 +24,6 @@ brief 快检已登记原件及 source_scope：未变文件仅查元数据，已�
 
 向量绑定实际输入版本及 embedding_identity，写入前后核源版本；同维数不同身份或旧输入不参与当前查询。默认 CLI hybrid 直接融合全部粒度，当前范围无兼容向量时明确提示 embed 或 text，空范围正常返回空。brief 的 vector_pending 由当前记录派生，报告未编码或输入过期；服务身份在实际查询时核对。原图编码与描述分开，只有描述改写时原图向量可复用。查询和历史快照省略派生向量大数组；恢复保留表示与图片快照后可重建，仍须核业务原件存在且版本一致。超限与超时保留共享服务原错，不截断、不重试、不停共享服务。
 
-[selection.py](../../../experiments/20261106-basepack/src/basepack/memory/selection.py) 按真实 worker 分数排序，去重复身份/原文覆盖，按文字预算交付完整内容与省略入口；词法距离不冒充 agent 分数。已安装 [skill](../../../experiments/20261106-basepack/src/basepack/memory/SKILL.md) 驱动一次检索委托，宿主负责实际派工，没有模型 API 或后台 agent。
+[selection.py](../../../experiments/20261106-basepack/src/basepack/memory/selection.py) 按真实 worker 分数排序，去重复身份/原文覆盖，按文字预算交付完整内容与省略入口；词法距离不冒充 agent 分数。已安装 [skill](../../../experiments/20261106-basepack/src/basepack/memory/SKILL.md) 驱动一次检索委托，宿主按 `config ai --purpose retrieval` 的结果派工（默认 tier1），没有模型 API 或后台 agent。
 
 memory init 安装原生 schema 并绑定项目 UUID，同时在项目 instructions 加入 brief 与已安装 skill 入口；普通 init 不建库。数据库进程必须按项目独立物理目录启动，多聊天共用该进程。绑定核查防止误连另一项目；数据路径的实际归属仍须部署命令正确配置。

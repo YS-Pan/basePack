@@ -62,6 +62,13 @@ class ProjectConfig:
     def jobs_dir(self) -> Path:
         return self.data_path("jobs", "jobs_dir")
 
+    def resolve_ai(self, *, purpose: str = "task", tier: str | None = None) -> dict:
+        ai = self.raw["ai"]
+        if tier is None:
+            tier = ai[{"task": "default_tier", "retrieval": "retrieval_tier"}[purpose]]
+        settings = ai["tiers"][tier]
+        return {"tier": tier, "model": settings["model"], "reasoning_effort": settings["reasoning_effort"]}
+
 
 def load_machine_config(path: str | Path) -> MachineConfig:
     path = Path(path).resolve()
@@ -109,4 +116,6 @@ def describe(config: ProjectConfig) -> dict:
         result["memory_dir"] = str(config.memory_dir)
     if "jobs" in config.raw:
         result["jobs_dir"] = str(config.jobs_dir)
+    if "ai" in config.raw:
+        result["ai"] = config.raw["ai"]
     return result

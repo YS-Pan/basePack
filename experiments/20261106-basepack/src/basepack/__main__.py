@@ -13,7 +13,12 @@ def main():
     init.add_argument("--machine-config", required=True)
     init.add_argument("--config-name", default=".basepack/config.toml")
     config = sub.add_parser("config")
-    config.add_subparsers(dest="config_action", required=True).add_parser("show")
+    config_commands = config.add_subparsers(dest="config_action", required=True)
+    config_commands.add_parser("show")
+    ai = config_commands.add_parser("ai", help="Resolve project AI settings for host dispatch")
+    selection = ai.add_mutually_exclusive_group()
+    selection.add_argument("--purpose", choices=["task", "retrieval"], default="task")
+    selection.add_argument("--tier", choices=["tier1", "tier2", "tier3", "tier4"])
     check = sub.add_parser("doctor", help="Read-only facility checks")
     check.add_argument("--facility", choices=["core", "embedding", "condor", "all"], default="all")
     from .embedding.cli import register_commands as embedding_commands
@@ -36,7 +41,8 @@ def main():
         from .project.config import load_project_config, describe
         config = load_project_config(args.config)
         if args.command == "config":
-            result = describe(config)
+            result = (describe(config) if args.config_action == "show"
+                      else config.resolve_ai(purpose=args.purpose, tier=args.tier))
         elif args.command == "doctor":
             from .project.doctor import doctor
             result = doctor(config, args.facility)
