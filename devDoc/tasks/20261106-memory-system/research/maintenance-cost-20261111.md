@@ -82,6 +82,8 @@
 
 这些建议尚未变为新的来源筛选、默认审核或运行策略。SQL分包的中小规模估计仍只针对传输改造，不能推广为“几百行代码即可解决本轮全部两小时成本”。
 
+后续对[发布回读和独立审计的专项核实](review-overhead-20261111.md)进一步区分必要保证与执行成本：账本已经复用681条有效判定，两次最终717条判定相同，1215请求和996依据各按其键去重，不能直接叫作重复AI审阅；真正可简化的是同一有效主张逐级再判、普通维护扩成全量独立审计及无新增问题的反复收尾。摘要超证据等真实错误与程序尚未校验非空parent可解析的边界也已列明，未直接取消当前检查。
+
 ## 原证与本轮范围
 
 选留三个分支报告和独立统计在项目忽略的 artifacts/runs/20261111-memory-maintenance-cost/：timeline.md、history.md、architecture.md、independent-source-counts.json。原始验收账本在 artifacts/runs/20261111-task-archive-memory/audit/final-report.md 及其链接；时间线源为该主chat与真实协调者/reader会话。派工/部分消息加密、模型用量和部分阶段计时不可得，均保留未知。
