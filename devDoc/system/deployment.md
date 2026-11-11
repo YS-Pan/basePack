@@ -65,6 +65,8 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 
 ## 环境与服务
 
+项目 `.basepack` 的推荐内部结构、生产状态与临时/选留材料的边界见[本机数据目录约定](project-data-layout.md)；现行 0.9.1 的工作目录偏差及候选调整在该页明确区分。
+
 依赖由 pyproject.toml 与 uv.lock 维护，CUDA 来源明确。系统环境不做清理式同步，共享服务环境不安装无关 MCP 集成。源码与 wheel 验证分别核导入位置；普通安装从源码外运行。
 
 共享 embedding 沿用 Shawl/SCM，Manual、LocalSystem、no-restart/kill-process-tree；LitServe 单 worker 常驻，客户端超时只结束等待。项目 SurrealDB 可沿用已有普通用户隐藏手动认证进程。cwd、原生 store、日志与启动材料在项目 memory 目录；serve.ps1 从同一配置取得显式回环地址、username 和密码文件，设置原生认证入口后调用稳定 exe，不启用 unauthenticated。新库一次安全随机生成文件，已有库缺文件时恢复原凭据；launcher 不生成密码。SCM 是管理员可选方式，本轮未配置。basepack 只连接，停止项目库不停止共享模型。
