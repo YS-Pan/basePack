@@ -44,6 +44,23 @@
 
 SurrealDB [HTTP 协议文档](https://surrealdb.com/docs/reference/rest-api/http-protocol)列出 /sql 默认上限 1 MiB，超限返回 413，自托管可配置 SURREAL_HTTP_MAX_SQL_BODY_SIZE。本次请求大于该默认值；当前进程的有效上限未核实。**超限组的具体来源、各部分大小占比及归档是否导致其膨胀尚未定位**，不把静态机制当作实际组分析。
 
+## 本调查 chat 自身的同类现象
+
+用户追加指出本调查期间也没有启动并行自动维护。核对[本调查 chat](codex://threads/01a1c97f-f5db-76c0-852f-b1db986b02f7)上一轮记录，确认**没有运行承担持续记忆维护职责的并行分支**；已启动的两个子 agent 是只读调查分支，不能计作维护团队。
+
+| 北京时间 | 本调查 chat 的实际调用 |
+| --- | --- |
+| 15:26:18 | 用户提出调查请求 |
+| 15:27:33 / 15:27:47 | 启动 thread_timeline_audit、maintenance_contract_audit，只读调查 |
+| 15:28:07 | 主 agent 才执行 brief → maintain 的串行 shell，距任务开始约 1 分 49 秒 |
+| 15:28:09 | 首次预检失败：state_5.sqlite 访问失败，SQLite code 14 / OS error 5 |
+| 15:28:21–15:28:57 | 正常用户上下文重跑并等待，机械 apply 遇 HTTP 413，SQL 1,292,144 bytes |
+| 15:33:46 | 对本 chat 的 20261111-auto-investigation.control 执行 stop，返回 stopped:true |
+
+主 agent 没有在任务开始即独立异步管理维护预检；调用时等待预检结果，两个调查 agent 当时仍在并行。两次失败后没有派出记忆维护协调者或建立恢复分支，随后继续调查并收尾。这既包含启动延迟，也包含预检失败后维护没有接续；不能只把它作为其他 chat 故障的复现，而省略本 chat 自身的执行结果。预检没有正常返回，不等于 needs_semantic=false；仅调用过 maintain 和最后 stop 也不证明自动维护已经运行。另一个 chat 正在维护，不能替代本 chat 的生命周期记录。本轮发现并记录该现象，尚未修复。
+
+证据为本 chat 的会话记录：C:/Users/ysPan/.codex/sessions/2026/11/11/rollout-2026-11-11T15-26-12-01a1c97f-f5db-76c0-852f-b1db986b02f7.jsonl，第 13、57、63、71–92、211 行；独立调查 agent 已复核上述调用和时间。
+
 ## 后续修复与验收
 
 - 宿主执行：明确业务开始的异步预检及句柄归属，以真实命令、派工和退出事件确认执行。当前模板已有持续接批要求；再次增加相同文字本身不能证明遗漏已消除。
