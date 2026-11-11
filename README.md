@@ -57,7 +57,7 @@ The wheel includes the program, configuration and entry templates, memory schema
 | Entry | Contents |
 | --- | --- |
 | [Route README](experiments/20261106-basepack/README.md) | Capabilities, development, builds, and tests |
-| [Maintenance experiment](experiments/20261111-basepack-maintenance/README.md) | Prepared candidate for entry instructions, SQL batching, maintenance cost strategies and local data layout; implementation has not started |
+| [Maintenance experiment](experiments/20261111-basepack-maintenance/README.md) | Prepared candidate for program checks, entry instructions, SQL batching, usage feedback and maintenance policy; implementation has not started |
 | [Project setup](experiments/20261106-basepack/docs/setup-project.md) | Configuration, new shells, upgrades, relocation, and skill discovery |
 | [Memory guide](experiments/20261106-basepack/docs/memory.md) | Initial knowledge, retrieval, small-batch maintenance, and backup |
 | [Resource guide](experiments/20261106-basepack/docs/resources.md) | Text/image embedding, HTCondor jobs, and Python APIs |
