@@ -1,6 +1,6 @@
 # 当前文件与运行逻辑框图
 
-按 2026 年 11 月 11 日的 0.8.1 源码合同更新；既有项目沿用认证服务、原密码、物理库和 UUID，客户端升级与入口刷新不要求迁库。0.5.0 core/jobs 和共享 embedding 服务继续保留，后者与当前客户端协议兼容。沿用[参考 chat](codex://threads/01a1bb3f-4db8-7c10-8d71-c951aba18aa2) 按文件位置分层的方法；记忆行为的实际验收边界见[专项进度](../tasks/20261106-memory-system/progress.md)，阶段合同见[记忆方案图](../tasks/20261106-memory-system/diagrams.md)。
+按 2026 年 11 月 11 日的 0.9.1 源码合同更新；本轮修复和安装验证见 [一致性审阅进度](../tasks/20261111-consistency-review/progress.md)，本机部署观测见 [环境记录](environment.md)。既有项目沿用认证服务、原密码、物理库和 UUID，客户端升级与入口刷新不要求迁库。0.5.0 core/jobs 和共享 embedding 服务继续保留，后者与当前客户端协议兼容。沿用[参考 chat](codex://threads/01a1bb3f-4db8-7c10-8d71-c951aba18aa2) 按文件位置分层的方法；记忆行为的实际验收边界见[专项进度](../tasks/20261106-memory-system/progress.md)，阶段合同见[记忆方案图](../tasks/20261106-memory-system/diagrams.md)。
 
 ## 路径与读图约定
 
@@ -24,7 +24,7 @@ flowchart TB
   subgraph source["R / E：唯一产品维护源"]
     code["E/src/basepack/<br/>代码与 project/templates/"]
     deps["E/pyproject.toml + uv.lock<br/>依赖与发行声明"]
-    wheel["E/dist/交付批次/<br/>basepack-0.8.1-*.whl"]
+    wheel["E/dist/交付批次/<br/>basepack-0.9.1-*.whl"]
     r9["E/dist/r9/<br/>保留 basepack-0.5.0 wheel"]
     policy["E/examples/condor/<br/>60_resources.conf、70_job_transforms.conf"]
     code -->|构建| wheel

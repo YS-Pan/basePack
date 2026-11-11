@@ -102,19 +102,30 @@ def maintain(memory, scope, *, control=None, timeout=600):
     normalize = comparison_text
     receipts = []
     reused_chunks = []
+    candidates = {}
+    mechanical_dependency_pending = set()
+    completed_empty = set()
     change_by_path = {row['path']: row for row in changes}
     for path, change in change_by_path.items():
         if control:
             check(control)
-        if change['kind'] != 'modified':
+        if change['kind'] not in {'added', 'modified'}:
             continue
-        previous = by_path[path]
-        current = memory._load_source(path, previous.get('kind'))
-        if current.revision == previous['revision']:
-            receipts.append(memory.apply({'sources': [{'id': previous['id'], 'path': path,
-                                                       'revision': current.revision}]}, control=control, timeout=timeout))
-            continue
+        previous = by_path.get(path)
+        current = memory._load_source(path, previous.get('kind') if previous else None)
+        source = {'path': path, 'revision': current.revision}
+        if previous:
+            source['id'] = previous['id']
         active = [row for row in members if row['path'] == path and not row['retired']]
+        if not isinstance(current, ImageSource) and not current.text and not active:
+            candidates[path] = {'source': source, 'members': [], 'reused': []}
+            completed_empty.add(path)
+            continue
+        if change['kind'] == 'added':
+            continue
+        if current.revision == previous['revision']:
+            candidates[path] = {'source': source, 'members': [], 'reused': []}
+            continue
         if isinstance(current, ImageSource) or not active:
             continue
         # Never treat a newer accepted source as proof that an older member was
@@ -157,16 +168,8 @@ def maintain(memory, scope, *, control=None, timeout=600):
                                                                'mandatory', 'coverage_gaps')},
                                  'start_line': mapped[0], 'end_line': mapped[1]})
             if accepted:
-                receipts.append(memory.apply({'sources': [{'id': previous['id'], 'path': path,
-                                                           'revision': current.revision}],
-                                              'expected': {row['id']: row['knowledge_revision'] for row in members},
-                                              'members': accepted}, control=control, timeout=timeout))
-                reused_chunks.extend(item['id'] for item in accepted)
-            continue
-        active_ids = {row['id'] for row in active}
-        by_id = {row['id']: row for row in members}
-        if any(by_id[basis['member']]['stale'] or by_id[basis['member']]['retired']
-               for row in active for basis in row.get('basis', []) if basis['member'] not in active_ids):
+                candidates[path] = {'source': source, 'members': accepted,
+                                    'reused': [item['id'] for item in accepted]}
             continue
         accepted = []
         for row in active:
@@ -176,20 +179,73 @@ def maintain(memory, scope, *, control=None, timeout=600):
             if row['kind'] != 'chunk':
                 item['text'] = row['text']
             accepted.append(item)
-        receipts.append(memory.apply({'sources': [{'id': previous['id'], 'path': path, 'revision': current.revision}],
+        candidates[path] = {'source': source, 'members': accepted, 'reused': []}
+
+    # Evidence members accepted by this run must publish together with their
+    # dependents, so both the basis and expected versions describe one state.
+    candidate_paths = {item['id']: path for path, candidate in candidates.items()
+                       for item in candidate['members']}
+    linked = {path: set() for path in candidates}
+    for path, candidate in candidates.items():
+        for item in candidate['members']:
+            for dependency in item.get('evidence', []):
+                other = candidate_paths.get(dependency)
+                if other is not None:
+                    linked[path].add(other)
+                    linked[other].add(path)
+    remaining = set(candidates)
+    while remaining:
+        group, pending = set(), [min(remaining)]
+        while pending:
+            path = pending.pop()
+            if path not in group:
+                group.add(path)
+                pending.extend(linked[path] - group)
+        remaining -= group
+        accepted = [item for path in sorted(group) for item in candidates[path]['members']]
+        accepted_ids = {item['id'] for item in accepted}
+        by_id = {row['id']: row for row in members}
+        closed = True
+        for item in accepted:
+            for dependency in item.get('evidence', []):
+                if dependency in accepted_ids:
+                    continue
+                evidence = by_id[dependency]
+                if evidence['stale'] or evidence['retired']:
+                    closed = False
+                    continue
+                try:
+                    original = memory._load_source(evidence['path'], evidence['kind'])
+                except FileNotFoundError:
+                    closed = False
+                    continue
+                if original.revision != evidence['source_revision']:
+                    closed = False
+        if not closed:
+            mechanical_dependency_pending.update(accepted_ids)
+            continue
+        receipts.append(memory.apply({'sources': [candidates[path]['source'] for path in sorted(group)],
                                       'expected': {row['id']: row['knowledge_revision'] for row in members},
-                                      'members': accepted},
-                                     control=control, timeout=timeout))
-    if receipts:
+                                      'members': accepted}, control=control, timeout=timeout))
+        reused_chunks.extend(member for path in sorted(group) for member in candidates[path]['reused'])
         known = memory._rows('source')
         by_path = {row['path']: row for row in known if not row.get('deleted')}
         members = memory._rows('member')
 
     semantic = {}
     for change in changes:
-        if change['kind'] in {'added', 'deleted'}:
+        if change['kind'] in {'added', 'deleted'} and change['path'] not in completed_empty:
             semantic[change['path']] = {'path': change['path'], 'reason': change['kind'], 'members': [], 'versions': []}
     current_sources = {}
+
+    def current_source(path, kind):
+        if path not in current_sources:
+            try:
+                current_sources[path] = memory._load_source(path, kind)
+            except FileNotFoundError:
+                current_sources[path] = None
+        return current_sources[path]
+
     member_by_id = {row['id']: row for row in members}
     for row in members:
         if row['retired']:
@@ -200,12 +256,9 @@ def maintain(memory, scope, *, control=None, timeout=600):
             reasons.append('stale')
         if row.get('coverage_gaps'):
             reasons.append('coverage_gaps')
-        if path not in current_sources:
-            try:
-                current_sources[path] = memory._load_source(path, row['kind'])
-            except FileNotFoundError:
-                current_sources[path] = None
-        current = current_sources[path]
+        if row['id'] in mechanical_dependency_pending:
+            reasons.append('mechanical_dependency_pending')
+        current = current_source(path, row['kind'])
         if current is None:
             reasons.append('missing')
         if current is not None and current.revision != row['source_revision']:
@@ -260,6 +313,9 @@ def maintain(memory, scope, *, control=None, timeout=600):
     for path in by_path:
         active = [row for row in members if row['path'] == path and not row['retired']]
         if not active:
+            current = current_source(path, by_path[path].get('kind'))
+            if current is not None and not isinstance(current, ImageSource) and not current.text:
+                continue
             semantic.setdefault(path, {'path': path, 'members': [], 'versions': []})['reason'] = 'no_active_knowledge'
             continue
         current = current_sources[path]

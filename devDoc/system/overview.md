@@ -1,6 +1,6 @@
 # 系统实现概览
 
-当前唯一 active 路线是 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.9.0。代码、依赖锁、测试、产品文档、示例及随包 skill 位于实验工程；根 devDoc 维护现行实现与活动工作。本机稳定客户端已普通升级为 0.9.0，本项目入口已刷新并经新的 NoProfile PowerShell 实际执行 brief；UUID、知识表、meta、3 条 mandatory 与 397 项 pending 均与停写后的 0.8.1 基线一致。本轮功能验收范围为本项目，其它项目的 0.9.0 功能尚未验收；证据见 [本轮进度](../tasks/20261111-memory-worker-prompts/progress.md)。实测和历史版本边界见 [环境记录](environment.md)，资源部署基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。
+当前唯一 active 路线是 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.9.1，本轮一致性修复与验证见 [进度](../tasks/20261111-consistency-review/progress.md)。代码、依赖锁、测试、产品文档、示例及随包 skill 位于实验工程；根 devDoc 维护现行实现与活动工作。0.9.0 的普通安装、项目入口、UUID 和指定知识记录核验见 [前轮进度](../tasks/20261111-memory-worker-prompts/progress.md)；当前安装状态和实际范围沿一致性审阅进度接续。实测和历史版本边界见 [环境记录](environment.md)，资源部署基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。
 
 本仓库提供三项可独立使用的 skill：[engineering-judgment](../../skills/engineering-judgment/SKILL.md) 用于设计、错误处理、兼容和使用流程的工程取舍，保留独立形态，通过长期使用反馈维护；[file-structure](../../skills/file-structure/SKILL.md) 推荐或整理开发文档和实验工程布局；[agent-team](../../skills/agent-team/SKILL.md) 为每项任务选择组织，按完整交付过程判断独立完成、简单协作或清晰分层，并使用宿主已有的订阅 subagent 能力。安装时选择完整目录放入目标 `.agents/skills/`，或把已有项目原件联接到该发现目录，核对相对引用与宿主实际列表；`init` 与 core doctor 不覆盖这项验收。完整步骤见 [项目接入](../../experiments/20261106-basepack/docs/setup-project.md#独立-skills-安装与发现)。组织选择与协作已有指令层实现，复杂广读的质量与总成本对照仍见 [专项记录](../tasks/20261106-rebuild/research/agent-team.md)。
 
@@ -10,7 +10,7 @@
 
 memory init 绑定项目 UUID 并写入随包 skill 和 brief 的宿主入口，包含固定 Python、绝对配置、数据库启动材料及使用问题记录入口；客户端从唯一 password_file 自动读取认证凭据。search、brief 和 read 纯读已发布知识及依据快照。宿主在任务开始独立运行默认 `memory maintain --control ...`，发现整个项目的受管来源、可归属 Codex 持久化聊天及历史未接受范围，完成机械小批；来源清单与实际语义覆盖分开报告。短结果提供协调者模型映射和 `memory prompt` 命令，宿主先设置实际模型，再交给子 agent 自行执行。英文协调者/reader 模板随 wheel 分发，渲染只读配置与回执。协调者持续接续来源分组批次，旧候选无需手动深维护准入；业务完成时 stop 并取消协调者及全部后代，不等已获准提交的事务。已采集原文及已发布批次保留，查询不等候维护。边界及流程见 [记忆模块](modules/memory.md)。
 
-CLI 未传检索模式时读取 memory.search_mode，新项目默认 vector；hybrid/vector 返回匹配语义身份的已发布覆盖，模型或兼容向量缺失明确失败。查询统一返回 `{matches, vector_coverage}`，brief 不再重复变化列表与向量 pending；采集、语义接受和向量覆盖分别报告。`memory guide/rank/stop` 在配置解析前独立处理自身输入；prompt 需要配置但不创建数据库客户端。doctor 默认 core，模型与 Condor 显式选查。
+CLI 未传检索模式时读取 memory.search_mode，新项目默认 vector；hybrid/vector 返回匹配语义身份的已发布覆盖，模型或兼容向量缺失明确失败。CLI search 与 Python `Memory.vector_search`、`Memory.hybrid_search` 统一返回 `{matches, vector_coverage}`，brief 不再重复变化列表与向量 pending；采集、语义接受和向量覆盖分别报告。`memory guide/rank/stop` 在配置解析前独立处理自身输入；prompt 需要配置但不创建数据库客户端。doctor 默认 core，模型与 Condor 显式选查。
 
 Codex 宿主自动提供项目绑定和完整注册根，线程明确 projectId 优先，字段缺失时按 root/worktree/common-dir 与其它注册项目根排除冲突；无法取证留覆盖缺口，非 Codex 保持文件功能。每聊天导出留在项目 memory 目录并沿原生 source_version 保存，精确回读提供消息身份与正文字节范围。宿主字段、附件及完整分叉/继承范围的实际验收边界见 [本轮进度](../tasks/20261110-onboarding-simplification/progress.md)。
 

@@ -316,7 +316,7 @@ class Memory:
                     raise ValueError(f"Deleted source exists again: {previous['path']}")
                 current[previous["path"]] = None
                 record = _record(previous["id"])
-                statements.append(f"IF {_sql(record)}.revision != {_sql(previous['revision'])} {{ THROW 'Concurrent source revision changed'; }};")
+                statements.append(f"IF {_sql(record)}.version != {_sql(_record(previous['version']))} {{ THROW 'Concurrent source version changed'; }};")
                 statements.append(f"UPDATE {_sql(record)} SET deleted=true;")
                 continue
             source = self._load_source(expected["path"], expected.get("kind"))
@@ -325,11 +325,11 @@ class Memory:
             current[source.path] = source
             previous = by_id[expected["id"]] if "id" in expected else by_path.get(source.path)
             record = _record(previous["id"]) if previous else _Record("source", uuid4().hex)
-            version = _Record("source_version", _digest(record.key + source.revision))
+            version = _Record("source_version", _digest(_sql([record, source.revision, source.path])))
             sources[source.path], versions[source.path] = record, version
             if previous:
-                statements.append(f"IF {_sql(record)}.revision != {_sql(previous['revision'])} {{ THROW 'Concurrent source revision changed'; }};")
-            snapshot = {"source": record, "revision": source.revision}
+                statements.append(f"IF {_sql(record)}.version != {_sql(_record(previous['version']))} {{ THROW 'Concurrent source version changed'; }};")
+            snapshot = {"source": record, "revision": source.revision, "path": source.path}
             kind = "image" if isinstance(source, ImageSource) else "text"
             if kind == "image":
                 assets[source.path] = retain_image(self.config.memory_dir, source)
@@ -523,12 +523,32 @@ class Memory:
         snapshot = self._execute(f"SELECT * FROM ONLY {_sql(_record(version, 'source_version'))};")[0]
         if snapshot is None:
             raise ValueError(f"Source snapshot not found: {version}")
-        if _record(snapshot["source"]) != _record(member["source"]):
+        same_source = _record(snapshot["source"]) == _record(member["source"])
+        history = []
+        if source_version is not None and (not same_source or "path" not in snapshot):
+            direct, nested = self._execute(
+                f"SELECT previous.path AS path, previous.source_version AS source_version FROM change "
+                f"WHERE target={_sql(_record(member_id))} AND previous.source={_sql(_record(snapshot['source']))}; "
+                f"SELECT VALUE previous.members[WHERE id={_sql(_record(member_id))} "
+                f"AND source={_sql(_record(snapshot['source']))}] FROM change "
+                f"WHERE previous.members.*.id CONTAINS {_sql(_record(member_id))};")
+            history = direct + [record for group in nested for record in group]
+        if not same_source and not history:
             raise ValueError(f"Source snapshot does not belong to member {member_id}: {version}")
         source = self._execute(f"SELECT * FROM ONLY {_sql(_record(snapshot['source']))};")[0]
         if source is None:
             raise ValueError(f"Snapshot source not found: {snapshot['source']}")
-        path, revision = source["path"], snapshot["revision"]
+        if "path" in snapshot:
+            path = snapshot["path"]
+        else:
+            accepted = history + ([member] if same_source else [])
+            exact = [record for record in accepted if
+                     _record(record["source_version"]) == _record(version, "source_version")]
+            accepted_paths = {record["path"] for record in exact or accepted}
+            if len(accepted_paths) != 1:
+                raise ValueError(f"Source snapshot has ambiguous historical paths for member {member_id}: {version}")
+            path = accepted_paths.pop()
+        revision = snapshot["revision"]
         if snapshot["kind"] == "image":
             asset = self.config.memory_dir / snapshot["asset"]
             if sha256(asset.read_bytes()).hexdigest() != revision:

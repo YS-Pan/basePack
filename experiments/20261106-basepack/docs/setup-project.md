@@ -167,10 +167,10 @@ if ($LASTEXITCODE -ne 0) { throw "search failed ($LASTEXITCODE)" }
 
 0.8.1 已收敛的调用合同继续保留，升级前核对自己的 Python 脚本与配置：
 
-- 检索统一返回 `{matches, vector_coverage}`，从 `matches` 取候选；删除 `include_coverage` 参数及裸列表返回格式。
+- CLI 检索与 Python `Memory.vector_search`、`Memory.hybrid_search` 统一返回 `{matches, vector_coverage}`，从 `matches` 取候选；删除这些接口的 `include_coverage` 参数及裸列表返回格式。
 - brief 删除恒空 `changes/change_count` 与重复 `vector_pending/vector_pending_count`，保留 `vector_coverage`、知识 pending、`coverage_gaps` 和 `change_check`；来源发现、原文采集与语义接受分别核对。
 - 删除 `MachineConfig.state_dir`、机器模板 `[shared].state_dir` 及其回显。embedding 日志仍由 SCM/Shawl 服务定义指定，jobs 仍使用项目 `jobs_dir`，不用搬迁日志。
-- 删除内部 `MemberContent/read_member` 当前原件读取接口；已发布原文通过 `memory read` 或 `SurrealMemory.read` 读取对应快照及显式 `source_version`。
+- 删除内部 `MemberContent/read_member` 当前原件读取接口；已发布原文通过 `memory read` 或 Python `Memory.read` 读取对应快照及显式 `source_version`。
 
 `memory guide/rank/stop` 无需 `--config`；项目动作仍需配置。`memory prompt` 需要显式配置，但只读配置、模板和回执，不要求数据库、密码文件或模型可用。独立 skills 的安装合同不变，升级客户端不会替目标项目安装它们。
 

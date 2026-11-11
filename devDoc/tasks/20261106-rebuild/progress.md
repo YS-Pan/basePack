@@ -1,8 +1,10 @@
 # 重建总进度
 
-更新：2026 年 11 月 10 日（北京时间）。
+更新：2026 年 11 月 11 日（北京时间）。
 
 ## 当前阶段
+
+本轮按用户要求先完成[近期一致性评估](../20261111-consistency-review/assessment.md)，再修复，最后维护记忆。修复、验证与记忆维护状态集中在[本轮进度](../20261111-consistency-review/progress.md)。
 
 当前唯一 active 路线为 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，源码、构建声明、测试、产品文档、示例及资源和记忆 skill 在该实验工程内维护；根目录保留统一 devDoc 和三项通用技能。本次布局迁移的实际检查与接续见 [迁移结果](../../archive/20261109-project-layout/result.md)，不改变 R9 和记忆功能的完成状态。
 

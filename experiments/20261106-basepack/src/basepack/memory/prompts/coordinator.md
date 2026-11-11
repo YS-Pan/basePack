@@ -4,13 +4,14 @@ Project root: $root
 Python: $python
 Project config: $config
 Maintenance receipt: $receipt
+Codex provenance inputs: $codex
 Task control: $control
 Work directory: $work
 Merged batch: $batch
 Receipt cutoff: $semantic_count semantic sources and $relations_count pending relations. Read this receipt for the actual work; it is the fixed candidate set for this assignment.
 This receipt and the parent lifecycle define this maintenance assignment. Read the batch and evidence contract in the installed memory workflow at $skill; do not start a new task-level maintain or recapture.
 
-1. Group receipt candidates by source and dependency into bounded batches. For `pending_relations`, follow each basis member with `$read_command` to find its original path, then prepare the relevant paths together. Inspect related nodes, edges, and their evidence; `$neighbors_command` includes stale history. Preserve original errors and report inaccessible or malformed source material with its path and error.
+1. Group receipt candidates by source and dependency into bounded batches. For `pending_relations`, follow each basis member with `$read_command` to find its original path, then prepare the relevant paths together. Inspect related nodes, edges, and their evidence; `$neighbors_command` includes stale history. Include the installed workflow's provenance lookup when assigning managed chat attachments: match both the handed-off `codex.project_id` and assigned image's `managed_attachment` in the current capture receipt or retained framing headers, then preserve verified matching chat-part identities in the image locator. An unavailable project ID leaves the origin unresolved. Preserve original errors and report inaccessible or malformed source material with its path and error.
 2. Dispatch up to four bounded readers concurrently. Set model `$reader_model` and reasoning effort `$reader_effort` as actual host spawn parameters for each reader. Add `--paths` and its project-relative files as shell-quoted arguments to the following command:
 
    $reader_command
@@ -20,5 +21,5 @@ This receipt and the parent lifecycle define this maintenance assignment. Read t
 
    $apply_command
 
-4. After each apply, use search, read, and neighbors to verify the published content and saved original evidence before marking candidates accepted. Verify every receipt-listed affected ID's accepted disposition and every uncovered range's current representation coverage with its saved evidence. Count handled candidates by these checks, and retain unresolved IDs and ranges as remaining work; source registration, apply success, or a source participating in a batch establishes progress only. Report any failed verification with the original error and correct or reprepare affected material.
+4. After each apply, use search, read, and neighbors to verify the published content and saved original evidence before marking candidates accepted. Verify every receipt-listed affected ID's accepted disposition and every uncovered range's current representation coverage with its saved evidence, including managed images' saved origin locators. A zero-line text source needs source registration and disposition of any old members and dependencies, with no fabricated member range. For other sources, source registration, apply success, or participation in a batch establishes progress only. Count handled candidates by these checks and retain unresolved IDs and ranges as remaining work. Report any failed verification with the original error and correct or reprepare affected material.
 5. Continue dispatching the next bounded batch until every candidate in this receipt is handled, the host stops this task, or remaining candidates are genuinely blocked and actionable work is exhausted. Report accepted work, coverage, unresolved candidates and their original errors. The host owns future maintenance runs and any later receipt. Use the host's subscription agents and lifecycle, not a database queue, scheduler, or LLM API.

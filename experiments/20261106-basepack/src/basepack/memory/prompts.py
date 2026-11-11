@@ -62,7 +62,10 @@ def _reader_hints(material, paths):
             relevant.append(hint)
         elif not basis or any(path is None for path in known_paths):
             unknown += 1
-    return {"sources": sources, "related_pending_relations": relevant, "unresolved_pending_relations_count": unknown}
+    hints = {"sources": sources, "related_pending_relations": relevant, "unresolved_pending_relations_count": unknown}
+    if "codex" in material:
+        hints["codex"] = material["codex"]
+    return hints
 
 
 def render_prompt(config, receipt, control, *, role="coordinator", tier=None, paths=None):
@@ -85,6 +88,7 @@ def render_prompt(config, receipt, control, *, role="coordinator", tier=None, pa
         "relations_count": str(len(material["pending_relations"])),
         "paths": json.dumps(paths or [], ensure_ascii=False),
         "hints": json.dumps(_reader_hints(material, paths) if role == "reader" else {}, ensure_ascii=False),
+        "codex": json.dumps(material.get("codex", {}), ensure_ascii=False),
         "work": str(work),
         "batch": str(batch),
         "reader_command": memory_command(config, "prompt", "--receipt", receipt_path,

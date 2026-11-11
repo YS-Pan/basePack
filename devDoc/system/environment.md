@@ -8,6 +8,12 @@
 
 选留证据现统一位于根 `artifacts/runs/`。前次临时材料整理的映射为 `artifacts/runs/tmp-reorganization-20261108/moves.json`，本次位置映射为 `artifacts/runs/20261109-project-layout/moves.json`；原始回执及下文历史路径保留当时含义，结合两轮映射回查长期副本，tmp 内容按可清除处理。
 
+## 2026-11-11 0.9.1 一致性修复与旧依据兼容
+
+稳定客户端 `D:/AgentTools/envs/basepack-client/Scripts/python.exe` 已普通 no-deps 升级为 0.9.1，Python 3.13.17。最终 wheel 位于 active 工程 `dist/consistency-0.9.1-final/`，SHA256 `1843a2df3630c094775b81d78ded799527230fce8365bc1e8d0d92629c39f3cc`；42 个包文件与源码、隔离普通安装及稳定安装逐字节相同。最终源码 432 passed/0 skipped，源码外普通 wheel 432 passed/0 skipped；独立认证库、共享图文 embedding、原生恢复和 Condor policy 检查均启用。初次临时 wheel 测试环境缺依赖的 11 失败及 K1 初版兼容负验原证均保留，不当作最终交付结果。
+
+新 wheel 实际回读正式库 1128 个非退役记录所用独立 basis，全部成功；其中 58 项旧重绑定依据曾被初版过强门槛拒读，现已修复并保留原同源合同。普通升级前后七表全部记录逐表 digest 相同，UUID、三条 mandatory、397 pending 和 1274/1274 兼容向量保持；升级未维护知识或重启正式库/共享服务。新 NoProfile PowerShell 实际执行更新后的项目入口，brief 返回三条 mandatory 和 397 pending。此轮仅验本项目及共用安装，未重验其它项目功能。记忆维护在升级核验后另行执行，实际接受与余项见 [本轮进度](../tasks/20261111-consistency-review/progress.md)，非秘密证据在 `artifacts/runs/20261111-consistency-review/`。
+
 ## 2026-11-11 0.9.0 worker prompt 与全项目默认
 
 稳定客户端 `D:/AgentTools/envs/basepack-client/Scripts/python.exe` 已普通 no-deps 升级为 0.9.0；Python 3.13.17，从稳定 site-packages 导入。main 独立重算最终 wheel SHA256 `3bdb716795d09db9ca087904e38c920f18c9a2134555906b1e816d1725fd1d12`，42 个包文件与最终 wheel、源码一致，包含英文 coordinator/reader 模板。源码外最终普通 wheel 完整检查 395 passed、0 skipped，启用独立认证库、真实共享模型与本机 Condor policy 检查；此前初版与最终候选仅两份模板及 RECORD 不同，完整检查已对最终候选重跑。具体范围与真实多批验收见[本轮结果](../tasks/20261111-memory-worker-prompts/result.md)。

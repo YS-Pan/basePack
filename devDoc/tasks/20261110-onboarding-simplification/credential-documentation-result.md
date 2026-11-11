@@ -14,4 +14,4 @@
 
 `tmp/20261111-auth-credentials/docs-check.py` 对 15 份 Markdown（含本文） 完成 UTF-8、围栏、README 英文正文和 227 个本地链接/锚点检查；6 段新库准备、launcher、启动、检查、SCM 与原生导出 PowerShell 示例均经原生语法解析。相关 Git 差异检查在包内冻结及最终环境补记后完成。临时材料只在本任务 tmp；没有打印、复制到报告或提交密码原文。
 
-本分支只读准备外部手写入口方案；validation 已完成实际入口更新，外部提交由 root 统一处理。本分支不修改正式配置、数据库或客户端，也不运行独立 skill 效果测试。最终普通 wheel 和三个项目的新 shell 读写、原凭据/launcher/PID 及七表逐字段一致证据见 [安装结果](credential-installation-result.md)，环境当前状态见 [日期实测](../../system/environment.md#2026-11-11-081-认证凭据与普通安装)。此后只补非包内记录，README/SKILL/template 字节未再改；文档检查不代替功能验收。
+本分支只读准备外部手写入口方案；validation 已完成实际入口更新，外部提交由 root 统一处理。本分支不修改正式配置、数据库或客户端，也不运行独立 skill 效果测试。最终普通 wheel 和三个项目的新 shell 读写、原凭据/launcher/PID 及七表逐字段一致证据见 [安装结果](credential-installation-result.md)，环境当前状态见 [日期实测](../../system/environment.md#2026-11-11-081-认证凭据与普通安装历史)。此后只补非包内记录，README/SKILL/template 字节未再改；文档检查不代替功能验收。

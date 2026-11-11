@@ -1,6 +1,6 @@
 # 项目配置与部署合同
 
-更新：2026 年 11 月 11 日。当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.9.0。本文维护代码、业务实例、共享设施与升级边界。本机稳定客户端已通过普通 no-deps 安装升级为 0.9.0，42 个安装文件与最终 wheel 字节一致；本项目沿用原 UUID 和知识，刷新入口后经新的 NoProfile PowerShell 验证 brief。本轮未验收其它项目的 0.9.0 功能，安装与保留数据证据见 [本轮进度](../tasks/20261111-memory-worker-prompts/progress.md)，实测和历史观察见 [环境记录](environment.md)。共享资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。操作从路线 README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md) 和 [管理员说明](../../experiments/20261106-basepack/docs/administrator.md) 进入。
+更新：2026 年 11 月 11 日。当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.9.1。本文维护代码、业务实例、共享设施与升级边界。当前安装状态和本轮修复验证沿 [一致性审阅进度](../tasks/20261111-consistency-review/progress.md) 接续；0.9.0 的普通安装、原 UUID、指定知识记录及入口检查见 [前轮进度](../tasks/20261111-memory-worker-prompts/progress.md)。实测和历史观察见 [环境记录](environment.md)，共享资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。操作从路线 README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md) 和 [管理员说明](../../experiments/20261106-basepack/docs/administrator.md) 进入。
 
 ## 位置与责任
 
@@ -75,13 +75,15 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 
 ## 升级与回退
 
+0.9.1 修复维护依赖与空来源处理、聊天附件出处交接、历史快照回读及检索去重。新来源快照保存接受时路径并将路径纳入版本身份；旧快照保留同来源读取合同，跨来源以成员历史证明归属，不要求逐版本的成员接受记录。旧快照缺路径时仅使用可核的唯一路径，不强迁或重写已有知识。配置、UUID、原凭据、embedding 身份和共享服务保持既有合同，实际安装与验证沿 [本轮进度](../tasks/20261111-consistency-review/progress.md) 接续。
+
 0.9.0 增加随 wheel 安装的英文维护模板与纯 `memory prompt` 渲染入口。默认 Git 清单加 source_scope 显式包含项取代仅按 source_scope 发现，非 Git 仍按声明范围；历史已登记及未接受来源保持全局接续。maintain 短结果增加发现边界、control 与协调者派工元数据，宿主按返回命令交接，刷新生成入口和自有包装。模型映射由项目 [ai] 解析，宿主实际设置；数据库 schema、原凭据、UUID、向量身份与共享服务沿用既有合同。安装、构建和真实使用结果分别按专项进度核实。
 
 0.7.0 将查询与维护分离：查询读取已发布内容及依据快照，维护候选在所选模式的向量准备好后原子发布。知识表与项目/机器配置 schema 保持现有格式；升级保留 UUID、数据及显式检索模式，运行 memory init 刷新 schema 和生成入口。0.7.1 删除独立 text 模式；旧 text 项目复用或补齐兼容向量后切换 vector/hybrid，保留知识、ID 和来源。新项目默认 vector。
 
 0.8.1 保留既有认证库和原用户名/密码文件，删除 password_env 手工桥。升级前备份 wheel、配置、密码文件和完整恢复集合，等待在途客户端调用结束后普通更新客户端，刷新 instructions 与自有包装。服务、物理目录、端口和 UUID 保持，通常无需重启或迁库；新 shell 直接核 brief/search/read/neighbors。失败按原错误恢复凭据或回退客户端，不清库、不重新总结。
 
-0.8.0 将维护入口收敛为 `memory maintain` 的确定性预检与余下语义交接，默认读取 source_scope，采集可归属聊天后按来源接续。检索统一 `{matches, vector_coverage}`，Python 调用方需删除 `include_coverage` 并读取 matches；brief 删除 `changes/change_count/vector_pending/vector_pending_count`。删除无消费者的 MachineConfig.state_dir 和旧 MemberContent/read_member 原件接口，快照回源保持。独立 skills 仍从配套源码取得，未改 wheel 发行范围。
+0.8.0 将维护入口收敛为 `memory maintain` 的确定性预检与余下语义交接，默认读取 source_scope，采集可归属聊天后按来源接续。CLI search 与 Python `Memory.vector_search`、`Memory.hybrid_search` 统一 `{matches, vector_coverage}`，两项 Python 方法删除 `include_coverage`，调用方读取 matches；brief 删除 `changes/change_count/vector_pending/vector_pending_count`。删除无消费者的 MachineConfig.state_dir 和旧 MemberContent/read_member 原件接口，快照回源保持。独立 skills 仍从配套源码取得，未改 wheel 发行范围。
 
 轻客户端要求 Python >=3.13，CPU/CUDA 模型依赖由各自 extra 选择。共享 embedding 的协议和语义身份未变，现有 0.5.0 CUDA 服务可继续运行；CPU 服务按自动设备选择启动，保持相同模型与 FP16。Condor 继续维护准入和排队，capacity 只作观测。更老项目缺少检索模式或 `[ai]` 时按[项目接入](../../experiments/20261106-basepack/docs/setup-project.md#版本升级)补齐。
 

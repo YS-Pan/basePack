@@ -6,6 +6,97 @@ import pytest
 from test_memory_store import batch_for, memory
 
 
+@pytest.mark.parametrize('dependency_first', [False, True])
+def test_mechanical_sources_with_cross_source_evidence_publish_together(memory, dependency_first):
+    paths = ['a.md', 'z.md'] if dependency_first else ['z.md', 'a.md']
+    for path in paths:
+        (memory.config.root / path).write_bytes(b'Accepted requirement.\n')
+    prepared = memory.prepare(paths)
+    memory.apply({'sources': [{'path': row['path'], 'revision': row['revision']}
+                              for row in prepared['sources']],
+                  'members': [
+                      {'id': 'evidence', 'kind': 'chunk', 'path': paths[0],
+                       'start_line': 1, 'end_line': 1},
+                      {'id': 'summary', 'kind': 'file', 'path': paths[1],
+                       'start_line': 1, 'end_line': 1, 'text': 'Accepted requirement.',
+                       'evidence': ['evidence']}]})
+    old = memory.read('evidence')['member']['source_version']
+    for path in paths:
+        (memory.config.root / path).write_bytes(b'Accepted requirement.\r\n')
+    result = memory.maintain(paths)
+    assert result['mechanical_batches'] == 1
+    assert not result['needs_semantic']
+    evidence = memory.read('evidence')
+    summary = memory.read('summary')['member']
+    assert evidence['original']['text'] == 'Accepted requirement.\r\n'
+    assert summary['basis'][0]['source_version'] == evidence['member']['source_version']
+    assert summary['basis'][0]['knowledge_revision'] == evidence['member']['knowledge_revision']
+    assert memory.read('evidence', source_version=old, start_line=1, end_line=1)['original']['text'] == 'Accepted requirement.\n'
+    assert not memory.maintain(paths)['needs_semantic']
+
+
+@pytest.mark.parametrize('external_change', ['replace', 'append_accepted_source', 'delete'])
+def test_mechanical_source_with_changed_external_evidence_remains_semantic(memory, external_change):
+    for path in ['evidence.md', 'summary.md']:
+        (memory.config.root / path).write_bytes(b'Accepted requirement.\n')
+    prepared = memory.prepare(['evidence.md', 'summary.md'])
+    memory.apply({'sources': [{'path': row['path'], 'revision': row['revision']}
+                              for row in prepared['sources']],
+                  'members': [
+                      {'id': 'evidence', 'kind': 'chunk', 'path': 'evidence.md',
+                       'start_line': 1, 'end_line': 1},
+                      {'id': 'summary', 'kind': 'chunk', 'path': 'summary.md',
+                       'start_line': 1, 'end_line': 1, 'evidence': ['evidence']}]})
+    before = memory.read('summary')['member']
+    if external_change == 'delete':
+        (memory.config.root / 'evidence.md').unlink()
+    elif external_change == 'append_accepted_source':
+        (memory.config.root / 'evidence.md').write_bytes(b'Accepted requirement.\nException to the requirement.\n')
+        prepared = memory.prepare(['evidence.md'])
+        memory.apply({'sources': [{'path': 'evidence.md', 'revision': prepared['sources'][0]['revision']}]})
+    else:
+        (memory.config.root / 'evidence.md').write_bytes(b'Changed requirement.\n')
+    (memory.config.root / 'summary.md').write_bytes(b'Accepted requirement.\r\n')
+    result = memory.maintain([])
+    material = json.loads(open(result['receipt'], encoding='utf-8').read())
+    summary = next(row for row in material['semantic'] if row['path'] == 'summary.md')
+    assert 'mechanical_dependency_pending' in summary['members'][0]['reasons']
+    assert memory.read('summary')['member'] == before
+
+
+def test_empty_text_source_registration_finishes_until_body_appears(memory):
+    path = memory.config.root / '__init__.py'
+    path.write_bytes(b'')
+    result = memory.maintain(['__init__.py'])
+    assert result['mechanical_batches'] == 1
+    assert not result['needs_semantic']
+    assert memory.sources()[0]['path'] == '__init__.py'
+    assert memory._rows('member') == []
+    assert not memory.maintain([])['needs_semantic']
+    path.write_bytes(b'New requirement.\n')
+    assert memory.maintain([])['needs_semantic']
+
+
+def test_cleared_source_requires_old_knowledge_retirement_before_empty_completion(memory):
+    path = memory.config.root / 'cleared.md'
+    path.write_bytes(b'Old requirement.\n')
+    prepared = memory.prepare(['cleared.md'])
+    memory.apply({'sources': [{'path': 'cleared.md', 'revision': prepared['sources'][0]['revision']}],
+                  'members': [{'id': 'old', 'kind': 'chunk', 'path': 'cleared.md',
+                               'start_line': 1, 'end_line': 1}],
+                  'nodes': [{'id': 'old_claim', 'kind': 'decision', 'text': 'Old requirement.',
+                             'evidence': ['old']}]})
+    path.write_bytes(b'')
+    assert memory.maintain([])['needs_semantic']
+    prepared = memory.prepare(['cleared.md'])
+    memory.apply({'sources': [{'path': 'cleared.md', 'revision': prepared['sources'][0]['revision']}],
+                  'expected': prepared['expected'], 'delete_members': ['old']})
+    assert memory.maintain([])['needs_semantic']  # the dependent claim still needs disposition
+    prepared = memory.prepare(['cleared.md'])
+    memory.apply({'sources': [], 'expected': prepared['expected'], 'delete_nodes': ['old_claim']})
+    assert not memory.maintain([])['needs_semantic']
+
+
 def test_maintenance_reuses_semantics_for_line_endings_and_preserves_old_snapshot(memory, monkeypatch):
     from basepack.memory import candidate_vectors
 

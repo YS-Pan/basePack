@@ -1,4 +1,5 @@
 import argparse
+import json
 from pathlib import Path
 import subprocess
 
@@ -228,6 +229,8 @@ def test_maintain_discovers_git_project_and_emits_complete_worker_command(tmp_pa
     (config.root / "unsupported.bin").write_bytes(b"binary\0content")
     calls = []
     receipt = str(config.memory_dir / "maintenance/receipt.json")
+    Path(receipt).parent.mkdir(parents=True, exist_ok=True)
+    Path(receipt).write_text('{"semantic": [], "pending_relations": []}', encoding="utf-8")
     monkeypatch.setattr("basepack.memory.store.Memory.maintain", lambda self, scope, **kwargs:
                         calls.append((scope, kwargs)) or {"needs_semantic": True, "receipt": receipt})
     result, status = dispatch(_memory_args("maintain"), config)
@@ -246,6 +249,39 @@ def test_maintain_discovers_git_project_and_emits_complete_worker_command(tmp_pa
     assert str(control) in result["worker"]["render_command"]
     assert receipt in result["worker"]["render_command"]
     assert calls[0][1] == {"control": str(control), "timeout": 600}
+    material = json.loads(Path(receipt).read_text(encoding="utf-8"))
+    assert material["codex"] == {"project_id": result["codex"]["project_id"],
+                                  "capture_dir": str(config.memory_dir / "codex"),
+                                  "attachment_dir": str(config.memory_dir / "codex-attachments")}
+
+
+def test_maintain_receipt_keeps_current_and_retained_codex_provenance(tmp_path, monkeypatch):
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    config = load_project_config(init_project(tmp_path / "project", machine))
+    _provision_password(config)
+    receipt = config.memory_dir / "maintenance" / "semantic.json"
+    receipt.parent.mkdir()
+    receipt.write_text('{"semantic": [], "pending_relations": []}', encoding="utf-8")
+    capture_receipt = receipt.with_name('capture.json')
+    monkeypatch.setattr("basepack.memory.cli._collect_codex", lambda *args, **kwargs:
+                        {"project_id": "owned", "status": "captured", "paths": [],
+                         "receipt": str(capture_receipt)})
+    monkeypatch.setattr("basepack.memory.discovery.retained_codex_paths", lambda *args:
+                        {"paths": [".basepack/memory/codex-attachments/retained.png"], "gaps": []})
+    monkeypatch.setattr("basepack.memory.store.Memory.maintain", lambda *args, **kwargs:
+                        {"needs_semantic": True, "receipt": str(receipt)})
+    result, status = dispatch(_memory_args("maintain", "--scope", "no-new-discovery"), config)
+    assert status == 0
+    material = json.loads(receipt.read_text(encoding="utf-8"))
+    assert material["codex"] == {"project_id": "owned", "receipt": str(capture_receipt),
+                                  "capture_dir": str(config.memory_dir / "codex"),
+                                  "attachment_dir": str(config.memory_dir / "codex-attachments")}
+    from basepack.memory.prompts import render_prompt
+    rendered = render_prompt(config, result["receipt"], result["control"], role="reader",
+                             paths=[".basepack/memory/codex-attachments/retained.png"])
+    hints = json.loads(rendered["prompt"].split('Bounded receipt hints: ', 1)[1].splitlines()[0])
+    assert hints['codex'] == material['codex']
 
 
 def test_maintain_keeps_owned_retained_captures_when_collection_is_unavailable(tmp_path, monkeypatch):

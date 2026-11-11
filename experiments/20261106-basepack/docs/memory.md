@@ -31,7 +31,7 @@ memory changes --scope '资料目录'
 
 prepare 时包括本批所用依据与关系两端的材料；它提供新旧编号原文、已有与关联成员、节点、关系及 expected 知识版本，图片返回可打开的原图路径。关联记录的来源原文仍需 read 或扩充 prepare 范围核实。将材料交给订阅 agent，在同次阅读中选择最终块边界并生成摘要、节点和图边；结构备读单元只用于定位。批次 JSON 合同与操作流程在 `memory guide` 返回的已安装 skill 中，源码维护源为 [SKILL.md](../src/basepack/memory/SKILL.md)。
 
-apply 核对来源版本，以及本批改写、退休、更正目标、实际使用的既有依据成员和关系两端的 expected 版本，再原子写入；无关 expected 不阻塞并行，缺 expected 仅允许本批新建记录。原文块由程序按范围取原词，摘要、边界、依据、历史与更正持久保存。旧草稿冲突时重新 prepare、共读后再提交。原件变化作为待维护信息，已发布知识及其依据快照仍可查询；受影响内容须在维护时共读，未变输入与兼容向量可复用，文件追加的新内容必须重核完整摘要。部分摘要显式保存 coverage_gaps。接受删除保留旧依据，相关主张按剩余证据重核；仅登记更正而未同批替换的错误内容标待核并排除查询。再次共读、apply 并查询新结果后，才算完成增量维护。向量模式在 apply 事务前准备候选编码，内容与匹配向量一起发布。深检查使用 `changes --scope <文件或目录> --deep`。
+apply 核对来源版本，以及本批改写、退休、更正目标、实际使用的既有依据成员和关系两端的 expected 版本，再原子写入；无关 expected 不阻塞并行，缺 expected 仅允许本批新建记录。原文块由程序按范围取原词，摘要、边界、依据、历史与更正持久保存。旧草稿冲突时重新 prepare、共读后再提交。原件变化作为待维护信息，已发布知识及其依据快照仍可查询；受影响内容须在维护时共读，未变输入与兼容向量可复用，文件追加的新内容必须重核完整摘要。部分摘要显式保存 coverage_gaps。接受删除保留旧依据，相关主张按剩余证据重核；仅登记更正而未同批替换的错误内容标待核并排除查询。再次共读、apply 并查询新结果后，才算完成增量维护。apply 在事务前准备候选内容与匹配向量，再由同一短事务发布；准备或版本核对失败时不发布本批。深检查使用 `changes --scope <文件或目录> --deep`。
 
 新内容由 apply 使用 [共享 embedding](resources.md) 编码；已有内容补建或重建索引时运行 `memory embed`，不另外加载模型。文件/章节使用已接受摘要，块使用原文，图片使用原始图片；兼容且输入未变的向量复用。超限保留原错误，交回原阅读 agent 调整分块或摘要，不能静默截断。模型不可用时停止本批发布或查询，并保留原错误。
 
@@ -47,9 +47,11 @@ memory maintain --control '<本任务唯一control>' --output '<maintenance-summ
 
 默认面向整个项目的受管来源，不按当前业务任务的文件缩小维护范围。Git 项目枚举项目内已跟踪和未忽略的未跟踪文件，并加入 `memory.source_scope` 显式包含项，排除工具状态、环境与缓存；非 Git 项目使用声明的 `source_scope`。所有已登记来源、历史 pending/未接受范围和可归属 Codex 原件持续参与维护。`--scope <文件或目录> ...` 只覆盖本轮新文件发现，不把历史来源限制到该范围。无需为日常维护递归扫描 `.`；不支持的二进制材料留缺口，读取失败保留原错。
 
+零行文字来源且没有活动知识时，只需登记来源，不创建无效行范围的 member。已有正文被清空时，仍须退役旧成员并处理依赖；完成后不反复派发该空来源，重新出现正文会继续发现。
+
 预检先按 [Codex 绑定](setup-project.md#codex-项目聊天接入) 取得本次可读的持久化聊天截点，再比较来源及旧成员实际接受版本。Git 干净仍可能有尚未接受的原文。发现清单、聊天采集、语义接受和向量覆盖分别检查，不能据其中一项声称全部项目材料已接受。`changes` 提供显式变化查看，`maintain` 才负责机械更新与语义交接；查询不调用两者。
 
-程序直接处理原字节 hash 相同的元数据变化、完整正文仅 CRLF/LF 变化，以及有唯一定位且上下文可确认未变的原文块。完整回执保留机械批次、旧/新行映射、变化片段、受影响成员与关系；换行归一只用于比较，快照仍按真实原字节保存。编码输入及身份未变才复用向量；实际输入变化按现有 apply 合同编码。已有 stale、更正、退役或语义证据不足的范围保留待核，局部文字相同不表示父级摘要或关系均有效。
+程序在依据闭合时处理原字节 hash 相同的元数据变化、完整正文仅 CRLF/LF 变化，以及有唯一定位且上下文可确认未变的原文块；相互依赖的机械候选共同发布，无法证明依赖仍有效的范围留给语义共读。完整回执保留机械批次、旧/新行映射、变化片段、受影响成员与关系；换行归一只用于比较，快照仍按真实原字节保存。编码输入及身份未变才复用向量；实际输入变化按现有 apply 合同编码。已有 stale、更正、退役或语义证据不足的范围保留待核，局部文字相同不表示父级摘要或关系均有效。
 
 预检简报返回机械处理计数、`needs_semantic`、本地 `receipt`、绝对 `control`、`discovery` 边界/缺口、`codex` 采集状态及必要的 `worker` 派工元数据。显式调用省略 `--control` 时会自动分配唯一路径。`needs_semantic=false` 时不创建语义 agent；为 true 时，宿主先按 `worker.model` 和 `worker.reasoning_effort` 设置实际模型与推理强度，再用干净历史启动协调者，只传一条英文启动句和 `worker.render_command`：
 
@@ -72,7 +74,7 @@ Codex 维护采集真实用户消息与可取得的助手文字，保留 thread/
 
 受管聊天原文保存在 `memory.data_dir/codex/<thread>.txt`，版本 hash 属于该导出的真实 UTF-8 字节。接受后沿现有 source_version 保存快照；`read` 的 `original.chat_locations` 从所选已核快照返回聊天链接、thread/turn/item/part、UTF-8 字节范围及本次读取的正文交集，生成头与分隔符不当作人类原文。旧已发布版本可在原聊天续写或修订后继续核实。
 
-可读取且格式受支持的 `localImage` 按内容 hash 复制到 `memory.data_dir/codex-attachments/`，作为独立图片原件进入同一维护范围；采集回执保留 chat part 身份，语义 worker 实际打开图片，并将该身份作为 locator 接受。缺失或不支持的附件留 gap；真实聊天附件仍未验，不能据模拟 PNG 回归宣称全部附件可用。
+可读取且格式受支持的 `localImage` 按内容 hash 复制到 `memory.data_dir/codex-attachments/`，作为独立图片原件进入同一维护范围。语义回执的 `codex` 及 reader 提示提供项目 ID、本轮采集回执（如有）和保留聊天/附件目录；worker 按随包 skill 从采集记录或历史 framed 原件核对同项目及同附件的 chat part 身份，实际打开图片，再将原记录身份作为 locator 接受。附件缺失、身份不可核或格式不支持时留 gap；真实聊天附件仍未验，不能据模拟 PNG 回归宣称全部附件可用。
 
 当前宿主列表中的部分项目/父子字段缺失时依项目根与 worktree 证据归属；显式 subagent 引用须以直接 thread/read 返回的父级身份核对且无项目冲突，才递归采集。无法确认的范围明确留 gap。附件不可取时、引用的 subagent 未能列出或读取时也保留缺口，不按不存在退役旧知识。完整分叉/继承身份、附件原件及全部聊天覆盖仍未完成真实验收；采集回执、语义待核与向量覆盖分别检查，`pending=0` 不等于全部聊天已接受。
 
@@ -114,7 +116,7 @@ brief 直接提供必须保留的信息、相关线索、来源与覆盖缺口�
 
 编号、文件名和需保留完整字符的短语使用 `--mode hybrid --literal`：在路径、标题和正文中做大小写无关的子串匹配，直接命中排在语义补充结果前，并带 `lexical_rank`。它按完整字符段匹配，区别于分词全文查询；结果仍可包含语义补充，引用前须 read 核实。`vector --literal` 会报错，需显式选择 hybrid。
 
-`search` 的 CLI 与 Python 接口统一返回 `{matches, vector_coverage}`；Python 调用方从 `matches` 读取候选，不再接收裸列表或使用 `include_coverage`。brief 保留知识 pending、`coverage_gaps`、`change_check` 与 `vector_coverage`，删除恒空 `changes/change_count` 和重复 `vector_pending/vector_pending_count`。
+CLI `memory search` 与 Python `Memory.vector_search`、`Memory.hybrid_search` 统一返回 `{matches, vector_coverage}`；调用方从 `matches` 读取候选，两项 Python 方法不再接收 `include_coverage`。brief 保留知识 pending、`coverage_gaps`、`change_check` 与 `vector_coverage`，删除恒空 `changes/change_count` 和重复 `vector_pending/vector_pending_count`。
 
 brief、search 和 read 只读已发布知识及对应原文快照，不扫描原件或等待维护。`changes --scope` 显式发现已登记来源及指定范围中的变化；未改原件只查元数据，深查才做完整 hash。独立 `maintain` 的默认发现与持续维护边界见 [自动维护](#自动维护与手动维护)。任务词未命中时，短项目地图仍提供前提线索。
 
@@ -126,13 +128,13 @@ read 只接受 member ID；语义 node/edge 经 neighbors 查看 `basis`，按�
 memory read '<basis.member>' --source-version '<basis.source_version>' --start-line <basis.start_line> --end-line <basis.end_line>
 ```
 
-图片传同一 `source_version` 及存在的 `--locator '<basis.locator 的 JSON>'`，实际打开 `original.image_path`。引用的是 read 返回的 `original`；同时返回的 `member` 是当前记录，stable ID 更新后的当前摘要或行范围不能替代关系保存的旧依据。neighbors 默认展开当前关系，历史复核显式加 `--include-stale`。原件变化或缺失时仍读已发布版本的快照；快照缺失或损坏时返回错误。
+图片传同一 `source_version` 及存在的 `--locator '<basis.locator 的 JSON>'`，实际打开 `original.image_path`。引用的是 read 返回的 `original`；同时返回的 `member` 是当前记录，stable ID 更新后的当前摘要或行范围不能替代关系保存的旧依据。同一 source 的已发布旧版本继续可读；成员跨 source 移动后，须有成员历史证明它曾属该来源，不要求逐版本的成员接受记录。新快照的 `original.path` 使用保存的出处；旧快照缺路径时优先使用请求版本的历史路径，否则须有唯一可核的同来源成员路径，不保证恢复未记录的精确历史路径。neighbors 默认展开当前关系，历史复核显式加 `--include-stale`。原件变化或缺失时仍读已发布版本的快照；快照缺失、损坏或路径歧义时返回错误。
 
 当前 ID 合同支持字符串与整数 key。无表名前缀时是原始字符串 key；带 `member:`、`node:` 等前缀时是数据库 canonical ID，可直接沿用返回值。字符串 key `123` 与 canonical `member:123` 的数字 key 不同；字符串形式为 ``member:`123` ``。含冒号的 key 使用完整 canonical ID。
 
 任务已知少量文件时，启动 brief 后可以直接批量读取；需要发现位置、未点名前提或跨材料依据时，再用记忆检索。父级摘要用于补背景或条件，选证据时避免重复已选原文块。
 
-工作 agent 可只委托一次，使用 [项目配置](setup-project.md#agent-模型等级) 的检索等级（默认 tier1），让 worker 完成多轮检索、父子/语义展开、原文核实和评分，再用 `rank --input <scored.json> --budget <文字字符数>` 排序交付实际内容。词法分数与 agent 分数不同。超预算证据保留补读入口，不静默截掉条件；工作 agent 仍可自由补读。
+工作 agent 可只委托一次，使用 [项目配置](setup-project.md#agent-模型等级) 的检索等级（默认 tier1），让 worker 完成多轮检索、父子/语义展开、原文核实和评分，再用 `rank --input <scored.json> --budget <文字字符数>` 排序交付实际内容。rank 按依据版本、读取位置及实际表示去重，区分同一成员的历史版本/范围、摘要或标题更正及图片不同区域。词法分数与 agent 分数不同。超预算证据保留补读入口，不静默截掉条件；工作 agent 仍可自由补读。
 
 ## 备份与恢复
 

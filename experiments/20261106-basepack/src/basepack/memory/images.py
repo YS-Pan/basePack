@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
+from uuid import uuid4
 
 
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".tif", ".tiff"}
@@ -34,8 +35,16 @@ def retain_image(memory_dir: Path, source: ImageSource) -> str:
     relative = Path("assets") / (source.revision + Path(source.path).suffix.lower())
     target = memory_dir / relative
     target.parent.mkdir(parents=True, exist_ok=True)
-    if not target.exists():
-        target.write_bytes(source.data)
-    if sha256(target.read_bytes()).hexdigest() != source.revision:
-        raise ValueError(f"Image evidence snapshot revision mismatch: {target}")
+    if target.exists():
+        if sha256(target.read_bytes()).hexdigest() != source.revision:
+            raise ValueError(f"Image evidence snapshot revision mismatch: {target}")
+    else:
+        temporary = target.with_name(f".{target.name}.{uuid4().hex}.tmp")
+        try:
+            temporary.write_bytes(source.data)
+            if sha256(temporary.read_bytes()).hexdigest() != source.revision:
+                raise ValueError(f"Image evidence snapshot revision mismatch: {temporary}")
+            temporary.replace(target)
+        finally:
+            temporary.unlink(missing_ok=True)
     return relative.as_posix()

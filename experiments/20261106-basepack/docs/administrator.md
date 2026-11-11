@@ -87,6 +87,8 @@ if (-not (Test-Path -LiteralPath $settings.memory_password_file)) {
 
 将下面的 `serve.ps1` 保存到配置的 memory.data_dir（默认 `.basepack/memory/`），先创建该目录及 `logs/`。执行账户须能读凭据、读写 store 与日志。替换三个绝对路径；Windows PowerShell 5.1 的 `.ps1` 保存为带 BOM 的 UTF-8。脚本不生成或替换密码，只把同一文件交给 SurrealDB 原生认证入口：
 
+以下示例仅创建 HTTP 服务，endpoint 使用 `http://...`；HTTPS 须按 `surreal start --help` 另配原生 `--web-crt` 和 `--web-key` 证书与密钥参数。
+
 ```powershell
 $ErrorActionPreference = 'Stop'
 $python = '<absolute-python.exe>'
@@ -95,10 +97,12 @@ $surreal = '<absolute-surreal.exe>'
 $json = & $python -X utf8 -m basepack --config $config config show
 if ($LASTEXITCODE -ne 0) { throw "Cannot load project config ($LASTEXITCODE)" }
 $settings = $json | ConvertFrom-Json
+$endpoint = [Uri]$settings.memory.endpoint
+$bind = '{0}:{1}' -f $endpoint.Host, $endpoint.Port
 Set-Location -LiteralPath $settings.memory_dir
 $env:SURREAL_USER = $settings.memory.username
 $env:SURREAL_PASS = [IO.File]::ReadAllText($settings.memory_password_file)
-& $surreal start --bind ([Uri]$settings.memory.endpoint).Authority --allow-origin 'http://127.0.0.1' 'surrealkv://store'
+& $surreal start --bind $bind --allow-origin 'http://127.0.0.1' 'surrealkv://store'
 exit $LASTEXITCODE
 ```
 

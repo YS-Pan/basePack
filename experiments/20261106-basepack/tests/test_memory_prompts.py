@@ -104,6 +104,30 @@ def test_reader_hints_match_windows_paths(prompt_project, tmp_path):
     assert '"sources": [{"path": "folder/one.md"' in reader["prompt"]
 
 
+@pytest.mark.parametrize("current_capture", [False, True])
+@pytest.mark.parametrize("project_id", ["owned-project", None])
+def test_render_preserves_codex_provenance_pointers_without_opening_them(
+        prompt_project, tmp_path, current_capture, project_id):
+    codex = {"project_id": project_id, "capture_dir": str(tmp_path / "missing 中文 captures"),
+             "attachment_dir": str(tmp_path / "missing image's directory")}
+    if current_capture:
+        codex["receipt"] = str(tmp_path / "missing capture receipt.json")
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text(json.dumps({"semantic": [{"path": "attachment.png", "members": []}],
+                                   "pending_relations": [], "codex": codex}), encoding="utf-8")
+    coordinator = render_prompt(prompt_project, receipt, tmp_path / "control")
+    assert f"Codex provenance inputs: {json.dumps(codex, ensure_ascii=False)}" in coordinator["prompt"]
+    reader = render_prompt(prompt_project, receipt, tmp_path / "control", role="reader", paths=["attachment.png"])
+    hint_text = reader["prompt"].split("Bounded receipt hints: ", 1)[1].splitlines()[0]
+    hints = json.loads(hint_text)
+    assert hints["codex"] == codex
+    assert hints["sources"] == [{"path": "attachment.png", "members": []}]
+    for result in (coordinator, reader):
+        assert "match both the handed-off `codex.project_id`" in result["prompt"]
+        assert "An unavailable project ID leaves the origin unresolved." in result["prompt"]
+    assert not prompt_project.memory_dir.exists()
+
+
 def test_render_preserves_input_errors(prompt_project, tmp_path):
     receipt = tmp_path / "receipt.json"
     receipt.write_text("not JSON", encoding="utf-8")

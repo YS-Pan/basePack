@@ -123,6 +123,14 @@ def dispatch(args, config):
             result["discovery"] = {"mode": discovery["mode"], "sources": len(scope),
                                    "gaps": discovery["gaps"]}
             if result["needs_semantic"]:
+                receipt = Path(result["receipt"])
+                material = json.loads(receipt.read_text(encoding="utf-8"))
+                material["codex"] = {"project_id": codex["project_id"],
+                                     "capture_dir": str(config.memory_dir / "codex"),
+                                     "attachment_dir": str(config.memory_dir / "codex-attachments")}
+                if "receipt" in codex:
+                    material["codex"]["receipt"] = codex["receipt"]
+                receipt.write_text(json.dumps(material, ensure_ascii=False, indent=2), encoding="utf-8")
                 result["worker"] = prompt_dispatch(config, result["receipt"], control)
     if args.output:
         path = Path(args.output).resolve()

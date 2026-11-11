@@ -1,5 +1,6 @@
 """Sort agent scores and deliver content under an explicit character budget."""
 
+import json
 import math
 
 
@@ -15,12 +16,16 @@ def select_scored(items: list[dict], budget: int) -> dict:
     used = 0
     for item in sorted(items, key=lambda row: (-row["score"], row["id"])):
         reason = None
-        content_key = (item["path"], item["revision"], item["start_line"],
-                       item["end_line"], item["kind"], item["text"])
-        if item["id"] in identities or content_key in contents:
+        version = (item.get("source_version"), item["revision"])
+        locator = json.dumps(item.get("locator"), sort_keys=True) if item["kind"] == "image" else None
+        position = (item["start_line"], item["end_line"], locator)
+        representation = (item["kind"], item.get("title", ""), item["text"])
+        identity = (item["id"], version, position, representation)
+        content_key = (item["path"], version, position, representation)
+        if identity in identities or content_key in contents:
             reason = "duplicate"
         if item["kind"] == "chunk":
-            key = (item["path"], item["revision"])
+            key = (item["path"], version)
             start, end = item["start_line"], item["end_line"]
             if any(left <= start and end <= right for left, right in coverage.get(key, [])):
                 reason = "covered_original"
@@ -31,9 +36,9 @@ def select_scored(items: list[dict], budget: int) -> dict:
             continue
         selected.append(item)
         used += len(item["text"])
-        identities.add(item["id"])
+        identities.add(identity)
         contents.add(content_key)
         if item["kind"] == "chunk":
-            key = (item["path"], item["revision"])
+            key = (item["path"], version)
             coverage.setdefault(key, []).append((item["start_line"], item["end_line"]))
     return {"items": selected, "text_characters": used, "budget": budget, "omitted": omitted}

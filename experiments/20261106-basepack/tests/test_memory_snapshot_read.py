@@ -6,6 +6,7 @@ import json
 import pytest
 
 from basepack.memory.cli import dispatch, register_commands
+from basepack.memory.store import _record, _sql
 from test_memory_store import batch_for, memory
 
 
@@ -125,3 +126,134 @@ def test_codex_message_identity_and_text_survive_source_update_in_saved_snapshot
     assert loc["text"] == "原要求：保留证据 🚀"
     assert loc["part_byte_start"] == 0
     assert loc["part_byte_end"] == len(loc["text"].encode("utf-8"))
+
+
+@pytest.mark.parametrize("legacy_snapshot", [False, True])
+@pytest.mark.parametrize("history_shape", ["direct", "nested"])
+def test_old_basis_remains_readable_after_member_moves_to_another_source(memory, legacy_snapshot, history_shape, monkeypatch):
+    text = "The original condition remains evidence.\n"
+    old_path, new_path = "before.md", "after.md"
+    (memory.config.root / old_path).write_text(text, encoding="utf-8")
+    prepared = memory.prepare([old_path])
+    memory.apply({"sources": [{"path": old_path, "revision": prepared["sources"][0]["revision"]}],
+                  "members": [{"id": "moving", "kind": "chunk", "path": old_path,
+                               "title": "Condition", "start_line": 1, "end_line": 1}],
+                  "nodes": [{"id": "old_claim", "kind": "condition", "text": "The original condition",
+                             "evidence": ["moving"]}]})
+    basis = memory.neighbors("node:old_claim")["record"]["basis"][0]
+    if legacy_snapshot:
+        memory._execute(f"UPDATE {_sql(_record(basis['source_version']))} UNSET path;")
+    original = memory.read("moving")["original"]
+    snapshot = memory._execute(f"SELECT * FROM ONLY {_sql(_record(basis['source_version']))};")[0]
+    before_vector = memory._execute("SELECT embedding,input_revision FROM ONLY member:moving;")[0]
+
+    def unexpected_embedding(*args, **kwargs):
+        pytest.fail("unchanged representation was encoded again")
+
+    monkeypatch.setattr("basepack.memory.candidate_vectors.EmbeddingClient.embed", unexpected_embedding)
+
+    (memory.config.root / new_path).write_text(text, encoding="utf-8")
+    prepared = memory.prepare([old_path, new_path])
+    source = next(item for item in prepared["sources"] if item["path"] == new_path)
+    memory.apply({"sources": [{"path": new_path, "revision": source["revision"]}],
+                  "expected": prepared["expected"],
+                  "members": [{"id": "moving", "kind": "chunk", "path": new_path,
+                               "title": "Condition", "start_line": 1, "end_line": 1}]})
+    if history_shape == "nested":
+        previous = (f"target=member:moving AND previous.source={_sql(_record(snapshot['source']))}")
+        memory._execute("CREATE change:legacy_detected SET operation='detected_change', "
+                        f"previous={{members:(SELECT VALUE previous FROM change WHERE {previous})}}; "
+                        f"DELETE change WHERE {previous};")
+
+    assert memory.read("moving")["original"]["path"] == new_path
+    historical = memory.read(basis["member"], source_version=basis["source_version"],
+                             start_line=basis["start_line"], end_line=basis["end_line"])["original"]
+    assert historical == original
+    assert memory._execute(f"SELECT * FROM ONLY {_sql(_record(basis['source_version']))};")[0] == snapshot
+    assert memory._execute("SELECT embedding,input_revision FROM ONLY member:moving;")[0] == before_vector
+
+
+def test_source_path_only_change_has_a_distinct_immutable_snapshot(memory):
+    old_path, new_path = "old-name.md", "new-name.md"
+    text = "Identical bytes retain the old source location.\n"
+    (memory.config.root / old_path).write_text(text, encoding="utf-8")
+    prepared = memory.prepare([old_path])
+    memory.apply({"sources": [{"path": old_path, "revision": prepared["sources"][0]["revision"]}],
+                  "members": [{"id": "renamed", "kind": "chunk", "path": old_path,
+                               "title": "Condition", "start_line": 1, "end_line": 1}]})
+    original = memory.read("renamed")["original"]
+    old_member = memory.read("renamed")["member"]
+    old_snapshot = memory._execute(f"SELECT * FROM ONLY {_sql(_record(original['source_version']))};")[0]
+    (memory.config.root / old_path).rename(memory.config.root / new_path)
+    prepared = memory.prepare([old_path, new_path])
+    source = next(item for item in prepared["sources"] if item["path"] == new_path)
+    memory.apply({"sources": [{"id": old_member["source"], "path": new_path,
+                               "revision": source["revision"]}],
+                  "expected": prepared["expected"],
+                  "members": [{"id": "renamed", "kind": "chunk", "path": new_path,
+                               "title": "Condition", "start_line": 1, "end_line": 1}]})
+    current = memory.read("renamed")["original"]
+    assert current["path"] == new_path
+    assert current["source_version"] != original["source_version"]
+    assert len(memory._rows("source_version")) == 2
+    assert old_snapshot["path"] == old_path
+    assert memory._execute(f"SELECT * FROM ONLY {_sql(_record(original['source_version']))};")[0] == old_snapshot
+    assert memory.read("renamed", source_version=original["source_version"],
+                       start_line=1, end_line=1)["original"] == original
+
+
+def test_concurrent_same_bytes_source_move_rejects_the_old_publication(memory, monkeypatch):
+    old_path, new_path = "before.md", "after.md"
+    data = b"Unchanged original bytes.\n"
+    for path in (old_path, new_path):
+        (memory.config.root / path).write_bytes(data)
+    source = memory.prepare([old_path])["sources"][0]
+    memory.apply({"sources": [{"path": old_path, "revision": source["revision"]}]})
+    source_id = memory.sources()[0]["id"]
+    execute = memory._execute
+    publish_other_path = True
+
+    def interleaved(sql, **kwargs):
+        nonlocal publish_other_path
+        if publish_other_path and sql.startswith("BEGIN;"):
+            publish_other_path = False
+            memory.apply({"sources": [{"id": source_id, "path": new_path, "revision": source["revision"]}]})
+        return execute(sql, **kwargs)
+
+    monkeypatch.setattr(memory, "_execute", interleaved)
+    with pytest.raises(RuntimeError, match="Concurrent source version changed"):
+        memory.apply({"sources": [{"id": source_id, "path": old_path, "revision": source["revision"]}]})
+    assert memory.sources()[0]["path"] == new_path
+
+
+@pytest.mark.parametrize("move_source", [False, True])
+def test_legacy_rebound_member_keeps_its_old_basis_readable(memory, move_source):
+    path = "legacy.md"
+    data = b"Unchanged original evidence.\n"
+    (memory.config.root / path).write_bytes(data)
+    source = memory.prepare([path])["sources"][0]
+    memory.apply({"sources": [{"path": path, "revision": source["revision"]}],
+                  "members": [{"id": "rebound", "kind": "chunk", "path": path,
+                               "title": "Condition", "start_line": 1, "end_line": 1}],
+                  "nodes": [{"id": "old_claim", "kind": "condition", "text": "Unchanged condition",
+                             "evidence": ["rebound"]}]})
+    basis = memory.neighbors("node:old_claim")["record"]["basis"][0]
+    memory._execute(f"UPDATE {_sql(_record(basis['source_version']))} UNSET path;")
+    original = memory.read("rebound")["original"]
+    (memory.config.root / path).write_bytes(data + b"New unrelated material.\n")
+    source = memory.prepare([path])["sources"][0]
+    memory.apply({"sources": [{"path": path, "revision": source["revision"]}]})
+    # Old clients rebound unchanged siblings without recording a member accept.
+    memory._execute("UPDATE member:rebound SET source_version=(SELECT VALUE version FROM ONLY "
+                    f"{_sql(_record(memory.sources()[0]['id']))}), source_revision={_sql(source['revision'])};")
+    if move_source:
+        new_path = "moved.md"
+        (memory.config.root / new_path).write_bytes(data)
+        prepared = memory.prepare([path, new_path])
+        source = next(item for item in prepared["sources"] if item["path"] == new_path)
+        memory.apply({"sources": [{"path": new_path, "revision": source["revision"]}],
+                      "expected": prepared["expected"],
+                      "members": [{"id": "rebound", "kind": "chunk", "path": new_path,
+                                   "title": "Condition", "start_line": 1, "end_line": 1}]})
+    assert memory.read(basis["member"], source_version=basis["source_version"],
+                       start_line=basis["start_line"], end_line=basis["end_line"])["original"] == original
