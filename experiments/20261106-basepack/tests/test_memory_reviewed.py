@@ -6,6 +6,45 @@ from test_memory_maintenance import memory
 from test_memory_store import batch_for, memory as store_memory
 
 
+@pytest.mark.parametrize('field,decision', [
+    ('dispositions', {'kind': 'no_knowledge', 'start_line': 1, 'end_line': 1, 'reason': 'Read'}),
+    ('deferred_refinement', {'start_line': 1, 'end_line': 1, 'reason': 'Read'}),
+])
+@pytest.mark.parametrize('payload_kind', ['populated', 'empty', 'null'])
+@pytest.mark.parametrize('explicit_control', [False, True])
+def test_source_decisions_at_batch_root_are_rejected_before_publication(
+        memory, monkeypatch, field, decision, payload_kind, explicit_control):
+    from basepack.memory import candidate_vectors, owner
+
+    path = memory.config.root / 'source.md'
+    path.write_bytes(b'original\n')
+    source = memory.prepare(['source.md'])['sources'][0]
+    monkeypatch.setattr(candidate_vectors, 'encode_candidates',
+                        lambda *args, **kwargs: pytest.fail('misplaced decision reached encoding'))
+    payload = {'populated': [decision], 'empty': [], 'null': None}[payload_kind]
+    batch = {'sources': [{'path': 'source.md', 'revision': source['revision']}],
+             'members': [{'id': 'chunk', 'kind': 'chunk', 'path': 'source.md',
+                          'start_line': 1, 'end_line': 1}], field: payload}
+    control = memory.config.memory_dir / 'maintenance' / 'explicit-test.control' if explicit_control else None
+    if control:
+        claim = owner.acquire(memory.config.memory_dir, memory.connection['project_id'], 'test', control)
+        assert claim['acquired']
+    try:
+        with pytest.raises(ValueError, match=rf'{field}.*sources\[\]'):
+            memory.apply(batch, control=str(control) if control else None)
+        for table in ('source', 'source_version', 'member', 'node', 'semantic', 'change'):
+            assert memory._rows(table) == []
+        status = owner.status(memory.config.memory_dir)
+        if control:
+            assert status['run_id'] == claim['owner']['run_id']
+        else:
+            assert status is None
+    finally:
+        if control:
+            owner.stop_owned(memory.config.memory_dir, control)
+            owner.release(memory.config.memory_dir, control)
+
+
 def test_reviewed_image_reopens_when_original_changes(memory):
     image = memory.config.root / 'image.png'
     image.write_bytes(b'first image bytes')

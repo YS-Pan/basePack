@@ -414,6 +414,9 @@ class Memory:
         if control:
             from .maintenance import check
             check(control)
+        for field in ("dispositions", "deferred_refinement"):
+            if field in batch:
+                raise ValueError(f"{field} must be inside the relevant sources[] entry, not at batch root")
         for index, item in enumerate(batch.get("members", [])):
             if item["kind"] in {"file", "section", "chunk"}:
                 missing = [field for field in ("start_line", "end_line") if field not in item]

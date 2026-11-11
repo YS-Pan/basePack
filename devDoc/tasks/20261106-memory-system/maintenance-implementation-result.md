@@ -12,7 +12,7 @@
 - 已交付父项解析/依赖并发guard、AGENTS托管入口与升级刷新、原生事务透明分消息、默认无审计、持久使用反馈、来源已阅/重复与待细化处置、单owner维护及工作包进入根tmp。CLI apply显式传control，Python省略时仅在空闲项目取短期owner；反馈报告可并发，发布由单owner负责。
 - 完整候选源码套件482 passed、5 skipped，280.57秒；实际导入候选src，隔离SurrealDB4.0.0内存实例。完整stdout未另存，工具结果及条件已整理；五个跳过项后续在active源码、独立数据库及共享模型配置下全部通过（13.44秒），涵盖图像/向量、原生恢复、特殊ID与overflow。事务后续专项14通过、反馈含新旧表原生恢复8通过，保留原日志。代码测试属于开发验收，普通知识批次不追加审计。
 - 普通任务子agent只收到业务问题及生成AGENTS，实际brief、取得owner、预检、派协调者、stop/取消/release；释放前未另观测协调者终止，后续宿主状态为interrupted。停止control和空发布列表保证旧任务不能继续发布，不把事后状态冒充当时观察。
-- 本项目普通安装在`D:/AgentTools/envs/basepack-client-0.10/`，只修改本项目runtime.python与入口；原共用客户端仍为0.9.1。最终wheel SHA256为`1ae8096c523f1170ae41e5a4f979c53f9d4723afbafdd3eec7663000aefaf984`，50个包文件与安装和active源码逐字节相同。刷新前后原UUID`464948e9-d41e-420f-966b-ebaa602fd9bc`、七表计数、三条fresh mandatory及托管块外字节已核；共享模型、数据库进程/目录/原凭据及其它项目入口未改。
+- 本项目普通安装在`D:/AgentTools/envs/basepack-client-0.10/`，只修改本项目runtime.python与入口；原共用客户端仍为0.9.1。最终wheel SHA256为`db6d990cf0476359948663e5cdfd7053ffe63f48e14624f5145297166ba5af5a`，50个包文件与安装和active源码逐字节相同。刷新前后原UUID`464948e9-d41e-420f-966b-ebaa602fd9bc`、七表计数、三条fresh mandatory及托管块外字节已核；共享模型、数据库进程/目录/原凭据及其它项目入口未改。
 - 目录治理先核活动使用、实际配置与当前/历史来源；未以文件夹名字作为删除依据。具体结果见下节。
 
 旧客户端背景维护的真实413批次在新客户端单次Python apply成功：相同batch、3来源、29成员、1节点、1边，无invalidated。旧HTTP SQL为1,254,584字节；新原生事务一个query消息为1,271,022字节，2.559秒，未手工拆批或调整HTTP服务限额。本例未达到新消息分组上限，多消息原子性由隔离专项证明。该次生产写入为项目SurrealKV上的一个合法实测，未扩张成完整磁盘负载验收。
@@ -38,6 +38,8 @@
 最终按四组清单累计删除2,877文件、1,064,167,175逻辑字节，另非递归移除7个确实为空的容器：备份2,535文件/1,005,490,896字节，限定杂项81文件/1,849,500字节，覆盖工作包220文件/44,359,998字节，散落历史导出及工作包41文件/12,466,781字节。十份尚无精确原件重建依据的包（3,488,837字节）、覆盖真实结果/语义输入/driver、onboarding原件及维护身份全部保留。最终ready200、8次指定回读、literal检索、2,096/2,096兼容向量、64件选留hash及升级后6项文件不变量通过；[精确清理结果](../../../artifacts/runs/20261111-maintenance-cleanup/result.md)列明保留例外。一次入口在授权升级中刷新导致清理前检查中止，重新以已完成升级的基线核对后执行，未吞掉不变量错误。
 
 0.10真实维护中多次出现`Partial file summary requires explicit coverage_gaps`：作者把framed聊天file摘要范围写为正文第2行起，而原件第1行仍是文件一部分。程序正确拒绝，尚未半发布。已在随包SKILL的members唯一合同补明完整file覆盖1..末行（含头部）、依据chunk可仅覆盖正文；真正部分覆盖仍须真实gaps。协调者确认无在途apply后短暂停新发布，重建普通wheel并核50文件一致后恢复；逻辑/API/schema/owner不变，已获作者草稿复用，SKILL来源重新prepare。
+
+真实维护又确认程序缺口：两份作者batch把dispositions放在顶层，旧apply返回成功却只登记source。已将两来源改回partial，创建持久反馈；在共用_apply以字段存在检查拒绝顶层dispositions/deferred_refinement，报明应在对应sources[]，不自动搬移或引入通用schema平台。隔离红测复现静默接受，修复后数据库/CLI定向60passed、0skipped，覆盖空/null及自动/显式owner、编码前拒绝、六表无半批、已有合法B/F。唯一发布者确认无在途apply后安装并核50文件一致；原作者重新prepare并正确嵌入source，两来源成功发布，feedback:3e330779946046c59a1e0d3f5c5f845e已resolve为fixed。前一条framing处置反馈feedback:ec6f65a4e19f4f949d2bf1827ebe8b7c亦已fixed。原错、批次与实际回归见misplaced-disposition/及本轮台账。
 
 ## 本轮记忆维护
 
