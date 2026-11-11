@@ -1,10 +1,10 @@
 # 项目记忆实现
 
-0.8.1 源码实现 SurrealDB 上的多层文字、原图向量与语义关系，首建和维护由宿主订阅 reader 同读完成。正式 wheel 与完整行为验收状态见 [专项进度](../../tasks/20261106-memory-system/progress.md)，P0 原生接入证据见 [结果](../../tasks/20261106-memory-system/p0-result.md)，用户流程见 [记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
+源码面向 0.9.0，实现 SurrealDB 上的多层文字、原图向量与语义关系，以及默认全项目维护和随包英文维护提示词。首建和维护由宿主订阅 agent 同读完成。正式 wheel 与完整行为验收状态见 [专项进度](../../tasks/20261106-memory-system/progress.md)，P0 原生接入证据见 [结果](../../tasks/20261106-memory-system/p0-result.md)，用户流程见 [记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
 
 ## 职责与数据
 
-认证在客户端构造边界统一完成：CLI/Python 共用 ProjectConfig 解析的 username 与 memory_password_file，以 UTF-8 解码文件（兼容 BOM，保留 CRLF/首尾空白）并发送 Basic Authorization；默认文件为实际 memory_dir/password.txt。config show 不读 secret，guide/rank/stop 不创建客户端。password_env 手工桥退出；缺文件、权限或错密保留原错，不生成替代密钥或免认证回退。新库凭据由首次部署显式准备，launcher 读取同一文件；已有库和凭据随普通升级保留。
+认证在客户端构造边界统一完成：CLI/Python 共用 ProjectConfig 解析的 username 与 memory_password_file，以 UTF-8 解码文件（兼容 BOM，保留 CRLF/首尾空白）并发送 Basic Authorization；默认文件为实际 memory_dir/password.txt。config show 不读 secret，guide/rank/stop 与 prompt 不创建数据库客户端。password_env 手工桥退出；缺文件、权限或错密保留原错，不生成替代密钥或免认证回退。新库凭据由首次部署显式准备，launcher 读取同一文件；已有库和凭据随普通升级保留。
 
 - [content.py](../../../experiments/20261106-basepack/src/basepack/memory/content.py) 读取项目内 UTF-8 原字节版本与 1-based 闭区间，保留 CRLF；结构单元仅供备读，快/深变化检查不生成语义边界。
 - [store.py](../../../experiments/20261106-basepack/src/basepack/memory/store.py) 通过原生 HTTP/SurrealQL 操作领域记录与事务；没有多后端层或自建 MCP。原生 CLI 负责服务与导出/恢复。
@@ -28,11 +28,15 @@ brief、search 和 read 只读取已发布状态及其依据版本，不扫描�
 
 向量绑定实际输入版本及 embedding_identity；仅支持 vector/hybrid，默认 vector。search 和 brief 的相关通道报告已发布范围内相同 identity 的兼容与待建数量；缺少兼容向量时明确报错，真实空范围与空命中保持可辨。旧 text 配置须先改为 vector 或 hybrid，再 embed 补建索引；CPU/CUDA 的相同语义 identity 共用向量。apply 先准备候选向量，并在同一短事务发布内容和匹配向量；模型失败保留原错误并停止本批，不发布无匹配向量的内容。输入版本与 identity 未变化的向量可复用。
 
-`memory maintain` 先以配置的声明范围及已有来源进行深比较，处理可证明的机械等价并写入项目 memory 目录下的完整回执；余下语义候选按来源归并，供宿主订阅 worker 接续。历史 stale 不能仅因最后一次事件为 detected_change 就恢复。宿主提供开始/完成事件与可取消子任务时，可异步启动预检和低优先级小批维护，业务不等待。`apply --control` 和 `stop --control` 使用任务独有控制文件同步仲裁：停止先到则不提交，已获得提交资格的事务完成或回滚；停止失败保留错误且仍取消 worker。控制不终止共享服务或已开始的共享推理，迟到结果不被采用。缺少宿主能力时不可宣称自动生命周期已启用。
+`memory maintain` 默认以项目 Git 清单（已跟踪与未忽略的未跟踪文件）加 source_scope 显式包含项发现原件；非 Git 项目使用声明范围。已登记来源、历史 pending/未接受范围与可归属 Codex 原件持续参与，`--scope` 只覆盖新文件发现。完整回执保存深比较与机械等价证据；短结果报告 discovery 边界/缺口、receipt、control 及 worker 派工元数据。历史 stale 不能仅因最后一次事件为 detected_change 就恢复；枚举与机械更新不证明完整语义覆盖。
+
+`memory prompt --receipt <receipt> --control <control>` 只读项目配置、随包英文模板和回执，返回 prompt、角色、档位、实际模型映射及可重复运行的 render_command；不读取凭据、不连库或模型、不写控制与状态。默认 coordinator/tier2，`--role reader --paths ...` 默认 reader/tier1；显式 `--tier` 仅改模型档位。宿主先把返回的模型/推理强度设到派工接口，再给子 agent 一条英文启动句及命令，由其执行并遵循 prompt；角色详细逻辑在模板单一维护。
+
+宿主提供开始/完成事件与可取消子任务时，异步启动默认维护，业务不等待。协调者持续拥有下一批、reader 与统一发布的责任，直到业务停止、候选耗尽或实际阻碍；单个 reader 或批次完成不结束分支。所有 apply 复用任务 control，采用回执聊天截点；下一轮再处理当前聊天追加内容。`apply --control` 和 `stop --control` 同步仲裁：停止先到则不提交，stop 不等待已获准提交的事务；业务完成后宿主取消协调者及全部后代。停止失败保留原错且仍取消 agent。控制不终止共享服务或已开始的共享推理。缺少宿主能力时不可宣称自动生命周期已启用；旧候选无需手动深维护才可接续。
 
 [selection.py](../../../experiments/20261106-basepack/src/basepack/memory/selection.py) 按真实 worker 分数排序，去重复身份/原文覆盖，按文字预算交付完整内容与省略入口；词法距离不冒充 agent 分数。已安装 [skill](../../../experiments/20261106-basepack/src/basepack/memory/SKILL.md) 驱动一次检索委托，宿主按 `config ai --purpose retrieval` 的结果派工（默认 tier1），没有模型 API 或后台 agent。
 
-memory init 安装原生 schema 并绑定项目 UUID，同时在项目 instructions 加入 brief 与已安装 skill 入口；普通 init 不建库。新进程按生成入口直接使用显式配置读取 brief；本地数据库不使用密码，配置只接受回环 endpoint。入口同时定位本项目 launcher、cwd 和日志。数据库进程必须按项目独立物理目录启动，多聊天共用该进程。绑定核查防止误连另一项目；数据路径的实际归属仍须部署命令正确配置。
+memory init 安装原生 schema 并绑定项目 UUID，同时在项目 instructions 加入 brief 与已安装 skill 入口；普通 init 不建库。新进程按生成入口直接使用显式配置读取 brief，客户端与 launcher 读取同一密码文件，配置只接受回环 endpoint。入口同时定位本项目 launcher、cwd 和日志。数据库进程必须按项目独立物理目录启动，多聊天共用该进程。绑定核查防止误连另一项目；数据路径的实际归属仍须部署命令正确配置。
 
 ## Codex 来源边界
 

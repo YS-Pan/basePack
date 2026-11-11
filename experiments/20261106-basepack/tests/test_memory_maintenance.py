@@ -323,6 +323,31 @@ def test_task_start_checks_registered_originals_outside_new_discovery_scope(memo
     assert memory.changes(["guide.md"])[0]["path"] == "guide.md"
 
 
+def test_maintenance_discovery_override_keeps_registered_source_changes(memory):
+    original = "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n"
+    memory.apply(batch_for(memory, original))
+    (memory.config.root / "guide.md").write_bytes((original + "新的历史来源约束。\n").encode("utf-8"))
+    (memory.config.root / "selected.md").write_text("仅覆盖新增发现。\n", encoding="utf-8")
+    result = memory.maintain(["selected.md"])
+    report = json.loads(open(result["receipt"], encoding="utf-8").read())
+    assert {item["path"] for item in report["semantic"]} == {"guide.md", "selected.md"}
+    assert any(item["path"] == "guide.md" and item["kind"] == "modified" for item in report["changes"])
+
+
+def test_maintenance_empty_discovery_keeps_unaccepted_sources_and_pending_relations(memory):
+    memory.apply(batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n"))
+    (memory.config.root / "old-unaccepted.md").write_text("尚未接受的旧来源。\n", encoding="utf-8")
+    prepared = memory.prepare(["old-unaccepted.md"])
+    memory.apply({"sources": [{"path": "old-unaccepted.md", "revision": prepared["sources"][0]["revision"]}]})
+    memory._execute("UPDATE node:local SET stale=true;")
+    result = memory.maintain([])
+    report = json.loads(open(result["receipt"], encoding="utf-8").read())
+    assert result["needs_semantic"]
+    assert any(item["path"] == "old-unaccepted.md" and item["reason"] == "no_active_knowledge"
+               for item in report["semantic"])
+    assert "node:local" in {item["id"] for item in report["pending_relations"]}
+
+
 def test_change_detection_keeps_published_knowledge(memory):
     memory.apply(batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n"))
     source = memory.config.root / "guide.md"

@@ -40,7 +40,8 @@ username = 'root'
 # Optional UTF-8 secret file, absolute or relative to the project root.
 # Default: memory.data_dir/password.txt. Provision it before starting a new database.
 # password_file = '.basepack/memory/password.txt'
-# Optional files/directories for discovering additions; otherwise check registered paths.
+# Git projects discover tracked and untracked nonignored files by default.
+# Additional files/directories; also the discovery scope for projects without Git.
 source_scope = []
 
 [memory.codex]

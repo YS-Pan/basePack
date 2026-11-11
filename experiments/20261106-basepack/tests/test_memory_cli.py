@@ -164,11 +164,15 @@ def test_generated_bootstrap_loads_config_in_fresh_shell_from_other_cwd(tmp_path
 
 
 def test_maintain_defaults_to_project_scope_and_passes_control(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("basepack.memory.discovery._git_repository", lambda root: False)
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
     config = load_project_config(init_project(tmp_path / "project", machine))
     _provision_password(config)
     config.raw["memory"]["source_scope"] = ["docs"]
+    (config.root / "docs").mkdir()
+    (config.root / "docs/new.md").write_text("New source", encoding="utf-8")
     calls = []
     monkeypatch.setattr("basepack.memory.store.Memory.maintain",
                         lambda self, scope, **kwargs: calls.append((scope, kwargs)) or {"needs_semantic": 0})
@@ -178,7 +182,97 @@ def test_maintain_defaults_to_project_scope_and_passes_control(tmp_path, monkeyp
     result, status = dispatch(args, config)
     assert status == 0 and result["needs_semantic"] == 0
     assert result["codex"]["status"] == "binding_unavailable"
-    assert calls == [(["docs"], {"control": "task.control", "timeout": 600})]
+    control = str(Path("task.control").resolve())
+    assert calls == [(["docs/new.md"], {"control": control, "timeout": 600})]
+    assert result["control"] == control
+    assert result["discovery"] == {"mode": "configured", "sources": 1, "gaps": []}
+    assert "worker" not in result
+
+
+def _memory_args(*options):
+    parser = argparse.ArgumentParser()
+    register_commands(parser.add_subparsers(dest="command"))
+    return parser.parse_args(["memory", *options])
+
+
+def test_prompt_cli_never_constructs_memory_or_creates_state(tmp_path, monkeypatch):
+    import json
+
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    config = load_project_config(init_project(tmp_path / "project", machine))
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text(json.dumps({"semantic": [], "pending_relations": []}), encoding="utf-8")
+    control = config.memory_dir / "new control" / "task.control"
+    monkeypatch.setattr("basepack.memory.store.Memory",
+                        lambda *args: pytest.fail("rendering opened the memory store"))
+    result, status = dispatch(_memory_args("prompt", "--receipt", str(receipt),
+                                          "--control", str(control)), config)
+    assert status == 0 and result["tier"] == "tier2"
+    assert result["role"] == "coordinator" and result["prompt"]
+    assert not config.memory_dir.exists()
+    assert not config.memory_password_file.exists()
+    with pytest.raises(SystemExit):
+        _memory_args("prompt", "--receipt", str(receipt), "--control", str(control),
+                     "--output", str(config.memory_dir / "prompt.json"))
+    assert not config.memory_dir.exists()
+
+
+def test_maintain_discovers_git_project_and_emits_complete_worker_command(tmp_path, monkeypatch):
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    config = load_project_config(init_project(tmp_path / "project", machine))
+    _provision_password(config)
+    subprocess.run(["git", "init", "-q"], cwd=config.root, check=True)
+    (config.root / "outside-current-task.md").write_text("Project wide", encoding="utf-8")
+    (config.root / "unsupported.bin").write_bytes(b"binary\0content")
+    calls = []
+    receipt = str(config.memory_dir / "maintenance/receipt.json")
+    monkeypatch.setattr("basepack.memory.store.Memory.maintain", lambda self, scope, **kwargs:
+                        calls.append((scope, kwargs)) or {"needs_semantic": True, "receipt": receipt})
+    result, status = dispatch(_memory_args("maintain"), config)
+    assert status == 0
+    assert "outside-current-task.md" in calls[0][0]
+    assert all(not path.startswith(".basepack/") for path in calls[0][0])
+    assert result["discovery"]["mode"] == "git"
+    assert result["discovery"]["gaps"] == [{"path": "unsupported.bin", "reason": "binary"}]
+    assert result["worker"]["role"] == "coordinator"
+    assert result["worker"]["tier"] == "tier2"
+    assert result["worker"]["model"] == config.resolve_ai(tier="tier2")["model"]
+    assert result["worker"]["reasoning_effort"] == config.resolve_ai(tier="tier2")["reasoning_effort"]
+    assert "prompt" not in result["worker"]
+    control = Path(result["control"])
+    assert control.is_absolute() and control.parent == config.memory_dir / "maintenance"
+    assert str(control) in result["worker"]["render_command"]
+    assert receipt in result["worker"]["render_command"]
+    assert calls[0][1] == {"control": str(control), "timeout": 600}
+
+
+def test_maintain_keeps_owned_retained_captures_when_collection_is_unavailable(tmp_path, monkeypatch):
+    import json
+
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    config = load_project_config(init_project(tmp_path / "project", machine))
+    _provision_password(config)
+    config.raw["memory"]["codex"]["project_id"] = "owned-project"
+    capture = config.memory_dir / "codex" / "old-thread.txt"
+    capture.parent.mkdir()
+    body = "已保留且未登记的旧聊天。".encode("utf-8")
+    header = {"project_id": "owned-project", "thread_id": "old-thread", "byte_length": len(body),
+              "managed_attachment": "codex-attachments/old.png"}
+    capture.write_bytes(json.dumps(header).encode() + b"\n" + body + b"\n")
+    attachment = config.memory_dir / "codex-attachments" / "old.png"
+    attachment.parent.mkdir()
+    attachment.write_bytes(b"image")
+    calls = []
+    monkeypatch.setattr("basepack.memory.store.Memory.maintain", lambda self, scope, **kwargs:
+                        calls.append(scope) or {"needs_semantic": False})
+    result, _ = dispatch(_memory_args("maintain", "--scope", "no-new-discovery"), config)
+    assert result["codex"]["status"] == "binding_unavailable"
+    assert result["codex"]["retained_sources"] == 2
+    assert result["codex"]["retained_gaps"] == []
+    assert calls == [[".basepack/memory/codex-attachments/old.png", ".basepack/memory/codex/old-thread.txt"]]
 
 
 def test_codex_registry_is_used_for_maintenance_scope(tmp_path, monkeypatch):

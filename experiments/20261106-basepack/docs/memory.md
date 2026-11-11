@@ -39,21 +39,32 @@ apply 核对来源版本，以及本批改写、退休、更正目标、实际�
 
 ## 自动维护与手动维护
 
-宿主有独立工具任务、可取消子任务句柄及任务开始/完成事件时，业务开始后并行运行确定性预检，业务无需等待：
+宿主有独立工具任务、可取消子任务句柄及任务开始/完成事件时，预先分配任务唯一 control 路径，再于业务开始后并行运行确定性预检，业务无需等待；即使回执尚未返回，业务完成也能通过已知路径停止预检：
 
 ```powershell
 memory maintain --control '<本任务唯一control>' --output '<maintenance-summary.json>'
 ```
 
-默认使用项目 `source_scope`，`--scope <文件或目录> ...` 可覆盖本轮范围。预检先按 [Codex 绑定](setup-project.md#codex-项目聊天接入) 采集本次可取得的持久化聊天截点，再比较登记来源、声明范围及旧成员实际接受版本。Git 干净仍可能有尚未接受的原文。`changes` 提供显式变化查看，`maintain` 才负责机械更新与语义交接；查询不调用两者。
+默认面向整个项目的受管来源，不按当前业务任务的文件缩小维护范围。Git 项目枚举项目内已跟踪和未忽略的未跟踪文件，并加入 `memory.source_scope` 显式包含项，排除工具状态、环境与缓存；非 Git 项目使用声明的 `source_scope`。所有已登记来源、历史 pending/未接受范围和可归属 Codex 原件持续参与维护。`--scope <文件或目录> ...` 只覆盖本轮新文件发现，不把历史来源限制到该范围。无需为日常维护递归扫描 `.`；不支持的二进制材料留缺口，读取失败保留原错。
+
+预检先按 [Codex 绑定](setup-project.md#codex-项目聊天接入) 取得本次可读的持久化聊天截点，再比较来源及旧成员实际接受版本。Git 干净仍可能有尚未接受的原文。发现清单、聊天采集、语义接受和向量覆盖分别检查，不能据其中一项声称全部项目材料已接受。`changes` 提供显式变化查看，`maintain` 才负责机械更新与语义交接；查询不调用两者。
 
 程序直接处理原字节 hash 相同的元数据变化、完整正文仅 CRLF/LF 变化，以及有唯一定位且上下文可确认未变的原文块。完整回执保留机械批次、旧/新行映射、变化片段、受影响成员与关系；换行归一只用于比较，快照仍按真实原字节保存。编码输入及身份未变才复用向量；实际输入变化按现有 apply 合同编码。已有 stale、更正、退役或语义证据不足的范围保留待核，局部文字相同不表示父级摘要或关系均有效。
 
-预检简报返回 `mechanical_batches`、`reused_chunks`、`semantic_sources`、`pending_relations`、`needs_semantic`、本地 `receipt` 路径和 `codex` 采集状态。`needs_semantic=false` 时不创建语义维护 worker；为 true 时只把必要变化、受影响摘要/关系及回读入口一次交给订阅 worker，按来源接续小批。worker 按需展开新旧原文，通过 prepare/expected/apply 原子发布。部分机械批次已经完成，其余未接受范围仍跨任务可发现。
+预检简报返回机械处理计数、`needs_semantic`、本地 `receipt`、绝对 `control`、`discovery` 边界/缺口、`codex` 采集状态及必要的 `worker` 派工元数据。显式调用省略 `--control` 时会自动分配唯一路径。`needs_semantic=false` 时不创建语义 agent；为 true 时，宿主先按 `worker.model` 和 `worker.reasoning_effort` 设置实际模型与推理强度，再用干净历史启动协调者，只传一条英文启动句和 `worker.render_command`：
 
-采集与语义发布使用同一任务 control。worker 的 `memory apply --batch <batch.json> --control <control>` 沿用该控制文件；业务完成时宿主运行无需配置的 `memory stop --control <control>`，再取消该任务 worker，不等待编码或已进入提交的短事务。stop 先于提交仲裁时，候选不会发布；已采集原文和已发布批次保留，下次继续未接受范围。stop 失败保留原错并仍取消 worker，不能据此声称阻止发布。宿主缺少生命周期能力时说明自动维护不可用。
+```text
+Run the following command and follow the `prompt` field in its JSON output:
+<worker.render_command>
+```
 
-自动小批可接续既有积压，任务相关性只影响优先级。积压较多时可提醒用户另行发起手动深维护，不设置停用自动维护的数量阈值，也不承诺任务结束前清完历史。手动深维护由用户发起，沿同一流程更全面共读旧材料与关系。检索 worker 和维护 worker 各自执行。
+子 agent 自己执行该命令并遵循返回的 `prompt`。默认命令为 `memory prompt --receipt <receipt> --control <control>`；它返回 `prompt`、`role`、`tier`、`model`、`reasoning_effort` 和 `render_command`。协调者与 reader 的英文提示词随 wheel 分发，详细分工只在模板维护。reader 使用 `--role reader --paths <项目文件...>`。角色与档位独立：协调者默认 tier2，reader 默认 tier1；显式 `--tier <tier>` 仍保留所选角色，按项目映射解析模型。提示词渲染只读配置、模板与回执，不读密码、不连数据库或模型，也不改控制文件或状态。
+
+协调者按来源分批，安排 reader，共读跨来源关系的两端并统一发布；一次 reader 返回或一个批次发布后，仍由它安排下一批，直到业务停止、候选耗尽或遇到实际阻碍。每批通过 prepare/expected/apply 发布，并实际查询/回读验证。采用回执的聊天截点，不反复追赶当前聊天新消息。部分机械批次已经完成，其余未接受范围仍跨任务可发现。
+
+采集与语义发布使用同一任务 control。每次 `memory apply --batch <batch.json> --control <control>` 沿用该文件；业务完成时宿主运行无需配置的 `memory stop --control <control>`，再取消协调者及全部后代，不等待编码或已获准提交的短事务。stop 先于提交仲裁时，候选不会发布；已采集原文和已发布批次保留，下次继续未接受范围。stop 失败保留原错并仍取消这些 agent，不能据此声称阻止发布。宿主缺少生命周期能力时说明自动维护不可用。
+
+自动小批可接续既有积压，任务相关性只影响优先级，旧材料不以另行手动深维护为准入条件。显式深维护可进一步抽读旧材料与关系，不承诺普通业务任务结束前清完历史。特殊任务可调整组织、发现范围，或直接发送临时英文提示词，并简述原因与覆盖范围。检索和维护各自执行。
 
 ## 聊天来源与精确回读
 
@@ -105,7 +116,7 @@ brief 直接提供必须保留的信息、相关线索、来源与覆盖缺口�
 
 `search` 的 CLI 与 Python 接口统一返回 `{matches, vector_coverage}`；Python 调用方从 `matches` 读取候选，不再接收裸列表或使用 `include_coverage`。brief 保留知识 pending、`coverage_gaps`、`change_check` 与 `vector_coverage`，删除恒空 `changes/change_count` 和重复 `vector_pending/vector_pending_count`。
 
-brief、search 和 read 只读已发布知识及对应原文快照，不扫描原件或等待维护。`changes --scope` 显式发现已登记来源及指定范围中的变化；未改原件只查元数据，深查才做完整 hash。独立 `maintain` 默认使用配置的 `source_scope` 发现新文件，并接续已有来源及未接受范围。任务词未命中时，短项目地图仍提供前提线索。
+brief、search 和 read 只读已发布知识及对应原文快照，不扫描原件或等待维护。`changes --scope` 显式发现已登记来源及指定范围中的变化；未改原件只查元数据，深查才做完整 hash。独立 `maintain` 的默认发现与持续维护边界见 [自动维护](#自动维护与手动维护)。任务词未命中时，短项目地图仍提供前提线索。
 
 向量查询和 brief 的相关通道报告当前已发布范围的 identity、总数、兼容数和待建范围；缺少兼容向量与真实无命中分别可见。升级旧 `search_mode = 'text'` 项目时，先用原客户端按需运行 `memory embed`，再以 `memory search --mode vector --text '<代表主题>'` 核已发布覆盖的 `total = compatible` 且 `pending = 0`；然后将配置改为 `vector` 或 `hybrid` 并升级客户端。若已安装新客户端，仍可先运行 `embed` 和显式 `search --mode vector` 检查覆盖，再切换配置。旧值与 `--mode text` 均不再支持。`memory sources` 列完整来源元数据，供手动深维护抽样；抽到的材料与旧图要实际共读，未发现新关系也如实记录。
 

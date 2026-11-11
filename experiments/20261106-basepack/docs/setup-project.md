@@ -1,6 +1,6 @@
 # 项目接入
 
-本文描述 0.8.1 的认证与自动凭据读取流程。按根 [安装步骤](../../../README.md#install-the-lightweight-client) 安装轻量客户端。项目记忆需要每项目独立的 SurrealDB 和共享 embedding 模型服务；普通重任务需要 HTCondor。设施由机器维护者按 [管理员说明](administrator.md) 准备。
+本文描述面向 0.9.0 的项目接入，包括既有认证与新的维护提示词交接；正式安装状态见 [交付进度](../../../devDoc/tasks/20261106-memory-system/progress.md)。按根 [安装步骤](../../../README.md#install-the-lightweight-client) 安装轻量客户端。项目记忆需要每项目独立的 SurrealDB 和共享 embedding 模型服务；普通重任务需要 HTCondor。设施由机器维护者按 [管理员说明](administrator.md) 准备。
 
 ## 首次接入
 
@@ -56,7 +56,7 @@ bp --config $config doctor
 | engineering-judgment | `skills/engineering-judgment/` | 支持 skills 的宿主 |
 | resources | `experiments/20261106-basepack/skills/resources/` | 已接入的 embedding 或 HTCondor 工具 |
 
-这些独立技能不在 wheel 内；仅安装 wheel 的使用者可另取对应版本源码中的所选目录，无需重装客户端。记忆 skill 随 wheel 安装，通过 `memory guide` 与生成的 instructions 直接定位。
+这些独立技能不在 wheel 内；仅安装 wheel 的使用者可另取对应版本源码中的所选目录，无需重装客户端。记忆 skill 与协调者/reader 的英文维护提示词随 wheel 安装，通过 `memory guide`、`memory prompt` 与生成的 instructions 使用。
 
 1. **选择安装位置。** 新项目优先把所选完整目录复制到 `<project>/.agents/skills/<name>/`。已有 `<project>/skills/<name>/` 维护原件时，保留该维护源，在 `.agents/skills/<name>` 建立指向它的目录联接。其它宿主按其技能安装规则选择发现位置。
 2. **核对已有入口。** 修改前检查同名路径；正确的完整目录或指向预期原件的联接直接复用。同名用户技能、非预期目录或指向其它目标的联接保留原状，报告路径与目标冲突后再决定处理。重复执行时先做此核对，跳过已正确安装项。
@@ -104,7 +104,7 @@ bp --config $config config ai --purpose retrieval
 bp --config $config config ai --tier tier2
 ```
 
-`config ai` 默认解析日常用途；多轮检索、筛选和重排序使用 `--purpose retrieval`，专项维护分工见 [记忆使用](memory.md)。宿主向 agent 派工接口传入返回的 `model` 和 `reasoning_effort`；basepack 不自行调用理解模型。
+`config ai` 默认解析日常用途；多轮检索、筛选和重排序使用 `--purpose retrieval`。维护提示词的 coordinator/reader 角色分别默认 tier2/tier1，`memory prompt --tier` 可显式改档而保留角色。宿主在创建子 agent 前，向派工接口实际传入解析的 `model` 和 `reasoning_effort`；提示词文字不能替代宿主设置，basepack 不自行调用理解模型。维护交接见 [记忆使用](memory.md#自动维护与手动维护)。
 
 ## 启用记忆
 
@@ -127,7 +127,7 @@ bp --config $config memory brief --task '当前任务'
 
 成功时 init 安装 schema、绑定数据库身份并刷新 instructions 的记忆入口；guide 返回已安装流程的位置，空库 brief 返回空结果。误连另一 UUID 会报错，应修正 endpoint 和目录，保留本项目 UUID。最后按 [最小闭环](memory.md#最小闭环示例) 写入一条知识，用所选检索模式找回并读取依据，即完成首次使用。
 
-brief、search、read 只读上次已发布知识及其依据快照。`memory maintain` 在独立维护路径先采集可归属聊天、比较原件并完成机械小批，余下语义范围交给宿主 agent；`source_scope` 声明新增文件的发现范围。自动维护、显式手动维护和原件更新见 [记忆使用](memory.md#自动维护与手动维护)。
+brief、search、read 只读上次已发布知识及其依据快照。`memory maintain` 默认维护整个项目的受管来源：Git 项目发现已跟踪和未忽略的未跟踪文件，另加 `source_scope` 显式包含项；非 Git 项目使用声明范围。已登记来源、历史 pending/未接受范围和可归属聊天持续参与。日常调用通常不传 `--scope`；该参数只覆盖新文件发现。机械小批完成后，宿主按返回元数据启动持续协调者，由子 agent 自行运行渲染命令并读取英文提示词。自动维护、边界与缺口见 [记忆使用](memory.md#自动维护与手动维护)。
 
 ## Codex 项目聊天接入
 
@@ -163,14 +163,16 @@ if ($LASTEXITCODE -ne 0) { throw "search failed ($LASTEXITCODE)" }
 
 先按 [备份步骤](memory.md#备份与恢复) 保留知识、配置和原件恢复集合，再由客户端维护者安装新包。已有配置保持 schema 2、机器 schema 1 和原 UUID。
 
-0.8.1 沿用以下已收敛的调用合同，升级前核对自己的 Python 脚本与配置：
+面向 0.9.0 的升级增加 `memory prompt` 和 `maintain` 派工元数据；默认全项目发现取代仅以 `source_scope` 发现。原有 `source_scope` 保留为 Git 项目的显式包含项与非 Git 项目的声明范围，不必将 Git 内新增源码逐个登记。已有来源和历史待维护范围仍全局接续；根据 `discovery` 与回执检查实际覆盖，升级不会自动完成全部语义接受。刷新 instructions 后按 [自动维护](memory.md#自动维护与手动维护) 派工。
+
+0.8.1 已收敛的调用合同继续保留，升级前核对自己的 Python 脚本与配置：
 
 - 检索统一返回 `{matches, vector_coverage}`，从 `matches` 取候选；删除 `include_coverage` 参数及裸列表返回格式。
 - brief 删除恒空 `changes/change_count` 与重复 `vector_pending/vector_pending_count`，保留 `vector_coverage`、知识 pending、`coverage_gaps` 和 `change_check`；来源发现、原文采集与语义接受分别核对。
 - 删除 `MachineConfig.state_dir`、机器模板 `[shared].state_dir` 及其回显。embedding 日志仍由 SCM/Shawl 服务定义指定，jobs 仍使用项目 `jobs_dir`，不用搬迁日志。
 - 删除内部 `MemberContent/read_member` 当前原件读取接口；已发布原文通过 `memory read` 或 `SurrealMemory.read` 读取对应快照及显式 `source_version`。
 
-`memory guide/rank/stop` 无需 `--config`；项目动作仍需配置。独立 skills 的发行与安装合同不变，升级客户端不会替目标项目安装它们。
+`memory guide/rank/stop` 无需 `--config`；项目动作仍需配置。`memory prompt` 需要显式配置，但只读配置、模板和回执，不要求数据库、密码文件或模型可用。独立 skills 的安装合同不变，升级客户端不会替目标项目安装它们。
 
 升级到 0.7.1 前先确认共享模型服务可用。旧 text 项目用显式 vector 查询核已发布活跃范围的向量覆盖：
 
@@ -187,7 +189,7 @@ bp --config $config memory search --mode vector --text '<代表性主题>'
 ### 从既有认证客户端升级
 
 1. 保留旧 wheel、项目配置、原密码文件和 [完整恢复集合](memory.md#备份与恢复)。核 `username` 与 `password_file` 指向当前服务使用的同一凭据；默认位置不变时可省略 password_file，删除 password_env。
-2. 等正在调用的客户端完成后普通安装 0.8.1，更新配置中的 Python 路径（若解释器改变）。数据库、原密码、物理目录、端口与 UUID 保持；已有认证服务通常无需重启或迁库。
+2. 等正在调用的客户端完成后普通安装目标版本，更新配置中的 Python 路径（若解释器改变）。数据库、原密码、物理目录、端口与 UUID 保持；已有认证服务通常无需重启或迁库。
 3. 执行 `memory init` 刷新 instructions，删除项目手写说明和包装脚本中的旧环境变量加载。新 shell 直接 brief/search/read/neighbors，核原知识及依据；已有兼容向量无需重新编码。
 
 密码文件缺失时恢复原凭据，不为已有库生成新密码。改写文件不等于轮换数据库中保存的账户密码；确需轮换时先由数据库管理员更新账户，再同步唯一凭据文件和 launcher。失败保留原错，按保留的 wheel 与配置回退；不清库或重新总结。

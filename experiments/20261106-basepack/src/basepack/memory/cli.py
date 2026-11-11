@@ -8,7 +8,7 @@ def register_commands(subparsers):
     memory = subparsers.add_parser("memory", help="Project-local multilevel memory")
     commands = memory.add_subparsers(dest="memory_action", required=True)
     actions = {name: commands.add_parser(name) for name in
-               ("init", "guide", "sources", "prepare", "apply", "stop", "embed", "search", "read", "neighbors", "brief", "changes", "maintain", "rank")}
+               ("init", "guide", "sources", "prepare", "apply", "stop", "embed", "search", "read", "neighbors", "brief", "changes", "maintain", "prompt", "rank")}
     actions["prepare"].add_argument("--paths", nargs="+", required=True,
                                     help="Project-relative files; enumerate directories first")
     actions["apply"].add_argument("--batch", required=True, help="Agent-produced UTF-8 JSON batch")
@@ -35,14 +35,23 @@ def register_commands(subparsers):
     actions["brief"].add_argument("--limit", type=int, default=6)
     actions["changes"].add_argument("--scope", nargs="+", required=True)
     actions["changes"].add_argument("--deep", action="store_true")
-    actions["maintain"].add_argument("--scope", nargs="+", help="Override the configured source scope")
+    actions["maintain"].add_argument("--scope", nargs="+", help="Override new-file discovery; registered sources and pending relations remain included")
     actions["maintain"].add_argument("--codex-registry", help="Host project binding and complete registered roots as UTF-8 JSON")
     actions["maintain"].add_argument("--control", help="Unique task control file for host cancellation")
     actions["maintain"].add_argument("--timeout", type=float, default=600, help="Candidate embedding timeout")
+    actions["prompt"].add_argument("--receipt", required=True, help="Maintenance receipt to render as worker context")
+    actions["prompt"].add_argument("--control", required=True, help="The same task control file used by maintain and apply")
+    actions["prompt"].add_argument("--role", choices=["coordinator", "reader"], default="coordinator")
+    actions["prompt"].add_argument("--tier", choices=["tier1", "tier2", "tier3", "tier4"],
+                               help="Override the role's default AI tier")
+    actions["prompt"].add_argument("--paths", nargs="+", help="Reader's bounded project-relative source files")
     actions["rank"].add_argument("--input", required=True, help="Read candidates with agent scores")
     actions["rank"].add_argument("--budget", type=int, default=6000, help="Returned text character budget")
-    for command in actions.values():
-        command.add_argument("--output", help="Write JSON here and return its location")
+    for name, command in actions.items():
+        if name == "prompt":
+            command.set_defaults(output=None)
+        else:
+            command.add_argument("--output", help="Write JSON here and return its location")
 
 
 def dispatch(args, config):
@@ -56,6 +65,10 @@ def dispatch(args, config):
     elif action == "rank":
         from .selection import select_scored
         result = select_scored(json.loads(Path(args.input).read_text(encoding="utf-8")), args.budget)
+    elif action == "prompt":
+        from .prompts import render_prompt
+        result = render_prompt(config, args.receipt, args.control,
+                               role=args.role, tier=args.tier, paths=args.paths)
     else:
         from .store import Memory
         memory = Memory(config)
@@ -91,11 +104,26 @@ def dispatch(args, config):
         elif action == "changes":
             result = memory.changes(args.scope, deep=args.deep)
         elif action == "maintain":
-            scope = args.scope if args.scope is not None else config.raw["memory"]["source_scope"]
-            codex = _collect_codex(config, args.codex_registry, control=args.control)
-            scope = list(scope) + codex.pop("paths", [])
-            result = memory.maintain(scope, control=args.control, timeout=args.timeout)
+            from uuid import uuid4
+            from .discovery import discover_sources, retained_codex_paths
+            from .maintenance import check
+            from .prompts import prompt_dispatch
+            control = str(Path(args.control).resolve() if args.control else
+                          config.memory_dir / "maintenance" / f"task-{uuid4().hex}.control")
+            check(control)
+            discovery = discover_sources(config, args.scope)
+            codex = _collect_codex(config, args.codex_registry, control=control)
+            retained = retained_codex_paths(config, codex["project_id"])
+            scope = list(dict.fromkeys([*discovery["paths"], *codex.pop("paths", []), *retained["paths"]]))
+            codex["retained_sources"] = len(retained["paths"])
+            codex["retained_gaps"] = retained["gaps"]
+            result = memory.maintain(scope, control=control, timeout=args.timeout)
             result["codex"] = codex
+            result["control"] = control
+            result["discovery"] = {"mode": discovery["mode"], "sources": len(scope),
+                                   "gaps": discovery["gaps"]}
+            if result["needs_semantic"]:
+                result["worker"] = prompt_dispatch(config, result["receipt"], control)
     if args.output:
         path = Path(args.output).resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -114,7 +142,7 @@ def _collect_codex(config, registry_path, *, control=None):
     binding = (json.loads(Path(registry_path).read_text(encoding="utf-8")) if registry_path
                else config.raw["memory"].get("codex", {}))
     if not binding.get("project_id") or not binding.get("registry_complete"):
-        return {"status": "binding_unavailable", "paths": [],
+        return {"status": "binding_unavailable", "project_id": binding.get("project_id"), "paths": [],
                 "gap": "Host project ID and complete registered project roots are required."}
     resolved = discover_binding(config.root, binding["project_id"], binding["other_project_roots"])
     client = AppServer(os.environ.get("CODEX_APP_RUNTIME_CLI_PATH", "codex"))
@@ -135,7 +163,7 @@ def _collect_codex(config, registry_path, *, control=None):
     directory.mkdir(parents=True, exist_ok=True)
     receipt = directory / f"codex-{uuid4().hex}.json"
     receipt.write_text(json.dumps(details, ensure_ascii=False, indent=2), encoding="utf-8")
-    return {"status": "captured", "discovered": len(discovered["matched"]),
+    return {"status": "captured", "project_id": binding["project_id"], "discovered": len(discovered["matched"]),
             "unresolved": len(discovered["unresolved"]), "gaps": len(discovered["gaps"]) + len(captured["gaps"]),
             "receipt": str(receipt), "paths": paths}
 
@@ -167,7 +195,7 @@ if ($LASTEXITCODE -ne 0) {{ throw "memory brief failed ($LASTEXITCODE)" }}
 
 `memory search` 未传 `--mode` 时采用当前配置 `memory.search_mode`；仅支持 `vector`（新项目默认）或 `hybrid`。`hybrid --literal` 优先返回路径、标题或正文的精确子串命中，`lexical_rank` 标明词法命中；无此字段的是语义补充。`vector --literal` 明确拒绝。显式 `--mode` 优先；旧 `text` 配置须改为 `vector` 或 `hybrid`，设施或兼容向量缺失保留原错。
 
-直接保留 mandatory 信息；stale=true 的内容只作待核，不当作当前事实。brief、search 和 read 读取已发布知识及其依据快照，不扫描或维护来源。宿主支持可取消子任务与任务开始/完成事件时，异步运行 `memory maintain --control <任务控制文件>`；先处理机械变化，仅有语义候选时再派低优先级维护 worker，业务完成时停止本任务维护。Codex 宿主按随包 skill 提供项目注册清单，未取得时报告聊天采集缺口；缺少生命周期能力时说明自动维护不可用。多轮检索、筛选与重排前用同一命令前缀运行 `config ai --purpose retrieval` 解析项目档位。按 [记忆流程](<{skill}>) 执行。
+直接保留 mandatory 信息；stale=true 的内容只作待核，不当作当前事实。brief、search 和 read 只读已发布知识及其依据快照。宿主支持可取消子任务与任务开始/完成事件时，预先分配任务唯一控制文件，默认异步运行 `memory maintain --control <任务唯一控制文件>`，不按当前任务文件缩小范围；它先维护全项目受管来源并完成机械变化。仅 `needs_semantic=true` 时，按返回 `worker` 的 `model`/`reasoning_effort` 设置宿主派工，给协调者一条英文启动句及 `worker.render_command`，由其执行并遵循 JSON 的 `prompt`。协调者持续接续收据中的待维护批次；业务完成时运行 `memory stop --control <同一文件>`，再取消协调者及其后代，不等待已获准提交的事务。Codex 宿主按随包 skill 刷新项目注册清单，缺失时报告采集缺口；缺少生命周期能力时说明自动维护不可用。多轮检索、筛选与重排前用同一命令前缀运行 `config ai --purpose retrieval` 解析项目档位。按 [记忆流程](<{skill}>) 执行。
 {end}"""
     if start in existing or end in existing:
         if existing.count(start) != 1 or existing.count(end) != 1:

@@ -8,7 +8,17 @@
 
 选留证据现统一位于根 `artifacts/runs/`。前次临时材料整理的映射为 `artifacts/runs/tmp-reorganization-20261108/moves.json`，本次位置映射为 `artifacts/runs/20261109-project-layout/moves.json`；原始回执及下文历史路径保留当时含义，结合两轮映射回查长期副本，tmp 内容按可清除处理。
 
-## 2026-11-11 0.8.1 认证凭据与普通安装
+## 2026-11-11 0.9.0 worker prompt 与全项目默认
+
+稳定客户端 `D:/AgentTools/envs/basepack-client/Scripts/python.exe` 已普通 no-deps 升级为 0.9.0；Python 3.13.17，从稳定 site-packages 导入。main 独立重算最终 wheel SHA256 `3bdb716795d09db9ca087904e38c920f18c9a2134555906b1e816d1725fd1d12`，42 个包文件与最终 wheel、源码一致，包含英文 coordinator/reader 模板。源码外最终普通 wheel 完整检查 395 passed、0 skipped，启用独立认证库、真实共享模型与本机 Condor policy 检查；此前初版与最终候选仅两份模板及 RECORD 不同，完整检查已对最终候选重跑。具体范围与真实多批验收见[本轮结果](../tasks/20261111-memory-worker-prompts/result.md)。
+
+升级前停止本轮后台维护，旧 0.8.1 wheel 保留。安装没有写知识表或重启服务；同一 UUID、七表计数、meta、三条 mandatory 内容、397 pending 和 1274/1274 兼容向量均与停写后的 baseline 相同。这是计数/入口及指定记录比较，不冒充七表逐字段迁移核验。本项目生成入口已刷新，Git 默认发现实际返回 287 个文件候选且无格式缺口，安装后的 prompt 默认 coordinator/tier2，英文与派工元数据实收通过；没有据此宣称这些文件已语义接受。
+
+新 NoProfile PowerShell 按生成 memory 段执行 brief，实际返回 3 条 mandatory 与 397 pending。沙箱以 `-File` 执行临时 `.ps1` 曾被 AuthorizationManager 拒绝；保持原安全策略，改按生成入口本来要求的命令段用 `-Command` 实测。初次提取误选通用 config show 围栏，发现没有 mandatory 后改为只取 basepack-memory 标记内的 brief 围栏，并核实际内容通过。0.9.0 本轮只验本项目入口与共用安装，三个项目 0.8.1 认证升级的既有实证仍见下节。
+
+Codex App Server 在受限沙箱初始化用户状态目录失败的问题仍存在；本轮经自动批准在正常用户上下文执行同一默认维护命令成功，未改 HOME 或范围、未静默降级。共享 embedding、数据库及 Condor 保持原实例。
+
+## 2026-11-11 0.8.1 认证凭据与普通安装（历史）
 
 稳定客户端 `D:/AgentTools/envs/basepack-client/Scripts/python.exe`（Python 3.13.17）已以普通 no-deps 安装升级到 0.8.1，从其 site-packages 导入。最终 wheel SHA256 为 `5b823201fcdef46f7f22db13af624da6d80cd6f23f9937d4f14a382f6b19917f`，38 份安装文件与最终 wheel、源码逐字节一致。源码外普通包完整回归为 369 passed、0 skipped；末次重包仅含同义 SKILL 文案与 RECORD 差异，Python 代码及测试未变，未为该措辞重复功能回归。
 
@@ -22,7 +32,7 @@
 
 ## 当前资源查询与执行边界（2026-11-10）
 
-0.6.3 发布准备已在独立轻量客户端、全新下载的 SurrealDB 和临时数据目录验证，源码 201 项通过、无跳过；新 shell 使用生成入口的实际结果与独立新机资源部署待验范围见 [发布结果](../tasks/20261106-rebuild/github-publish-result.md)。该次发布准备没有替换当时的正式环境；当前客户端安装状态见上节 0.8.1 记录，资源查询的双上下文边界仍按本节实证。
+0.6.3 发布准备已在独立轻量客户端、全新下载的 SurrealDB 和临时数据目录验证，源码 201 项通过、无跳过；新 shell 使用生成入口的实际结果与独立新机资源部署待验范围见 [发布结果](../tasks/20261106-rebuild/github-publish-result.md)。该次发布准备没有替换当时的正式环境；当前客户端安装状态见上节 0.9.0 记录，资源查询的双上下文边界仍按本节实证。
 
 最新双上下文复查仍为：受限 agent 沙箱中的 `condor_status` 成功、`condor_q -json` 以 `AUTHENTICATE:1005` 失败；相同配置在正常用户上下文两者均成功，队列为空。沙箱内 Windows NTSSPI 认证限制仍在，不能把正常用户路径验收通过写成该限制已修复，也不能由容量查询成功推断队列认证成功。对照原证为 `artifacts/runs/20261110-condor-auth-context/`。
 
