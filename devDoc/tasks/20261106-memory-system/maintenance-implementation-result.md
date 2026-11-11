@@ -1,6 +1,6 @@
 # 维护改造实施结果
 
-2026-11-11（北京时间）。状态：改造、候选收敛、本项目安装及清理已交付；显式记忆维护的实际结果在末节接续。
+2026-11-11—12（北京时间）。状态：改造、候选收敛、本项目安装、清理及固定回执的显式记忆维护均已完成；维护所有权已释放。
 
 ## 授权与范围
 
@@ -12,7 +12,7 @@
 - 已交付父项解析/依赖并发guard、AGENTS托管入口与升级刷新、原生事务透明分消息、默认无审计、持久使用反馈、来源已阅/重复与待细化处置、单owner维护及工作包进入根tmp。CLI apply显式传control，Python省略时仅在空闲项目取短期owner；反馈报告可并发，发布由单owner负责。
 - 完整候选源码套件482 passed、5 skipped，280.57秒；实际导入候选src，隔离SurrealDB4.0.0内存实例。完整stdout未另存，工具结果及条件已整理；五个跳过项后续在active源码、独立数据库及共享模型配置下全部通过（13.44秒），涵盖图像/向量、原生恢复、特殊ID与overflow。事务后续专项14通过、反馈含新旧表原生恢复8通过，保留原日志。代码测试属于开发验收，普通知识批次不追加审计。
 - 普通任务子agent只收到业务问题及生成AGENTS，实际brief、取得owner、预检、派协调者、stop/取消/release；释放前未另观测协调者终止，后续宿主状态为interrupted。停止control和空发布列表保证旧任务不能继续发布，不把事后状态冒充当时观察。
-- 本项目普通安装在`D:/AgentTools/envs/basepack-client-0.10/`，只修改本项目runtime.python与入口；原共用客户端仍为0.9.1。最终wheel SHA256为`db6d990cf0476359948663e5cdfd7053ffe63f48e14624f5145297166ba5af5a`，50个包文件与安装和active源码逐字节相同。刷新前后原UUID`464948e9-d41e-420f-966b-ebaa602fd9bc`、七表计数、三条fresh mandatory及托管块外字节已核；共享模型、数据库进程/目录/原凭据及其它项目入口未改。
+- 本项目普通安装在`D:/AgentTools/envs/basepack-client-0.10/`，只修改本项目runtime.python与入口；原共用客户端仍为0.9.1。最终wheel SHA256为`f9036c12ea38fdaf024b66252354174139834accaf7ecdab2b4c9cc53a769040`，50个包文件与安装和active源码逐字节相同。刷新前后原UUID`464948e9-d41e-420f-966b-ebaa602fd9bc`、七表计数、三条fresh mandatory及托管块外字节已核；共享模型、数据库进程/目录/原凭据及其它项目入口未改。
 - 目录治理先核活动使用、实际配置与当前/历史来源；未以文件夹名字作为删除依据。具体结果见下节。
 
 旧客户端背景维护的真实413批次在新客户端单次Python apply成功：相同batch、3来源、29成员、1节点、1边，无invalidated。旧HTTP SQL为1,254,584字节；新原生事务一个query消息为1,271,022字节，2.559秒，未手工拆批或调整HTTP服务限额。本例未达到新消息分组上限，多消息原子性由隔离专项证明。该次生产写入为项目SurrealKV上的一个合法实测，未扩张成完整磁盘负载验收。
@@ -37,12 +37,24 @@
 
 最终按四组清单累计删除2,877文件、1,064,167,175逻辑字节，另非递归移除7个确实为空的容器：备份2,535文件/1,005,490,896字节，限定杂项81文件/1,849,500字节，覆盖工作包220文件/44,359,998字节，散落历史导出及工作包41文件/12,466,781字节。十份尚无精确原件重建依据的包（3,488,837字节）、覆盖真实结果/语义输入/driver、onboarding原件及维护身份全部保留。最终ready200、8次指定回读、literal检索、2,096/2,096兼容向量、64件选留hash及升级后6项文件不变量通过；[精确清理结果](../../../artifacts/runs/20261111-maintenance-cleanup/result.md)列明保留例外。一次入口在授权升级中刷新导致清理前检查中止，重新以已完成升级的基线核对后执行，未吞掉不变量错误。
 
+## 真实使用反馈与修复
+
 0.10真实维护中多次出现`Partial file summary requires explicit coverage_gaps`：作者把framed聊天file摘要范围写为正文第2行起，而原件第1行仍是文件一部分。程序正确拒绝，尚未半发布。已在随包SKILL的members唯一合同补明完整file覆盖1..末行（含头部）、依据chunk可仅覆盖正文；真正部分覆盖仍须真实gaps。协调者确认无在途apply后短暂停新发布，重建普通wheel并核50文件一致后恢复；逻辑/API/schema/owner不变，已获作者草稿复用，SKILL来源重新prepare。
 
 真实维护又确认程序缺口：两份作者batch把dispositions放在顶层，旧apply返回成功却只登记source。已将两来源改回partial，创建持久反馈；在共用_apply以字段存在检查拒绝顶层dispositions/deferred_refinement，报明应在对应sources[]，不自动搬移或引入通用schema平台。隔离红测复现静默接受，修复后数据库/CLI定向60passed、0skipped，覆盖空/null及自动/显式owner、编码前拒绝、六表无半批、已有合法B/F。唯一发布者确认无在途apply后安装并核50文件一致；原作者重新prepare并正确嵌入source，两来源成功发布，feedback:3e330779946046c59a1e0d3f5c5f845e已resolve为fixed。前一条framing处置反馈feedback:ec6f65a4e19f4f949d2bf1827ebe8b7c亦已fixed。原错、批次与实际回归见misplaced-disposition/及本轮台账。
 
+另一次作者仍在补第4行依据时，旧42成员草稿已发布。来源改回partial并按当前prepare补齐，feedback:a832017a712a4e6ca359e0ce70d0b5b0已fixed。协调者模板现要求作者明确完成、给最终路径/hash；修订另存，发布者冻结唯一自有快照并提交该字节版本。15项模板回归通过，实际后续批次采用此交接；本轮发布冻结、stop且全部后代结束后，将最终模板wheel安装并核50文件一致，再释放owner。没有追加语义复审。
+
+本机共享embedding服务实际`max_length=2048`。三次批次遇到HTTP500，服务原错记录超限token，编码在forward前拒绝；原作者按记录边界重分块后成功。后端按长度排序，错误向量序号不能直接映射作者成员；逐项诊断才确定其中一个超限chunk。没有机械截断、提高共享服务限额或原样盲重试。客户端HTTP500尚缺输入身份和token细节，已形成[Issue草稿](../../../artifacts/runs/20261111-maintenance-implementation/embedding-overflow-issue-draft.md)，未提交。
+
 ## 本轮记忆维护
 
-任务内后台预检第一次在沙箱内失败：Codex App Server无法打开`C:/Users/ysPan/.codex/state_5.sqlite`（SQLite code 14 / OS error 5）。正常用户上下文重跑成功：3机械批次、31复用块；固定回执`.basepack/memory/maintenance/1030e20e195c4b3e938a785ae99ca9a2.json`，control为`.basepack/memory/20261111-implementation-background.control`。已按回执模型实际启动维护协调者，按用户的新策略不追加事后审计。新一轮显式维护在实现与整理之后进行；后台处理量不代替该项交付。
+任务内后台预检第一次在沙箱内失败：Codex App Server无法打开`C:/Users/ysPan/.codex/state_5.sqlite`（SQLite code 14 / OS error 5）。正常用户上下文重跑成功：3机械批次、31复用块；固定回执`.basepack/memory/maintenance/1030e20e195c4b3e938a785ae99ca9a2.json`，control为`.basepack/memory/20261111-implementation-background.control`。按回执模型实际启动协调者，最终31次成功apply涉及61个唯一来源、200成员、1节点、4边；无在途发布时stop、取消并释放。随后另行成功提交上文原413批次。这些处理量不代替新客户端显式维护。
 
-后台回执另有全局聊天归属未决336项、采集gap 73项；它们不等于本项目缺失聊天数，也不表示已接受750个语义来源候选。最终已处理范围、未决和余项据实际运行补充，代码测试数、派工成功与知识数量均不替代功能验收。
+显式维护刷新Codex项目注册清单后，以回执`61f4ec9733fc4934a37b9812357054f3`固定来源与聊天截点：35个机械批次、298个复用块；语义候选767个唯一来源（727初次、40已有变动）。主协调者为唯一发布者，四名直属作者及两个下级分支按不重叠路径接续；全局不超过13个并发席位。每源由实际作者阅读、表示或给出有理由的已阅处置；按最终稿/hash交接，成功程序提交计入完成。
+
+最终767/767均为handled，无assigned/partial，258条成功发布记录。626个来源的结案包含知识表示，136个为无新增知识，5个为重复/无新增知识组合处置；本轮已接受批次的sources条目未记录非空deferred_refinement。十组已跟踪依赖及本轮三条反馈全部解决。逐路径/版本/处置/提交快照台账、固定回执、原错及选留修正稿见[显式维护原证](../../../artifacts/runs/20261111-maintenance-implementation/explicit-memory/)。这是作者生成与程序提交的完成口径，没有例行回读、检索抽查或全库语义审计。
+
+本轮control创建于11日22:40:53，12日01:24:34已确认释放，约2小时44分钟，包含实际阅读、派工、编码、修复和收尾；无同规模对照，不能据此宣称整体提速。stop时publications为空，协调者及所有后代已观察为completed；最终wheel同步后release成功，`memory owner`返回null。控制与回执按恢复合同保留，数据库和共享模型继续运行。
+
+范围限制：原始捕获内已有的截断及上下文缺口按源保留，没有补造不可见文本。预检Codex统计为发现152、保留703、全局归属未决336、采集gap76；这些单位不同，不等于767来源中的失败数，也不能解释为本项目缺失聊天数量。固定回执之外及截点之后的新聊天、本文和最终提交变化留待后续维护；不为追逐本轮新材料重开采集。除上述捕获限制及embedding错误信息后续外，本轮固定范围无剩余阻塞。
