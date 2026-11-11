@@ -4,6 +4,8 @@
 
 ## 当前阶段
 
+已按用户要求于 2026-11-11 19:01（北京时间）公开发布 [0.9.1 开发版](https://github.com/YS-Pan/basePack/releases/tag/v0.9.1)，附普通 wheel 与 SHA256 校验和；重建包等价检查、隔离普通安装及附件下载校验通过，详见[发布结果](github-publish-result.md#091-开发版)。发布包含现行 0.9.1 功能与维护调查文档，不将候选实验或待实施方案标为已修复。
+
 近期一致性评估、0.9.1 修复及固定维护检查点已验收，历史依据见[归档进度](../../archive/20261111-consistency-review/progress.md)。全项目知识维护继续沿[记忆系统进度](../20261106-memory-system/progress.md)推进。
 
 已结束的 engineering-judgment、0.7.1 整改、0.8.1 接入简化、0.9.0 worker prompt 和 0.9.1 一致性修复任务已整体归档；本目录继续维护跨工具工作，记忆专项继续维护未完成知识目标。

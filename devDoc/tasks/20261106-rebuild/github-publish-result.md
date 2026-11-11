@@ -1,4 +1,6 @@
-# basePack 0.6.3 首次发布结果
+# basePack GitHub 发布结果
+
+最新公开开发版为 [v0.9.1](https://github.com/YS-Pan/basePack/releases/tag/v0.9.1)，发布与验证见文末；下文保留 0.6.3 首发及 0.6.4 许可补丁的历史条件。
 
 2026 年 11 月 10 日（北京时间）。本任务按 [发布计划](github-publish-plan.md) 准备 [YS-Pan/basePack](https://github.com/YS-Pan/basePack) 的首次源码发布。用户明确要求当前项目的记忆留在本机。
 
@@ -60,3 +62,21 @@ Release 仅上传上述 58,361 字节 wheel 和 99 字节 `SHA256SUMS.txt`，为
 0.6.4 为许可与元数据补丁，保留已发布 0.6.3 的标签与附件。构建声明采用 SPDX MIT 与三条 License-File，并将 setuptools 下限设为 77.0.3。0.6.4 wheel 为 64,272 字节，SHA256 为 `ef522d809518548ac51e4dcf604a3b72c2f718a870fc7ce052161b1fb50121ef`，发布到 [v0.6.4 开发版](https://github.com/YS-Pan/basePack/releases/tag/v0.6.4)。
 
 定向检查确认根、工程、wheel 和普通安装中的 MIT 全文一致；两份 Qwen 声明在包资源和 dist-info/licenses 中均存在且与 0.6.3 原字节一致。33 个运行包文件与 0.6.3 完全相同，纯净客户端普通安装、pip check、模块 CLI 与 console entry 通过；本次没有重跑此前 201 项功能矩阵或启停数据库/共享服务。已于北京时间 2026-11-10 14:19 发布，tag 指向 `0566e76`；GitHub 已识别仓库许可证为 MIT。wheel 与 99 字节校验和重新下载后均与本机已验收附件一致；原证选留于本机 `artifacts/runs/20261110-github-publish/license-064/`，项目记忆仍未上传。
+
+## 0.9.1 开发版
+
+按用户要求于北京时间 **2026-11-11 19:01:37** 发布 [v0.9.1](https://github.com/YS-Pan/basePack/releases/tag/v0.9.1)，公开 prerelease、非草稿；远端 tag 指向已推送的 `15d17b8558933cbeaf46497c62f6e3c703e6031b`。发布说明汇总 0.6.4 之后的查询/维护解耦、知识与向量原子发布、CPU/CUDA embedding、认证凭据自动读取、全项目发现与 Codex 采集、worker prompt 和 0.9.1 一致性修复。
+
+附件仅有 `basepack-0.9.1-py3-none-any.whl`（92,928 B）和 `SHA256SUMS.txt`（98 B）。发行 wheel 的 SHA256 为：
+
+```text
+592f79e7097ff2cc530c25756c84766a918d31e00500945472bbd2714bc72f3e
+```
+
+此前最终测试 wheel 的哈希 `1843a2df…` 保留为历史验收证据。本轮因 README 的一致性报告链接从 tasks 迁入 archive 而重新构建；新旧 wheel 的 42 个包文件与当前 active 源码逐字节一致，仅 METADATA 和 RECORD 内容有差异。核对当前 README 元数据、Python >=3.13、MIT 及三份许可文件、全部 RECORD 哈希和字节数通过。
+
+新隔离环境普通安装本次发行 wheel，仅安装 basepack 0.9.1 与 psutil 7.2.2；源码外 `-I` 核对导入路径和 42 个安装文件，通过 pip check、模块及 console 命令入口、memory guide 和 prompt 帮助。此前源码和普通 wheel 各 432 passed、0 skipped，以及正式旧依据 1128/1128 精确回读的条件沿[一致性验收](../../archive/20261111-consistency-review/progress.md)；本轮没有重复完整功能回归。
+
+先建立草稿并上传附件，两个附件重新下载后的 SHA256 均与本地一致，再正式发布；发布后 API 确认非草稿、prerelease、两个附件及其 digest，远端 tag 与上述提交相同。非秘密构建、安装、发布回执及验证脚本选留于本机 `artifacts/runs/20261111-release/`，项目记忆、数据库、配置、凭据、模型和运行原证未上传。
+
+发布说明明确保留升级备份、旧 text 模式迁移及设施准备要求；自动维护漏启动、长耗时和 SQL 413 仍为已知问题。新增[维护候选实验](../../../experiments/20261111-basepack-maintenance/README.md)只有入口，AGENTS 指令入口和透明 SQL 分包尚未实现，长耗时的具体方案留到本轮[维护计划](../20261106-memory-system/automatic-maintenance-plan.md)结束后讨论。完整空白新机部署及真实聊天附件覆盖仍有待验范围，本次发布不改变这些边界。

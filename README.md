@@ -29,7 +29,7 @@ $python = (Resolve-Path '.venv/Scripts/python.exe').Path
 
 The Python package lives in `experiments/20261106-basepack`; include that directory when installing from the repository root. These commands install the lightweight client. Project memory connects to a shared model service whose dependencies belong in its service environment. General skills can be used independently. This virtual environment belongs to the current clone; after moving or deleting it, recreate the client and update project instructions.
 
-Older packages are available from [GitHub Releases](https://github.com/YS-Pan/basePack/releases). To build a normal wheel from the current source, see the [route README](experiments/20261106-basepack/README.md#development-checks-and-builds). For an existing project, follow the [upgrade steps](experiments/20261106-basepack/docs/setup-project.md#版本升级) to back up its data and refresh its entry point.
+Development wheels are available from [GitHub Releases](https://github.com/YS-Pan/basePack/releases). To build a normal wheel from the current source, see the [route README](experiments/20261106-basepack/README.md#development-checks-and-builds). For an existing project, follow the [upgrade steps](experiments/20261106-basepack/docs/setup-project.md#版本升级) to back up its data and refresh its entry point.
 
 ## Enable project memory
 
