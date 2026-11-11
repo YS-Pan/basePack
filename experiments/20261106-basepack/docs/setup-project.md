@@ -137,7 +137,7 @@ Codex 宿主按项目归属默认接入可取得的聊天，不要求逐 thread 
 
 维护入口通过受支持的 App Server 列出 active 与 archived 聊天并分页读取正文。明确的项目 ID 优先；线程未带项目 ID 时，用项目根、Git worktree/common-dir 与宿主其它注册项目根排除冲突。不能确认的条目留在 unresolved/gaps；标题与关键词不判定归属。受管 UTF-8 导出保存在项目 `memory.data_dir/codex/`，由同一维护入口加入发现范围；无需把每个 thread 填入 `source_scope`，也不递归扫描数据库、控制文件和维护回执。
 
-采集回执的 discovered、unresolved、gaps 和路径描述本轮原文发现与采集；`needs_semantic` 与语义回执描述仍需阅读的范围。brief 的 `codex_collection.status` 为 `unavailable`、`registry_incomplete` 或 `not_checked`，只表示绑定能力或查询未检查采集，不能证明全部聊天已入库。可取得的受支持 localImage 会作为独立原图来源保存到 codex-attachments；附件不可取得、缺少的 subagent 与归属不明范围保留缺口。当前实际验收边界见 [本轮进度](../../../devDoc/tasks/20261110-onboarding-simplification/progress.md)；附件原件、完整分叉/继承身份和全部项目聊天覆盖仍需真实使用验证。
+采集回执的 discovered、unresolved、gaps 和路径描述本轮原文发现与采集；`needs_semantic` 与语义回执描述仍需阅读的范围。brief 的 `codex_collection.status` 为 `unavailable`、`registry_incomplete` 或 `not_checked`，只表示绑定能力或查询未检查采集，不能证明全部聊天已入库。可取得的受支持 localImage 会作为独立原图来源保存到 codex-attachments；附件不可取得、缺少的 subagent 与归属不明范围保留缺口。当前实际验收边界见 [本轮进度](../../../devDoc/archive/20261110-onboarding-simplification/progress.md)；附件原件、完整分叉/继承身份和全部项目聊天覆盖仍需真实使用验证。
 
 ## 新 shell 接续
 
@@ -194,7 +194,7 @@ bp --config $config memory search --mode vector --text '<代表性主题>'
 
 密码文件缺失时恢复原凭据，不为已有库生成新密码。改写文件不等于轮换数据库中保存的账户密码；确需轮换时先由数据库管理员更新账户，再同步唯一凭据文件和 launcher。失败保留原错，按保留的 wheel 与配置回退；不清库或重新总结。
 
-正式项目升级结果见 [本轮进度](../../../devDoc/tasks/20261110-onboarding-simplification/progress.md)。
+正式项目升级结果见 [本轮进度](../../../devDoc/archive/20261110-onboarding-simplification/progress.md)。
 
 ## 移动与重新检出
 
