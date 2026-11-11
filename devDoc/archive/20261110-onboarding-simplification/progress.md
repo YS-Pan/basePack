@@ -1,5 +1,7 @@
 # 接入、记忆维护与运行简化进度
 
+2026-11-11清理补记：下文两次普通维护的旧`.basepack/memory/batches`工作目录已清理；[定位选型回执](../../../artifacts/runs/20261111-maintenance-cleanup/selected/memory/batches/20261110_plan-mechanical-memory-maintenance/applied.json)及[计划合并回执](../../../artifacts/runs/20261111-maintenance-cleanup/selected/memory/batches/20261110_plan_consolidation/applied.json)已逐字节选留，历史数量与当时条件不变。范围和映射见[清理结果](../../../artifacts/runs/20261111-maintenance-cleanup/result.md)。
+
 归档：2026-11-11。0.8.1 保留认证、凭据自动读取及三个既有项目升级已交付；0.8.0 免认证候选保留历史身份。剩余知识维护与聊天、真实附件覆盖验证沿[记忆系统进度](../../tasks/20261106-memory-system/progress.md)接续。
 
 2026-11-11（北京时间）。状态：0.8.1已完成并普通升级至三个既有项目；下方保留0.8.0免认证候选的原交付截面。

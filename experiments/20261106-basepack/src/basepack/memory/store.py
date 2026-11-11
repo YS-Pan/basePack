@@ -7,8 +7,10 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import re
+import sys
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
+from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
 
 from basepack.project.config import ProjectConfig
@@ -16,7 +18,7 @@ from .content import SourceContent, _project_path, detect_changes, numbered_text
 from .images import IMAGE_SUFFIXES, ImageSource, read_image, retain_image
 
 
-_CANDIDATE_OMIT = "embedding,basis,raw_revision,knowledge_revision"
+_CANDIDATE_OMIT = "embedding,basis,raw_revision"
 
 
 @dataclass(frozen=True)
@@ -73,13 +75,26 @@ def _original(source: SourceContent, start: int, end: int) -> str:
     return "".join(lines[start - 1:end])
 
 
+class SqlResponseError(RuntimeError):
+    """A SQL request returned a definite server-side statement error."""
+
+
+class _RpcError(RuntimeError):
+    pass
+
+
+class PublicationOutcomeUnknown(RuntimeError):
+    """The commit response was lost and the transaction could not be confirmed."""
+
+
 class Memory:
     """Bind every action to one explicit project and its native database."""
 
     def __init__(self, config: ProjectConfig):
         self.config = config
         self.connection = config.raw["memory"]
-        credential = f"{self.connection['username']}:{config.memory_password_file.read_bytes().decode('utf-8-sig')}"
+        self._password = config.memory_password_file.read_bytes().decode("utf-8-sig")
+        credential = f"{self.connection['username']}:{self._password}"
         self._authorization = "Basic " + b64encode(credential.encode("utf-8")).decode("ascii")
 
     def _execute(self, sql: str, *, check_project: bool = True) -> list:
@@ -99,14 +114,116 @@ class Memory:
         except HTTPError as error:
             error.add_note(error.read().decode("utf-8"))
             if error.code == 413:
-                error.add_note(f"SQL request body: {len(body)} bytes; server capacity is unknown. "
-                               "Split the work into smaller manual batches, retain prepare's expected versions "
-                               "and each batch's atomicity, and read relation endpoints at their accepted versions.")
+                error.add_note(f"SQL request body: {len(body)} bytes; server capacity is unknown.")
             raise
         errors = [statement["result"] for statement in statements if statement["status"] != "OK"]
         if errors:
-            raise RuntimeError("\n".join(str(error) for error in errors))
+            raise SqlResponseError("\n".join(str(error) for error in errors))
         return [statement["result"] for statement in statements][1 if check_project else 0:]
+
+    def _publish(self, statements: list[str], *, control: str | None = None) -> None:
+        """Send complete SQL statements in bounded messages in one native transaction."""
+        from websocket import create_connection
+
+        limit = 2112 * 1024
+        marker = _Record("meta", "publication_" + uuid4().hex)
+        project_check = (f"IF meta:project.project_id != {_sql(self.connection['project_id'])} "
+                         "{ THROW 'Memory database belongs to another project or is not initialized'; };")
+        statements = [project_check, *statements[1:-1],
+                      f"CREATE {_sql(marker)} SET committed=true RETURN NONE;"]
+        # Measure the actual JSON wire message, including escaped SQL and transaction id.
+        def payload(sql):
+            return json.dumps({"id": 999999, "method": "query", "txn": "0" * 36,
+                               "params": [sql]}, ensure_ascii=False).encode("utf-8")
+        groups, group = [], []
+        for statement in statements:
+            candidate = "\n".join([*group, statement])
+            if len(payload(candidate)) > limit:
+                if not group:
+                    raise ValueError(f"One SQL statement exceeds the {limit}-byte WebSocket message limit; "
+                                     "reduce the source or increase the supported message capacity")
+                groups.append("\n".join(group))
+                group = [statement]
+                if len(payload(statement)) > limit:
+                    raise ValueError(f"One SQL statement exceeds the {limit}-byte WebSocket message limit; "
+                                     "reduce the source or increase the supported message capacity")
+            else:
+                group.append(statement)
+        if group:
+            groups.append("\n".join(group))
+
+        publication = None
+        if control:
+            from .owner import begin_publication, finish_publication
+            publication = begin_publication(self.config.memory_dir, control, marker.key.removeprefix("publication_"))
+        finished = False
+        ws = None
+        transaction = None
+        committing = False
+        try:
+            endpoint = urlsplit(self.connection["endpoint"].rstrip("/"))
+            url = urlunsplit(("wss" if endpoint.scheme == "https" else "ws", endpoint.netloc,
+                              endpoint.path + "/rpc", "", ""))
+            ws = create_connection(url, subprotocols=["json"], timeout=30)
+            sequence = 0
+            def rpc(method, params=None, txn=None):
+                nonlocal sequence
+                sequence += 1
+                message = {"id": sequence, "method": method}
+                if params is not None:
+                    message["params"] = params
+                if txn is not None:
+                    message["txn"] = txn
+                ws.send(json.dumps(message, ensure_ascii=False))
+                response = json.loads(ws.recv())
+                if "error" in response:
+                    raise _RpcError(str(response["error"]))
+                return response["result"]
+            rpc("signin", [{"user": self.connection["username"], "pass": self._password}])
+            rpc("use", [self.connection["namespace"], self.connection["database"]])
+            transaction = rpc("begin")
+            for group in groups:
+                results = rpc("query", [group], transaction)
+                errors = [result["result"] for result in results if result["status"] != "OK"]
+                if errors:
+                    raise RuntimeError("\n".join(map(str, errors)))
+            committing = True
+            try:
+                rpc("commit", [transaction])
+            except Exception as error:
+                if isinstance(error, _RpcError) and "TransactionConflict" in str(error):
+                    finished = True
+                    raise
+                # A lost or otherwise ambiguous response does not establish
+                # failure. Only the transactional marker confirms publication.
+                try:
+                    committed = self._execute(f"SELECT * FROM ONLY {_sql(marker)};")[0]
+                except Exception as verification_error:
+                    unknown = PublicationOutcomeUnknown(
+                        f"Publication outcome unknown; inspect {_sql(marker)} before any retry")
+                    unknown.add_note(f"Marker verification failed: {verification_error!r}")
+                    unknown.verification_error = verification_error
+                    raise unknown from error
+                if not committed:
+                    raise PublicationOutcomeUnknown(
+                        f"Publication outcome unknown; inspect {_sql(marker)} before any retry") from error
+            finished = True
+        except Exception:
+            if not committing:
+                if transaction is None:
+                    finished = True
+                elif ws is not None:
+                    try:
+                        rpc("cancel", [transaction])
+                        finished = True
+                    except Exception:
+                        pass
+            raise
+        finally:
+            if ws is not None:
+                ws.close()
+            if publication is not None and finished:
+                finish_publication(self.config.memory_dir, control, publication)
 
     def install_schema(self) -> dict:
         # Install the schema and bind its project in one native transaction.
@@ -169,6 +286,8 @@ class Memory:
                     old = SourceContent(item["path"], previous["revision"], previous["size"],
                                         previous["mtime_ns"], snapshot["text"])
                     item["previous"] = {"revision": old.revision, "numbered_text": numbered_text(old)}
+                item["previous"].update({key: snapshot[key] for key in ("dispositions", "deferred_refinement")
+                                         if key in snapshot})
             prepared.append(item)
             ids.extend(member["id"] for member in item["members"])
         edges = self._execute("SELECT * FROM semantic WHERE "
@@ -264,6 +383,28 @@ class Memory:
                 f"UPDATE semantic SET stale=true, knowledge_revision={_sql(uuid4().hex)} WHERE basis.*.member CONTAINSANY {refs} OR in IN {refs} OR out IN {refs} OR in IN {nodes} OR out IN {nodes};"]
 
     def apply(self, batch: dict, *, control: str | None = None, timeout: float = 600) -> dict:
+        self.config.memory_search_mode
+        if control:
+            return self._apply(batch, control=control, timeout=timeout)
+        from .owner import acquire, release, stop_owned
+        control = str(self.config.memory_dir / "maintenance" / f"manual-{uuid4().hex}.control")
+        result = acquire(self.config.memory_dir, self.connection["project_id"], "Python apply", control)
+        if not result["acquired"]:
+            raise RuntimeError(f"Memory maintenance already owned: {result['owner']}")
+        try:
+            return self._apply(batch, control=control, timeout=timeout)
+        finally:
+            original = sys.exception()
+            try:
+                stop_owned(self.config.memory_dir, control)
+                # An uncertain publication remains in flight and release refuses it.
+                release(self.config.memory_dir, control)
+            except Exception as cleanup_error:
+                if original is None:
+                    raise
+                original.add_note(f"Maintenance owner retained: {cleanup_error}")
+
+    def _apply(self, batch: dict, *, control: str | None = None, timeout: float = 600) -> dict:
         """Check exact source revisions, then accept one agent batch atomically.
 
         Unmentioned records and edges survive. Accepted chunk text comes from the
@@ -298,7 +439,13 @@ class Memory:
                         for item in batch.get(key, []) for value in item.get("evidence", [])}
         dependencies.update(_record(item[endpoint]) for item in batch.get("edges", [])
                             for endpoint in ("in", "out"))
+        parents = {_record(item["parent"]) for item in batch.get("members", []) if item.get("parent")}
+        if any(parent.table != "member" for parent in parents):
+            raise ValueError("Parent must reference a member")
+        dependencies.update(parents)
         expected = {_record(key): value for key, value in batch.get("expected", {}).items()}
+        from .reviewed import dependencies as review_dependencies
+        dependencies.update(review_dependencies(self, batch, before_members, targets, expected))
         for target in sorted(targets | dependencies, key=lambda value: (value.table, _sql(value.key))):
             record = _sql(target)
             if target in expected:
@@ -307,6 +454,12 @@ class Memory:
             else:
                 statements.append(f"IF {record}.id != NONE "
                                   "{ THROW 'Existing knowledge requires expected revision; prepare and read again'; };")
+            # Force a write conflict when a checked dependency changes before
+            # commit; SurrealDB snapshot reads alone permit write skew.
+            if target in dependencies:
+                guard = "_guard_" + uuid4().hex
+                statements.append(f"UPDATE {record} SET {guard}=true RETURN NONE;")
+                statements.append(f"UPDATE {record} UNSET {guard} RETURN NONE;")
         for expected in batch["sources"]:
             if expected.get("deleted"):
                 previous = by_id[expected["id"]] if "id" in expected else by_path[expected["path"]]
@@ -330,6 +483,12 @@ class Memory:
             if previous:
                 statements.append(f"IF {_sql(record)}.version != {_sql(_record(previous['version']))} {{ THROW 'Concurrent source version changed'; }};")
             snapshot = {"source": record, "revision": source.revision, "path": source.path}
+            if previous and _record(previous["version"]) == version:
+                old_snapshot = self._execute(f"SELECT * FROM ONLY {_sql(version)};")[0]
+                snapshot.update({key: old_snapshot[key] for key in ("dispositions", "deferred_refinement")
+                                 if key in old_snapshot})
+            snapshot.update({key: expected[key] for key in ("dispositions", "deferred_refinement")
+                             if key in expected})
             kind = "image" if isinstance(source, ImageSource) else "text"
             if kind == "image":
                 assets[source.path] = retain_image(self.config.memory_dir, source)
@@ -479,6 +638,10 @@ class Memory:
                 statements.append(f"UPDATE {_sql(target)} SET stale=true, knowledge_revision={_sql(uuid4().hex)};")
                 if target.table == "node":
                     statements.append(f"UPDATE semantic SET stale=true, knowledge_revision={_sql(uuid4().hex)} WHERE in={_sql(target)} OR out={_sql(target)};")
+        for parent in parents:
+            record = _sql(parent)
+            statements.append(f"IF {record}.id = NONE OR {record}.retired = true "
+                              "{ THROW 'Parent member does not exist or is retired'; };")
         statements.append("COMMIT;")
         # Encoding may take time; never publish a candidate from a changed original.
         for expected in batch["sources"]:
@@ -490,10 +653,7 @@ class Memory:
                 source = self._load_source(expected["path"], expected.get("kind"))
                 if source.revision != expected["revision"]:
                     raise ValueError(f"Source revision mismatch for {source.path}: expected {expected['revision']}, found {source.revision}")
-        if control:
-            from .maintenance import begin_commit
-            begin_commit(control)
-        self._execute("\n".join(statements))
+        self._publish(statements, control=control)
         return {"sources": len(current), "members": len(submitted), "nodes": len(batch.get("nodes", [])),
                 "edges": len(batch.get("edges", [])), "invalidated": sorted(retired)}
 
@@ -612,7 +772,7 @@ class Memory:
         selected_ids = {row["id"] for row in clues}
         clues.extend(dict(row, clue_role="map") for row in overview if row["id"] not in selected_ids)
         fields = {"id", "kind", "title", "text", "path", "source_revision", "source_version", "start_line", "end_line",
-                  "parent", "stale", "retired", "coverage_gaps", "locator", "clue_role"}
+                  "parent", "stale", "retired", "coverage_gaps", "locator", "clue_role", "knowledge_revision"}
         def startup_item(row):
             return {key: value for key, value in row.items() if key in fields}
         detail_limit = max(20, limit)
@@ -644,6 +804,10 @@ class Memory:
     def maintain(self, scope: list[str], *, control: str | None = None, timeout: float = 600) -> dict:
         """Run deterministic maintenance and retain the semantic handoff."""
         from .maintenance import maintain
+        from .owner import check_owned
+        if not control:
+            raise ValueError("Maintenance requires the project owner's control")
+        check_owned(self.config.memory_dir, control)
         return maintain(self, scope, control=control, timeout=timeout)
 
     def _check_changes(self, known: list[dict], scope: list[str], *, deep: bool) -> list[dict]:

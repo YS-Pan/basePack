@@ -1,33 +1,9 @@
-# basePack 维护试验
+# basePack maintenance trial
 
-状态：候选实验入口已建立，代码试验尚未开始。本目录用于本轮维护计划的隔离实现与验证，当前不能作为可运行或可安装的实验包。
+This trial is complete. Its verified changes have been merged into the sole active route, [20261106-basepack](../20261106-basepack/README.md), targeting 0.10.0.dev1. This directory retains the trial entry, rather than a second maintained implementation.
 
-详细计划及后续状态统一维护于根 devDoc：
+The independent candidate started from 0.9.1 at commit `490b1c219ef92b625dd3075a0516ce6c761c5f80`. It covered owner-based maintenance, direct agent entry instructions, atomic SQL message batching, parent dependencies, persistent use feedback, read dispositions and gradual refinement.
 
-- [维护试验计划](../../devDoc/tasks/20261106-memory-system/automatic-maintenance-plan.md)
-- [记忆专项进度](../../devDoc/tasks/20261106-memory-system/progress.md)
+See the root [implementation result](../../devDoc/tasks/20261106-memory-system/maintenance-implementation-result.md) for actual tests, installation, memory maintenance and limits, and the [plan](../../devDoc/tasks/20261106-memory-system/automatic-maintenance-plan.md) for the accepted contracts. The tested source snapshot, consolidation hashes and selected evidence remain in [run artifacts](../../artifacts/runs/20261111-maintenance-implementation/).
 
-## 本轮范围
-
-- 重要实施项：保留已有来源、版本、原文范围、依据、向量及事务程序保护，优先补非空父引用等真实机械缺口；不让AI手工替代，不从零重写已有六类保护。
-- 在 AGENTS 的 basePack 专用块直接呈现关键行为，短指令逐项链接详细流程，并覆盖新项目与已有项目的入口刷新。
-- 对调用 AI agent 透明的 SQL 自动分包，保持一次逻辑 apply 的知识与向量原子发布；事务连接及依赖先试验验证。
-- SQL 容量数值仍为候选，未决定或应用新的正式服务配置。
-- A：建立与普通维护默认不追加语义审计、事后逐项回读/抽查或独立审计；仅用户明确请求时手动审计。沿用固定候选/来源分批，不冻结全项目版本。
-- 使用反馈：检索worker和调用agent均可轻量记录问题，未来由单维护owner处理；补持久待办、观察版本及回执/派工闭环，不将疑点直接改成知识。
-- B：在已有空正文登记之外，补非空来源的已阅无新增/重复处置，避免重复首建；作者已阅不表示独立审计。
-- F：复用已有 file/section/chunk 和全文快照，试验粗层交付与精细渐进；衔接依据合同、缺口和重复入队，不新建另一套分层模型。
-- 同一项目同时只由一个 thread 持有维护，补项目全生命周期所有权；现有 control 仅做单任务短时仲裁，多 thread 同时维护留待未来。
-- 按[目录约定](../../devDoc/system/project-data-layout.md)整理后续产物，并计划清除本项目旧备份与无用杂项。
-
-用户已将默认不审计/使用反馈方向和程序检查补缺纳入本轮，取代此前待决定与事后例行核验建议。D不考虑，E通用加速排除，C已有能力不重做；作者理解和程序写入保护继续。当前只更新计划/说明，候选代码、正式模板切换及大规模删除/迁移未执行。
-
-## 基线与运行边界
-
-基线为 0.9.1，对应仓库提交 490b1c219ef92b625dd3075a0516ce6c761c5f80 中的 experiments/20261106-basepack。实施第一步再导入需要的源码、依赖声明和测试，建立本目录自身的运行入口；不得只链接旧实验的可变源码。
-
-已核此基线与公开 v0.9.1 所指 15d17b8 的整个实验目录相同；沿用固定基线用于复现，差异与真正待补项见[一致性核查](../../devDoc/tasks/20261106-memory-system/research/plan-consistency-20261111.md)。
-
-[现行路线](../20261106-basepack/README.md)继续承担当前安装和运行入口。候选代码使用独立环境、配置与测试数据库；共享模型等通用设施通过配置复用。试运行材料放项目根 tmp，选留原证放根 artifacts/runs。
-
-试验通过后再明确合回、替换或终止选择并同步入口，避免长期保留两套权威实现。当前没有切换正式客户端或数据库。
+The small agent comparison did not demonstrate lower total cost. Ordinary maintenance completes after authoring and program publication; audits require explicit user intent.

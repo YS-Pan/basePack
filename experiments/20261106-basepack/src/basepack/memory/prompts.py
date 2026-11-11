@@ -46,7 +46,7 @@ def _reader_hints(material, paths):
     for item in semantic:
         if item["path"] not in selected:
             continue
-        sources.append({key: item[key] for key in ("path", "reason") if key in item})
+        sources.append({key: item[key] for key in ("path", "reason", "category") if key in item})
         sources[-1]["members"] = [{key: member[key] for key in
                                    ("id", "kind", "reasons", "source_version", "start_line", "end_line")
                                    if key in member} for member in item["members"]]
@@ -75,7 +75,7 @@ def render_prompt(config, receipt, control, *, role="coordinator", tier=None, pa
     material = json.loads(receipt_path.read_text(encoding="utf-8"))
     template = Template((Path(__file__).with_name("prompts") / f"{role}.md").read_text(encoding="utf-8"))
     reader = config.resolve_ai(tier="tier1") if role == "coordinator" else None
-    work = config.memory_dir / "maintenance" / "work" / receipt_path.stem / uuid4().hex
+    work = config.root / "tmp" / "basepack-maintenance" / receipt_path.stem / uuid4().hex
     reading, batch = work / "reading.json", work / "batch.json"
     values = {
         "skill": str(Path(__file__).with_name("SKILL.md").resolve()),
@@ -86,6 +86,7 @@ def render_prompt(config, receipt, control, *, role="coordinator", tier=None, pa
         "control": str(Path(control).resolve()),
         "semantic_count": str(len(material["semantic"])),
         "relations_count": str(len(material["pending_relations"])),
+        "feedback_count": str(len(material.get("feedback", []))),
         "paths": json.dumps(paths or [], ensure_ascii=False),
         "hints": json.dumps(_reader_hints(material, paths) if role == "reader" else {}, ensure_ascii=False),
         "codex": json.dumps(material.get("codex", {}), ensure_ascii=False),

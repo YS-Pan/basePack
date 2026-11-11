@@ -8,6 +8,14 @@
 
 选留证据现统一位于根 `artifacts/runs/`。前次临时材料整理的映射为 `artifacts/runs/tmp-reorganization-20261108/moves.json`，本次位置映射为 `artifacts/runs/20261109-project-layout/moves.json`；原始回执及下文历史路径保留当时含义，结合两轮映射回查长期副本，tmp 内容按可清除处理。
 
+## 2026-11-11 0.10.0.dev1维护改造与本项目接入
+
+候选隔离验证后合回唯一active路线。本项目普通wheel安装在独立稳定环境`D:/AgentTools/envs/basepack-client-0.10/`，Python3.13.17、psutil7.2.2、websocket-client1.9.2；原共用客户端仍为0.9.1。本项目runtime.python和两份托管入口刷新，原UUID、三条fresh mandatory、刷新前后七表计数及块外字节通过；最终50个包文件与源码和安装逐字节相同。
+
+完整候选源码482passed/5skipped；五个跳过项随后在active源码和独立数据库全部通过，使用真实共享embedding、原图向量、特殊ID、overflow和原生恢复。事务与反馈负测另有实际输出。旧HTTP413原批次在生产SurrealKV经新原生事务成功，3来源29成员，未调整服务配置或手工拆批。隔离负测采用SurrealDB4.0.0内存引擎，未覆盖自定义WS限额、全面磁盘负测和长期负载。一次owner.json替换WinError5的原占用者仍未知。
+
+旧备份/可重建杂项按引用和逐文件证据清理；升级仅留一套当前回退材料。版本、最终wheel哈希、来源/动作、无审计策略对照的负面结果及实际记忆维护沿[实施结果](../tasks/20261106-memory-system/maintenance-implementation-result.md)与[原证索引](../../artifacts/runs/20261111-maintenance-implementation/README.md)核实，不把下文历史0.9.1位置当当前运行入口。
+
 ## 2026-11-11 0.9.1 一致性修复与旧依据兼容
 
 稳定客户端 `D:/AgentTools/envs/basepack-client/Scripts/python.exe` 已普通 no-deps 升级为 0.9.1，Python 3.13.17。最终 wheel 位于 active 工程 `dist/consistency-0.9.1-final/`，SHA256 `1843a2df3630c094775b81d78ded799527230fce8365bc1e8d0d92629c39f3cc`；42 个包文件与源码、隔离普通安装及稳定安装逐字节相同。最终源码 432 passed/0 skipped，源码外普通 wheel 432 passed/0 skipped；独立认证库、共享图文 embedding、原生恢复和 Condor policy 检查均启用。初次临时 wheel 测试环境缺依赖的 11 失败及 K1 初版兼容负验原证均保留，不当作最终交付结果。

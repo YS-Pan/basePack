@@ -10,7 +10,7 @@ basePack gives agents project-local memory, shared compute coordination, and ind
 | file-structure | Organize project files by purpose and lifecycle | A host with skills |
 | engineering-judgment | Judge contracts, responsibilities, compatibility, and the work passed to users | A host with skills |
 
-The current source targets **0.9.1, in development**, for Windows and Python 3.13+. The host's subscription-based agents understand material, build relations, and score results; basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability. Current fixes, installation evidence, and remaining verification are recorded in the [consistency review progress](devDoc/archive/20261111-consistency-review/progress.md).
+The current source targets **0.10.0.dev1, in development**, for Windows and Python 3.13+. The host's subscription-based agents understand material, build relations, and score results; basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability. The [maintenance implementation result](devDoc/tasks/20261106-memory-system/maintenance-implementation-result.md) records current checks, installation and remaining limits.
 
 **basePack is under development. Real use also serves as testing; record problems so they can inform subsequent fixes.**
 
@@ -38,7 +38,7 @@ Development wheels are available from [GitHub Releases](https://github.com/YS-Pa
 3. Follow [shared model deployment](experiments/20261106-basepack/docs/administrator.md) to prepare a CPU or CUDA embedding service, set its endpoint in the machine configuration, and verify one embedding request. Memory does not require HTCondor.
 4. Follow the [new-shell steps](experiments/20261106-basepack/docs/setup-project.md#新-shell-接续), run `memory init` and `memory brief`, then complete the [minimal read/write workflow](experiments/20261106-basepack/docs/memory.md#最小闭环示例). New shells and chats follow the generated `AGENTS.md → .basepack/instructions.md` entry to run a brief directly. The client reads the configured password file automatically; no shell variable is needed.
 
-Default background maintenance covers the managed project, including Git-tracked and nonignored untracked files, explicit includes, registered sources, historical pending work, and owned Codex captures. It completes mechanical changes and returns a command for a continuing coordinator to load the shipped English prompt. The host sets the actual model before dispatch and stops the coordinator and its descendants when business work ends. Discovery boundaries and unavailable content remain explicit coverage gaps; see [maintenance](experiments/20261106-basepack/docs/memory.md#自动维护与手动维护) and [Codex chat setup](experiments/20261106-basepack/docs/setup-project.md#codex-项目聊天接入).
+Default background maintenance acquires one project owner, covers managed files, registered and historical work, owned Codex captures and unresolved use feedback, then returns a continuing coordinator command when needed. Other chats continue business. Authors read and generate knowledge once; successful program publication completes ordinary maintenance. There is no routine audit or publication readback. The host stops its owner, cancels its agents and releases after publication ends. Read dispositions and deferred refinement prevent unchanged work from repeatedly entering initial construction. See [maintenance and feedback](experiments/20261106-basepack/docs/memory.md#自动维护与手动维护) and [Codex chat setup](experiments/20261106-basepack/docs/setup-project.md#codex-项目聊天接入).
 
 Each project's configuration, password file, knowledge, database, and local entry point stay in that project's ignored directories. **Project memory is not distributed with this source repository.** A new clone creates its own configuration through `init`; recover existing knowledge from that project's backup.
 
@@ -57,7 +57,7 @@ The wheel includes the program, configuration and entry templates, memory schema
 | Entry | Contents |
 | --- | --- |
 | [Route README](experiments/20261106-basepack/README.md) | Capabilities, development, builds, and tests |
-| [Maintenance experiment](experiments/20261111-basepack-maintenance/README.md) | Prepared candidate for program checks, entry instructions, SQL batching, usage feedback and maintenance policy; implementation has not started |
+| [Maintenance experiment](experiments/20261111-basepack-maintenance/README.md) | Isolated trial and consolidation record for the maintenance changes |
 | [Project setup](experiments/20261106-basepack/docs/setup-project.md) | Configuration, new shells, upgrades, relocation, and skill discovery |
 | [Memory guide](experiments/20261106-basepack/docs/memory.md) | Initial knowledge, retrieval, small-batch maintenance, and backup |
 | [Resource guide](experiments/20261106-basepack/docs/resources.md) | Text/image embedding, HTCondor jobs, and Python APIs |

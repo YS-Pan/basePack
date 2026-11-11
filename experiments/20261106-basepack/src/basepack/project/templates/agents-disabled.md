@@ -1,0 +1,1 @@
+- 开始或接续任务时，先读取本项目的 Python 与配置：[本机入口](.basepack/instructions.md#startup)。记忆尚未启用，启用前完成 [记忆接入](.basepack/instructions.md#memory-setup)。

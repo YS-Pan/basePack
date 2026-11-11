@@ -21,17 +21,17 @@ def test_memory_activation_preserves_business_text_and_updates_one_local_entry(t
     project = tmp_path / "中文 project"
     config = load_project_config(init_project(project, machine))
     instructions = project / ".basepack/instructions.md"
-    original = instructions.read_text(encoding="utf-8")
+    original = instructions.read_text(encoding="utf-8").split("<!-- basepack-memory:start -->", 1)[0]
     _activate(config)
     instructions.write_text(instructions.read_text(encoding="utf-8") + "\n业务尾注：需保留。\n", encoding="utf-8")
     _activate(config)
     updated = instructions.read_text(encoding="utf-8")
-    assert updated.startswith(original.rstrip())
+    assert updated.startswith(original)
     assert updated.endswith("\n业务尾注：需保留。\n")
     assert updated.count("<!-- basepack-memory:start -->") == 1
     assert f"$basepackConfig = '{config.path}'" in updated
     assert "--config $basepackConfig memory brief" in updated
-    assert "[记忆流程](<" in updated
+    assert "[检索流程](<" in updated
     assert "memory.search_mode" in updated
     assert "`hybrid --literal`" in updated
     assert "`vector --literal` 明确拒绝" in updated
@@ -179,7 +179,7 @@ def test_maintain_defaults_to_project_scope_and_passes_control(tmp_path, monkeyp
                         lambda self, scope, **kwargs: calls.append((scope, kwargs)) or {"needs_semantic": 0})
     parser = argparse.ArgumentParser()
     register_commands(parser.add_subparsers(dest="command"))
-    args = parser.parse_args(["memory", "maintain", "--control", "task.control"])
+    args = parser.parse_args(["memory", "maintain", "--holder", "thread", "--control", "task.control"])
     result, status = dispatch(args, config)
     assert status == 0 and result["needs_semantic"] == 0
     assert result["codex"]["status"] == "binding_unavailable"
@@ -233,7 +233,7 @@ def test_maintain_discovers_git_project_and_emits_complete_worker_command(tmp_pa
     Path(receipt).write_text('{"semantic": [], "pending_relations": []}', encoding="utf-8")
     monkeypatch.setattr("basepack.memory.store.Memory.maintain", lambda self, scope, **kwargs:
                         calls.append((scope, kwargs)) or {"needs_semantic": True, "receipt": receipt})
-    result, status = dispatch(_memory_args("maintain"), config)
+    result, status = dispatch(_memory_args("maintain", "--holder", "thread", "--control", str(config.memory_dir / "maintenance" / "task.control")), config)
     assert status == 0
     assert "outside-current-task.md" in calls[0][0]
     assert all(not path.startswith(".basepack/") for path in calls[0][0])
@@ -271,7 +271,7 @@ def test_maintain_receipt_keeps_current_and_retained_codex_provenance(tmp_path, 
                         {"paths": [".basepack/memory/codex-attachments/retained.png"], "gaps": []})
     monkeypatch.setattr("basepack.memory.store.Memory.maintain", lambda *args, **kwargs:
                         {"needs_semantic": True, "receipt": str(receipt)})
-    result, status = dispatch(_memory_args("maintain", "--scope", "no-new-discovery"), config)
+    result, status = dispatch(_memory_args("maintain", "--holder", "thread", "--control", str(config.memory_dir / "maintenance" / "task.control"), "--scope", "no-new-discovery"), config)
     assert status == 0
     material = json.loads(receipt.read_text(encoding="utf-8"))
     assert material["codex"] == {"project_id": "owned", "receipt": str(capture_receipt),
@@ -304,7 +304,7 @@ def test_maintain_keeps_owned_retained_captures_when_collection_is_unavailable(t
     calls = []
     monkeypatch.setattr("basepack.memory.store.Memory.maintain", lambda self, scope, **kwargs:
                         calls.append(scope) or {"needs_semantic": False})
-    result, _ = dispatch(_memory_args("maintain", "--scope", "no-new-discovery"), config)
+    result, _ = dispatch(_memory_args("maintain", "--holder", "thread", "--control", str(config.memory_dir / "maintenance" / "task.control"), "--scope", "no-new-discovery"), config)
     assert result["codex"]["status"] == "binding_unavailable"
     assert result["codex"]["retained_sources"] == 2
     assert result["codex"]["retained_gaps"] == []

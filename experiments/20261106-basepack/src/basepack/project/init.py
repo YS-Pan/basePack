@@ -49,27 +49,55 @@ def init_project(root: str | Path, machine_config: str | Path,
 
 def _write_project_entry(root: Path, config: Path, python: Path) -> None:
     """Write the project's detailed instructions and host entry."""
-    agents = root / "AGENTS.md"
-    existing = agents.read_text(encoding="utf-8") if agents.exists() else ""
-    snippet = template("agents-snippet.md")
-    start, end = "<!-- basepack:start -->", "<!-- basepack:end -->"
-    if start in existing or end in existing:
-        before, _, tail = existing.partition(start)
-        closing = tail.index(end)
-        if existing.count(start) != 1 or existing.count(end) != 1:
-            raise ValueError("Duplicate basepack entry markers in AGENTS.md")
-        after = tail[closing + len(end):]
-        existing = before + snippet.rstrip() + after
-    else:
-        existing = existing.rstrip() + "\n\n" + snippet
-    instructions = root / ".basepack" / "instructions.md"
-    instructions.write_text(Template(template("instructions.md")).substitute(
-        python=str(python).replace("'", "''"),
-        config=config.relative_to(root).as_posix().replace("'", "''"),
-    ), encoding="utf-8")
-    agents.write_text(existing.lstrip("\n"), encoding="utf-8")
+    refresh_project_entry(root, config, python)
     ignore = root / ".gitignore"
     lines = ignore.read_text(encoding="utf-8").splitlines() if ignore.exists() else []
     if "/.basepack/" not in lines:
         lines.append("/.basepack/")
     ignore.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def replace_managed_block(existing: bytes, section: str, *, name: str, path: str) -> bytes:
+    """Replace one ordered marker pair while retaining every outside byte."""
+    start = f"<!-- {name}:start -->".encode()
+    end = f"<!-- {name}:end -->".encode()
+    replacement = section.strip().encode("utf-8")
+    if start in existing or end in existing:
+        if (existing.count(start) != 1 or existing.count(end) != 1
+                or existing.index(start) >= existing.index(end)):
+            raise ValueError(f"Invalid {name} entry markers in {path}")
+        opening, closing = existing.index(start), existing.index(end) + len(end)
+        return existing[:opening] + replacement + existing[closing:]
+    separator = b"" if not existing else (b"\n" if existing.endswith(b"\n") else b"\n\n")
+    return existing + separator + replacement + b"\n"
+
+
+def refresh_project_entry(root: Path, config: Path, python: Path, *,
+                          memory_enabled: bool = False, memory_dir: Path | None = None) -> None:
+    """Refresh the same managed entries during project init and memory init."""
+    root, config, python = Path(root).resolve(), Path(config).resolve(), Path(python)
+    agents = root / "AGENTS.md"
+    instructions = root / ".basepack" / "instructions.md"
+    state = "enabled" if memory_enabled else "disabled"
+    snippet = template("agents-snippet.md").replace("$memory_instructions", template(f"agents-{state}.md").strip())
+    host_entry = replace_managed_block(agents.read_bytes() if agents.exists() else b"", snippet,
+                                       name="basepack", path="AGENTS.md")
+    existing = instructions.read_bytes() if instructions.exists() else Template(template("instructions.md")).substitute(
+        python=str(python).replace("'", "''"),
+        config=config.relative_to(root).as_posix().replace("'", "''"),
+    ).encode("utf-8")
+    from basepack.memory import __file__ as memory_module
+    skill = Path(memory_module).with_name("SKILL.md").resolve().as_posix()
+    section = template(f"memory-{state}.md").replace(
+        "<!-- basepack-memory:end -->", template("tools.md") + "\n<!-- basepack-memory:end -->")
+    section = Template(section).substitute(
+        python=str(python).replace("'", "''"),
+        config=str(config).replace("'", "''"),
+        skill=skill,
+        memory_dir=(memory_dir or root / ".basepack/memory").as_posix(),
+    )
+    details = replace_managed_block(existing, section, name="basepack-memory", path="instructions.md")
+    # Validate both boundaries before either file changes.
+    instructions.parent.mkdir(parents=True, exist_ok=True)
+    instructions.write_bytes(details)
+    agents.write_bytes(host_entry)

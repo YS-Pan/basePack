@@ -3,7 +3,102 @@ import os
 
 import pytest
 
-from test_memory_store import batch_for, memory
+from test_memory_store import batch_for, memory as store_memory
+
+
+@pytest.fixture
+def memory(store_memory):
+    """Run each direct maintenance call under a temporary project owner."""
+    from uuid import uuid4
+    from basepack.memory import owner
+
+    memory = store_memory
+    maintain = memory.maintain
+
+    def owned_maintain(scope, *, control=None, timeout=600):
+        if control is not None:
+            return maintain(scope, control=control, timeout=timeout)
+        control = memory.config.memory_dir / "maintenance" / f"test-{uuid4().hex}.control"
+        claim = owner.acquire(memory.config.memory_dir, memory.connection["project_id"], "test", control)
+        assert claim["acquired"]
+        try:
+            return maintain(scope, control=str(control), timeout=timeout)
+        finally:
+            owner.stop_owned(memory.config.memory_dir, control)
+            if not owner.status(memory.config.memory_dir)["publications"]:
+                owner.release(memory.config.memory_dir, control)
+
+    memory.maintain = owned_maintain
+    return memory
+
+
+def test_pending_feedback_alone_dispatches_semantic_work(memory):
+    from basepack.memory import feedback
+
+    report = feedback.report(memory, kind='retrieval', issue='Expected result missing', query='requirement')
+    result = memory.maintain([])
+    receipt = json.loads(open(result['receipt'], encoding='utf-8').read())
+    assert result['needs_semantic'] and result['feedback'] == 1
+    assert receipt['semantic'] == [] and receipt['pending_relations'] == []
+    assert [item['id'] for item in receipt['feedback']] == [report['id']]
+
+
+def test_reviewed_ranges_persist_only_for_the_read_source_version(memory):
+    path = memory.config.root / 'reviewed.md'
+    path.write_bytes(b'read\nunread\n')
+    source = memory.prepare(['reviewed.md'])['sources'][0]
+    reviewed = {'kind': 'no_knowledge', 'start_line': 1, 'end_line': 1, 'reason': 'No project knowledge'}
+    memory.apply({'sources': [{'path': 'reviewed.md', 'revision': source['revision'],
+                               'dispositions': [reviewed]}]})
+    result = memory.maintain([])
+    report = json.loads(open(result['receipt'], encoding='utf-8').read())
+    assert report['semantic'][0]['uncovered_ranges'][0]['text'] == 'unread\n'
+    source = memory.prepare(['reviewed.md'])['sources'][0]
+    memory.apply({'sources': [{'path': 'reviewed.md', 'revision': source['revision'],
+                               'dispositions': [reviewed, {'kind': 'no_knowledge', 'start_line': 2,
+                                                            'end_line': 2, 'reason': 'No project knowledge'}]}]})
+    assert not memory.maintain([])['needs_semantic']
+    source = memory.prepare(['reviewed.md'])['sources'][0]
+    memory.apply({'sources': [{'path': 'reviewed.md', 'revision': source['revision']}]})
+    assert not memory.maintain([])['needs_semantic']
+    path.write_bytes(b'read\nunread\nnew\n')
+    assert memory.maintain([])['needs_semantic']
+
+
+def test_duplicate_disposition_requeues_when_representation_changes(memory):
+    memory.apply(batch_for(memory, '# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n'))
+    (memory.config.root / 'duplicate.md').write_text('同一约束。\n', encoding='utf-8')
+    prepared = memory.prepare(['duplicate.md', 'guide.md'])
+    source = prepared['sources'][0]
+    representation = next(row for row in memory._rows('member') if row['id'] == 'member:storage')
+    memory.apply({'sources': [{'path': 'duplicate.md', 'revision': source['revision'], 'dispositions': [{
+        'kind': 'duplicate', 'start_line': 1, 'end_line': 1, 'reason': 'Already represented',
+        'representations': [{'id': representation['id'], 'knowledge_revision': representation['knowledge_revision']}]}]}],
+        'expected': prepared['expected']})
+    assert not memory.maintain([])['needs_semantic']
+    memory._execute('UPDATE member:storage SET stale=true, knowledge_revision="changed";')
+    report = json.loads(open(memory.maintain([])['receipt'], encoding='utf-8').read())
+    assert any(item['path'] == 'duplicate.md' and item.get('uncovered_ranges') for item in report['semantic'])
+
+
+def test_deferred_gap_requires_exact_current_member_and_leaves_other_gaps(memory):
+    batch = batch_for(memory, '# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n')
+    batch['members'][0]['coverage_gaps'] = ['read and deferred', 'unread']
+    memory.apply(batch)
+    guide = next(row for row in memory._rows('member') if row['id'] == 'member:guide')
+    source = memory.prepare(['guide.md'])['sources'][0]
+    deferred = {'start_line': 1, 'end_line': 5, 'reason': 'Refine later', 'gaps': [
+        {'member': guide['id'], 'knowledge_revision': guide['knowledge_revision'], 'gap': 'read and deferred'}]}
+    memory.apply({'sources': [{'path': 'guide.md', 'revision': source['revision'],
+                               'deferred_refinement': [deferred]}], 'expected': {'member:guide': guide['knowledge_revision']}})
+    report = json.loads(open(memory.maintain([])['receipt'], encoding='utf-8').read())
+    assert 'coverage_gaps' in report['semantic'][0]['members'][0]['reasons']
+    deferred['gaps'].append({'member': guide['id'], 'knowledge_revision': guide['knowledge_revision'], 'gap': 'unread'})
+    memory.apply({'sources': [{'path': 'guide.md', 'revision': source['revision'],
+                               'deferred_refinement': [deferred]}], 'expected': {'member:guide': guide['knowledge_revision']}})
+    assert not memory.maintain([])['needs_semantic']
+    memory._execute('UPDATE member:guide SET knowledge_revision="changed";')
+    assert memory.maintain([])['needs_semantic']
 
 
 @pytest.mark.parametrize('dependency_first', [False, True])
@@ -330,16 +425,19 @@ def test_same_chunk_under_another_heading_needs_semantic_review(memory):
 
 
 def test_stopped_maintenance_does_not_publish_or_advance_source(memory):
-    from basepack.memory.maintenance import MaintenanceStopped, stop
+    from basepack.memory.maintenance import MaintenanceStopped
+    from basepack.memory.owner import acquire, release, stop_owned
 
     original = '# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n'
     memory.apply(batch_for(memory, original))
     revision = memory.sources()[0]['revision']
     (memory.config.root / 'guide.md').write_bytes(original.replace('\n', '\r\n').encode('utf-8'))
     control = memory.config.root / 'stopped'
-    stop(control)
+    acquire(memory.config.memory_dir, memory.connection['project_id'], 'test', control)
+    stop_owned(memory.config.memory_dir, control)
     with pytest.raises(MaintenanceStopped):
         memory.maintain(['guide.md'], control=str(control))
+    release(memory.config.memory_dir, control)
     assert memory.sources()[0]['revision'] == revision
 
 
@@ -353,7 +451,7 @@ def test_mechanical_publish_rejects_concurrent_knowledge_correction(memory, monk
     def concurrent(batch, **kwargs):
         expected = memory.prepare(['guide.md'])['expected']
         apply({'sources': [], 'expected': expected, 'corrections': [
-            {'id': 'racing_error', 'target': 'member:storage', 'reason': '并发更正'}]})
+            {'id': 'racing_error', 'target': 'member:storage', 'reason': '并发更正'}]}, control=kwargs['control'])
         return apply(batch, **kwargs)
 
     monkeypatch.setattr(memory, 'apply', concurrent)
@@ -462,16 +560,16 @@ def test_unchanged_start_reads_metadata_without_loading_all_member_bodies(memory
     assert "changes" not in memory.brief(limit=0)
 
 
-def test_startup_receives_short_project_map_without_opaque_versions(memory):
+def test_startup_and_search_include_observed_version_for_feedback(memory):
     memory.apply(batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n"))
     result = memory.brief()
     assert result["clues"]
     assert all(row["clue_role"] == "map" for row in result["clues"])
     assert "basis" not in result["mandatory"][0]
-    assert "knowledge_revision" not in result["mandatory"][0]
+    assert result["mandatory"][0]["knowledge_revision"]
     candidates = memory.search("数据库")
     assert candidates
-    assert all("basis" not in row and "knowledge_revision" not in row for row in candidates)
+    assert all("basis" not in row and row["knowledge_revision"] for row in candidates)
 
 
 def test_node_merge_and_deleted_support_preserve_remaining_evidence(memory):
@@ -578,6 +676,8 @@ def test_only_active_summary_dependencies_propagate_changes(memory, retired):
     guide, storage = updated["members"][0], updated["members"][2]
     guide.update(start_line=4, end_line=5, text="资料必须保留。", evidence=["retention"],
                  coverage_gaps=["数据库章节独立维护"])
+    if retired:
+        storage["parent"] = "guide"
     memory.apply({"sources": updated["sources"], "expected": updated["expected"],
                   "members": [guide, storage], "delete_members": ["storage_section"] if retired else []})
     prepared = memory.prepare(["guide.md"])

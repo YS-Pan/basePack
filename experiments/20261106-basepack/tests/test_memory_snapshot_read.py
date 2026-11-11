@@ -210,19 +210,25 @@ def test_concurrent_same_bytes_source_move_rejects_the_old_publication(memory, m
     source = memory.prepare([old_path])["sources"][0]
     memory.apply({"sources": [{"path": old_path, "revision": source["revision"]}]})
     source_id = memory.sources()[0]["id"]
-    execute = memory._execute
-    publish_other_path = True
+    publish = memory._publish
+    moved = False
 
-    def interleaved(sql, **kwargs):
-        nonlocal publish_other_path
-        if publish_other_path and sql.startswith("BEGIN;"):
-            publish_other_path = False
-            memory.apply({"sources": [{"id": source_id, "path": new_path, "revision": source["revision"]}]})
-        return execute(sql, **kwargs)
+    def interleaved(statements, **kwargs):
+        nonlocal moved
+        # A competing transaction has accepted the same bytes at a new path.
+        # Inject it after the old publication prepared, before its transaction.
+        snapshot = {"source": _record(source_id), "revision": source["revision"],
+                    "path": new_path, "kind": "text", "text": data.decode("utf-8")}
+        memory._execute(f"BEGIN; CREATE source_version:concurrent_move CONTENT {_sql(snapshot)}; "
+                        f"UPDATE {_sql(_record(source_id))} "
+                        f"SET path={_sql(new_path)}, version=source_version:concurrent_move; COMMIT;")
+        moved = True
+        return publish(statements, **kwargs)
 
-    monkeypatch.setattr(memory, "_execute", interleaved)
+    monkeypatch.setattr(memory, "_publish", interleaved)
     with pytest.raises(RuntimeError, match="Concurrent source version changed"):
         memory.apply({"sources": [{"id": source_id, "path": old_path, "revision": source["revision"]}]})
+    assert moved
     assert memory.sources()[0]["path"] == new_path
 
 

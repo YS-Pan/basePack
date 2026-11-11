@@ -291,7 +291,7 @@ def test_memory_endpoint_rejects_remote_aliases_and_credentials(ai_config, endpo
 
 
 @pytest.mark.parametrize("configured", ["none", "invalid", "missing_secret"])
-@pytest.mark.parametrize("action", ["guide", "rank", "stop"])
+@pytest.mark.parametrize("action", ["guide", "rank"])
 def test_memory_tools_run_without_loading_project_configuration(tmp_path, configured, action):
     command = [sys.executable, "-m", "basepack"]
     if configured == "invalid":
@@ -305,15 +305,12 @@ def test_memory_tools_run_without_loading_project_configuration(tmp_path, config
         assert not load_project_config(config).memory_password_file.exists()
         command += ["--config", str(config)]
     command += ["memory", action]
-    control = tmp_path / "control"
     if action == "rank":
         scored = tmp_path / "scored.json"
         scored.write_text(json.dumps([{"id": "evidence", "text": "actual body", "score": 90,
                                        "kind": "chunk", "path": "source.md", "revision": "v1",
                                        "start_line": 1, "end_line": 1}]), encoding="utf-8")
         command += ["--input", str(scored)]
-    elif action == "stop":
-        command += ["--control", str(control)]
     result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", timeout=10)
     assert result.returncode == 0, result.stderr
     data = json.loads(result.stdout)
@@ -321,23 +318,25 @@ def test_memory_tools_run_without_loading_project_configuration(tmp_path, config
         assert Path(data["skill"]).is_file()
     elif action == "rank":
         assert data["items"][0]["text"] == "actual body"
-    else:
-        assert data == {"stopped": True}
-        assert control.read_bytes() == b"S"
 
 
-@pytest.mark.parametrize("action, option", [("rank", "--input"), ("stop", "--control")])
+@pytest.mark.parametrize("action, option", [("rank", "--input")])
 def test_memory_tools_preserve_bad_input_errors_without_config(tmp_path, action, option):
     bad = tmp_path / "bad-input"
     if action == "rank":
         bad.write_text("not json", encoding="utf-8")
-    else:
-        bad.mkdir()
     result = subprocess.run([sys.executable, "-m", "basepack", "memory", action, option, str(bad)],
                             capture_output=True, text=True, encoding="utf-8", timeout=10)
     assert result.returncode != 0
-    assert ("JSONDecodeError" if action == "rank" else "PermissionError") in result.stderr
+    assert "JSONDecodeError" in result.stderr
     assert "--config is required" not in result.stderr
+
+
+def test_stop_requires_explicit_config(tmp_path):
+    result = subprocess.run([sys.executable, "-m", "basepack", "memory", "stop", "--control", str(tmp_path / "control")],
+                            capture_output=True, text=True, encoding="utf-8", timeout=10)
+    assert result.returncode == 2
+    assert "--config is required" in result.stderr
 
 
 def test_project_memory_actions_still_require_explicit_config():
@@ -377,7 +376,7 @@ def test_cpu_embedding_doctor_needs_no_gpu_probe(ai_config, monkeypatch, tmp_pat
 
 def test_generated_entries_cover_first_setup_and_local_issue_feedback(ai_config):
     agents = (ai_config.root / "AGENTS.md").read_text(encoding="utf-8")
-    assert "已存在" in agents and "init" in agents
+    assert "新检出缺少本机入口" in agents and "安装与项目接入" in agents
     instructions = (ai_config.root / ".basepack/instructions.md").read_text(encoding="utf-8")
     assert "本项目已有约定" in instructions
     assert "https://github.com/YS-Pan/basePack/issues" in instructions

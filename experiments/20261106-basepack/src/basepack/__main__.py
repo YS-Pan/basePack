@@ -43,7 +43,7 @@ def main():
     elif args.command == "embedding":
         from .embedding.cli import dispatch
         result, exit_code = dispatch(args)
-    elif args.command == "memory" and args.memory_action in ("guide", "rank", "stop"):
+    elif args.command == "memory" and args.memory_action in ("guide", "rank"):
         from .memory.cli import dispatch
         result, exit_code = dispatch(args, None)
     else:

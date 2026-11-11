@@ -37,5 +37,16 @@
 - Git 保存源码、skills、短文档和小样例；模型、虚拟环境、项目数据库、缓存、密钥及大型运行产物留在仓库外或忽略目录中。
 
 <!-- basepack:start -->
-开始或接续本项目任务时，若本机已有 [.basepack/instructions.md](.basepack/instructions.md)，读取该入口；新检出尚无入口时，按 [README](README.md#install-the-lightweight-client) 安装并完成 [项目接入](experiments/20261106-basepack/docs/setup-project.md)。本机配置、凭据和记忆通过本项目接入或备份恢复，不随源码分发。
+## basePack
+
+- 开始或接续任务时，按本机 Python/配置运行 `memory brief`；保留 mandatory，待核内容按业务需要回源：[启动](.basepack/instructions.md#startup)。
+- 宿主支持可取消子任务与任务生命周期时，默认异步启动全项目 `memory maintain`，由程序原子取得本项目维护所有权；已有 owner 时继续业务：[自动维护](.basepack/instructions.md#maintenance)。
+- 仅持有维护且 `needs_semantic=true` 时，按 `worker` 返回的模型/推理强度实际派协调者，持续接批：[派工](.basepack/instructions.md#dispatch)。
+- 业务结束时 stop 自有 control，取消自有协调者及后代，确认发布阶段结束后释放所有权；未明状态保留待处理：[收尾](.basepack/instructions.md#stop)。
+- 用户明确要求维护时，将授权范围内的处置、实际阻塞和余项纳入交付：[显式维护](.basepack/instructions.md#explicit-maintenance)。
+- 检索 worker 或调用 agent 使用中发现问题时，轻量报告疑点和观察版本，交维护处理：[使用反馈](.basepack/instructions.md#feedback)。
+- 建立与普通维护在作者生成及程序提交后结束；仅用户明确要求记忆系统审计时按其范围审计：[手动审计](.basepack/instructions.md#audit)。
+
+- 分配 AI、检索或调用资源工具时，按本项目配置解析档位与设施入口：[AI 与资源](.basepack/instructions.md#ai-resources)。
+- 新检出缺少本机入口时，先完成 [安装与项目接入](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/setup-project.md)；本机配置、凭据和记忆通过接入或备份恢复，不随源码分发。
 <!-- basepack:end -->

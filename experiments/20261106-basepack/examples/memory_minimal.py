@@ -18,7 +18,10 @@ env = {**os.environ, "PYTHONUTF8": "1"}
 
 
 def run(*arguments):
-    subprocess.run([*cli, *arguments], check=True, env=env)
+    result = subprocess.run([*cli, *arguments], check=True, env=env, stdout=subprocess.PIPE,
+                            encoding="utf-8")
+    print(result.stdout, end="", flush=True)
+    return json.loads(result.stdout)
 
 
 # Exclusive creation protects any existing business file with this name.
@@ -26,8 +29,13 @@ source_path = "memory-example.md"
 with (project.root / source_path).open("x", encoding="utf-8", newline="\n") as stream:
     stream.write("# 试用说明\n## 约定\n试用问题 A-17 留在开发记录。\n项目数据库按项目隔离。\n")
 
-work = project.memory_dir / ("example-" + uuid4().hex)
+run_id = "example-" + uuid4().hex
+work = project.root / "tmp" / run_id
 work.mkdir(parents=True)
+control = project.memory_dir / "maintenance" / (run_id + ".control")
+owner = run("maintain", "--holder", run_id, "--control", str(control))
+if not owner["acquired"]:
+    raise RuntimeError(f"Project maintenance is owned by {owner['owner']}")
 reading_path, batch_path = work / "reading.json", work / "batch.json"
 run("prepare", "--paths", source_path, "--output", str(reading_path))
 reading = json.loads(reading_path.read_text(encoding="utf-8"))
@@ -48,7 +56,9 @@ batch = {
     ],
 }
 batch_path.write_text(json.dumps(batch, ensure_ascii=False, indent=2), encoding="utf-8")
-run("apply", "--batch", str(batch_path))
+run("apply", "--batch", str(batch_path), "--control", str(control))
+run("stop", "--control", str(control))
+run("release", "--control", str(control))
 run("search", "--text", "A-17", "--mode", "hybrid", "--literal")
 run("search", "--text", source_path, "--mode", "hybrid", "--literal")
 run("read", "member:`example-chunk`")

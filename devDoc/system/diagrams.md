@@ -1,6 +1,6 @@
 # 当前文件与运行逻辑框图
 
-按 2026 年 11 月 11 日的 0.9.1 源码合同更新；本轮修复和安装验证见 [一致性审阅进度](../archive/20261111-consistency-review/progress.md)，本机部署观测见 [环境记录](environment.md)。既有项目沿用认证服务、原密码、物理库和 UUID，客户端升级与入口刷新不要求迁库。0.5.0 core/jobs 和共享 embedding 服务继续保留，后者与当前客户端协议兼容。沿用[参考 chat](codex://threads/01a1bb3f-4db8-7c10-8d71-c951aba18aa2) 按文件位置分层的方法；记忆行为的实际验收边界见[专项进度](../tasks/20261106-memory-system/progress.md)，阶段合同见[记忆方案图](../tasks/20261106-memory-system/diagrams.md)。
+按 2026 年 11 月 11 日的 0.10.0.dev1源码合同更新；当前实现与安装见[维护改造结果](../tasks/20261106-memory-system/maintenance-implementation-result.md)，本机部署观测见 [环境记录](environment.md)。既有项目沿用认证服务、原密码、物理库和 UUID，客户端升级与入口刷新不要求迁库。0.5.0 core/jobs 和共享 embedding 服务继续保留，后者与当前客户端协议兼容。沿用[参考 chat](codex://threads/01a1bb3f-4db8-7c10-8d71-c951aba18aa2) 按文件位置分层的方法；记忆行为的实际验收边界见[专项进度](../tasks/20261106-memory-system/progress.md)，阶段合同见[记忆方案图](../tasks/20261106-memory-system/diagrams.md)。
 
 ## 路径与读图约定
 
@@ -24,7 +24,7 @@ flowchart TB
   subgraph source["R / E：唯一产品维护源"]
     code["E/src/basepack/<br/>代码与 project/templates/"]
     deps["E/pyproject.toml + uv.lock<br/>依赖与发行声明"]
-    wheel["E/dist/交付批次/<br/>basepack-0.9.1-*.whl"]
+    wheel["E/dist/交付批次/<br/>basepack-0.10.0.dev1-*.whl"]
     r9["E/dist/r9/<br/>保留 basepack-0.5.0 wheel"]
     policy["E/examples/condor/<br/>60_resources.conf、70_job_transforms.conf"]
     code -->|构建| wheel
@@ -35,7 +35,7 @@ flowchart TB
   r9 -->|既有安装保留| service["Is：共享 embedding 服务 0.5.0"]
   policy -->|管理员单独部署| condor["C/config/ 下的站点策略"]
   memory -->|init 读取安装包内模板| instance["P/.basepack/<br/>config.toml + instructions.md"]
-  memory -->|init 合并短指针与忽略规则| entry["P/AGENTS.md<br/>P/.gitignore"]
+  memory -->|init合并关键动作与忽略规则| entry["P/AGENTS.md<br/>P/.gitignore"]
   memory -->|memory init：schema、项目 UUID、brief 入口| instance
 ```
 
@@ -142,7 +142,7 @@ flowchart TB
     chats["P/.basepack/memory/codex/<br/>受管 UTF-8 聊天导出"]
     client["memory/ + P/.basepack/config.toml<br/>回环endpoint、UUID、username<br/>自动读同一password_file"]
     launch -->|普通用户隐藏手动启动| server
-    client -->|原生 HTTP / SurrealQL；核项目身份| server
+    client -->|HTTP查询 / WebSocket事务分包；核身份| server
     server -->|独占物理目录，多聊天共用| store
     original -->|prepare 读原件并核版本与范围| client
     chats -->|同一 source_version / prepare / apply| client
@@ -176,7 +176,7 @@ flowchart TB
   reader -->|同批成果| apply
   host -->|一次检索委托| retrieval
   retrieval -->|同一 reader 阅读与评分| delivery
-  host -->|业务结束：stop control，再取消worker| preflight
+  host -->|业务结束：stop、取消、确认发布、release| preflight
 ```
 
 brief/search/read 保持纯读。确定性维护把元数据、全文换行等价与有足够上下文证据的唯一定位交给程序；余下语义范围按来源合并并跨任务接续，不因积压数量关闭自动小批。聊天采集先依宿主绑定、项目根/worktree及完整注册根排除归属冲突；受管原文与旧已发布快照分别保留，消息精确定位从快照解析。任务 control 共用于采集和发布，已采集/已发布部分保留；采集数量、语义 pending 和向量覆盖各有边界。实际验收与未核范围见 [本轮进度](../archive/20261110-onboarding-simplification/progress.md)。
@@ -208,7 +208,7 @@ flowchart LR
   ecli -->|解析机器配置| config
 ```
 
-图列主要调用与材料关系，不枚举每个 import；需要项目的命令从 `__main__` 取得解析后的配置再交给对应模块。`memory guide/rank/stop` 在配置解析前分派，按各自输入独立运行。memory skill 通过宿主的订阅 reader 执行理解、建图与评分，数据库使用原生 HTTP/SQL，服务与备份使用 SurrealDB CLI。旧自写 HTTP/supervisor/worker 登记、私有 RPC 和 `migrate` 已从 0.5.0 退役，历史材料见资源归档。依据：[源码入口](../../experiments/20261106-basepack/src/basepack/__main__.py)、[架构边界](architecture.md)。
+图列主要调用与材料关系，不枚举每个 import；需要项目的命令从 `__main__` 取得解析后的配置再交给对应模块。`memory guide/rank`在配置解析前分派；owner/stop/release需配置定位状态，不读凭据或连库。memory skill 通过宿主的订阅 reader 执行理解、建图与评分，数据库使用原生HTTP查询及WebSocket事务分包，服务与备份使用 SurrealDB CLI。旧自写 HTTP/supervisor/worker 登记、私有 RPC 和 `migrate` 已从 0.5.0 退役，历史材料见资源归档。依据：[源码入口](../../experiments/20261106-basepack/src/basepack/__main__.py)、[架构边界](architecture.md)。
 
 ## 7. 开发文档、skills 与临时材料放在哪里
 

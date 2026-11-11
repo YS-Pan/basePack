@@ -12,11 +12,11 @@ class MaintenanceStopped(RuntimeError):
 
 
 @contextmanager
-def _locked(path):
+def _locked(path, timeout=0.5):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open('a+b') as file:
-        deadline = time.monotonic() + 0.5
+        deadline = time.monotonic() + timeout
         while True:
             try:
                 file.seek(0)
@@ -76,6 +76,7 @@ def maintain(memory, scope, *, control=None, timeout=600):
     from uuid import uuid4
 
     from .content import comparison_text, line_changes, locate_lines, mapped_line_range
+    from . import feedback
     from .images import ImageSource
     from .store import _record, _sql
 
@@ -247,6 +248,46 @@ def maintain(memory, scope, *, control=None, timeout=600):
         return current_sources[path]
 
     member_by_id = {row['id']: row for row in members}
+    records_by_id = {row['id']: row for row in [*members, *nodes, *edges]}
+
+    def current_reference(ref):
+        record = records_by_id.get(ref['id'])
+        if (record is None or record['stale'] or record['retired']
+                or record['knowledge_revision'] != ref['knowledge_revision']):
+            return False
+        relevant = [record] if record['id'] in member_by_id else [
+            member_by_id.get(basis['member']) for basis in record.get('basis', [])]
+        for member in relevant:
+            if member is None or member['stale'] or member['retired']:
+                return False
+            original = current_source(member['path'], member['kind'])
+            if original is None or original.revision != member['source_revision']:
+                return False
+        return True
+
+    def reviewed(path, current):
+        """Return current-version dispositions whose referenced knowledge remains valid."""
+        source = by_path.get(path)
+        if source is None or current is None or source['revision'] != current.revision:
+            return [], []
+        version = snapshot(source['version'])
+        dispositions = []
+        for item in version.get('dispositions', []):
+            if item['kind'] == 'duplicate' and not all(current_reference(ref)
+                                                        for ref in item['representations']):
+                continue
+            dispositions.append(item)
+        coarse = [row for row in members if row['path'] == path and not row['retired']
+                  and not row['stale'] and row['source_revision'] == current.revision]
+        if isinstance(current, ImageSource):
+            deferred = [entry for entry in version.get('deferred_refinement', [])
+                        if entry.get('whole_image') and any(row['kind'] == 'image' for row in coarse)]
+        else:
+            deferred = [entry for entry in version.get('deferred_refinement', []) if any(
+                row['kind'] in {'file', 'section'} and row['start_line'] <= entry['start_line']
+                and entry['end_line'] <= row['end_line'] for row in coarse)]
+        return dispositions, deferred
+
     for row in members:
         if row['retired']:
             continue
@@ -254,11 +295,15 @@ def maintain(memory, scope, *, control=None, timeout=600):
         reasons = []
         if row['stale']:
             reasons.append('stale')
-        if row.get('coverage_gaps'):
-            reasons.append('coverage_gaps')
         if row['id'] in mechanical_dependency_pending:
             reasons.append('mechanical_dependency_pending')
         current = current_source(path, row['kind'])
+        _, deferred = reviewed(path, current)
+        deferred_gaps = {(gap['member'], gap['knowledge_revision'], gap['gap'])
+                         for item in deferred for gap in item.get('gaps', [])}
+        if any((row['id'], row['knowledge_revision'], gap) not in deferred_gaps
+               for gap in row.get('coverage_gaps', [])):
+            reasons.append('coverage_gaps')
         if current is None:
             reasons.append('missing')
         if current is not None and current.revision != row['source_revision']:
@@ -312,19 +357,26 @@ def maintain(memory, scope, *, control=None, timeout=600):
     # old summaries never prove acceptance of the new source's context.
     for path in by_path:
         active = [row for row in members if row['path'] == path and not row['retired']]
+        current = current_source(path, by_path[path].get('kind'))
+        dispositions, deferred = reviewed(path, current)
         if not active:
-            current = current_source(path, by_path[path].get('kind'))
             if current is not None and not isinstance(current, ImageSource) and not current.text:
                 continue
-            semantic.setdefault(path, {'path': path, 'members': [], 'versions': []})['reason'] = 'no_active_knowledge'
-            continue
-        current = current_sources[path]
+            if isinstance(current, ImageSource):
+                if not any(item.get('whole_image') for item in dispositions):
+                    semantic.setdefault(path, {'path': path, 'members': [], 'versions': []})['reason'] = 'no_active_knowledge'
+                continue
+            if current is None:
+                semantic.setdefault(path, {'path': path, 'members': [], 'versions': []})['reason'] = 'no_active_knowledge'
+                continue
         if current is None or isinstance(current, ImageSource):
             continue
         item = semantic.get(path)
         current_lines = current.text.splitlines(keepends=True)
         line_count = len(current_lines)
         covered = set()
+        for entry in [*dispositions, *deferred]:
+            covered.update(range(entry['start_line'], entry['end_line'] + 1))
         for row in active:
             if row['stale']:
                 continue
@@ -355,11 +407,15 @@ def maintain(memory, scope, *, control=None, timeout=600):
                 start = None
         if missing:
             item = semantic.setdefault(path, {'path': path, 'members': [], 'versions': []})
+            if not active:
+                item['reason'] = 'no_active_knowledge'
             item['uncovered_ranges'] = missing
     # Remove entries created only to inspect unchanged sibling snapshots.
     semantic = {path: item for path, item in semantic.items()
                 if item.get('reason') or item['members'] or item.get('uncovered_ranges')}
     for item in semantic.values():
+        item['category'] = ('existing_change' if any(row['path'] == item['path'] for row in members)
+                            or item.get('reason') == 'deleted' else 'initial')
         ids = {member['id'] for member in item['members']}
         related_nodes = [row for row in nodes if not row['retired'] and any(
             basis['member'] in ids for basis in row.get('basis', []))]
@@ -370,13 +426,15 @@ def maintain(memory, scope, *, control=None, timeout=600):
             any(basis['member'] in ids for basis in row.get('basis', [])))]
     pending_relations = [{'id': row['id'], 'basis': row.get('basis', [])}
                          for row in [*nodes, *edges] if row['stale'] and not row['retired']]
+    pending_feedback = feedback.pending(memory)
     material = {'changes': changes, 'mechanical': receipts, 'reused_chunks': reused_chunks,
                 'semantic': list(semantic.values()),
-                'pending_relations': pending_relations}
+                'pending_relations': pending_relations, 'feedback': pending_feedback}
     destination = memory.config.memory_dir / 'maintenance'
     destination.mkdir(parents=True, exist_ok=True)
     receipt = destination / f'{uuid4().hex}.json'
     receipt.write_text(json.dumps(material, ensure_ascii=False, indent=2), encoding='utf-8')
     return {'mechanical_batches': len(receipts), 'reused_chunks': len(reused_chunks), 'semantic_sources': len(semantic),
-            'pending_relations': len(pending_relations), 'needs_semantic': bool(semantic or pending_relations),
+            'pending_relations': len(pending_relations), 'feedback': len(pending_feedback),
+            'needs_semantic': bool(semantic or pending_relations or pending_feedback),
             'receipt': str(receipt)}

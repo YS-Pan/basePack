@@ -54,6 +54,8 @@ ppt 原缺 `[ai]` 已按既有升级合同只补缺项，采用本项目当前�
 
 ## 证据与交接
 
+2026-11-11清理补记：下文所述本项目历史备份目录已按用户要求删除，外项目备份未动；独有安装证据已选留，路径映射及复验见[维护改造结果](../../tasks/20261106-memory-system/maintenance-implementation-result.md#目录清理)。历史恢复payload不再保留，以下仍描述当时验收条件。
+
 必要安装摘要、脚本和日志已选留 [artifacts/runs/20261110-rectification-installation](../../../artifacts/runs/20261110-rectification-installation/)。其中 `preparation.json` 与 `verification.json` 记录 0.7.0 阶段，`vector-migration.json` 记录复用迁移，`verification-071.json` 记录最终逐项目检查，`shared-upgrade-071.log` 与 `processes-before-upgrade-071.json` 记录最终安装及进程排空。中心证据只保留安装信息、计数和 digest，实际知识与命令内容保留在所属项目备份。
 
 每个项目的向量迁移、入口刷新、独立 shell、模式错误与快照 read 原证在其自己的 `.basepack/memory/backups/rectification-0.7.1-vector-20261110/`。一次性完整材料仍位于 `tmp/rectification-installation/`。

@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "basepack"
-version = "0.9.1"
+version = "0.10.0.dev1"
 description = "Project-local tools with shared embedding and HTCondor resources"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE", "src/basepack/embedding/LICENSE.Qwen3-VL-Embedding.txt", "src/basepack/embedding/NOTICE.Qwen3-VL-Embedding.txt"]
 requires-python = ">=3.13"
-dependencies = ["psutil>=7.2,<8"]
+dependencies = ["psutil>=7.2,<8", "websocket-client>=1.8,<2"]
 
 [project.optional-dependencies]
 embedding = ["sentence-transformers==6.2.0", "litserve==0.2.19", "torch==2.10.0", "torchvision==0.25.0", "transformers==5.22.1", "Pillow>=13,<15"]

@@ -125,7 +125,7 @@ bp memory guide
 bp --config $config memory brief --task '当前任务'
 ```
 
-成功时 init 安装 schema、绑定数据库身份并刷新 instructions 的记忆入口；guide 返回已安装流程的位置，空库 brief 返回空结果。误连另一 UUID 会报错，应修正 endpoint 和目录，保留本项目 UUID。最后按 [最小闭环](memory.md#最小闭环示例) 写入一条知识，用所选检索模式找回并读取依据，即完成首次使用。
+成功时 init 安装 schema、绑定数据库身份，并共用项目 init 的刷新入口更新 instructions 与 AGENTS 托管块；块外原字节保持，重复刷新幂等，损坏标记明确报错。普通 init 生成未启用记忆的指令，不要求连接数据库。guide 返回已安装流程的位置，空库 brief 返回空结果。误连另一 UUID 时修正 endpoint 和目录，保留原 UUID。按 [最小闭环](memory.md#最小闭环示例) 完成一次开发试用，核写入、检索及依据。
 
 brief、search、read 只读上次已发布知识及其依据快照。`memory maintain` 默认维护整个项目的受管来源：Git 项目发现已跟踪和未忽略的未跟踪文件，另加 `source_scope` 显式包含项；非 Git 项目使用声明范围。已登记来源、历史 pending/未接受范围和可归属聊天持续参与。日常调用通常不传 `--scope`；该参数只覆盖新文件发现。机械小批完成后，宿主按返回元数据启动持续协调者，由子 agent 自行运行渲染命令并读取英文提示词。自动维护、边界与缺口见 [记忆使用](memory.md#自动维护与手动维护)。
 
@@ -133,7 +133,7 @@ brief、search、read 只读上次已发布知识及其依据快照。`memory ma
 
 Codex 宿主按项目归属默认接入可取得的聊天，不要求逐 thread 配置。宿主从当前聊天与完整项目清单取得项目 ID、其它已注册项目根，在 `init` 时自动传 `--codex-project-id`、可重复的 `--codex-other-project-root` 和 `--codex-registry-complete`；已有项目由宿主更新配置的 `[memory.codex]`。这是宿主元数据接法，Codex 项目 ID 与 basePack 的 `memory.project_id` UUID 各自保留。
 
-首次启用或旧项目升级时，生成的 instructions 指引 Codex 宿主补齐绑定；每次维护预检刷新完整注册根。`memory maintain --codex-registry <UTF-8-JSON>` 可传入本轮的 `{project_id, other_project_roots, registry_complete:true}`，覆盖配置中的绑定用于该轮采集。非 Codex 宿主或无法取得绑定时继续文件记忆，并明确显示聊天覆盖缺口。
+首次启用或旧项目升级时，instructions 指引 Codex 宿主补齐绑定；每次维护预检刷新完整注册根。`memory maintain --holder <本thread身份> --control <全新稳定路径> --codex-registry <UTF-8-JSON>` 可传本轮 `{project_id, other_project_roots, registry_complete:true}`，覆盖本轮采集绑定。注册清单工作文件放根 tmp，采集原件与定位回执保留在实际 memory 目录。非 Codex 宿主或绑定不可取时继续文件记忆，明确聊天覆盖缺口。
 
 维护入口通过受支持的 App Server 列出 active 与 archived 聊天并分页读取正文。明确的项目 ID 优先；线程未带项目 ID 时，用项目根、Git worktree/common-dir 与宿主其它注册项目根排除冲突。不能确认的条目留在 unresolved/gaps；标题与关键词不判定归属。受管 UTF-8 导出保存在项目 `memory.data_dir/codex/`，由同一维护入口加入发现范围；无需把每个 thread 填入 `source_scope`，也不递归扫描数据库、控制文件和维护回执。
 
@@ -161,6 +161,8 @@ if ($LASTEXITCODE -ne 0) { throw "search failed ($LASTEXITCODE)" }
 
 ## 版本升级
 
+0.10.0.dev1已合入维护试验的改动。已有项目安装后执行`memory init`，同时刷新AGENTS短指令与本机入口，保留原UUID和托管块外字节。自动维护使用`maintain --holder <thread> --control <全新路径>`；同项目只由一个owner预检和发布，结束时stop、取消自有后代、确认发布结束后release。CLI的`apply`须传owner的control；Python省略control时仅在空闲项目取得短期owner，繁忙则明确失败。详见[自动维护](memory.md#自动维护与手动维护)、[反馈与审计](memory.md#使用反馈与手动审计)及随包skill。多项目共用解释器时逐项目安排入口升级，或先使用独立客户端环境；不让旧入口继续调用新生命周期接口。
+
 先按 [备份步骤](memory.md#备份与恢复) 保留知识、配置和原件恢复集合，再由客户端维护者安装新包。已有配置保持 schema 2、机器 schema 1 和原 UUID。
 
 面向 0.9.0 的升级增加 `memory prompt` 和 `maintain` 派工元数据；默认全项目发现取代仅以 `source_scope` 发现。原有 `source_scope` 保留为 Git 项目的显式包含项与非 Git 项目的声明范围，不必将 Git 内新增源码逐个登记。已有来源和历史待维护范围仍全局接续；根据 `discovery` 与回执检查实际覆盖，升级不会自动完成全部语义接受。刷新 instructions 后按 [自动维护](memory.md#自动维护与手动维护) 派工。
@@ -172,7 +174,7 @@ if ($LASTEXITCODE -ne 0) { throw "search failed ($LASTEXITCODE)" }
 - 删除 `MachineConfig.state_dir`、机器模板 `[shared].state_dir` 及其回显。embedding 日志仍由 SCM/Shawl 服务定义指定，jobs 仍使用项目 `jobs_dir`，不用搬迁日志。
 - 删除内部 `MemberContent/read_member` 当前原件读取接口；已发布原文通过 `memory read` 或 Python `Memory.read` 读取对应快照及显式 `source_version`。
 
-`memory guide/rank/stop` 无需 `--config`；项目动作仍需配置。`memory prompt` 需要显式配置，但只读配置、模板和回执，不要求数据库、密码文件或模型可用。独立 skills 的安装合同不变，升级客户端不会替目标项目安装它们。
+`memory guide/rank` 无需 `--config`；owner/stop/release/recover-owner 需要本项目配置定位状态，但不读取数据库凭据。`memory prompt` 只读配置、模板与回执，不要求数据库、密码或模型。独立 skills 的安装合同不变，升级客户端不会替项目安装它们。
 
 升级到 0.7.1 前先确认共享模型服务可用。旧 text 项目用显式 vector 查询核已发布活跃范围的向量覆盖：
 
@@ -190,7 +192,7 @@ bp --config $config memory search --mode vector --text '<代表性主题>'
 
 1. 保留旧 wheel、项目配置、原密码文件和 [完整恢复集合](memory.md#备份与恢复)。核 `username` 与 `password_file` 指向当前服务使用的同一凭据；默认位置不变时可省略 password_file，删除 password_env。
 2. 等正在调用的客户端完成后普通安装目标版本，更新配置中的 Python 路径（若解释器改变）。数据库、原密码、物理目录、端口与 UUID 保持；已有认证服务通常无需重启或迁库。
-3. 执行 `memory init` 刷新 instructions，删除项目手写说明和包装脚本中的旧环境变量加载。新 shell 直接 brief/search/read/neighbors，核原知识及依据；已有兼容向量无需重新编码。
+3. 执行 `memory init` 刷新 instructions 与 AGENTS 托管块，删除项目手写说明和包装脚本中的旧环境变量加载。新 shell 直接 brief/search/read/neighbors，核原知识及依据；已有兼容向量无需重新编码。这是升级验证，日常知识批次按作者生成和程序提交完成。
 
 密码文件缺失时恢复原凭据，不为已有库生成新密码。改写文件不等于轮换数据库中保存的账户密码；确需轮换时先由数据库管理员更新账户，再同步唯一凭据文件和 launcher。失败保留原错，按保留的 wheel 与配置回退；不清库或重新总结。
 

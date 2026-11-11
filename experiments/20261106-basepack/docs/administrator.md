@@ -69,7 +69,7 @@ CondorClient 按机器配置的 bin_dir/config_file 调用原生命令并设置 
 
 多个项目可共用 SurrealDB 程序，每项目使用独立的物理目录、端口、init 生成的 UUID 和凭据，见 [双项目示例](setup-project.md#启用记忆)。namespace/database 不代替物理隔离，同项目多个聊天共用一个数据库进程。服务启用认证并仅监听显式回环 IP；UUID 负责防误连，账户密码负责访问认证。
 
-模板将 `[memory].username` 设为 root，已有库填写其实际用户名。可选 `password_file` 相对项目根或为绝对路径，省略时为实际 `memory_dir/password.txt`。客户端与 launcher 读取这一份 UTF-8 文本（可带 BOM，保留 CRLF 和首尾空白），`config show` 只返回 `memory_password_file` 绝对路径；不输出密码，不设置 password_env。`memory guide/rank/stop` 不需要配置或凭据，普通 init 和只用资源工具也不创建密码文件。
+模板将 `[memory].username` 设为 root，已有库填写其实际用户名。可选 `password_file` 相对项目根或为绝对路径，省略时为实际 `memory_dir/password.txt`。客户端与 launcher 读取这一份 UTF-8 文本（可带 BOM，保留 CRLF 和首尾空白），`config show` 只返回路径，不输出密码，不设置 password_env。`memory guide/rank` 不需要配置或凭据；owner/stop/release/recover-owner 需配置定位本项目运行状态，但不需要凭据或连接数据库。普通 init 和只用资源工具不创建密码文件。
 
 **仅首次部署全新库时**，用下面命令生成一次无 BOM、无末尾换行的强随机密码。已有文件直接复用；已有库缺文件时恢复原凭据，不能为它换一个随机密码。密码文件留在忽略目录并限制读取权限。以下使用已选的 Python 与配置：
 

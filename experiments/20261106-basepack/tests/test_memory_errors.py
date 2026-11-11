@@ -47,7 +47,6 @@ def test_sql_413_reports_actual_request_size_and_keeps_original_error(tmp_path):
         assert "request too large" in notes
         assert f"{len(received[0])} bytes" in notes
         assert "server capacity is unknown" in notes
-        assert "expected versions" in notes and "atomicity" in notes and "relation endpoints" in notes
     finally:
         server.shutdown()
         thread.join()

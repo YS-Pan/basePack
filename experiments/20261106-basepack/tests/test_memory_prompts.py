@@ -62,7 +62,7 @@ def test_render_reads_only_receipt_and_templates(prompt_project, tmp_path, monke
     control = tmp_path / "new" / "control"
     coordinator = render_prompt(prompt_project, receipt, control)
     assert coordinator["role"] == "coordinator" and coordinator["tier"] == "tier2"
-    assert "1 semantic sources and 2 pending relations" in coordinator["prompt"]
+    assert "1 semantic sources, 2 pending relations and 0 reports" in coordinator["prompt"]
     assert "secret-body" not in coordinator["prompt"]
     assert "sole publisher" in coordinator["prompt"]
     assert "both relation endpoints" in coordinator["prompt"]
@@ -72,7 +72,8 @@ def test_render_reads_only_receipt_and_templates(prompt_project, tmp_path, monke
     assert reader_ai["reasoning_effort"] in coordinator["prompt"]
     assert "actual host spawn parameters" in coordinator["prompt"]
     assert "Execute the following command, parse its JSON output, and follow its prompt." in coordinator["prompt"]
-    assert "published content and saved original evidence" in coordinator["prompt"]
+    assert "do not launch an audit" in coordinator["prompt"].lower()
+    assert "no-knowledge or duplicate disposition" in coordinator["prompt"]
     assert "<batch.json>" not in coordinator["prompt"]
     assert str(control) in coordinator["prompt"]
     assert not control.parent.exists() and not prompt_project.memory_dir.exists()
@@ -87,7 +88,7 @@ def test_render_reads_only_receipt_and_templates(prompt_project, tmp_path, monke
     assert "<batch.json>" not in reader["prompt"]
     assert "open the original `image_path`" in reader["prompt"]
     batch = reader["prompt"].split("Batch artifact: ", 1)[1].splitlines()[0]
-    assert str(prompt_project.memory_dir / "maintenance" / "work" / receipt.stem) in batch
+    assert str(prompt_project.root / "tmp" / "basepack-maintenance" / receipt.stem) in batch
     assert not Path(batch).parent.exists()
     again = render_prompt(prompt_project, receipt, control, role="reader", paths=["one.md"])
     assert batch != again["prompt"].split("Batch artifact: ", 1)[1].splitlines()[0]
