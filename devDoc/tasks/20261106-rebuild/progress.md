@@ -4,7 +4,9 @@
 
 ## 当前阶段
 
-本轮按用户要求先完成[近期一致性评估](../20261111-consistency-review/assessment.md)，再修复，最后维护记忆。修复、验证与记忆维护状态集中在[本轮进度](../20261111-consistency-review/progress.md)。
+近期一致性评估、0.9.1 修复及固定维护检查点已验收，历史依据见[归档进度](../../archive/20261111-consistency-review/progress.md)。全项目知识维护继续沿[记忆系统进度](../20261106-memory-system/progress.md)推进。
+
+已结束的 engineering-judgment、0.7.1 整改、0.8.1 接入简化、0.9.0 worker prompt 和 0.9.1 一致性修复任务已整体归档；本目录继续维护跨工具工作，记忆专项继续维护未完成知识目标。
 
 当前唯一 active 路线为 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，源码、构建声明、测试、产品文档、示例及资源和记忆 skill 在该实验工程内维护；根目录保留统一 devDoc 和三项通用技能。本次布局迁移的实际检查与接续见 [迁移结果](../../archive/20261109-project-layout/result.md)，不改变 R9 和记忆功能的完成状态。
 
@@ -33,17 +35,17 @@
 
 ## 阻碍与待核
 
-- array reconstruct 原遗漏的两项 skill 发现入口已按本轮计划补齐，官方 `skills/list` 返回两项 `scope=repo`、`errors=[]`，外部 main 提交 `931634e`。完整目录、引用、冲突与发现核验已纳入产品接入说明；init/core doctor 的职责仍不等同于技能安装与发现验收，见[调查接续](research/array-skill-discovery.md)与[文档结果](../20261110-onboarding-simplification/documentation-result.md)。
+- array reconstruct 原遗漏的两项 skill 发现入口已按本轮计划补齐，官方 `skills/list` 返回两项 `scope=repo`、`errors=[]`，外部 main 提交 `931634e`。完整目录、引用、冲突与发现核验已纳入产品接入说明；init/core doctor 的职责仍不等同于技能安装与发现验收，见[调查接续](research/array-skill-discovery.md)与[文档结果](../../archive/20261110-onboarding-simplification/documentation-result.md)。
 - 文件结构建议已有独立 skill；真实大项目迁移、未来布局及记忆读取效果继续按实际任务验证，记忆自用验收见 [独立任务](../20261106-memory-system/plan.md#devdoc-自用与读取轮数)。
 - 分层协作已有指令层初版，[P7](plan.md#p7-分层-agent-组织) 仍需真实广读任务的能力与成果质量对照。主上下文、团队总用量和耗时单独记录，允许增加用量换取质量提升。
 
 ## 下一步
 
-已执行[接入、记忆维护与运行简化计划](../20261110-onboarding-simplification/plan.md)，0.8.0交付脚本增量维护、Codex聊天来源、接口清理、技能发现和英文README；随后按用户选择完成0.8.1保留认证与自动读取凭据。普通wheel369项通过、无跳过，共用客户端及三个项目入口已实际升级，七表逐字段、原凭据及数据库进程保持。新shell直接调用不再手工加载密码；实际覆盖与回退材料见[专项进度](../20261110-onboarding-simplification/progress.md)和[正式升级结果](../20261110-onboarding-simplification/credential-installation-result.md)。0.8.0免认证仅保留历史隔离证据，远端推送/发布未执行。
+已执行[接入、记忆维护与运行简化计划](../../archive/20261110-onboarding-simplification/plan.md)，0.8.0交付脚本增量维护、Codex聊天来源、接口清理、技能发现和英文README；随后按用户选择完成0.8.1保留认证与自动读取凭据。普通wheel369项通过、无跳过，共用客户端及三个项目入口已实际升级，七表逐字段、原凭据及数据库进程保持。新shell直接调用不再手工加载密码；实际覆盖与回退材料见[专项进度](../../archive/20261110-onboarding-simplification/progress.md)和[正式升级结果](../../archive/20261110-onboarding-simplification/credential-installation-result.md)。0.8.0免认证仅保留历史隔离证据，远端推送/发布未执行。
 
-独立 [engineering-judgment skill](../../../skills/engineering-judgment/SKILL.md) 已编写、保留并接入，见[交付结果](../20261110-engineering-judgment/result.md)。按用户最新要求取消技能测试与按收益去留，效果在长期真实使用中观察；源码和入口已提交 f8bb5b2。
+独立 [engineering-judgment skill](../../../skills/engineering-judgment/SKILL.md) 已编写、保留并接入，见[交付结果](../../archive/20261110-engineering-judgment/result.md)。按用户最新要求取消技能测试与按收益去留，效果在长期真实使用中观察；源码和入口已提交 f8bb5b2。
 
-[basePack整改](../20261110-rectification/progress.md) 已完成故障修复、查询/维护解耦与 CPU/CUDA 适配的源码；随后按用户最新要求删除独立text模式，最终0.7.1普通wheel在Python3.14完整266项通过、无跳过，共用客户端与三个项目已完成向量配置迁移，七表逐字段未变；实际结果沿该进度维护。自动维护在业务期间按来源小批推进，业务结束停止；积压多只限制擅自启动独立手动深维护，不排除正常自动小批。正常浮点差异按等价处理。阵列业务事项仍留其项目。
+[basePack整改](../../archive/20261110-rectification/progress.md) 已完成故障修复、查询/维护解耦与 CPU/CUDA 适配的源码；随后按用户最新要求删除独立text模式，最终0.7.1普通wheel在Python3.14完整266项通过、无跳过，共用客户端与三个项目已完成向量配置迁移，七表逐字段未变；实际结果沿该进度维护。自动维护在业务期间按来源小批推进，业务结束停止；积压多只限制擅自启动独立手动深维护，不排除正常自动小批。正常浮点差异按等价处理。阵列业务事项仍留其项目。
 
 用户已选择 MIT，[0.6.4 许可补丁](https://github.com/YS-Pan/basePack/releases/tag/v0.6.4) 已发布，GitHub 仓库识别为 MIT；源码、独立包许可证和元数据同步，定向构建/安装及附件下载校验通过，详见 [发布结果](github-publish-result.md#mit-许可补丁-064)。0.6.3 原标签和附件保留，项目记忆不上传。
 

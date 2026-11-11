@@ -12,11 +12,11 @@
 
 稳定客户端 `D:/AgentTools/envs/basepack-client/Scripts/python.exe` 已普通 no-deps 升级为 0.9.1，Python 3.13.17。最终 wheel 位于 active 工程 `dist/consistency-0.9.1-final/`，SHA256 `1843a2df3630c094775b81d78ded799527230fce8365bc1e8d0d92629c39f3cc`；42 个包文件与源码、隔离普通安装及稳定安装逐字节相同。最终源码 432 passed/0 skipped，源码外普通 wheel 432 passed/0 skipped；独立认证库、共享图文 embedding、原生恢复和 Condor policy 检查均启用。初次临时 wheel 测试环境缺依赖的 11 失败及 K1 初版兼容负验原证均保留，不当作最终交付结果。
 
-新 wheel 实际回读正式库 1128 个非退役记录所用独立 basis，全部成功；其中 58 项旧重绑定依据曾被初版过强门槛拒读，现已修复并保留原同源合同。普通升级前后七表全部记录逐表 digest 相同，UUID、三条 mandatory、397 pending 和 1274/1274 兼容向量保持；升级未维护知识或重启正式库/共享服务。新 NoProfile PowerShell 实际执行更新后的项目入口，brief 返回三条 mandatory 和 397 pending。此轮仅验本项目及共用安装，未重验其它项目功能。记忆维护在升级核验后另行执行，实际接受与余项见 [本轮进度](../tasks/20261111-consistency-review/progress.md)，非秘密证据在 `artifacts/runs/20261111-consistency-review/`。
+新 wheel 实际回读正式库 1128 个非退役记录所用独立 basis，全部成功；其中 58 项旧重绑定依据曾被初版过强门槛拒读，现已修复并保留原同源合同。普通升级前后七表全部记录逐表 digest 相同，UUID、三条 mandatory、397 pending 和 1274/1274 兼容向量保持；升级未维护知识或重启正式库/共享服务。新 NoProfile PowerShell 实际执行更新后的项目入口，brief 返回三条 mandatory 和 397 pending。此轮仅验本项目及共用安装，未重验其它项目功能。记忆维护在升级核验后另行执行，实际接受与余项见 [本轮进度](../archive/20261111-consistency-review/progress.md)，非秘密证据在 `artifacts/runs/20261111-consistency-review/`。
 
 ## 2026-11-11 0.9.0 worker prompt 与全项目默认
 
-稳定客户端 `D:/AgentTools/envs/basepack-client/Scripts/python.exe` 已普通 no-deps 升级为 0.9.0；Python 3.13.17，从稳定 site-packages 导入。main 独立重算最终 wheel SHA256 `3bdb716795d09db9ca087904e38c920f18c9a2134555906b1e816d1725fd1d12`，42 个包文件与最终 wheel、源码一致，包含英文 coordinator/reader 模板。源码外最终普通 wheel 完整检查 395 passed、0 skipped，启用独立认证库、真实共享模型与本机 Condor policy 检查；此前初版与最终候选仅两份模板及 RECORD 不同，完整检查已对最终候选重跑。具体范围与真实多批验收见[本轮结果](../tasks/20261111-memory-worker-prompts/result.md)。
+稳定客户端 `D:/AgentTools/envs/basepack-client/Scripts/python.exe` 已普通 no-deps 升级为 0.9.0；Python 3.13.17，从稳定 site-packages 导入。main 独立重算最终 wheel SHA256 `3bdb716795d09db9ca087904e38c920f18c9a2134555906b1e816d1725fd1d12`，42 个包文件与最终 wheel、源码一致，包含英文 coordinator/reader 模板。源码外最终普通 wheel 完整检查 395 passed、0 skipped，启用独立认证库、真实共享模型与本机 Condor policy 检查；此前初版与最终候选仅两份模板及 RECORD 不同，完整检查已对最终候选重跑。具体范围与真实多批验收见[本轮结果](../archive/20261111-memory-worker-prompts/result.md)。
 
 升级前停止本轮后台维护，旧 0.8.1 wheel 保留。安装没有写知识表或重启服务；同一 UUID、七表计数、meta、三条 mandatory 内容、397 pending 和 1274/1274 兼容向量均与停写后的 baseline 相同。这是计数/入口及指定记录比较，不冒充七表逐字段迁移核验。本项目生成入口已刷新，Git 默认发现实际返回 287 个文件候选且无格式缺口，安装后的 prompt 默认 coordinator/tier2，英文与派工元数据实收通过；没有据此宣称这些文件已语义接受。
 
@@ -30,11 +30,11 @@ Codex App Server 在受限沙箱初始化用户状态目录失败的问题仍存
 
 本项目、array reconstruct 与 ppt memsys 均保留原 UUID、账户和 store 目录；密码文件与 launcher 字节不变，数据库 PID 6232/33428/1236 及创建时间保持，未重启或迁库。七表全记录逐字段比较一致。三个项目分别在新的 NoProfile PowerShell、其它 cwd、清空 PASSWORD 环境变量的条件下直接运行生成入口 brief，均退出 0；read 与默认 vector 查询也实际通过。客户端自动读配置的唯一密码文件，旧 password_env 与手工桥已从配置、instructions 和自有包装清理。
 
-三项目另补齐各自 Codex 宿主 ID 和 36 个其它注册项目根，仅更新配置，本次升级没有执行历史聊天采集或语义接受；数据库不变与检索成功不代表来源已全部维护。共享 embedding 与 Condor 沿原实例。普通包、外部手写入口、保留状态与恢复材料的证据入口见 [0.8.1 安装结果](../tasks/20261110-onboarding-simplification/credential-installation-result.md)。下节及后续版本记录保留各自日期的历史条件。
+三项目另补齐各自 Codex 宿主 ID 和 36 个其它注册项目根，仅更新配置，本次升级没有执行历史聊天采集或语义接受；数据库不变与检索成功不代表来源已全部维护。共享 embedding 与 Condor 沿原实例。普通包、外部手写入口、保留状态与恢复材料的证据入口见 [0.8.1 安装结果](../archive/20261110-onboarding-simplification/credential-installation-result.md)。下节及后续版本记录保留各自日期的历史条件。
 
 ## 2026-11-10 0.7.1 整改与安装
 
-稳定客户端已普通升级为0.7.1，源码外完整CPU依赖的Python3.14.10环境全套266项通过、无跳过；轻客户端3.13/3.14与CPU/CUDA实际图文、索引复用的条件见[整改结果](../tasks/20261110-rectification/result.md)。三个已接入项目保留UUID，兼容向量全部复用后切为vector，七表所有字段不变。生成凭据入口在无继承变量的新NoProfile PowerShell和其它cwd中实过。共享0.5.0模型服务、机器配置与Condor策略保持原实例。
+稳定客户端已普通升级为0.7.1，源码外完整CPU依赖的Python3.14.10环境全套266项通过、无跳过；轻客户端3.13/3.14与CPU/CUDA实际图文、索引复用的条件见[整改结果](../archive/20261110-rectification/result.md)。三个已接入项目保留UUID，兼容向量全部复用后切为vector，七表所有字段不变。生成凭据入口在无继承变量的新NoProfile PowerShell和其它cwd中实过。共享0.5.0模型服务、机器配置与Condor策略保持原实例。
 
 ## 当前资源查询与执行边界（2026-11-10）
 
@@ -84,7 +84,7 @@ P5 安装基线之后，仓库修复了失效知识版本、关系依赖并发�
 
 ## 2026-11-10 产品文档移出的历史环境事实
 
-整改前管理员文档记录 Python 3.13.17、uv 0.13.7、驱动 617.42、RTX 4060 Ti 16380 MiB；这些是当时机器观测。LitServe 0.2.19 原生 `/shutdown` 在 Windows 小试曾残留进程，因此沿 R9 用 Shawl/SCM 停止服务树。原位置与版本依据见[文档整改结果](../tasks/20261110-rectification/docs-result.md#环境证据交接)，能力条件在产品管理员说明维护。
+整改前管理员文档记录 Python 3.13.17、uv 0.13.7、驱动 617.42、RTX 4060 Ti 16380 MiB；这些是当时机器观测。LitServe 0.2.19 原生 `/shutdown` 在 Windows 小试曾残留进程，因此沿 R9 用 Shawl/SCM 停止服务树。原位置与版本依据见[文档整改结果](../archive/20261110-rectification/docs-result.md#环境证据交接)，能力条件在产品管理员说明维护。
 
 ## 2026-11-09 R9 共享资源基线
 

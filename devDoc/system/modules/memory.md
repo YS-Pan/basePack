@@ -1,6 +1,6 @@
 # 项目记忆实现
 
-源码面向 0.9.1，实现 SurrealDB 上的多层文字、原图向量与语义关系，以及默认全项目维护和随包英文维护提示词。首建和维护由宿主订阅 agent 同读完成。本轮一致性修复与普通安装验证见 [进度](../../tasks/20261111-consistency-review/progress.md)；既有交付和完整行为验收边界见 [记忆专项进度](../../tasks/20261106-memory-system/progress.md)，P0 原生接入证据见 [结果](../../tasks/20261106-memory-system/p0-result.md)，用户流程见 [记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
+源码面向 0.9.1，实现 SurrealDB 上的多层文字、原图向量与语义关系，以及默认全项目维护和随包英文维护提示词。首建和维护由宿主订阅 agent 同读完成。本轮一致性修复与普通安装验证见 [进度](../../archive/20261111-consistency-review/progress.md)；既有交付和完整行为验收边界见 [记忆专项进度](../../tasks/20261106-memory-system/progress.md)，P0 原生接入证据见 [结果](../../tasks/20261106-memory-system/p0-result.md)，用户流程见 [记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
 
 ## 职责与数据
 

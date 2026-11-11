@@ -12,7 +12,7 @@
 
 [identity.py](../../../experiments/20261106-basepack/src/basepack/embedding/identity.py) 维护 `embedding_identity`：模型 revision/文件清单、Sentence Transformers 版本、FP16、指令、图像缩放和 pooling/归一化合同共同决定语义。服务地址、模型存放路径、队列期限、请求批次、线程和预算不改变此标识。0.5.0 引入新的身份，0.6.1 保持兼容。[记忆向量模块](../../../experiments/20261106-basepack/src/basepack/memory/vectors.py) 已按身份与输入版本判断复用、过滤不兼容向量，并通过 `memory embed` 重建。
 
-0.7.0 沿用该身份算法，CPU/CUDA 同模型与精度直接复用索引；正常浮点差异和近同分换序按语义等价处理。CPU/CUDA 依赖分别由 `embedding-cpu`、`embedding-cuda` extra 选择；跨设备实际证据在[本轮整改](../../tasks/20261110-rectification/progress.md)维护。
+0.7.0 沿用该身份算法，CPU/CUDA 同模型与精度直接复用索引；正常浮点差异和近同分换序按语义等价处理。CPU/CUDA 依赖分别由 `embedding-cpu`、`embedding-cuda` extra 选择；跨设备实际证据在[本轮整改](../../archive/20261110-rectification/progress.md)维护。
 
 首次准备使用 [短脚本](../../../experiments/20261106-basepack/examples/prepare_embedding_model.py) 调用官方 hf 下载并验证固定 revision，再从实际文件生成 model.lock.json；模型保存为 model_root/model/，清单记录模型名、revision 及文件相对路径、字节数和 SHA256。该步骤只在准备时运行。已有服务继续保留原锁；重建清单可能改变身份，调用项目据实际身份重建向量。机器模板显存预算 0 是待标定占位，首次启动前按机器测量填写正预算并协调 Condor 普通池。
 

@@ -10,7 +10,7 @@ basePack gives agents project-local memory, shared compute coordination, and ind
 | file-structure | Organize project files by purpose and lifecycle | A host with skills |
 | engineering-judgment | Judge contracts, responsibilities, compatibility, and the work passed to users | A host with skills |
 
-The current source targets **0.9.1, in development**, for Windows and Python 3.13+. The host's subscription-based agents understand material, build relations, and score results; basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability. Current fixes, installation evidence, and remaining verification are recorded in the [consistency review progress](devDoc/tasks/20261111-consistency-review/progress.md).
+The current source targets **0.9.1, in development**, for Windows and Python 3.13+. The host's subscription-based agents understand material, build relations, and score results; basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability. Current fixes, installation evidence, and remaining verification are recorded in the [consistency review progress](devDoc/archive/20261111-consistency-review/progress.md).
 
 **basePack is under development. Real use also serves as testing; record problems so they can inform subsequent fixes.**
 

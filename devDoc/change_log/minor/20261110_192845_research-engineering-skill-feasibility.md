@@ -1,6 +1,6 @@
 # 复核工程判断技能的现成方案与有效性
 
-2026 年 11 月 10 日。按用户要求重新联网检索，在技能任务内保存[调研结论与固定版本证据](../../tasks/20261110-engineering-judgment/research/feasibility.md)，并从[计划](../../tasks/20261110-engineering-judgment/plan.md#目标与依据)链接。
+2026 年 11 月 10 日。按用户要求重新联网检索，在技能任务内保存[调研结论与固定版本证据](../../archive/20261110-engineering-judgment/research/feasibility.md)，并从[计划](../../archive/20261110-engineering-judgment/plan.md#目标与依据)链接。
 
 补充完整链的官方示例与现成反馈技能，区分可用实现和实际效果证据。当前证据支持小规模验证，不能推导本项目防复发概率；对照基线应保留已有规则，同时观察多余防御和必要行为。主计划保持待实施。
 

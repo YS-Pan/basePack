@@ -56,8 +56,8 @@ basePack 应将“选择并安装所需独立 skills → 核对宿主发现结�
 
 ## 2026-11-10 接入修复接续
 
-以上保留调查当时的版本、缺口与建议。本轮按 [接入简化计划 A](../../20261110-onboarding-simplification/plan.md#a补齐技能接入闭环) 完成两项既有技能的发现入口修复，未新增 engineering-judgment，也未运行技能行为或效果测试。
+以上保留调查当时的版本、缺口与建议。本轮按 [接入简化计划 A](../../../archive/20261110-onboarding-simplification/plan.md#a补齐技能接入闭环) 完成两项既有技能的发现入口修复，未新增 engineering-judgment，也未运行技能行为或效果测试。
 
 外部项目 `D:/project/20261109 array reconstruct` 的 `.agents/skills/agent-team` 与 `.agents/skills/file-structure` 均为指向本项目 `skills/` 原件的 junction；相对引用随完整原件可达。该项目以 `main` 提交 `931634e` 保存两条精准忽略项及 `devDoc/system/basepack.md` 本机重建说明，提交后工作区干净。
 
-随后实际调用受支持的 Codex App Server `skills/list`，参数 `cwds=[外部项目根]`、`forceReload=true`。返回两项名称、`scope=repo`、解析到该项目原件的 SKILL.md 路径，且 `errors=[]`；本轮已验收宿主实际发现。原证为根 `artifacts/runs/20261110-onboarding-simplification/docs-array-skills-list.json`，具体文档交付与检查见 [本轮结果](../../20261110-onboarding-simplification/documentation-result.md)。
+随后实际调用受支持的 Codex App Server `skills/list`，参数 `cwds=[外部项目根]`、`forceReload=true`。返回两项名称、`scope=repo`、解析到该项目原件的 SKILL.md 路径，且 `errors=[]`；本轮已验收宿主实际发现。原证为根 `artifacts/runs/20261110-onboarding-simplification/docs-array-skills-list.json`，具体文档交付与检查见 [本轮结果](../../../archive/20261110-onboarding-simplification/documentation-result.md)。

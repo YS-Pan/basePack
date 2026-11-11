@@ -1,6 +1,6 @@
 # 当前文件与运行逻辑框图
 
-按 2026 年 11 月 11 日的 0.9.1 源码合同更新；本轮修复和安装验证见 [一致性审阅进度](../tasks/20261111-consistency-review/progress.md)，本机部署观测见 [环境记录](environment.md)。既有项目沿用认证服务、原密码、物理库和 UUID，客户端升级与入口刷新不要求迁库。0.5.0 core/jobs 和共享 embedding 服务继续保留，后者与当前客户端协议兼容。沿用[参考 chat](codex://threads/01a1bb3f-4db8-7c10-8d71-c951aba18aa2) 按文件位置分层的方法；记忆行为的实际验收边界见[专项进度](../tasks/20261106-memory-system/progress.md)，阶段合同见[记忆方案图](../tasks/20261106-memory-system/diagrams.md)。
+按 2026 年 11 月 11 日的 0.9.1 源码合同更新；本轮修复和安装验证见 [一致性审阅进度](../archive/20261111-consistency-review/progress.md)，本机部署观测见 [环境记录](environment.md)。既有项目沿用认证服务、原密码、物理库和 UUID，客户端升级与入口刷新不要求迁库。0.5.0 core/jobs 和共享 embedding 服务继续保留，后者与当前客户端协议兼容。沿用[参考 chat](codex://threads/01a1bb3f-4db8-7c10-8d71-c951aba18aa2) 按文件位置分层的方法；记忆行为的实际验收边界见[专项进度](../tasks/20261106-memory-system/progress.md)，阶段合同见[记忆方案图](../tasks/20261106-memory-system/diagrams.md)。
 
 ## 路径与读图约定
 
@@ -179,7 +179,7 @@ flowchart TB
   host -->|业务结束：stop control，再取消worker| preflight
 ```
 
-brief/search/read 保持纯读。确定性维护把元数据、全文换行等价与有足够上下文证据的唯一定位交给程序；余下语义范围按来源合并并跨任务接续，不因积压数量关闭自动小批。聊天采集先依宿主绑定、项目根/worktree及完整注册根排除归属冲突；受管原文与旧已发布快照分别保留，消息精确定位从快照解析。任务 control 共用于采集和发布，已采集/已发布部分保留；采集数量、语义 pending 和向量覆盖各有边界。实际验收与未核范围见 [本轮进度](../tasks/20261110-onboarding-simplification/progress.md)。
+brief/search/read 保持纯读。确定性维护把元数据、全文换行等价与有足够上下文证据的唯一定位交给程序；余下语义范围按来源合并并跨任务接续，不因积压数量关闭自动小批。聊天采集先依宿主绑定、项目根/worktree及完整注册根排除归属冲突；受管原文与旧已发布快照分别保留，消息精确定位从快照解析。任务 control 共用于采集和发布，已采集/已发布部分保留；采集数量、语义 pending 和向量覆盖各有边界。实际验收与未核范围见 [本轮进度](../archive/20261110-onboarding-simplification/progress.md)。
 
 ## 6. 产品源码内部怎样分工
 

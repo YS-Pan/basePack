@@ -1,6 +1,8 @@
 * text=auto
 *.md text eol=lf
 
-# Preserve the project charter and the original user-plan snapshot byte-for-byte.
+# Preserve the project charter and original snapshots byte-for-byte.
 devDoc/project-charter.md -text
 devDoc/tasks/20261106-rebuild/research/user-plan.original.md -text
+devDoc/archive/20261110-rectification/research/new-machine-defensive-review.original.md -text
+devDoc/archive/20261110-rectification/research/cpu-vector-requirements.original.md -text

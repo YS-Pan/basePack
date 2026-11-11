@@ -1,6 +1,6 @@
 # 项目配置与部署合同
 
-更新：2026 年 11 月 11 日。当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.9.1。本文维护代码、业务实例、共享设施与升级边界。当前安装状态和本轮修复验证沿 [一致性审阅进度](../tasks/20261111-consistency-review/progress.md) 接续；0.9.0 的普通安装、原 UUID、指定知识记录及入口检查见 [前轮进度](../tasks/20261111-memory-worker-prompts/progress.md)。实测和历史观察见 [环境记录](environment.md)，共享资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。操作从路线 README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md) 和 [管理员说明](../../experiments/20261106-basepack/docs/administrator.md) 进入。
+更新：2026 年 11 月 11 日。当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.9.1。本文维护代码、业务实例、共享设施与升级边界。当前安装状态和本轮修复验证沿 [一致性审阅进度](../archive/20261111-consistency-review/progress.md) 接续；0.9.0 的普通安装、原 UUID、指定知识记录及入口检查见 [前轮进度](../archive/20261111-memory-worker-prompts/progress.md)。实测和历史观察见 [环境记录](environment.md)，共享资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。操作从路线 README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md) 和 [管理员说明](../../experiments/20261106-basepack/docs/administrator.md) 进入。
 
 ## 位置与责任
 
@@ -75,7 +75,7 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 
 ## 升级与回退
 
-0.9.1 修复维护依赖与空来源处理、聊天附件出处交接、历史快照回读及检索去重。新来源快照保存接受时路径并将路径纳入版本身份；旧快照保留同来源读取合同，跨来源以成员历史证明归属，不要求逐版本的成员接受记录。旧快照缺路径时仅使用可核的唯一路径，不强迁或重写已有知识。配置、UUID、原凭据、embedding 身份和共享服务保持既有合同，实际安装与验证沿 [本轮进度](../tasks/20261111-consistency-review/progress.md) 接续。
+0.9.1 修复维护依赖与空来源处理、聊天附件出处交接、历史快照回读及检索去重。新来源快照保存接受时路径并将路径纳入版本身份；旧快照保留同来源读取合同，跨来源以成员历史证明归属，不要求逐版本的成员接受记录。旧快照缺路径时仅使用可核的唯一路径，不强迁或重写已有知识。配置、UUID、原凭据、embedding 身份和共享服务保持既有合同，实际安装与验证沿 [本轮进度](../archive/20261111-consistency-review/progress.md) 接续。
 
 0.9.0 增加随 wheel 安装的英文维护模板与纯 `memory prompt` 渲染入口。默认 Git 清单加 source_scope 显式包含项取代仅按 source_scope 发现，非 Git 仍按声明范围；历史已登记及未接受来源保持全局接续。maintain 短结果增加发现边界、control 与协调者派工元数据，宿主按返回命令交接，刷新生成入口和自有包装。模型映射由项目 [ai] 解析，宿主实际设置；数据库 schema、原凭据、UUID、向量身份与共享服务沿用既有合同。安装、构建和真实使用结果分别按专项进度核实。
 

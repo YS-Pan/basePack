@@ -4,4 +4,4 @@
 
 普通安装全套369项通过、无跳过；真实匿名写403、错密401且无写入，新进程和旧快照通过。最终仅同义SKILL变更重包，代码与测试不变，38文件重新字节核验。共用客户端及basePack/array/PPT已升级，三个项目七表逐字段一致、原凭据及数据库进程保持；外部入口与PPT原生备份已实际验证。
 
-原免认证候选保留历史证据，未切换正式库为免认证。实际范围、备份/回退资料、外部提交及原证见[正式升级结果](../../tasks/20261110-onboarding-simplification/credential-installation-result.md)和[实现结果](../../tasks/20261110-onboarding-simplification/credential-result.md)。没有推送或发布远端。
+原免认证候选保留历史证据，未切换正式库为免认证。实际范围、备份/回退资料、外部提交及原证见[正式升级结果](../../archive/20261110-onboarding-simplification/credential-installation-result.md)和[实现结果](../../archive/20261110-onboarding-simplification/credential-result.md)。没有推送或发布远端。

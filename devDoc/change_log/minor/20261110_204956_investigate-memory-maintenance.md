@@ -1,6 +1,6 @@
 # 调查记忆变化判断与自动维护遗漏
 
-根据用户质疑，完成[调查](../../tasks/20261110-onboarding-simplification/research/memory-maintenance-audit.md)：Git干净与memory modified基线不同，原进度确有未入记忆的内容；上一轮主派工过度限域、worker未比较旧版本便排除变化，导致只检查后提前结束。已纠正进度中的生命周期表述。
+根据用户质疑，完成[调查](../../archive/20261110-onboarding-simplification/research/memory-maintenance-audit.md)：Git干净与memory modified基线不同，原进度确有未入记忆的内容；上一轮主派工过度限域、worker未比较旧版本便排除变化，导致只检查后提前结束。已纠正进度中的生命周期表述。
 
 只读实测426项待核为339成员、9节点、78关系，全部最后失效追到旧detected_change。另用普通0.7.1、独立SurrealDB内存库及真实embedding复现sources-only接受导致changes清零而旧摘要未重核，并验证正确重交成员及依赖可恢复旧stale。建议先修维护派工与候选/完成信号，再接续原简化计划。
 

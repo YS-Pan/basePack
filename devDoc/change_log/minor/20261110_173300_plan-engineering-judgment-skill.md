@@ -1,6 +1,6 @@
 # 制定 engineering-judgment skill 计划
 
-2026 年 11 月 10 日。按用户要求保存[新技能计划与逻辑框图](../../tasks/20261110-engineering-judgment/plan.md)，从[总进度](../../tasks/20261106-rebuild/progress.md#下一步)提供接续入口。
+2026 年 11 月 10 日。按用户要求保存[新技能计划与逻辑框图](../../archive/20261110-engineering-judgment/plan.md)，从[总进度](../../tasks/20261106-rebuild/progress.md#下一步)提供接续入口。
 
 计划把用户目标、契约职责、证据性质和完成条件作为取舍依据，以少量正反案例和未见情境验证是否减少无依据限制，同时保留必要处理。沿根通用技能方式交付，不依赖 basePack 运行设施；技能开发验证与日常使用分开。
 

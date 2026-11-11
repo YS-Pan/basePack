@@ -4,7 +4,7 @@
 
 ## 原计划依据与接续基线
 
-- [技能发现调查讨论](codex://threads/01a1c54c-f714-7601-b442-22db64e27948)及[调查报告](../20261106-rebuild/research/array-skill-discovery.md)：array reconstruct 的旧版迁移复制了技能原件，但遗漏 `.agents/skills/` 发现入口；当前 `init`、core doctor 也不安装或验收独立技能。完整外部安装说明是在迁移之后补入的，不能倒推当时已有该流程。
+- [技能发现调查讨论](codex://threads/01a1c54c-f714-7601-b442-22db64e27948)及[调查报告](../../tasks/20261106-rebuild/research/array-skill-discovery.md)：array reconstruct 的旧版迁移复制了技能原件，但遗漏 `.agents/skills/` 发现入口；当前 `init`、core doctor 也不安装或验收独立技能。完整外部安装说明是在迁移之后补入的，不能倒推当时已有该流程。
 - [冗余与密码评估讨论](codex://threads/01a1c556-ef6d-7b32-8c84-f8878a31ed05)：提出配置无关命令、双返回格式、失用配置/接口及重复编码逻辑的简化；最后只评估了可信本机免认证，尚未授权或执行数据库切换。
 - 产品实现基线为 main `8fa500d`，源码及共用客户端为 0.7.1。[整改结果](../20261110-rectification/result.md)已交付删除纯 text 模式、三个项目迁移和普通 wheel 回归。本文以此为基线；保留 vector、hybrid 与 `hybrid --literal`，不重复实施已完成项。
 - 制定计划时共读生产代码、调用方、测试与文档；随后0.8.0候选完成接口及已知仓外Python调用方核验，范围见[安装结果](installation-result.md)。

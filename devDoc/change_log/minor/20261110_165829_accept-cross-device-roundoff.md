@@ -1,6 +1,6 @@
 # 按用户取舍忽略正常跨设备浮点差异
 
-2026-11-10，用户要求同模型、同精度下预期不大的误差视作没有差别。据此简化[整改计划](../../tasks/20261110-rectification/plan.md)及[分析](../../tasks/20261110-rectification/research/integration-notes.md)，更新总进度入口。
+2026-11-10，用户要求同模型、同精度下预期不大的误差视作没有差别。据此简化[整改计划](../../archive/20261110-rectification/plan.md)及[分析](../../archive/20261110-rectification/research/integration-notes.md)，更新总进度入口。
 
 CPU/CUDA采用语义等价和索引互用，近同分换序及K边界等价候选互换可接受。取消严格同序、规范重算/分桶和边界四组合矩阵；保留少量实际跨设备互查、语义找回、引用与基本数值检查。原反馈原稿保持不变，最新用户取舍在现行计划说明。
 
