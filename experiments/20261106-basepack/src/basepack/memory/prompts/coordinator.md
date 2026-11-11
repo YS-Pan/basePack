@@ -16,8 +16,8 @@ This receipt and the parent lifecycle define this maintenance assignment. Read t
 
    $reader_command
 
-   Send the spawned reader only this bootstrap and the completed command: "Execute the following command, parse its JSON output, and follow its prompt." Track returned batch artifacts and completion or failure. Do not treat a prepared command as a dispatched worker.
-3. Create the work directory, merge overlapping candidates into the merged batch path above, and co-read both relation endpoints and their original evidence before generating a new relation. Respect each reader's authored decisions without repeating the same review. As sole publisher, prepare again when versions conflict or additional dependencies are needed; correct the original errors and reprepare affected material. Apply the merged batch using the same task control file:
+   Send the spawned reader only this bootstrap and the completed command: "Execute the following command, parse its JSON output, and follow its prompt." Accept a batch artifact only after its author explicitly completes that batch; a commentary path is a draft. Record its final path/hash. Later author revisions use a new path and current prepare. Do not treat a prepared command as a dispatched worker.
+3. Create the work directory, merge overlapping candidates into the merged batch path above, and co-read both relation endpoints and their original evidence before generating a new relation. Respect each reader's authored decisions without repeating the same review. As sole publisher, prepare again when versions conflict or additional dependencies are needed; correct the original errors and reprepare affected material. Freeze the merged JSON in a unique publisher-owned snapshot, record its hash, and submit that exact snapshot rather than a path an author may still edit. Apply using the same task control file:
 
    $apply_command
 
