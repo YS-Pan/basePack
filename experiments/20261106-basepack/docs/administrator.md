@@ -67,13 +67,25 @@ CondorClient 按机器配置的 bin_dir/config_file 调用原生命令并设置 
 
 ## 项目 SurrealDB
 
-本节描述 0.8.0 候选的可信本机、仅回环监听、免认证合同，是否采用该候选尚待最终决定；现有正式 0.7.1 实例未切换。多个项目可共用 SurrealDB 程序，每项目分别使用物理数据目录、端口和 init 生成的 UUID，见 [双项目示例](setup-project.md#启用记忆)。namespace/database 不能代替物理隔离，同项目多个聊天共用一个数据库进程。
+多个项目可共用 SurrealDB 程序，每项目使用独立的物理目录、端口、init 生成的 UUID 和凭据，见 [双项目示例](setup-project.md#启用记忆)。namespace/database 不代替物理隔离，同项目多个聊天共用一个数据库进程。服务启用认证并仅监听显式回环 IP；UUID 负责防误连，账户密码负责访问认证。
 
-**部署此候选意味着能连接端口的本机程序拥有数据库 root OWNER 权限。真实浏览器验证还确认：恶意网页可向回环端点发送简单 POST 并成功写库，即使浏览器 fetch 报 CORS 错误。`--allow-origin` 限制跨域读取/预检，不阻止这种写入；loopback 和项目 UUID 都不提供访问认证，UUID 只防误连。** 在接受该边界后再部署；普通本机环境也需把可打开的网页纳入信任判断。
+模板将 `[memory].username` 设为 root，已有库填写其实际用户名。可选 `password_file` 相对项目根或为绝对路径，省略时为实际 `memory_dir/password.txt`。客户端与 launcher 读取这一份 UTF-8 文本（可带 BOM，保留 CRLF 和首尾空白），`config show` 只返回 `memory_password_file` 绝对路径；不输出密码，不设置 password_env。`memory guide/rank/stop` 不需要配置或凭据，普通 init 和只用资源工具也不创建密码文件。
 
-配置解析唯一限定 `memory.endpoint` 为 HTTP(S) 和显式回环 IP（127/8 或 `::1`），拒绝 `localhost`/其它域名、通配、局域网或远端地址，以及 URL 凭据、额外 path/query/fragment。下面示例使用 `http://127.0.0.1:18080`，launcher 通过已验证的同一配置绑定端口。
+**仅首次部署全新库时**，用下面命令生成一次无 BOM、无末尾换行的强随机密码。已有文件直接复用；已有库缺文件时恢复原凭据，不能为它换一个随机密码。密码文件留在忽略目录并限制读取权限。以下使用已选的 Python 与配置：
 
-将下面的 `serve.ps1` 保存到配置的 memory.data_dir（默认 `.basepack/memory/`），先创建该目录及 `logs/`。执行账户须能读写 store 与日志；候选不创建密码文件或加载密码环境变量。替换三个绝对路径，Python 使用项目 instructions 的实际入口；Windows PowerShell 5.1 的 `.ps1` 保存为带 BOM 的 UTF-8。以该目录为 cwd，`surrealkv://store` 始终指向该项目的 store：
+```powershell
+$ErrorActionPreference = 'Stop'
+$json = & $python -X utf8 -m basepack --config $config config show
+if ($LASTEXITCODE -ne 0) { throw "Cannot load project config ($LASTEXITCODE)" }
+$settings = $json | ConvertFrom-Json
+if (-not (Test-Path -LiteralPath $settings.memory_password_file)) {
+    if (Test-Path -LiteralPath (Join-Path $settings.memory_dir 'store')) { throw 'Existing store: restore its original password file' }
+    & $python -X utf8 -c "import secrets,sys; from pathlib import Path; p=Path(sys.argv[1]); p.parent.mkdir(parents=True,exist_ok=True); p.open('x',encoding='utf-8').write(secrets.token_urlsafe(32))" $settings.memory_password_file
+    if ($LASTEXITCODE -ne 0) { throw "Password preparation failed ($LASTEXITCODE)" }
+}
+```
+
+将下面的 `serve.ps1` 保存到配置的 memory.data_dir（默认 `.basepack/memory/`），先创建该目录及 `logs/`。执行账户须能读凭据、读写 store 与日志。替换三个绝对路径；Windows PowerShell 5.1 的 `.ps1` 保存为带 BOM 的 UTF-8。脚本不生成或替换密码，只把同一文件交给 SurrealDB 原生认证入口：
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -84,9 +96,13 @@ $json = & $python -X utf8 -m basepack --config $config config show
 if ($LASTEXITCODE -ne 0) { throw "Cannot load project config ($LASTEXITCODE)" }
 $settings = $json | ConvertFrom-Json
 Set-Location -LiteralPath $settings.memory_dir
-& $surreal start --bind ([Uri]$settings.memory.endpoint).Authority --unauthenticated --allow-origin 'http://127.0.0.1' 'surrealkv://store'
+$env:SURREAL_USER = $settings.memory.username
+$env:SURREAL_PASS = [IO.File]::ReadAllText($settings.memory_password_file)
+& $surreal start --bind ([Uri]$settings.memory.endpoint).Authority --allow-origin 'http://127.0.0.1' 'surrealkv://store'
 exit $LASTEXITCODE
 ```
+
+首次新库启动建立该账户；已有库使用库内已保存的账户。改写密码文件或 launcher 的环境值不会轮换已有账户，错误密码直接认证失败。配置限定 endpoint 为 HTTP(S) 显式回环 IP（127/8 或 ::1）；不使用域名、通配或远端地址。
 
 普通用户隐藏启动：memoryDir 使用上述配置解析出的实际目录。日志保留标准输出与错误，返回 PID 属于 PowerShell launcher：
 
@@ -117,7 +133,7 @@ if ($LASTEXITCODE -ne 0) { throw "memory brief failed ($LASTEXITCODE)" }
 
 成功时 `/ready` 返回 200，init 和 brief 返回本项目数据；再按 [最小记忆闭环](memory.md#最小闭环示例) 写入并读回知识。误连另一 UUID 必须报错，修正 endpoint 与目录，保留本项目 UUID。连接失败先查 stdout/stderr；若隐藏进程被宿主回收，在普通用户终端前台运行同一 serve.ps1，核路径、cwd、账户和权限并使用可存续的启动方式。同一 store 只启动一个进程。
 
-需要 SCM 托管时，管理员可为同一 launcher 注册服务，替换服务名和路径；上述免认证及浏览器边界同样适用：
+需要 SCM 托管时，管理员可为同一 launcher 注册服务，替换服务名和路径；服务仍使用同一认证文件与回环地址：
 
 ```powershell
 $shawl = '<absolute-shawl.exe>'
@@ -130,7 +146,7 @@ Start-Service -Name $memoryService
 
 停止手动进程时确认所属进程树与监听端口退出；SCM 使用 Stop-Service 并等待 Stopped。项目搬迁后更新 cwd/launcher 与日志，保留 project_id。原生 export、配置、业务原件、受管聊天与附件、必要 assets 共同构成恢复集合，步骤见 [备份恢复](memory.md#备份与恢复)。
 
-既有 0.7.1 认证库按 [版本升级](setup-project.md#版本升级) 先备份并安排停写窗口，在同一窗口切换客户端、配置和 launcher。候选源码/隔离库验证不代表正式库已获准切换；保持旧 wheel、配置、launcher 与回退凭据，失败按保留材料回退。
+既有认证项目按 [版本升级](setup-project.md#版本升级) 保留原密码文件、数据库、UUID 与服务；主要更新客户端和 instructions/自有包装，通常无需重启或迁库。缺凭据或认证失败按原错恢复，不生成替代密钥。
 
 ## 首次准备图文模型
 
@@ -295,7 +311,7 @@ Shawl 的 log-dir 保存包装器和服务输出。`status` 使用 `/health` 和
 
 ## 升级与回滚
 
-保留旧 wheel、机器配置和各项目 [恢复集合](memory.md#备份与恢复)，待共用客户端的调用结束后普通安装新包，核实际 Python 和导入位置。0.7.1 → 0.8.0 候选的认证与入口切换须安排停写窗口，迁移顺序见 [项目升级](setup-project.md#版本升级)。共享 embedding 的 HTTP 协议与语义身份保持兼容，已有服务可继续运行；客户端升级不要求重启模型或 Condor。
+保留旧 wheel、机器配置和各项目 [恢复集合](memory.md#备份与恢复)，待共用客户端的调用结束后普通安装新包，核实际 Python 和导入位置。0.7.1 → 0.8.1 保留认证与原数据库，客户端及入口更新顺序见 [项目升级](setup-project.md#版本升级)。共享 embedding 的 HTTP 协议与语义身份保持兼容，已有服务可继续运行；客户端升级不要求重启模型或 Condor。
 
 更新共享模型服务时先暂停请求，经 SCM 停止并确认进程树回收，再更新独立环境和配置，启动后执行所选后端的一次编码冒烟。模型、精度或前处理合同改变时按新 identity 补建项目向量；设备或路径变化可复用同身份索引。改变 Condor 容量按上节排空和重启 startd，修改提交规则按影响重载 schedd。
 

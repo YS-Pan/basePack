@@ -1,8 +1,10 @@
 # 项目记忆实现
 
-0.8.0 源码实现 SurrealDB 上的多层文字、原图向量与语义关系，首建和维护由宿主订阅 reader 同读完成。正式 wheel 与完整行为验收状态见 [专项进度](../../tasks/20261106-memory-system/progress.md)，P0 原生接入证据见 [结果](../../tasks/20261106-memory-system/p0-result.md)，用户流程见 [记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
+0.8.1 源码实现 SurrealDB 上的多层文字、原图向量与语义关系，首建和维护由宿主订阅 reader 同读完成。正式 wheel 与完整行为验收状态见 [专项进度](../../tasks/20261106-memory-system/progress.md)，P0 原生接入证据见 [结果](../../tasks/20261106-memory-system/p0-result.md)，用户流程见 [记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
 
 ## 职责与数据
+
+认证在客户端构造边界统一完成：CLI/Python 共用 ProjectConfig 解析的 username 与 memory_password_file，以 UTF-8 解码文件（兼容 BOM，保留 CRLF/首尾空白）并发送 Basic Authorization；默认文件为实际 memory_dir/password.txt。config show 不读 secret，guide/rank/stop 不创建客户端。password_env 手工桥退出；缺文件、权限或错密保留原错，不生成替代密钥或免认证回退。新库凭据由首次部署显式准备，launcher 读取同一文件；已有库和凭据随普通升级保留。
 
 - [content.py](../../../experiments/20261106-basepack/src/basepack/memory/content.py) 读取项目内 UTF-8 原字节版本与 1-based 闭区间，保留 CRLF；结构单元仅供备读，快/深变化检查不生成语义边界。
 - [store.py](../../../experiments/20261106-basepack/src/basepack/memory/store.py) 通过原生 HTTP/SurrealQL 操作领域记录与事务；没有多后端层或自建 MCP。原生 CLI 负责服务与导出/恢复。

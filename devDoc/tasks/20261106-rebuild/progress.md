@@ -37,7 +37,7 @@
 
 ## 下一步
 
-已执行[接入、记忆维护与运行简化计划](../20261110-onboarding-simplification/plan.md)，形成0.8.0本地候选：E脚本先处理机械变化并保留跨任务未读范围，F接入所属Codex项目的受支持聊天读取、归属核验及精确回源，C接口清理与两份英文README已完成；D按净维护收益保留必要编码重复。普通wheel全套354项通过，端到端与实际覆盖范围由[专项进度](../20261110-onboarding-simplification/progress.md)接续。免认证隔离恢复成功，但浏览器实证CORS不能阻止跨源简单POST写库，正式采用待用户取舍；共用客户端和正式三库保持0.7.1运行合同，未推送或发布候选。
+已执行[接入、记忆维护与运行简化计划](../20261110-onboarding-simplification/plan.md)，0.8.0交付脚本增量维护、Codex聊天来源、接口清理、技能发现和英文README；随后按用户选择完成0.8.1保留认证与自动读取凭据。普通wheel369项通过、无跳过，共用客户端及三个项目入口已实际升级，七表逐字段、原凭据及数据库进程保持。新shell直接调用不再手工加载密码；实际覆盖与回退材料见[专项进度](../20261110-onboarding-simplification/progress.md)和[正式升级结果](../20261110-onboarding-simplification/credential-installation-result.md)。0.8.0免认证仅保留历史隔离证据，远端推送/发布未执行。
 
 独立 [engineering-judgment skill](../../../skills/engineering-judgment/SKILL.md) 已编写、保留并接入，见[交付结果](../20261110-engineering-judgment/result.md)。按用户最新要求取消技能测试与按收益去留，效果在长期真实使用中观察；源码和入口已提交 f8bb5b2。
 

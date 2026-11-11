@@ -8,13 +8,21 @@
 
 选留证据现统一位于根 `artifacts/runs/`。前次临时材料整理的映射为 `artifacts/runs/tmp-reorganization-20261108/moves.json`，本次位置映射为 `artifacts/runs/20261109-project-layout/moves.json`；原始回执及下文历史路径保留当时含义，结合两轮映射回查长期副本，tmp 内容按可清除处理。
 
+## 2026-11-11 0.8.1 认证凭据与普通安装
+
+稳定客户端 `D:/AgentTools/envs/basepack-client/Scripts/python.exe`（Python 3.13.17）已以普通 no-deps 安装升级到 0.8.1，从其 site-packages 导入。最终 wheel SHA256 为 `5b823201fcdef46f7f22db13af624da6d80cd6f23f9937d4f14a382f6b19917f`，38 份安装文件与最终 wheel、源码逐字节一致。源码外普通包完整回归为 369 passed、0 skipped；末次重包仅含同义 SKILL 文案与 RECORD 差异，Python 代码及测试未变，未为该措辞重复功能回归。
+
+本项目、array reconstruct 与 ppt memsys 均保留原 UUID、账户和 store 目录；密码文件与 launcher 字节不变，数据库 PID 6232/33428/1236 及创建时间保持，未重启或迁库。七表全记录逐字段比较一致。三个项目分别在新的 NoProfile PowerShell、其它 cwd、清空 PASSWORD 环境变量的条件下直接运行生成入口 brief，均退出 0；read 与默认 vector 查询也实际通过。客户端自动读配置的唯一密码文件，旧 password_env 与手工桥已从配置、instructions 和自有包装清理。
+
+三项目另补齐各自 Codex 宿主 ID 和 36 个其它注册项目根，仅更新配置，本次升级没有执行历史聊天采集或语义接受；数据库不变与检索成功不代表来源已全部维护。共享 embedding 与 Condor 沿原实例。普通包、外部手写入口、保留状态与恢复材料的证据入口见 [0.8.1 安装结果](../tasks/20261110-onboarding-simplification/credential-installation-result.md)。下节及后续版本记录保留各自日期的历史条件。
+
 ## 2026-11-10 0.7.1 整改与安装
 
 稳定客户端已普通升级为0.7.1，源码外完整CPU依赖的Python3.14.10环境全套266项通过、无跳过；轻客户端3.13/3.14与CPU/CUDA实际图文、索引复用的条件见[整改结果](../tasks/20261110-rectification/result.md)。三个已接入项目保留UUID，兼容向量全部复用后切为vector，七表所有字段不变。生成凭据入口在无继承变量的新NoProfile PowerShell和其它cwd中实过。共享0.5.0模型服务、机器配置与Condor策略保持原实例。
 
 ## 当前资源查询与执行边界（2026-11-10）
 
-0.6.3 发布准备已在独立轻量客户端、全新下载的 SurrealDB 和临时数据目录验证，源码 201 项通过、无跳过；新 shell 使用生成入口的实际结果与独立新机资源部署待验范围见 [发布结果](../tasks/20261106-rebuild/github-publish-result.md)。稳定客户端仍为下述已安装版本，正式项目数据库与共享模型服务沿用原实例；本次发布准备没有替换它们。
+0.6.3 发布准备已在独立轻量客户端、全新下载的 SurrealDB 和临时数据目录验证，源码 201 项通过、无跳过；新 shell 使用生成入口的实际结果与独立新机资源部署待验范围见 [发布结果](../tasks/20261106-rebuild/github-publish-result.md)。该次发布准备没有替换当时的正式环境；当前客户端安装状态见上节 0.8.1 记录，资源查询的双上下文边界仍按本节实证。
 
 最新双上下文复查仍为：受限 agent 沙箱中的 `condor_status` 成功、`condor_q -json` 以 `AUTHENTICATE:1005` 失败；相同配置在正常用户上下文两者均成功，队列为空。沙箱内 Windows NTSSPI 认证限制仍在，不能把正常用户路径验收通过写成该限制已修复，也不能由容量查询成功推断队列认证成功。对照原证为 `artifacts/runs/20261110-condor-auth-context/`。
 

@@ -149,7 +149,7 @@ def _activate(config):
     skill = Path(__file__).with_name("SKILL.md").resolve().as_posix()
     memory_dir = config.memory_dir.as_posix()
     section = f"""{start}
-记忆已在本项目启用。每个新的 PowerShell 进程执行下面整段读取启动信息，无需预先设置凭据。
+记忆已在本项目启用。每个新的 PowerShell 进程执行下面整段读取启动信息；客户端自动读取本项目配置指定的密码文件，无需手工加载凭据。
 
 ```powershell
 $ErrorActionPreference = 'Stop'

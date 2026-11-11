@@ -125,8 +125,10 @@ def test_real_native_restore_and_rebuild_from_retained_text_and_pixels(real_memo
     export = tmp_path.parent / (tmp_path.name + "_backup.surql")
     arguments = ["--endpoint", memory.connection["endpoint"], "--namespace", memory.connection["namespace"]]
     executable = os.environ["BASEPACK_MEMORY_TEST_SURREAL"]
+    native_env = {**os.environ, "SURREAL_USER": "root",
+                   "SURREAL_PASS": Path(os.environ["BASEPACK_MEMORY_TEST_PASSWORD_FILE"]).read_bytes().decode("utf-8-sig")}
     subprocess.run([executable, "export", *arguments, "--database", "product_tests", str(export)],
-                   check=True, capture_output=True, text=True)
+                   check=True, capture_output=True, text=True, env=native_env)
     moved = tmp_path.parent / (tmp_path.name + "_restored")
     shutil.copytree(tmp_path, moved)
     restored_raw = deepcopy(memory.config.raw)
@@ -134,7 +136,7 @@ def test_real_native_restore_and_rebuild_from_retained_text_and_pixels(real_memo
     restored = Memory(replace(memory.config, root=moved, raw=restored_raw))
     memory._execute("REMOVE DATABASE IF EXISTS product_vectors_tests; DEFINE DATABASE product_vectors_tests;")
     subprocess.run([executable, "import", *arguments, "--database", "product_vectors_tests", str(export)],
-                   check=True, capture_output=True, text=True)
+                   check=True, capture_output=True, text=True, env=native_env)
     after = {table: restored._execute(f"SELECT * FROM {table} ORDER BY id;")[0] for table in before}
     assert before == after
     assert restored.read("shapes")["original"]["image_path"].startswith(str(moved))

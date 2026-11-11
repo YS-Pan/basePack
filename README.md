@@ -10,7 +10,7 @@ basePack gives agents project-local memory, shared compute coordination, and ind
 | file-structure | Organize project files by purpose and lifecycle | A host with skills |
 | engineering-judgment | Judge contracts, responsibilities, compatibility, and the work passed to users | A host with skills |
 
-The current source is **0.8.0 development candidate**, for Windows and Python 3.13+. The host's subscription-based agents understand material, build relations, and score results; basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability. Current delivery evidence and remaining verification are recorded in the [onboarding progress](devDoc/tasks/20261110-onboarding-simplification/progress.md).
+The current source is **0.8.1, in development**, for Windows and Python 3.13+. The host's subscription-based agents understand material, build relations, and score results; basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability. Current delivery evidence and remaining verification are recorded in the [onboarding progress](devDoc/tasks/20261110-onboarding-simplification/progress.md).
 
 **basePack is under development. Real use also serves as testing; record problems so they can inform subsequent fixes.**
 
@@ -34,15 +34,13 @@ Older packages are available from [GitHub Releases](https://github.com/YS-Pan/ba
 ## Enable project memory
 
 1. Follow [project setup](experiments/20261106-basepack/docs/setup-project.md) to create a minimal machine configuration and run `init` for your project. New projects default to `vector`; `hybrid` is also available. The default `doctor` checks core facilities.
-2. Follow [project SurrealDB setup](experiments/20261106-basepack/docs/administrator.md#项目-surrealdb) to review the candidate's trusted-local boundary, select a separate directory and explicit loopback IP/port, start it without authentication, and check `/ready`.
+2. Follow [project SurrealDB setup](experiments/20261106-basepack/docs/administrator.md#项目-surrealdb) to select a separate directory and loopback IP/port, prepare its password file once, start an authenticated server, and check `/ready`.
 3. Follow [shared model deployment](experiments/20261106-basepack/docs/administrator.md) to prepare a CPU or CUDA embedding service, set its endpoint in the machine configuration, and verify one embedding request. Memory does not require HTCondor.
-4. Follow the [new-shell steps](experiments/20261106-basepack/docs/setup-project.md#新-shell-接续), run `memory init` and `memory brief`, then complete the [minimal read/write workflow](experiments/20261106-basepack/docs/memory.md#最小闭环示例). New shells and chats follow the generated `AGENTS.md → .basepack/instructions.md` entry to run a brief directly, with no password file or environment variable.
-
-**The candidate grants database administration to local clients. A malicious web page can also write through a simple POST to the loopback endpoint; CORS does not prevent it, and the project UUID only prevents accidental connections. Adoption of this candidate remains pending; existing production instances have not migrated.** Review the [deployment boundary](experiments/20261106-basepack/docs/administrator.md#项目-surrealdb) before enabling memory.
+4. Follow the [new-shell steps](experiments/20261106-basepack/docs/setup-project.md#新-shell-接续), run `memory init` and `memory brief`, then complete the [minimal read/write workflow](experiments/20261106-basepack/docs/memory.md#最小闭环示例). New shells and chats follow the generated `AGENTS.md → .basepack/instructions.md` entry to run a brief directly. The client reads the configured password file automatically; no shell variable is needed.
 
 In Codex, the generated host instructions obtain the project binding and registered roots for chat collection. Independent maintenance preflight collects available persisted chat text and compares sources before handing remaining semantic work to an agent. Missing binding, uncertain ownership, or unavailable content remain explicit coverage gaps; see [chat setup](experiments/20261106-basepack/docs/setup-project.md#codex-项目聊天接入).
 
-Each project's configuration, knowledge, database, and local entry point stay in that project's ignored directories. **Project memory is not distributed with this source repository.** A new clone creates its own configuration through `init`; recover existing knowledge from that project's backup.
+Each project's configuration, password file, knowledge, database, and local entry point stay in that project's ignored directories. **Project memory is not distributed with this source repository.** A new clone creates its own configuration through `init`; recover existing knowledge from that project's backup.
 
 ## Independent skills
 

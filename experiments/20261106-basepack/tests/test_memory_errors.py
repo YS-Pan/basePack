@@ -10,12 +10,14 @@ from basepack.memory.store import Memory
 
 def test_prepare_rejects_directory_before_database_access(tmp_path):
     (tmp_path / "资料.png").mkdir()
-    memory = Memory(SimpleNamespace(root=tmp_path, raw={"memory": {}}))
+    password = tmp_path / "password.txt"
+    password.write_text("memory-error-test-credential", encoding="utf-8")
+    memory = Memory(SimpleNamespace(root=tmp_path, memory_password_file=password, raw={"memory": {"username": "root"}}))
     with pytest.raises(ValueError, match=r"files, not directories.*Get-ChildItem -File"):
         memory.prepare(["资料.png"])
 
 
-def test_sql_413_reports_actual_request_size_and_keeps_original_error():
+def test_sql_413_reports_actual_request_size_and_keeps_original_error(tmp_path):
     received = []
 
     class Handler(BaseHTTPRequestHandler):
@@ -33,8 +35,10 @@ def test_sql_413_reports_actual_request_size_and_keeps_original_error():
     thread.start()
     try:
         connection = {"endpoint": f"http://127.0.0.1:{server.server_port}", "namespace": "ns", "database": "db",
-                      "project_id": "project"}
-        memory = Memory(SimpleNamespace(raw={"memory": connection}))
+                      "project_id": "project", "username": "root"}
+        password = tmp_path / "password.txt"
+        password.write_text("memory-error-test-credential", encoding="utf-8")
+        memory = Memory(SimpleNamespace(memory_password_file=password, raw={"memory": connection}))
         with pytest.raises(HTTPError) as failure:
             memory._execute("RETURN '中文';")
         assert failure.value.code == 413

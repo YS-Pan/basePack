@@ -1,6 +1,6 @@
 # basePack
 
-`20261106-basepack` is the only active implementation route. The current source is the 0.8.0 development candidate, for Windows and Python 3.13+. Each project keeps its configuration, knowledge, source evidence, and job records in its own `.basepack/`; programs and models can be shared. Start with the clone, virtual environment, and installation commands in the root [README](../../README.md#install-the-lightweight-client).
+`20261106-basepack` is the only active implementation route. The current source is 0.8.1, for Windows and Python 3.13+. Each project keeps its configuration, knowledge, source evidence, and job records in its own `.basepack/`; programs and models can be shared. Start with the clone, virtual environment, and installation commands in the root [README](../../README.md#install-the-lightweight-client).
 
 This project's own source and documentation use the [MIT license](LICENSE), matching the root license. Third-party notices remain in the package.
 
@@ -25,7 +25,7 @@ Text/image embedding reuses a persistent Qwen3-VL-Embedding-2B service. Its auto
 & $python -m basepack --config '<absolute-project>/.basepack/config.toml' doctor
 ```
 
-Review the [database procedure](docs/administrator.md#项目-surrealdb), then start a separate project process bound only to an explicit loopback IP with authentication disabled. Check `/ready` in the next call. **Local clients have database administration access, and a malicious web page can write through a simple POST even when CORS rejects reading the response. CORS does not prevent those writes; the project UUID only prevents accidental connections.** Adoption of this candidate remains pending, and existing production instances have not migrated. Then run:
+Follow the [database procedure](docs/administrator.md#项目-surrealdb) to prepare one password file and start an authenticated server bound to the project's loopback IP/port. Check `/ready` in the next call. The client reads that same file automatically. Then run:
 
 ```powershell
 & $python -m basepack --config '<absolute-project>/.basepack/config.toml' memory init
@@ -35,7 +35,7 @@ Review the [database procedure](docs/administrator.md#项目-surrealdb), then st
 
 Codex hosts supply project binding and complete registered roots through the [chat setup workflow](docs/setup-project.md#codex-项目聊天接入); uncertain ownership and unavailable parts remain coverage gaps. Collection progress and vector coverage each differ from semantic acceptance.
 
-After enabling memory, each new shell follows `.basepack/instructions.md` to run a brief directly; no password file or environment variable is needed. `memory.search_mode` is `vector` or `hybrid`; `memory search` uses it unless `--mode` overrides it. For identifiers, filenames, or exact text, use `--mode hybrid --literal`. The complete prepare/apply/search/read/neighbors workflow is in the [memory example](docs/memory.md#最小闭环示例). Project configuration, database, and knowledge remain local and are excluded from Git.
+After enabling memory, each new shell follows `.basepack/instructions.md` to run a brief directly; the client reads its password file, with no manual shell setup. `memory.search_mode` is `vector` or `hybrid`; `memory search` uses it unless `--mode` overrides it. For identifiers, filenames, or exact text, use `--mode hybrid --literal`. The complete prepare/apply/search/read/neighbors workflow is in the [memory example](docs/memory.md#最小闭环示例). Project configuration, password file, database, and knowledge remain local and are excluded from Git.
 
 Resource tools can also be used without enabling memory:
 

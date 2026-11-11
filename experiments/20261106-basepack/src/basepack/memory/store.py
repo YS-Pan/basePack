@@ -1,5 +1,6 @@
 """Project memory actions over native SurrealDB records and transactions."""
 
+from base64 import b64encode
 from dataclasses import asdict, dataclass
 from difflib import SequenceMatcher
 from hashlib import sha256
@@ -78,6 +79,8 @@ class Memory:
     def __init__(self, config: ProjectConfig):
         self.config = config
         self.connection = config.raw["memory"]
+        credential = f"{self.connection['username']}:{config.memory_password_file.read_bytes().decode('utf-8-sig')}"
+        self._authorization = "Basic " + b64encode(credential.encode("utf-8")).decode("ascii")
 
     def _execute(self, sql: str, *, check_project: bool = True) -> list:
         connection = self.connection
@@ -86,6 +89,7 @@ class Memory:
                    "{ THROW 'Memory database belongs to another project or is not initialized'; };\n" + sql)
         body = sql.encode("utf-8")
         request = Request(connection["endpoint"].rstrip("/") + "/sql", body, {
+            "Authorization": self._authorization,
             "surreal-ns": connection["namespace"], "surreal-db": connection["database"],
             "Accept": "application/json", "Content-Type": "text/plain; charset=utf-8",
         })

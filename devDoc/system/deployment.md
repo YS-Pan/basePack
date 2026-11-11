@@ -1,6 +1,6 @@
 # 项目配置与部署合同
 
-更新：2026 年 11 月 10 日。当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.8.0。本文维护代码、业务实例、共享设施与升级边界；本机稳定客户端及三个项目库仍为 0.7.1 认证实例；0.8.0 源码合同与正式迁移状态分开，正式升级在授权窗口执行。正式记忆安装状态见 [专项进度](../tasks/20261106-memory-system/progress.md)，共享资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。操作从路线 README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md) 和 [管理员说明](../../experiments/20261106-basepack/docs/administrator.md) 进入。
+更新：2026 年 11 月 11 日。当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.8.1。本文维护代码、业务实例、共享设施与升级边界；本机稳定客户端已普通升级为 0.8.1，三个项目沿用原认证、数据库、UUID 和服务进程；实测见 [环境记录](environment.md)。正式记忆安装状态见 [专项进度](../tasks/20261106-memory-system/progress.md)，共享资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。操作从路线 README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md) 和 [管理员说明](../../experiments/20261106-basepack/docs/administrator.md) 进入。
 
 ## 位置与责任
 
@@ -30,6 +30,7 @@
     instructions.md              实际 Python、配置与宿主操作入口
     jobs/                        提交材料、回执和作业输出
     memory/                      项目知识与维护材料
+      password.txt               默认唯一密码文件，忽略并受控备份
       store/                     本机原生 SurrealKV 目录
       assets/                    按 hash 保留的必要原图版本
       codex/                     受管聊天 UTF-8 原文导出
@@ -53,29 +54,30 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 | 机器配置中的相对设施路径 | 相对机器配置文件 |
 | embedding.endpoint | 显式共享 HTTP 地址，本机为 loopback 8765 |
 | memory.endpoint/namespace/database | HTTP(S) 显式回环 IP（127/8 或 ::1），拒绝域名/通配/远端及额外 URL 成分；逻辑库不代替物理隔离 |
+| memory.username/password_file | 用户名及唯一 UTF-8 密码文件；路径相对项目根或绝对，省略时为 memory_dir/password.txt |
 | memory.project_id/source_scope | 随项目保留的 UUID 和可选新增资料检查范围 |
 | memory.codex.project_id/other_project_roots/registry_complete | Codex 宿主项目绑定和完整注册根证据，独立于 basePack UUID；未取得时明确聊天缺口 |
 | memory.search_mode | CLI 未显式传 --mode 时采用的 hybrid/vector；新项目默认 vector |
 
 `memory guide/rank/stop` 只处理自身输入，在项目配置解析前分派。机器配置不再维护无消费者的 `[shared].state_dir`；模型日志由 SCM/Shawl 服务定义中的显式路径管理，jobs 材料仍归项目 jobs_dir。
 
-机器 embedding 节沿用 R9 endpoint、service_name、queue_timeout 及模型/预算设置。候选删除 memory.username/password_env/password_file、客户端 Basic Authorization 及对应 config show 回显；instructions 只保存固定 Python、绝对配置和 brief 调用，新的 shell 无需加载凭据。project_id 随移动或恢复保留，误连另一身份的库会失败。config show 和 doctor 只作诊断，不能替代真实功能验收。
+机器 embedding 节沿用 R9 endpoint、service_name、queue_timeout 及模型/预算设置。客户端以 username 和自动读取的 password_file 建立 Basic Authorization；config show 返回 memory_password_file 绝对路径而不读取或显示 secret。password_env 与手工 shell 桥退出。instructions 保留固定 Python、绝对配置和 brief 调用；guide/rank/stop 不读配置或凭据。project_id 随移动或恢复保留，误连另一身份的库会失败。config show 和 doctor 只作诊断，不能替代真实功能验收。
 
 ## 环境与服务
 
 依赖由 pyproject.toml 与 uv.lock 维护，CUDA 来源明确。系统环境不做清理式同步，共享服务环境不安装无关 MCP 集成。源码与 wheel 验证分别核导入位置；普通安装从源码外运行。
 
-共享 embedding 沿用 Shawl/SCM，Manual、LocalSystem、no-restart/kill-process-tree；LitServe 单 worker 常驻，客户端超时只结束等待。本机正式 0.7.1 SurrealDB 仍以普通用户隐藏手动进程和旧认证 launcher 运行。0.8.0 候选的 cwd、原生 store、日志与启动材料仍在项目 memory 目录，serve.ps1 从同一配置取得显式回环地址，调用稳定 exe 的 --bind/--unauthenticated/--allow-origin；不读密码文件。候选不代表正式实例已切换。SCM 是管理员可选方式，本轮未配置。basepack 只连接，停止项目库不停止共享模型。
+共享 embedding 沿用 Shawl/SCM，Manual、LocalSystem、no-restart/kill-process-tree；LitServe 单 worker 常驻，客户端超时只结束等待。项目 SurrealDB 可沿用已有普通用户隐藏手动认证进程。cwd、原生 store、日志与启动材料在项目 memory 目录；serve.ps1 从同一配置取得显式回环地址、username 和密码文件，设置原生认证入口后调用稳定 exe，不启用 unauthenticated。新库一次安全随机生成文件，已有库缺文件时恢复原凭据；launcher 不生成密码。SCM 是管理员可选方式，本轮未配置。basepack 只连接，停止项目库不停止共享模型。
 
-免认证候选允许可连接端口的本机程序拥有 root OWNER 权限；真实浏览器验证还证明不匹配 origin 的简单 POST 可以写库，即使 fetch 报 CORS 错误。allow-origin 只限制跨域读取/预检，loopback 与 UUID 不提供访问认证。是否采用该边界仍待最终决定，操作见 [管理员部署](../../experiments/20261106-basepack/docs/administrator.md#项目-surrealdb)。
+改写密码文件不会轮换数据库内的存储账户；轮换由管理员显式更新账户并同步同一文件。访问和认证失败保留原错，客户端不回退无认证。操作见 [管理员部署](../../experiments/20261106-basepack/docs/administrator.md#项目-surrealdb)。
 
-搬迁先停止该项目库并确认进程退出，再移动完整项目、调整启动 cwd/日志/endpoint，保留 UUID 后复核。在线备份使用原生 export；恢复集合含 export、配置、业务原件、受管聊天导出、codex-attachments 原件与定位回执、必要 assets。已接受语义与更正必须恢复，向量可以从保留表示重建。长期备份位置和保留周期由业务项目确定，Git 忽略和本机目录不代替备份。
+搬迁先停止该项目库并确认进程退出，再移动完整项目、调整启动 cwd/日志/endpoint，保留 UUID 后复核。在线备份使用原生 export；恢复集合含 export、配置、原凭据文件、业务原件、受管聊天导出、codex-attachments 原件与定位回执、必要 assets。已接受语义与更正必须恢复，向量可以从保留表示重建。长期备份位置和保留周期由业务项目确定，Git 忽略和本机目录不代替备份。
 
 ## 升级与回退
 
 0.7.0 将查询与维护分离：查询读取已发布内容及依据快照，维护候选在所选模式的向量准备好后原子发布。知识表与项目/机器配置 schema 保持现有格式；升级保留 UUID、数据及显式检索模式，运行 memory init 刷新 schema 和生成入口。0.7.1 删除独立 text 模式；旧 text 项目复用或补齐兼容向量后切换 vector/hybrid，保留知识、ID 和来源。新项目默认 vector。
 
-0.8.0 候选删除产品密码机制。既有 0.7.1 认证库先保留 export/配置/launcher/旧 wheel/回退凭据及完整恢复集合；在授权停写窗口逐项目停库、核进程和监听退出，以原 store/UUID 重启免认证 launcher，并一致更新共用客户端、配置、手写包装与 instructions。新进程无密码变量/文件核读写与误连/非回环拒绝后恢复业务；失败按保留材料回退，正式升级与远端发布未执行。
+0.8.1 保留既有认证库和原用户名/密码文件，删除 password_env 手工桥。升级前备份 wheel、配置、密码文件和完整恢复集合，等待在途客户端调用结束后普通更新客户端，刷新 instructions 与自有包装。服务、物理目录、端口和 UUID 保持，通常无需重启或迁库；新 shell 直接核 brief/search/read/neighbors。失败按原错误恢复凭据或回退客户端，不清库、不重新总结。
 
 0.8.0 将维护入口收敛为 `memory maintain` 的确定性预检与余下语义交接，默认读取 source_scope，采集可归属聊天后按来源接续。检索统一 `{matches, vector_coverage}`，Python 调用方需删除 `include_coverage` 并读取 matches；brief 删除 `changes/change_count/vector_pending/vector_pending_count`。删除无消费者的 MachineConfig.state_dir 和旧 MemberContent/read_member 原件接口，快照回源保持。独立 skills 仍从配套源码取得，未改 wheel 发行范围。
 

@@ -1,6 +1,6 @@
 # 系统结构与边界
 
-当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.8.0 的公共入口、项目记忆与资源工具。配置和安装合同见 [部署说明](deployment.md)，记忆实际完成边界见 [专项进度](../tasks/20261106-memory-system/progress.md)，资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。文件位置图见 [逻辑框图](diagrams.md)。
+当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.8.1 的公共入口、项目记忆与资源工具。配置和安装合同见 [部署说明](deployment.md)，记忆实际完成边界见 [专项进度](../tasks/20261106-memory-system/progress.md)，资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。文件位置图见 [逻辑框图](diagrams.md)。
 
 ## 当前组成
 
@@ -42,7 +42,7 @@ artifacts/runs/                    选留运行和迁移原证，Git 忽略
 - 项目显式指定 schema 2 接入配置，绑定运行 Python 和 schema 1 机器配置。project.root 相对项目配置，受管理数据进入该业务项目 `.basepack/`；机器相对路径以机器配置为基准。ProjectConfig 只解析公共绑定，各功能按需读取自身节；memory guide/rank/stop 在项目解析前处理自身输入。
 - 项目 `[ai]` 配置维护 tier1 至 tier4 的模型和推理强度及用途默认值；`config ai` 输出所选配置，宿主负责把 model 和 reasoning_effort 传入派工接口，程序不调用模型。
 - `init` 从安装包模板生成配置和详细 instructions，根 AGENTS 合并短指针；memory init 另行绑定项目 UUID 并写入 brief/skill 的宿主入口。旧格式先经保留的 0.4.0 迁移，当前版本直接读取 schema 2。
-- 0.8.0 候选的 memory endpoint 在唯一配置边界只接受 HTTP(S) 显式回环 IP；数据库免认证，本机客户端拥有 root OWNER 权限，真实浏览器简单 POST 也可写。CORS 不阻止该写入，项目 UUID 只防误连；候选是否采用仍待最终决定，正式 0.7.1 实例保持原认证方式。
+- memory endpoint 在唯一配置边界只接受 HTTP(S) 显式回环 IP；数据库保留认证。客户端与 launcher 按配置读取唯一 password_file（默认 memory_dir/password.txt）及 username，config show 只显示路径。password_env 及手工变量桥退出，缺失/权限/认证错误直接失败；UUID 防误连。已有库和凭据随客户端升级保留，通常无需重启或迁库。
 - 项目记忆只用 SurrealDB。member 同时是层级、检索表示与图节点；source_version、change 和必要图像 assets 保存原文依据及更正。source revision、input_revision、knowledge_revision 与 embedding_identity 各管来源、编码输入、并发更正和语义空间。原生事务原子接受，原生 CLI 负责服务、导出与恢复；没有多后端层或自建 MCP。
 - 结构解析只供定位。独立 `memory maintain` 先采集已绑定宿主聊天、比较原件与各成员实际接受版本，程序完成机械等价小批并输出必要变化与未决范围。智能块、摘要、识图、关系和评分的语义余项由宿主订阅 agent 同读完成，按来源核版本后原子发布内容与所需向量；机械匹配不替代语义判断。查询使用已发布知识与对应依据快照，brief 交付启动信息且不扫描或写入。宿主用同一 control 和可取消子任务管理自动维护的开始/结束，已有积压跨任务接续；手动深维护由用户明确发起。详细合同见 [记忆模块](modules/memory.md)。
 - Codex 来源适配仅通过受支持的 App Server 读取持久化消息；宿主提供当前项目绑定及完整注册根，以 projectId 优先、root/worktree 与其它注册项目根排冲突。每聊天的受管导出进入既有 source_version/prepare/apply，消息定位从已核快照解析；来源发现、正文采集、语义接受与向量覆盖各自可见。能力缺失或归属不明保留缺口，非 Codex 继续文件功能。

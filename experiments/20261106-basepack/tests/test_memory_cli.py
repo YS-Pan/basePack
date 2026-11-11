@@ -9,6 +9,11 @@ from basepack.project.config import load_project_config
 from basepack.project.init import init_project
 
 
+def _provision_password(config):
+    config.memory_password_file.parent.mkdir(parents=True, exist_ok=True)
+    config.memory_password_file.write_text("memory-cli-test-credential", encoding="utf-8")
+
+
 def test_memory_activation_preserves_business_text_and_updates_one_local_entry(tmp_path):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
@@ -90,6 +95,7 @@ def test_default_search_requires_a_valid_explicit_project_setting(tmp_path, conf
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
     config = load_project_config(init_project(tmp_path / "project", machine))
+    _provision_password(config)
     if configured is None:
         del config.raw["memory"]["search_mode"]
     else:
@@ -109,6 +115,7 @@ def test_vector_search_rejects_literal_before_retrieving(tmp_path, monkeypatch, 
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
     config = load_project_config(init_project(tmp_path / "project", machine))
+    _provision_password(config)
     monkeypatch.setattr("basepack.memory.store.Memory.vector_search",
                         lambda *args, **kwargs: pytest.fail("vector search accepted --literal"))
     options = ["--mode", "vector"] if explicit else []
@@ -120,6 +127,7 @@ def test_hybrid_search_passes_literal_to_lexical_retrieval(tmp_path, monkeypatch
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
     config = load_project_config(init_project(tmp_path / "project", machine))
+    _provision_password(config)
     config.raw["memory"]["search_mode"] = "hybrid"
     calls = []
 
@@ -159,6 +167,7 @@ def test_maintain_defaults_to_project_scope_and_passes_control(tmp_path, monkeyp
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
     config = load_project_config(init_project(tmp_path / "project", machine))
+    _provision_password(config)
     config.raw["memory"]["source_scope"] = ["docs"]
     calls = []
     monkeypatch.setattr("basepack.memory.store.Memory.maintain",

@@ -1,6 +1,6 @@
 # 系统实现概览
 
-当前唯一 active 路线是 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.8.0。代码、依赖锁、测试、产品文档、示例及随包 skill 位于实验工程；根 devDoc 维护现行实现与活动工作。本机正式客户端及三个项目库仍按 0.7.1 认证方式运行，本轮源码交付不等于正式库已切换；切换在授权迁移窗口执行。资源部署基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)，记忆功能与正式安装的实际完成边界见 [专项进度](../tasks/20261106-memory-system/progress.md)。
+当前唯一 active 路线是 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.8.1。代码、依赖锁、测试、产品文档、示例及随包 skill 位于实验工程；根 devDoc 维护现行实现与活动工作。本机稳定客户端已普通升级为 0.8.1，三个认证项目保留原密码、数据库、UUID 与运行进程；实测和历史版本边界见 [环境记录](environment.md)。资源部署基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)，记忆功能与正式安装的实际完成边界见 [专项进度](../tasks/20261106-memory-system/progress.md)。
 
 本仓库提供三项可独立使用的 skill：[engineering-judgment](../../skills/engineering-judgment/SKILL.md) 用于设计、错误处理、兼容和使用流程的工程取舍，保留独立形态，通过长期使用反馈维护；[file-structure](../../skills/file-structure/SKILL.md) 推荐或整理开发文档和实验工程布局；[agent-team](../../skills/agent-team/SKILL.md) 为每项任务选择组织，按完整交付过程判断独立完成、简单协作或清晰分层，并使用宿主已有的订阅 subagent 能力。安装时选择完整目录放入目标 `.agents/skills/`，或把已有项目原件联接到该发现目录，核对相对引用与宿主实际列表；`init` 与 core doctor 不覆盖这项验收。完整步骤见 [项目接入](../../experiments/20261106-basepack/docs/setup-project.md#独立-skills-安装与发现)。组织选择与协作已有指令层实现，复杂广读的质量与总成本对照仍见 [专项记录](../tasks/20261106-rebuild/research/agent-team.md)。
 
@@ -8,7 +8,7 @@
 
 [项目记忆](modules/memory.md) 使用唯一 SurrealDB 基座。一个 member 同时表示文件、实际章节、智能原文块或图片，也是默认检索表示及图节点；另有实体/决定/条件节点和带依据的原生语义边。宿主订阅 agent 同读完成分块、摘要、识图与关系，程序核源与逐记录知识版本后原子接受。多层全文、图文向量、严格回源、语义展开、人工更正及原生恢复共用这份持久知识。
 
-memory init 绑定项目 UUID 并写入随包 skill 和 brief 的宿主入口，包含固定 Python、绝对配置的一次 brief 调用、实际数据库启动材料及使用问题记录入口；候选不再加载凭据。search、brief 和 read 纯读已发布知识及其依据快照。宿主在任务开始独立运行 `memory maintain`，先采集可归属的 Codex 持久化聊天并比较来源，机械等价小批由程序完成；仅剩余语义范围交订阅 worker，完成阅读、建图和编码后短事务发布。自动维护按来源接续已有未接受范围，积压数量不关闭自动小批；手动深维护由用户另行发起。业务完成时发送该任务停止信号并取消 worker，已采集原文及已发布批次保留；查询不等候维护。CLI 未传检索模式时读取 memory.search_mode，新项目默认 vector；hybrid/vector 返回匹配语义身份的已发布覆盖，模型或兼容向量缺失明确失败。查询统一返回 `{matches, vector_coverage}`，brief 不再重复变化列表与向量 pending；采集、语义接受和向量覆盖分别报告。`memory guide/rank/stop` 在配置解析前独立处理自身输入。doctor 默认 core，模型与 Condor 显式选查。
+memory init 绑定项目 UUID 并写入随包 skill 和 brief 的宿主入口，包含固定 Python、绝对配置的一次 brief 调用、实际数据库启动材料及使用问题记录入口；客户端自动从唯一 password_file 读取认证凭据，新 shell 不再手工加载环境变量。search、brief 和 read 纯读已发布知识及其依据快照。宿主在任务开始独立运行 `memory maintain`，先采集可归属的 Codex 持久化聊天并比较来源，机械等价小批由程序完成；仅剩余语义范围交订阅 worker，完成阅读、建图和编码后短事务发布。自动维护按来源接续已有未接受范围，积压数量不关闭自动小批；手动深维护由用户另行发起。业务完成时发送该任务停止信号并取消 worker，已采集原文及已发布批次保留；查询不等候维护。CLI 未传检索模式时读取 memory.search_mode，新项目默认 vector；hybrid/vector 返回匹配语义身份的已发布覆盖，模型或兼容向量缺失明确失败。查询统一返回 `{matches, vector_coverage}`，brief 不再重复变化列表与向量 pending；采集、语义接受和向量覆盖分别报告。`memory guide/rank/stop` 在配置解析前独立处理自身输入。doctor 默认 core，模型与 Condor 显式选查。
 
 Codex 宿主自动提供项目绑定和完整注册根，线程明确 projectId 优先，字段缺失时按 root/worktree/common-dir 与其它注册项目根排除冲突；无法取证留覆盖缺口，非 Codex 保持文件功能。每聊天导出留在项目 memory 目录并沿原生 source_version 保存，精确回读提供消息身份与正文字节范围。宿主字段、附件及完整分叉/继承范围的实际验收边界见 [本轮进度](../tasks/20261110-onboarding-simplification/progress.md)。
 
@@ -16,7 +16,7 @@ Codex 宿主自动提供项目绑定和完整注册根，线程明确 projectId 
 
 普通 CPU/GPU 作业由 CondorClient 提交至 HTCondor；容量、队列、终态及 GPU 站点策略由 Condor 维护。共享模型服务位于 Condor 作业树之外，通过管理员固定背景预留与普通作业并存。项目知识、来源和工具产物属于各自项目，通用模型和机器环境可显式共用。配置、安装和运行目录见 [部署合同](deployment.md)。
 
-0.8.0 候选只提供可信本机免认证数据库，配置边界要求显式回环 IP；launcher 使用 --unauthenticated。真实浏览器简单 POST 可写，CORS 不提供写入隔离，UUID 只防误连；是否采用该认证方案仍待最终决定。本机正式 0.7.1 实例未切换。
+0.8.1 保留数据库认证与显式回环 IP。配置维护 username 与可选 password_file，默认文件为实际 memory_dir/password.txt；客户端和 launcher 读取同一文件，config show 只显示解析路径。文件缺失、权限或认证错误直接失败；已有库恢复原凭据，不随机换密码。UUID 只防误连，账户密码负责认证。
 
 每项目数据库使用该项目内独立物理目录及进程，多聊天共享；通用 exe 和 embedding 服务可跨项目共用。项目 UUID 核查防止误连，原生导出连同原件、必要 assets 与配置构成恢复集合。旧项目仅作参考，不承接其数据库或验收，依据见 [调研索引](../tasks/20261106-rebuild/research/sources.md)。
 

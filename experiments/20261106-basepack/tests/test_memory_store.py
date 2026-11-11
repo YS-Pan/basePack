@@ -1,7 +1,7 @@
 """Opt-in integration checks against an actual local SurrealDB server.
 
-The namespace/database are disposable. Start an unauthenticated loopback server,
-then set BASEPACK_MEMORY_TEST_ENDPOINT to run.
+The namespace/database are disposable. Start an authenticated loopback server,
+then set BASEPACK_MEMORY_TEST_ENDPOINT and BASEPACK_MEMORY_TEST_PASSWORD_FILE.
 """
 
 from copy import deepcopy
@@ -38,7 +38,8 @@ def _memory(tmp_path):
         pytest.skip("requires an actual disposable SurrealDB server")
     config = ProjectConfig(tmp_path / "project.toml", Path(sys.executable), tmp_path,
                            {"memory": {"data_dir": ".basepack/memory", "search_mode": "vector", "project_id": "product_test",
-                                       "endpoint": os.environ["BASEPACK_MEMORY_TEST_ENDPOINT"],
+                                       "endpoint": os.environ["BASEPACK_MEMORY_TEST_ENDPOINT"], "username": "root",
+                                       "password_file": os.environ["BASEPACK_MEMORY_TEST_PASSWORD_FILE"],
                                        "namespace": "memsys", "database": "product_tests"}},
                            MachineConfig(tmp_path / "machine.toml", {}))
     memory = Memory(config)
@@ -99,8 +100,11 @@ def test_publication_always_contains_matching_vectors(memory, mode):
 
 
 def test_legacy_text_mode_rejects_publication_before_database_access(tmp_path):
+    password_file = tmp_path / "password.txt"
+    password_file.write_text("test-password", encoding="utf-8")
     config = ProjectConfig(tmp_path / "project.toml", Path(sys.executable), tmp_path,
-                           {"memory": {"search_mode": "text"}}, MachineConfig(tmp_path / "machine.toml", {}))
+                           {"memory": {"search_mode": "text", "username": "root", "password_file": str(password_file)}},
+                           MachineConfig(tmp_path / "machine.toml", {}))
     memory = Memory(config)
     memory._execute = lambda *args, **kwargs: pytest.fail("invalid mode touched the database")
     with pytest.raises(ValueError, match="search_mode.*(vector|hybrid)"):

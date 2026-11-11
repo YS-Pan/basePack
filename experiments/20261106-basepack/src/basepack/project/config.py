@@ -57,6 +57,11 @@ class ProjectConfig:
         return self.data_path("memory", "data_dir")
 
     @property
+    def memory_password_file(self) -> Path:
+        value = self.raw["memory"].get("password_file")
+        return (self.root / value).resolve() if value is not None else self.memory_dir / "password.txt"
+
+    @property
     def memory_search_mode(self) -> str:
         mode = self.raw["memory"]["search_mode"]
         if mode == "text":
@@ -132,6 +137,7 @@ def describe(config: ProjectConfig) -> dict:
     if "memory" in config.raw:
         result["memory"] = config.raw["memory"]
         result["memory_dir"] = str(config.memory_dir)
+        result["memory_password_file"] = str(config.memory_password_file)
     if "jobs" in config.raw:
         result["jobs_dir"] = str(config.jobs_dir)
     if "ai" in config.raw:

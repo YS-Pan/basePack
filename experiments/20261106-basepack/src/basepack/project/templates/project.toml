@@ -32,10 +32,14 @@ data_dir = '.basepack/memory'
 # Retrieval mode: 'vector' or 'hybrid'; hybrid also supports --literal matching.
 search_mode = 'vector'
 project_id = '$memory_project_id'
-# Run a trusted-local unauthenticated server, bound only to this loopback IP.
+# Run this project's authenticated server, bound only to this loopback IP.
 endpoint = 'http://127.0.0.1:18080'
 namespace = 'basepack'
 database = 'memory'
+username = 'root'
+# Optional UTF-8 secret file, absolute or relative to the project root.
+# Default: memory.data_dir/password.txt. Provision it before starting a new database.
+# password_file = '.basepack/memory/password.txt'
 # Optional files/directories for discovering additions; otherwise check registered paths.
 source_scope = []
 

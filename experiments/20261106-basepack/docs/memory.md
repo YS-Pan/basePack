@@ -4,9 +4,9 @@
 
 ## 启用
 
-本文描述 0.8.0 候选，是否采用免认证边界仍待最终决定。按 [项目接入](setup-project.md#启用记忆) 先选独立目录、显式回环 endpoint 和 UUID，再按 [项目 SurrealDB](administrator.md#项目-surrealdb) 核风险后启动，在独立调用核 ready/init/brief。该候选允许本机客户端及可触达回环端点的恶意网页写库，CORS 不阻止简单 POST；UUID 只防误连。同项目多聊天复用服务，另一个项目使用自己的物理目录、端口及 UUID；通用 exe 和模型可共用。服务在查询期间保持运行。前台排错可在普通用户终端直接执行同一个 serve.ps1，其 cwd 与 endpoint 仍来自目标配置。
+按 [项目接入](setup-project.md#启用记忆) 选独立目录、回环 endpoint 和 UUID，再按 [项目 SurrealDB](administrator.md#项目-surrealdb) 准备认证服务与唯一密码文件，在独立调用核 ready/init/brief。同项目多聊天复用服务，另一个项目使用自己的物理目录、端口及 UUID；通用 exe 和模型可共用。服务在查询期间保持运行。前台排错可在普通用户终端直接执行同一个 serve.ps1，其 cwd 与 endpoint 仍来自目标配置。
 
-普通 init 只生成配置和入口；memory init 才安装 schema 并绑定 UUID、增加记忆启动指令。误连其它 UUID 的库会失败。每个新进程按 [新 shell 接续](setup-project.md#新-shell-接续) 直接使用 instructions 中的 Python 与显式配置运行 brief，无需密码环境变量或密码文件，不依赖上一次部署 shell。已有配置升级时补齐当前 memory 字段并重新 memory init 刷新记忆入口；只用资源工具无需记忆数据库。
+普通 init 只生成配置和入口；memory init 才安装 schema 并绑定 UUID、增加记忆启动指令。误连其它 UUID 的库会失败。每个新进程按 [新 shell 接续](setup-project.md#新-shell-接续) 直接使用 instructions 中的 Python 与显式配置运行 brief；客户端自动读配置的 password_file（默认 memory_dir/password.txt），无需手工环境变量，不依赖上一次部署 shell。已有配置升级时补齐当前 memory 字段并重新 memory init 刷新记忆入口；只用资源工具无需记忆数据库。
 
 ## 首建与维护
 
@@ -125,13 +125,23 @@ memory read '<basis.member>' --source-version '<basis.source_version>' --start-l
 
 ## 备份与恢复
 
-使用原生 export 写文件：
+basePack 客户端自动读凭据；原生 SurrealDB CLI 使用自己的 SURREAL_USER/PASS。下面只为该次原生导出临时设置它们，不把这段加入新 shell 的记忆入口：
 
 ```powershell
-& $surreal export --endpoint '<endpoint>' --namespace '<namespace>' --database '<database>' '<backup.surql>'
-if ($LASTEXITCODE -ne 0) { throw "Surreal export failed ($LASTEXITCODE)" }
-& $surreal import --endpoint '<新目录服务的 endpoint>' --namespace '<namespace>' --database '<database>' '<backup.surql>'
-if ($LASTEXITCODE -ne 0) { throw "Surreal import failed ($LASTEXITCODE)" }
+$ErrorActionPreference = 'Stop'
+$json = & $python -X utf8 -m basepack --config $config config show
+if ($LASTEXITCODE -ne 0) { throw "config show failed ($LASTEXITCODE)" }
+$settings = $json | ConvertFrom-Json
+$env:SURREAL_USER = $settings.memory.username
+$env:SURREAL_PASS = [IO.File]::ReadAllText($settings.memory_password_file)
+try {
+    & $surreal export --endpoint $settings.memory.endpoint --namespace $settings.memory.namespace --database $settings.memory.database '<backup.surql>'
+    if ($LASTEXITCODE -ne 0) { throw "Surreal export failed ($LASTEXITCODE)" }
+} finally {
+    Remove-Item Env:SURREAL_USER, Env:SURREAL_PASS
+}
 ```
 
-以下命令用于候选免认证库，无需 username 或密码环境变量。既有认证库的迁移前导出沿原版本配置执行，保留回退凭据，不混用新旧客户端。备份集合包括 export、项目配置、业务原件、受管 Codex 导出、codex-attachments 原件与定位回执及 `memory.data_dir` 下的 assets 图片快照（默认 `.basepack/memory/assets/`）；数据库内的摘要、边界、依据、更正和旧文字快照随 export 恢复。新目录保留 project_id，使用自己的数据目录与端口，再核原文定位、图关系和检索。向量可随 export 恢复，也可从保留表示和原图重新 embed，无需重新总结；重编码使用已接受表示与保留的图片快照。运行中的库使用原生 export；复制物理目录须先停写并停止服务。长期备份目的地与保留周期由业务项目确定。
+恢复时先为新的物理目录/端口启动认证服务，保留原 project_id；从该目标配置读取用户名及同一密码文件，再以原生 `import` 替换上述 `export`。缺失凭据先恢复正确文件，不给已有库重新生成密码。恢复后核快照、图关系和检索。
+
+备份集合包括 export、项目配置、原凭据文件、业务原件、受管 Codex 导出、codex-attachments 原件与定位回执及 `memory.data_dir` 下的 assets 图片快照（默认 `.basepack/memory/assets/`）；数据库内的摘要、边界、依据、更正和旧文字快照随 export 恢复。新目录保留 project_id，使用自己的数据目录与端口，再核原文定位、图关系和检索。向量可随 export 恢复，也可从保留表示和原图重新 embed，无需重新总结；重编码使用已接受表示与保留的图片快照。运行中的库使用原生 export；复制物理目录须先停写并停止服务。原凭据文件按受控方式备份，不随源码或发行包分发。长期备份目的地与保留周期由业务项目确定。

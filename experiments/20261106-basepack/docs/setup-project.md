@@ -1,6 +1,6 @@
 # 项目接入
 
-本文描述 0.8.0 候选；免认证方案是否采用仍待最终决定，正式 0.7.1 实例保持现状。按根 [安装步骤](../../../README.md#install-the-lightweight-client) 安装轻量客户端。项目记忆需要每项目独立的 SurrealDB 和共享 embedding 模型服务；普通重任务需要 HTCondor。设施由机器维护者按 [管理员说明](administrator.md) 准备。
+本文描述 0.8.1 的认证与自动凭据读取流程。按根 [安装步骤](../../../README.md#install-the-lightweight-client) 安装轻量客户端。项目记忆需要每项目独立的 SurrealDB 和共享 embedding 模型服务；普通重任务需要 HTCondor。设施由机器维护者按 [管理员说明](administrator.md) 准备。
 
 ## 首次接入
 
@@ -117,7 +117,7 @@ bp --config $config config ai --tier tier2
 | A | `<project-A>/.basepack/memory` | `http://127.0.0.1:18080` | A 的 init 生成的 UUID |
 | B | `<project-B>/.basepack/memory` | `http://127.0.0.1:18081` | B 的 init 生成的另一 UUID |
 
-按 [项目 SurrealDB](administrator.md#项目-surrealdb) 核免认证风险并创建仅回环监听的 launcher 与日志。该候选允许本机客户端及可触达端口的恶意网页写库，CORS 不阻止简单 POST，UUID 只防误连。接受该边界并启动后，在下一次独立调用检查 `/ready`，无需密码文件或环境变量，再执行：
+按 [项目 SurrealDB](administrator.md#项目-surrealdb) 为全新库准备一次随机密码文件，创建认证、仅回环监听的 launcher 与日志。已有库沿用原用户名和密码文件。启动后在下一次独立调用检查 `/ready`，客户端自动读取凭据，再执行：
 
 ```powershell
 bp --config $config memory init
@@ -141,7 +141,7 @@ Codex 宿主按项目归属默认接入可取得的聊天，不要求逐 thread 
 
 ## 新 shell 接续
 
-0.8.0 候选不提供 memory username、password_env 或 password_file 配置，也不发送 Basic Authorization。新 shell/新聊天直接沿项目 `AGENTS.md → .basepack/instructions.md` 取得实际 Python 与配置路径，运行 brief：
+模板将 `[memory].username` 设为 root，已有库填写其实际用户名；可选 `password_file` 是相对项目根或绝对路径，省略时使用实际 `memory_dir/password.txt`。CLI 与 Python 在创建记忆客户端时自动读取同一个 UTF-8 密码文件，`config show` 只返回解析后的 `memory_password_file` 路径。新 shell/新聊天直接沿项目 `AGENTS.md → .basepack/instructions.md` 取得实际 Python 与配置路径，运行 brief：
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -155,7 +155,7 @@ if ($LASTEXITCODE -ne 0) { throw "brief failed ($LASTEXITCODE)" }
 if ($LASTEXITCODE -ne 0) { throw "search failed ($LASTEXITCODE)" }
 ```
 
-成功时 brief 和 search 返回已发布知识及其依据。连接失败时按生成入口检查本项目 `serve.ps1`、cwd 与日志，由项目维护者显式启动数据库。同项目多聊天共用数据库，聊天结束后保持运行。项目搬迁后更新 Python/配置绝对路径，或重新 `memory init` 刷新入口。
+不再使用 password_env 或手工加载密码变量；缺文件、权限错误和错误密码直接保留原始失败。恢复正确文件或修正配置后重试，不自动生成替代密码，也不回退免认证。成功时 brief 和 search 返回已发布知识及其依据。连接失败时按生成入口检查本项目 `serve.ps1`、cwd 与日志，由项目维护者显式启动数据库。同项目多聊天共用数据库，聊天结束后保持运行。项目搬迁后更新 Python/配置绝对路径，或重新 `memory init` 刷新入口。
 
 查编号、文件名或指定原文片段时使用 `memory search --mode hybrid --literal --text '<查找内容>'`：在 title、text 和 path 中做不区分大小写的子串查找，精确匹配优先，以 lexical_rank 标记，随后附语义候选。vector 模式不接受 `--literal`；模型或向量缺失时按原始错误修复设施或补建。
 
@@ -163,7 +163,7 @@ if ($LASTEXITCODE -ne 0) { throw "search failed ($LASTEXITCODE)" }
 
 先按 [备份步骤](memory.md#备份与恢复) 保留知识、配置和原件恢复集合，再由客户端维护者安装新包。已有配置保持 schema 2、机器 schema 1 和原 UUID。
 
-0.8.0 收敛了以下调用合同，升级前核对自己的 Python 脚本与配置：
+0.8.1 沿用以下已收敛的调用合同，升级前核对自己的 Python 脚本与配置：
 
 - 检索统一返回 `{matches, vector_coverage}`，从 `matches` 取候选；删除 `include_coverage` 参数及裸列表返回格式。
 - brief 删除恒空 `changes/change_count` 与重复 `vector_pending/vector_pending_count`，保留 `vector_coverage`、知识 pending、`coverage_gaps` 和 `change_check`；来源发现、原文采集与语义接受分别核对。
@@ -180,20 +180,19 @@ bp --config $config memory search --mode vector --text '<代表性主题>'
 
 `vector_coverage` 的 total 与 compatible 相等且 pending 为 0 时，直接复用索引，将配置 `search_mode` 改为 `vector` 或 `hybrid`。有缺口或没有兼容向量时先运行 `memory embed` 补建，再查询确认覆盖；其 pending 还可能包含待语义维护的旧 stale 项，以查询返回的已发布活跃范围为切换条件。模型身份变化也按此补建，不回退到纯文字模式。
 
-采用免认证候选并进入迁移窗口后，按下面步骤一致切换；新 shell 无需加载凭据，执行 `memory init` 核 schema/UUID 并刷新入口，然后运行代表性 brief、search、read 和 neighbors。
+客户端升级后，按下面步骤保留已有认证与数据库，刷新入口；新 shell 无需手工加载凭据。执行 `memory init` 核 schema/UUID，再运行代表性 brief、search、read 和 neighbors。
 
-旧配置缺少 `search_mode` 时明确补入所选模式；缺少 `[ai]` 时从 [项目模板](../src/basepack/project/templates/project.toml) 补入等级。0.8.0 候选删除 memory.username/password_env/password_file 及对应 config show 回显。资源服务升级与回滚见 [管理员说明](administrator.md#升级与回滚)。
+旧配置缺少 `search_mode` 时明确补入所选模式；缺少 `[ai]` 时从 [项目模板](../src/basepack/project/templates/project.toml) 补入等级。0.8.1 保留 username/password_file，移除 password_env 与生成入口中的手工变量桥接。资源服务升级与回滚见 [管理员说明](administrator.md#升级与回滚)。
 
-### 从 0.7.1 认证库切换候选
+### 从既有认证客户端升级
 
-本轮只交付候选代码、文档与隔离验证；正式切换须先决定采用上述免认证边界，并安排维护窗口。共用客户端的所有在用项目和调用方须同时纳入计划，避免客户端与服务认证方式错配。
+1. 保留旧 wheel、项目配置、原密码文件和 [完整恢复集合](memory.md#备份与恢复)。核 `username` 与 `password_file` 指向当前服务使用的同一凭据；默认位置不变时可省略 password_file，删除 password_env。
+2. 等正在调用的客户端完成后普通安装 0.8.1，更新配置中的 Python 路径（若解释器改变）。数据库、原密码、物理目录、端口与 UUID 保持；已有认证服务通常无需重启或迁库。
+3. 执行 `memory init` 刷新 instructions，删除项目手写说明和包装脚本中的旧环境变量加载。新 shell 直接 brief/search/read/neighbors，核原知识及依据；已有兼容向量无需重新编码。
 
-1. 保留原生 export、原配置与 launcher、旧 wheel、必要回退凭据，以及业务原件、受管聊天/附件、assets。先恢复到独立目录/端口验证旧 UUID、快照、关系和兼容向量；不打开正式 store 的第二个进程。
-2. 停止该项目自动维护及调用，确认停写；停止其数据库，核监听与进程树退出。逐项目操作，以原 store 和 UUID 启动候选的 loopback/unauthenticated launcher。
-3. 在同一受控窗口普通升级共用客户端，删除在用配置旧凭据字段，刷新 instructions，并同步项目已有手写入口或包装脚本。不要用清库或重新总结绕过失败；按保留的 wheel/配置/launcher 和凭据回退。
-4. 在没有密码环境变量与运行时密码文件的新进程中，核 init、brief/search/read/neighbors、UUID 误连拒绝及非回环 endpoint 拒绝，再恢复业务。确认回退材料已保存后移除原在用密码文件；历史备份按既有保留约定管理。
+密码文件缺失时恢复原凭据，不为已有库生成新密码。改写文件不等于轮换数据库中保存的账户密码；确需轮换时先由数据库管理员更新账户，再同步唯一凭据文件和 launcher。失败保留原错，按保留的 wheel 与配置回退；不清库或重新总结。
 
-保留知识 ID、source_version、原件、stale/retired 与原 UUID；未变输入和兼容向量无需重新编码。已知外部调用方核查有明确范围，未知自定义脚本由使用者按上面的删除接口清单核对。正式迁移状态见 [本轮进度](../../../devDoc/tasks/20261110-onboarding-simplification/progress.md)。
+正式项目升级结果见 [本轮进度](../../../devDoc/tasks/20261110-onboarding-simplification/progress.md)。
 
 ## 移动与重新检出
 

@@ -220,16 +220,35 @@ def test_init_contains_project_ai_mapping(ai_config):
     assert describe(ai_config)["ai"] == ai_config.raw["ai"]
 
 
-def test_new_project_has_vector_search_without_credentials_or_shared_state(ai_config):
+def test_new_project_has_vector_search_and_credential_path_without_creating_secret(ai_config):
     assert ai_config.memory_search_mode == "vector"
     result = describe(ai_config)
     assert result["memory"]["search_mode"] == "vector"
-    assert not {"username", "password_env", "password_file"} & result["memory"].keys()
-    assert "memory_password_file" not in result
+    assert result["memory"]["username"] == "root"
+    assert "password_env" not in result["memory"]
+    assert result["memory_password_file"] == str(ai_config.memory_dir / "password.txt")
+    assert not ai_config.memory_password_file.exists()
     assert "[shared]" not in template("machine.toml")
     assert "state_dir" not in template("machine.toml")
     assert result["memory"]["codex"] == {
         "project_id": "", "other_project_roots": [], "registry_complete": False}
+
+
+@pytest.mark.parametrize("location", ["default", "relative", "absolute"])
+def test_password_file_is_resolved_from_project_and_config_show_never_reads_it(ai_config, tmp_path, location):
+    if location != "default":
+        value = "secrets/项目.txt" if location == "relative" else str(tmp_path / "outside secret.txt")
+        ai_config.raw["memory"]["password_file"] = value
+        expected = (ai_config.root / value).resolve()
+    else:
+        expected = ai_config.memory_dir / "password.txt"
+    assert ai_config.memory_password_file == expected
+    assert not expected.exists()
+    assert describe(ai_config)["memory_password_file"] == str(expected)
+    expected.parent.mkdir(parents=True, exist_ok=True)
+    secret = "private-test-secret-do-not-display"
+    expected.write_text(secret, encoding="utf-8")
+    assert secret not in json.dumps(describe(ai_config))
 
 
 def test_init_cli_saves_host_codex_binding_without_changing_basepack_uuid(tmp_path):
@@ -271,14 +290,20 @@ def test_memory_endpoint_rejects_remote_aliases_and_credentials(ai_config, endpo
         load_project_config(ai_config.path)
 
 
-@pytest.mark.parametrize("configured", [False, True])
+@pytest.mark.parametrize("configured", ["none", "invalid", "missing_secret"])
 @pytest.mark.parametrize("action", ["guide", "rank", "stop"])
 def test_memory_tools_run_without_loading_project_configuration(tmp_path, configured, action):
     command = [sys.executable, "-m", "basepack"]
-    if configured:
+    if configured == "invalid":
         invalid_config = tmp_path / "broken.toml"
         invalid_config.write_text("invalid = [", encoding="utf-8")
         command += ["--config", str(invalid_config)]
+    elif configured == "missing_secret":
+        machine = tmp_path / "machine.toml"
+        machine.write_text("schema_version=1\n", encoding="utf-8")
+        config = init_project(tmp_path / "project", machine)
+        assert not load_project_config(config).memory_password_file.exists()
+        command += ["--config", str(config)]
     command += ["memory", action]
     control = tmp_path / "control"
     if action == "rank":

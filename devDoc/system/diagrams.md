@@ -1,6 +1,6 @@
 # 当前文件与运行逻辑框图
 
-按 2026 年 11 月 10 日的 0.8.0 源码合同更新；本机正式客户端与三个项目库仍保留 0.7.1 认证运行，正式升级由迁移窗口执行。0.5.0 core/jobs 和共享 embedding 服务继续保留，后者与当前客户端协议兼容。沿用[参考 chat](codex://threads/01a1bb3f-4db8-7c10-8d71-c951aba18aa2) 按文件位置分层的方法；记忆行为的实际验收边界见[专项进度](../tasks/20261106-memory-system/progress.md)，阶段合同见[记忆方案图](../tasks/20261106-memory-system/diagrams.md)。
+按 2026 年 11 月 11 日的 0.8.1 源码合同更新；既有项目沿用认证服务、原密码、物理库和 UUID，客户端升级与入口刷新不要求迁库。0.5.0 core/jobs 和共享 embedding 服务继续保留，后者与当前客户端协议兼容。沿用[参考 chat](codex://threads/01a1bb3f-4db8-7c10-8d71-c951aba18aa2) 按文件位置分层的方法；记忆行为的实际验收边界见[专项进度](../tasks/20261106-memory-system/progress.md)，阶段合同见[记忆方案图](../tasks/20261106-memory-system/diagrams.md)。
 
 ## 路径与读图约定
 
@@ -8,7 +8,7 @@
 | --- | --- |
 | R | 本源码仓库：`D:/project/20261106 memsys` |
 | E | 当前 active 工程：`R/experiments/20261106-basepack` |
-| Im | 本机仍为 0.7.1 的客户端安装包：`D:/AgentTools/envs/basepack-client/Lib/site-packages/basepack` |
+| Im | 本机稳定客户端安装包：`D:/AgentTools/envs/basepack-client/Lib/site-packages/basepack` |
 | Ic | 保留的 0.5.0 core/jobs：`C:/Program Files/Python313/Lib/site-packages/basepack` |
 | Is | 保留的 0.5.0 embedding 服务：`C:/ProgramData/basepack/envs/service/Lib/site-packages/basepack` |
 | A | 本机共享设施：`D:/AgentTools` |
@@ -24,13 +24,13 @@ flowchart TB
   subgraph source["R / E：唯一产品维护源"]
     code["E/src/basepack/<br/>代码与 project/templates/"]
     deps["E/pyproject.toml + uv.lock<br/>依赖与发行声明"]
-    wheel["E/dist/交付批次/<br/>basepack-0.8.0-*.whl"]
+    wheel["E/dist/交付批次/<br/>basepack-0.8.1-*.whl"]
     r9["E/dist/r9/<br/>保留 basepack-0.5.0 wheel"]
     policy["E/examples/condor/<br/>60_resources.conf、70_job_transforms.conf"]
     code -->|构建| wheel
     deps -->|发行版本与依赖声明| wheel
   end
-  wheel -->|迁移窗口普通安装客户端| memory["Im：独立客户端环境<br/>memory 与资源调用入口"]
+  wheel -->|普通升级客户端| memory["Im：独立客户端环境<br/>memory 与资源调用入口"]
   r9 -->|既有安装保留| core["Ic：系统 core/jobs 0.5.0"]
   r9 -->|既有安装保留| service["Is：共享 embedding 服务 0.5.0"]
   policy -->|管理员单独部署| condor["C/config/ 下的站点策略"]
@@ -134,13 +134,13 @@ flowchart TB
 flowchart TB
   exe["A/bin/surrealdb-4.0.0/surreal.exe<br/>官方程序可跨项目共用"]
   subgraph project["业务项目 P：知识、原件与数据库归本项目"]
-    launch["P/.basepack/memory/serve.ps1<br/>0.8.0候选：显式回环bind<br/>--unauthenticated + --allow-origin"]
+    launch["P/.basepack/memory/serve.ps1<br/>认证 + 显式回环bind<br/>同config读取username / password_file"]
     server["本项目 SurrealDB 进程<br/>独立端口；本仓库 R 为 18080"]
     store["P/.basepack/memory/store/<br/>member：文件 → 实际章节 → 智能原文块 / 图片<br/>原文快照、摘要、依据、语义关系、更正与派生向量"]
     assets["P/.basepack/memory/assets/<br/>必要原图版本"]
     original["P 中的业务原件<br/>相对路径与原字节版本"]
     chats["P/.basepack/memory/codex/<br/>受管 UTF-8 聊天导出"]
-    client["0.8.0候选 memory/ + P/.basepack/config.toml<br/>显式回环 endpoint、项目 UUID；无凭据"]
+    client["memory/ + P/.basepack/config.toml<br/>回环endpoint、UUID、username<br/>自动读同一password_file"]
     launch -->|普通用户隐藏手动启动| server
     client -->|原生 HTTP / SurrealQL；核项目身份| server
     server -->|独占物理目录，多聊天共用| store
@@ -153,7 +153,7 @@ flowchart TB
   embedding -->|向量及 embedding_identity| client
 ```
 
-图中数据库连接为 0.8.0 候选合同；本仓库正式 SurrealDB 仍为 0.7.1 认证实例，由普通用户隐藏运行。候选 launcher 显式回环监听且免认证，新的 shell 直接 brief；真实浏览器简单 POST 可写，CORS 不阻止，UUID 只防误连，采用该方案仍待决定。共享 embedding 继续由 SCM/Shawl 托管。每项目的端口、UUID 与物理 store 独立，namespace/database 不代替物理隔离。文件、实际章节与智能原文块各为可寻址 member，默认可直接全文/向量检索；包含、摘要依据和语义边共同保存在项目库。恢复使用原生导出并保留原件、必要 assets 与配置。依据：[记忆实现](modules/memory.md)、[用户流程](../../experiments/20261106-basepack/docs/memory.md)。
+客户端和 launcher 读取同一个密码文件，前者自动认证，后者交给原生 SurrealDB。新 shell 直接 brief；guide/rank/stop 无需凭据。已有认证进程通常无需因客户端升级重启，原目录、凭据与 UUID 保持；缺文件恢复原凭据，改写文件不等于轮换库内账户。共享 embedding 继续由 SCM/Shawl 托管。每项目的端口、UUID 与物理 store 独立，namespace/database 不代替物理隔离。文件、实际章节与智能原文块各为可寻址 member，默认可直接全文/向量检索；包含、摘要依据和语义边共同保存在项目库。恢复使用原生导出并保留原件、必要 assets 与配置。依据：[记忆实现](modules/memory.md)、[用户流程](../../experiments/20261106-basepack/docs/memory.md)。
 
 ```mermaid
 flowchart TB

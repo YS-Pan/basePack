@@ -48,8 +48,11 @@ def test_vector_search_reports_missing_identity_instead_of_silent_text_fallback(
 
 
 @pytest.mark.parametrize("mode", ["vector", "hybrid"])
-def test_brief_uses_configured_related_and_does_not_scan(mode):
-    config = SimpleNamespace(memory_search_mode=mode, raw={"memory": {"source_scope": ["docs"]}})
+def test_brief_uses_configured_related_and_does_not_scan(mode, tmp_path):
+    password_file = tmp_path / "password.txt"
+    password_file.write_text("test-password", encoding="utf-8")
+    config = SimpleNamespace(memory_search_mode=mode, memory_password_file=password_file,
+                             raw={"memory": {"username": "root", "source_scope": ["docs"]}})
     memory = Memory(config)
     memory.sources = lambda: []
     memory._execute = lambda sql: [[], [], [], [], [], []]
