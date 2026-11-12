@@ -4,6 +4,8 @@
 
 ## 当前阶段
 
+2026-11-12 已形成[实际使用整改计划](../20261112-usage-rectification/plan.md)，依据 array reconstruct 聊天“梳理 GitHub 发布剩余工作”、BP-T27/T28、升级原证及当前源码。优先修 scope 路径前缀合同、按 shell 重复 brief 的生成入口、旧 mandatory 修正与 evidence 冲突接续；随后推进现行／历史召回分层及旧成果进入计划的真实业务验收，另查八源候选编码 HTTP500。已区分产品合同、调用整合与宿主限制，保留现有退役、快照及原子发布保护。本轮只交调查和计划，A–H 待实施，外部项目和知识库未修改；细节与未核范围见[调查记录](../20261112-usage-rectification/research/observations.md)。
+
 2026-11-12 用户授权的T2+N2+S2已实施并在本项目普通安装0.11.0.dev1，见[派工实施结果](dispatch-implementation-result.md)。容量采集/定点刷新、纯满队算法、固定layout与名称、独立检索入口及配置维护说明已交付；本机快照12，自动1coord+4reader、手动两满队共2coord+8reader余2席（无其它占用且材料充足）。源码444通过/138条件跳过，沙箱ACL一项普通权限补测通过；最终普通wheel相关226项通过，52包文件逐字节一致，升级身份/知识计数/凭据和自动刷新块外字节保持。实际验证固定名四reader团队、零reader协调者独立发布、tier1检索/阅读/评分/rank、四层宿主路径及句柄复用；所有自有维护停止、无未明发布、最终owner=null。后台与有界验收未处理材料留后续，不冒充全量维护。仅本项目升级，其它项目和共享设施不变。
 
 2026-11-12 按用户要求修订[手动维护数量算法](task-duration-and-worker-naming-plan.md#脚本计算本轮预算与布局)：M≥5时完整队数T=min(10,floor(M/5))，每队1coord+4reader，余量留空，不再为余2至4席开小队；M=1至4仅coord_0兼做reader。自动算法不变。本机12个可用subagent席位按新计划为手动2coord+8reader、余2席；示例、低并发边界和验收已同步。仅改计划，未实施。

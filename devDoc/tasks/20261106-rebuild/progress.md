@@ -45,6 +45,8 @@
 
 ## 下一步
 
+当前新增[实际使用整改计划](../20261112-usage-rectification/plan.md)：由真实阵列项目调用暴露的检索范围、重复启动、现行 mandatory、历史召回和旧成果承接问题优先推进；当前仅完成调查与计划，产品尚未整改，具体状态在该计划及记忆专项进度维护。
+
 已执行[接入、记忆维护与运行简化计划](../../archive/20261110-onboarding-simplification/plan.md)，0.8.0交付脚本增量维护、Codex聊天来源、接口清理、技能发现和英文README；随后按用户选择完成0.8.1保留认证与自动读取凭据。普通wheel369项通过、无跳过，共用客户端及三个项目入口已实际升级，七表逐字段、原凭据及数据库进程保持。新shell直接调用不再手工加载密码；实际覆盖与回退材料见[专项进度](../../archive/20261110-onboarding-simplification/progress.md)和[正式升级结果](../../archive/20261110-onboarding-simplification/credential-installation-result.md)。0.8.0免认证仅保留历史隔离证据，远端推送/发布未执行。
 
 独立 [engineering-judgment skill](../../../skills/engineering-judgment/SKILL.md) 已编写、保留并接入，见[交付结果](../../archive/20261110-engineering-judgment/result.md)。按用户最新要求取消技能测试与按收益去留，效果在长期真实使用中观察；源码和入口已提交 f8bb5b2。
