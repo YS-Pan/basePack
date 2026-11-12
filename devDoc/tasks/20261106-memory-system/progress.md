@@ -4,6 +4,8 @@
 
 ## 当前阶段
 
+2026-11-12 按用户要求修订[手动维护数量算法](task-duration-and-worker-naming-plan.md#脚本计算本轮预算与布局)：M≥5时完整队数T=min(10,floor(M/5))，每队1coord+4reader，余量留空，不再为余2至4席开小队；M=1至4仅coord_0兼做reader。自动算法不变。本机12个可用subagent席位按新计划为手动2coord+8reader、余2席；示例、低并发边界和验收已同步。仅改计划，未实施。
+
 2026-11-12 按用户要求在[现行维护计划](task-duration-and-worker-naming-plan.md#五项目配置维护要点文档与入口)增加面向使用者的项目配置维护说明及条件阅读入口，待实施。[只读盘点](research/project-config-maintenance-20261112.md)覆盖S2并发快照、模型映射、路径／生成入口、Codex注册绑定、scope／skills及数据库／凭据／共享设施联动，区分快照、每次直接读取和生成副本／运行状态。已核现有instructions刷新只替换托管块，块外首段旧路径仍需核对；计划不承诺刷新全文。仅改文档，未改实际配置或产品。
 
 2026-11-12 用户已选S2，[现行维护计划](task-duration-and-worker-naming-plan.md)统一为T2 + N2 + S2，待实施。安装／接入取得归一化宿主容量并写入`[ai].max_concurrent_subagents`，运行纯函数计算预算、团队、固定名称和派工prompt；首版工程默认自动预留1席、手动0席。补齐容量快照刷新、A缺失时仅给组织上限、容量不足只缩减未启动清单、检索同源派工及验收。评估保留选型依据，原维护试验计划新增后续入口；本轮只改文档，未改实际配置、程序、模板或安装。
