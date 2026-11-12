@@ -47,7 +47,7 @@
 
 ## 下一步
 
-当前新增[实际使用整改计划](../20261112-usage-rectification/plan.md)：由真实阵列项目调用暴露的检索范围、重复启动、现行 mandatory、历史召回和旧成果承接问题优先推进；当前仅完成调查与计划，产品尚未整改，具体状态在该计划及记忆专项进度维护。
+已执行[实际使用整改计划](../20261112-usage-rectification/plan.md)，源码及本项目普通客户端为0.12.0.dev1，已交付检索入口、任务级brief、精确知识历史和纯访问状态；真实业务采用、安装与恢复见[验收结果](../20261112-usage-rectification/acceptance-result.md)。共享服务部署、外部项目修正及长期效果边界沿[整改进度](../20261112-usage-rectification/progress.md)接续。
 
 已执行[接入、记忆维护与运行简化计划](../../archive/20261110-onboarding-simplification/plan.md)，0.8.0交付脚本增量维护、Codex聊天来源、接口清理、技能发现和英文README；随后按用户选择完成0.8.1保留认证与自动读取凭据。普通wheel369项通过、无跳过，共用客户端及三个项目入口已实际升级，七表逐字段、原凭据及数据库进程保持。新shell直接调用不再手工加载密码；实际覆盖与回退材料见[专项进度](../../archive/20261110-onboarding-simplification/progress.md)和[正式升级结果](../../archive/20261110-onboarding-simplification/credential-installation-result.md)。0.8.0免认证仅保留历史隔离证据，远端推送/发布未执行。
 

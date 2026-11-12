@@ -32,7 +32,7 @@
 
 ## 自用观察与接续
 
-0.11.0.dev1 的启动 brief 正常。自动维护首轮在 Codex 状态库 SQLite/arg0 沙箱权限处失败，owner 无发布；已 stop/release。正常用户上下文以全新 control 重开成功，原错误保留。当前自有 control 为 `.basepack/memory/maintenance/usage-rectification-01a1d01b-user.control`，回执为 `.basepack/memory/maintenance/4b91364f321f4307a9386bc93f08c069.json`，协调者 `/root/bp_mem_coord_0`，固定 0 队/4 reader。已完成采集不等于语义接受，聊天存在原始覆盖缺口；业务结束时按 owner 实况收尾，不为维护积压延长任务。
+0.11.0.dev1 的启动 brief 正常。自动维护首轮在 Codex 状态库 SQLite/arg0 沙箱权限处失败，owner 无发布；已 stop/release。正常用户上下文以全新 control 重开成功，原错误保留。当时自有 control 为 `.basepack/memory/maintenance/usage-rectification-01a1d01b-user.control`，回执为 `.basepack/memory/maintenance/4b91364f321f4307a9386bc93f08c069.json`，协调者 `/root/bp_mem_coord_0`，固定 0 队/4 reader。已完成采集不等于语义接受，聊天存在原始覆盖缺口；业务结束时按 owner 实况收尾，不为维护积压延长任务。
 
 ## 收尾与后续
 
@@ -41,3 +41,11 @@
 自动维护成功52/107来源（51 initial、1 existing-change），余55源、一条重复ID反馈pending。`publisher-chat-20.json`在0.11客户端/0.5服务下HTTP500、未发布且未重试；同一时点服务日志显示2523token超过2048，未取得请求uid，不能声称逐候选精确关联。它与F冻结八源为不同失败样本。已有知识的ID碰撞结构已修，产品重复ID入口检查仍待处理。协调者及reader已结束/中断，stopped且publications=[]后release，最终owner=null。逐源版本、冻结快照与原错选留 `artifacts/runs/20261112-usage-rectification/maintenance/`。
 
 剩余部署/使用边界：共享embedding仍为0.5，服务端422和请求索引须管理员后续安装服务包才生效；外部阵列正式库的旧mandatory及16个超限几何块仍由其任务修正/拆分后重新提交，本轮只读。存量未保存历史/旧端点仍有缺口；未来真实质量、成本和默认参数效果按使用反馈维护。未公开发布，未运行默认全库语义审计。
+
+## 实施后显式记忆维护
+
+2026-11-13（北京时间）。用户要求补做维护：实施期间已有上述自动维护，但最终交付材料晚于该轮截止。现以已安装的0.12.0.dev1执行全项目手动维护，固定回执为 `.basepack/memory/maintenance/6341eb1e02f742509800d37ae5d7750e.json`，control为 `.basepack/memory/maintenance/post-usage-2f74ab6-01a1d01b.control`。机械预处理完成36批、复用259块；固定109/109来源均已按实际原文处置（38初始、71已有变化），逐源接受版本、处置和发布快照见本轮 `source-disposition-manifest.json`。
+
+0.12交付源码、测试原文、使用文档、验收结果及相关讨论已纳入本轮更新；测试原文不等于本轮执行测试。同步修正记忆计划、历史阶段图入口及重建进度中的过时说明，并重新接受实际引用的旧规划摘要、状态节点和关系。证据版本冲突通过回源共读、重新接受后发布；本轮编码HTTP500保留原错，超长块拆分后成功发布，失败批未部分写入。此段维护结果也按当前原文进行末次同步，普通维护在作者生成及程序提交后结束，不追加语义审计。
+
+原始捕获缺口仍保留：聊天01a1bdad有13处截断、约15,297 token缺失，01a1b97f有6处截断及10组上下文缺失，01a1b8f0有一处约36 token截断；未恢复不存在的原件，也不把缺少输出的命令引用视为执行成功。`feedback:677ef790e3aa44d1879c83e151537489`仍pending：产品提交入口尚未拒绝归一化后的重复member ID，知识碰撞结构虽已更正，产品校验缺陷仍待修复。本轮未修改产品代码或共享服务。固定回执截止以后的新材料及上述部署、使用和长期效果边界继续接续，不将本轮完成解释为全项目永久无积压。
