@@ -8,7 +8,7 @@ def register_commands(subparsers):
     memory = subparsers.add_parser("memory", help="Project-local multilevel memory")
     commands = memory.add_subparsers(dest="memory_action", required=True)
     actions = {name: commands.add_parser(name) for name in
-               ("init", "guide", "sources", "prepare", "apply", "stop", "owner", "release", "recover-owner", "embed", "search", "read", "neighbors", "brief", "changes", "maintain", "prompt", "rank", "feedback-report", "feedback-list", "feedback-resolve")}
+               ("init", "guide", "sources", "prepare", "apply", "stop", "owner", "release", "recover-owner", "embed", "search", "read", "neighbors", "brief", "changes", "maintain", "prompt", "pending-dispatch", "retrieval-dispatch", "retrieval-prompt", "rank", "feedback-report", "feedback-list", "feedback-resolve")}
     actions["feedback-report"].add_argument("--kind", choices=["knowledge", "retrieval"], required=True)
     actions["feedback-report"].add_argument("--issue", required=True)
     actions["feedback-report"].add_argument("--target", help="Member, node or semantic edge ID")
@@ -56,17 +56,32 @@ def register_commands(subparsers):
     actions["maintain"].add_argument("--codex-registry", help="Host project binding and complete registered roots as UTF-8 JSON")
     actions["maintain"].add_argument("--control", required=True, help="Fresh, never-used task control file")
     actions["maintain"].add_argument("--holder", required=True, help="Host thread identity")
+    actions["maintain"].add_argument("--mode", choices=["automatic", "manual"], default="manual",
+                                    help="Automatic reserves one business seat; direct maintenance defaults to manual")
+    actions["maintain"].add_argument("--available-subagents", type=int,
+                                    help="Host raw free subagent seats, excluding the main agent and before business reserve")
     actions["maintain"].add_argument("--timeout", type=float, default=600, help="Candidate embedding timeout")
     actions["prompt"].add_argument("--receipt", required=True, help="Maintenance receipt to render as worker context")
     actions["prompt"].add_argument("--control", required=True, help="The same task control file used by maintain and apply")
     actions["prompt"].add_argument("--role", choices=["coordinator", "reader"], default="coordinator")
     actions["prompt"].add_argument("--tier", choices=["tier1", "tier2", "tier3", "tier4"],
                                help="Override the role's default AI tier")
-    actions["prompt"].add_argument("--paths", nargs="+", help="Reader's bounded project-relative source files")
+    actions["prompt"].add_argument("--paths", nargs="+", help="Bounded project-relative sources for a reader or nonpublishing coordinator")
+    actions["prompt"].add_argument("--team", type=int, default=0, help="Fixed team from this receipt's saved layout")
+    actions["prompt"].add_argument("--reader", type=int, default=0, help="Fixed reader slot within the team")
+    actions["pending-dispatch"].add_argument("--receipt", required=True)
+    actions["pending-dispatch"].add_argument("--available-subagents", required=True, type=int,
+                                           help="New host raw free seats; already-started workers are already deducted")
+    actions["pending-dispatch"].add_argument("--started-task-names", nargs="*", default=[])
+    for name in ("retrieval-dispatch", "retrieval-prompt"):
+        actions[name].add_argument("--request", required=True, help="UTF-8 JSON with question, scope and content_budget")
+        actions[name].add_argument("--slot", type=int, default=0, help="Parent-owned retrieval slot")
+        actions[name].add_argument("--available-subagents", type=int, help="Host raw free subagent seats")
+        actions[name].add_argument("--tier", choices=["tier1", "tier2", "tier3", "tier4"])
     actions["rank"].add_argument("--input", required=True, help="Read candidates with agent scores")
     actions["rank"].add_argument("--budget", type=int, default=6000, help="Returned text character budget")
     for name, command in actions.items():
-        if name == "prompt":
+        if name in ("prompt", "pending-dispatch", "retrieval-dispatch", "retrieval-prompt"):
             command.set_defaults(output=None)
         else:
             command.add_argument("--output", help="Write JSON here and return its location")
@@ -76,6 +91,7 @@ def dispatch(args, config):
     action = args.memory_action
     if action == "maintain":
         from .owner import acquire
+        from .prompts import maintenance_layout
         claim = acquire(config.memory_dir, config.raw["memory"]["project_id"], args.holder, args.control)
         if not claim["acquired"]:
             if args.output:
@@ -84,6 +100,7 @@ def dispatch(args, config):
                 path.write_text(json.dumps(claim, ensure_ascii=False, indent=2), encoding="utf-8")
                 return {"output": str(path)}, 0
             return claim, 0
+        layout = maintenance_layout(config, mode=args.mode, available_subagents=args.available_subagents)
     if action == "guide":
         result = {"skill": str(Path(__file__).with_name("SKILL.md"))}
     elif action == "stop":
@@ -105,7 +122,18 @@ def dispatch(args, config):
     elif action == "prompt":
         from .prompts import render_prompt
         result = render_prompt(config, args.receipt, args.control,
-                               role=args.role, tier=args.tier, paths=args.paths)
+                               role=args.role, tier=args.tier, paths=args.paths,
+                               team=args.team, reader=args.reader)
+    elif action == "pending-dispatch":
+        from .prompts import pending_workers
+        material = json.loads(Path(args.receipt).read_text(encoding="utf-8"))
+        result = {"workers": pending_workers(material["layout"], args.available_subagents,
+                                             started_task_names=args.started_task_names)}
+    elif action in ("retrieval-dispatch", "retrieval-prompt"):
+        from .prompts import retrieval_dispatch, render_retrieval_prompt
+        render = retrieval_dispatch if action == "retrieval-dispatch" else render_retrieval_prompt
+        result = render(config, args.request, slot=args.slot,
+                        available_subagents=args.available_subagents, tier=args.tier)
     else:
         from .store import Memory
         memory = Memory(config)
@@ -171,16 +199,20 @@ def dispatch(args, config):
             result["acquired"] = True
             result["discovery"] = {"mode": discovery["mode"], "sources": len(scope),
                                    "gaps": discovery["gaps"]}
-            if result["needs_semantic"]:
-                receipt = Path(result["receipt"])
-                material = json.loads(receipt.read_text(encoding="utf-8"))
-                material["codex"] = {"project_id": codex["project_id"],
-                                     "capture_dir": str(config.memory_dir / "codex"),
-                                     "attachment_dir": str(config.memory_dir / "codex-attachments")}
-                if "receipt" in codex:
-                    material["codex"]["receipt"] = codex["receipt"]
-                receipt.write_text(json.dumps(material, ensure_ascii=False, indent=2), encoding="utf-8")
-                result["worker"] = prompt_dispatch(config, result["receipt"], control)
+            result["layout"] = layout
+            receipt = Path(result["receipt"])
+            material = json.loads(receipt.read_text(encoding="utf-8"))
+            material["layout"] = layout
+            material["codex"] = {"project_id": codex["project_id"],
+                                 "capture_dir": str(config.memory_dir / "codex"),
+                                 "attachment_dir": str(config.memory_dir / "codex-attachments")}
+            if "receipt" in codex:
+                material["codex"]["receipt"] = codex["receipt"]
+            receipt.write_text(json.dumps(material, ensure_ascii=False, indent=2), encoding="utf-8")
+            if result["needs_semantic"] and layout["teams"]:
+                result["worker"] = prompt_dispatch(config, result["receipt"], control, layout=layout)
+            elif result["needs_semantic"]:
+                result["dispatch_blocked"] = "No subagent capacity; semantic work remains pending."
     if args.output:
         path = Path(args.output).resolve()
         path.parent.mkdir(parents=True, exist_ok=True)

@@ -6,7 +6,7 @@
 
 按 [项目接入](setup-project.md#启用记忆) 选独立目录、回环 endpoint 和 UUID，再按 [项目 SurrealDB](administrator.md#项目-surrealdb) 准备认证服务与唯一密码文件，在独立调用核 ready/init/brief。同项目多聊天复用服务，另一个项目使用自己的物理目录、端口及 UUID；通用 exe 和模型可共用。服务在查询期间保持运行。前台排错可在普通用户终端直接执行同一个 serve.ps1，其 cwd 与 endpoint 仍来自目标配置。
 
-普通 init 只生成配置和未启用记忆的入口；memory init 才安装 schema 并绑定 UUID、刷新 instructions 与 AGENTS 的记忆指令块。共用托管块更新保留块外原字节；重复刷新幂等，损坏标记明确报错。误连其它 UUID 的库会失败。每个新进程按 [新 shell 接续](setup-project.md#新-shell-接续) 使用本机 Python 与显式配置运行 brief；客户端自动读 password_file（默认 memory_dir/password.txt）。升级或搬迁后重新 memory init 刷新定位；只用资源工具无需记忆数据库。
+普通 init 只生成配置和未启用记忆的入口；memory init 才安装 schema 并绑定 UUID、刷新 instructions 与 AGENTS 的记忆指令块。共用托管块更新保留块外原字节；重复刷新幂等，损坏标记明确报错。误连其它 UUID 的库会失败。每个新进程按 [新 shell 接续](setup-project.md#新-shell-接续) 使用本机 Python 与显式配置运行 brief；客户端自动读 password_file（默认 memory_dir/password.txt）。升级或搬迁时先按 [配置维护要点](project-config-maintenance.md) 核实际路径，再运行 memory init 刷新托管块；instructions 块外旧路径另核。只用资源工具无需记忆数据库。
 
 ## 首建与维护
 
@@ -21,7 +21,7 @@ function memory {
     & $python -X utf8 -m basepack --config $config memory @args
     if ($LASTEXITCODE -ne 0) { throw "memory command failed ($LASTEXITCODE)" }
 }
-memory maintain --holder '<本thread身份>' --control '<memory.data_dir>/maintenance/<全新标识>.control'
+memory maintain --mode manual --holder '<本thread身份>' --control '<memory.data_dir>/maintenance/<全新标识>.control'
 # 仅 acquired=true 时继续；已有 owner 时报告持有者。
 memory prepare --paths '说明.md' '决定.md' --output '<project-root>/tmp/<run>/reading.json'
 # 阅读 prepare 输出，写出 agent-batch.json 后继续。
@@ -45,10 +45,12 @@ apply 核对来源版本，以及本批改写、退役、更正目标、实际�
 
 ## 自动维护与手动维护
 
-宿主有可取消子任务句柄及任务开始/完成事件时，分配稳定且全新的 control，与业务并行运行预检。程序预检前原子取得项目所有权；每个 thread 仍可 brief、报告问题及正常业务：
+主任务启动或接续时仍运行 brief。直觉预计不超过十分钟时跳过整个自动 maintain，包括预检、采集和取得 owner；明显更长时，在宿主有可取消子任务句柄及开始/完成事件的条件下，与业务并行启动一次全项目维护。范围明显扩大时重新判断，必要时首次启动，不等待计时门槛。子任务遵循委托和渲染提示词，不递归开维护。用户明确要求维护时用 `--mode manual`，不受时长门槛限制；缺少宿主生命周期能力时说明自动维护不可用，采用显式维护任务。
+
+启动时分配稳定且全新的 control。程序预检前原子取得项目所有权；每个 thread 仍可 brief、报告问题及正常业务：
 
 ```powershell
-memory maintain --holder '<本thread身份>' --control '<memory.data_dir>/maintenance/<全新标识>.control' --output '<project-root>/tmp/<run>/summary.json'
+memory maintain --mode automatic --holder '<本thread身份>' --control '<memory.data_dir>/maintenance/<全新标识>.control' --output '<project-root>/tmp/<run>/summary.json'
 ```
 
 默认面向整个项目的受管来源，不按当前业务任务的文件缩小维护范围。Git 项目枚举项目内已跟踪和未忽略的未跟踪文件，并加入 `memory.source_scope` 显式包含项，排除工具状态、环境与缓存；非 Git 项目使用声明的 `source_scope`。所有已登记来源、历史 pending/未接受范围和可归属 Codex 原件持续参与维护。`--scope <文件或目录> ...` 只覆盖本轮新文件发现，不把历史来源限制到该范围。无需为日常维护递归扫描 `.`；不支持的二进制材料留缺口，读取失败保留原错。
@@ -59,20 +61,26 @@ memory maintain --holder '<本thread身份>' --control '<memory.data_dir>/mainte
 
 程序在依据闭合时处理原字节 hash 相同的元数据变化、完整正文仅 CRLF/LF 变化，以及有唯一定位且上下文可确认未变的原文块；相互依赖的机械候选共同发布，无法证明依赖仍有效的范围留给语义共读。完整回执保留机械批次、旧/新行映射、变化片段、受影响成员与关系；换行归一只用于比较，快照仍按真实原字节保存。编码输入及身份未变才复用向量；实际输入变化按现有 apply 合同编码。已有 stale、更正、退役或语义证据不足的范围保留待核，局部文字相同不表示父级摘要或关系均有效。
 
-`acquired=false` 时返回已有 owner 的 holder/run_id/执行状态，跳过自身维护并继续业务；显式维护请求需报告该阻塞。`acquired=true` 时返回机械计数、`needs_semantic`、`receipt`、`control`、来源/采集边界及必要的 `worker`。未决反馈也触发语义维护，原件未变或 pending 为零并不关闭它。`needs_semantic=false` 时不创建语义 agent；为 true 时，宿主实际设置 `worker.model` 和 `worker.reasoning_effort`，干净历史派协调者，只传：
+`acquired=false` 时返回已有 owner 的 holder/run_id/执行状态，跳过自身维护并继续业务；显式维护请求需报告该阻塞。`acquired=true` 时返回机械计数、`needs_semantic`、`receipt`、`control`、固定的 `layout`、来源/采集边界及容量允许时的 `worker`。未决反馈也触发语义维护，原件未变或 pending 为零并不关闭它。`needs_semantic=false` 时不创建语义 agent；为 true 且存在 worker 时，宿主实际设置 `worker.task_name`、`worker.model` 和 `worker.reasoning_effort`，干净历史派协调者，只传：
 
 ```text
 Run the following command and follow the `prompt` field in its JSON output:
 <worker.render_command>
 ```
 
-子 agent 自己执行该命令并遵循返回的 `prompt`。默认命令为 `memory prompt --receipt <receipt> --control <control>`；它返回 `prompt`、`role`、`tier`、`model`、`reasoning_effort` 和 `render_command`。协调者与 reader 的英文提示词随 wheel 分发，详细分工只在模板维护。reader 使用 `--role reader --paths <项目文件...>`。角色与档位独立：协调者默认 tier2，reader 默认 tier1；显式 `--tier <tier>` 仍保留所选角色，按项目映射解析模型。提示词渲染只读配置、模板与回执，不读密码、不连数据库或模型，也不改控制文件或状态。
+子 agent 自己执行该命令并遵循返回的 `prompt`。`memory prompt --receipt <receipt> --control <control> --team 0` 渲染第 0 队协调者；reader 使用 `--team <t> --role reader --reader <r> --paths <项目文件...>`。其它队协调者也必须有有界 `--paths`，派前将返回命令中的来源占位符替换为实际分配文件。脚本统一给出名称、父子位置、模型、推理强度和发布权限；宿主原样设置，不临时设计人数或自由起名。角色与档位独立：协调者默认 tier2，reader 默认 tier1；显式 `--tier <tier>` 仍保留角色。渲染只读配置、模板与固定回执，不读密码、不连数据库或模型，也不改控制文件或状态；配置变化不重写已开始的一轮布局。
+
+布局使用接入时保存的宿主上限 C（不含主 agent、含全部后代）。宿主已有实时可用额度 A 时传 `--available-subagents <A>`：A 已扣其它占用（含检索），尚未扣本轮业务预留；自动维护预留 1 席，手动维护预留 0 席。脚本计算 `M=max(0,min(C,A)-预留)`。无 A 时仅返回配置允许的组织上限，实时额度未核，实际创建仍受宿主准入约束；容量快照的刷新见 [配置维护要点](project-config-maintenance.md#修改并发上限或切换宿主profile)。
+
+自动模式始终仅第 0 队：M 为 1–3 时单协调者，M≥4 时加至多 4 名 reader。手动模式 M 为 1–4 时单协调者；M≥5 时启用 `min(10,floor(M/5))` 个满队，每队 1 协调者和 4 reader，余量留空。M=0 不派 worker，未处理材料保持待办。材料不足时少启用整队；零 reader 的协调者亲自 prepare、读原文、分块、摘要、建图、处置与发布，不等待 reader。所有队共用一份 owner/control/receipt，第 0 队协调者是唯一 apply 发布者及反馈结案者；其它队在其子树内交稿，不独立开维护或发布。
+
+批次接续使用已知自有句柄；下一轮仅在上一轮及发布已结束后复用合规句柄，并使用全新 control。名称本身不证明实例归属。容量准入失败时保留原错与未派项、停止新增派工；取得新额度后用 `memory pending-dispatch --receipt <receipt> --available-subagents <A> --started-task-names <已启动名称...>` 仅缩减未启动清单，保留已启动名称和权限。不开第二个 owner，不以未派工冒充完成。
 
 协调者按来源分批，安排 reader，首次生成跨来源关系时共读两端并统一发布；持续接批直到业务停止、固定候选耗尽或实际阻碍。每批 prepare/expected/apply 发布，不追加日常发布后的审计。采用固定候选与聊天截点；prepare 读各批当时的原件，不声称任务开始时全项目原子冻结。回执外新增材料留后续；处置、粗层和待细化分别报告。
 
 采集与发布沿用自有 control。业务完成时，以本项目配置 `memory stop --control <control>`，取消协调者及后代；通过 `memory owner` 核发布状态，再 `memory release --control <同一control>`。stop 不撤销已获准提交，release 要求已停止且无未完成/未明发布。control 是协作授权凭证，只给持有者及其 worker，不能复用或按清理习惯删除。失败保留原错与 owner，业务答复报告余项。异常遗留先独立核旧持有者/后代已结束及事务结果已解决，再显式 `memory recover-owner --run-id <id> --owner-ended --publication-resolved`；不按文件年龄抢占。此机制用于协作互斥，不隔离有文件系统访问权的对手。
 
-自动小批接续已有积压，任务相关性只影响优先级。显式维护按授权范围交付实际处置、阻塞和余项，不以剩余数量或优先小批自行结案。普通业务结束不承诺清空历史。特殊任务可调整组织/范围或使用临时英文提示词，说明原因与覆盖。
+自动小批接续已有积压，任务相关性只影响优先级。显式维护按授权范围交付实际处置、阻塞和余项，不以剩余数量或优先小批自行结案。普通业务结束不承诺清空历史；连续短任务的积压留下一次长任务或显式维护。特殊任务可按授权调整范围，固定名称和本轮容量仍由脚本提供。
 
 ## 使用反馈与手动审计
 
@@ -148,7 +156,15 @@ memory read '<basis.member>' --source-version '<basis.source_version>' --start-l
 
 任务已知少量文件时，启动 brief 后可以直接批量读取；需要发现位置、未点名前提或跨材料依据时，再用记忆检索。父级摘要用于补背景或条件，选证据时避免重复已选原文块。
 
-工作 agent 可只委托一次，使用 [项目配置](setup-project.md#agent-模型等级) 的检索等级（默认 tier1），让 worker 完成多轮检索、父子/语义展开、原文核实和评分，再用 `rank --input <scored.json> --budget <文字字符数>` 排序交付实际内容。rank 按依据版本、读取位置及实际表示去重，区分同一成员的历史版本/范围、摘要或标题更正及图片不同区域。词法分数与 agent 分数不同。超预算证据保留补读入口，不静默截掉条件；工作 agent 仍可自由补读。
+检索一次委托涵盖多轮 search、read、neighbors、评分和 rank，默认按 [项目配置](setup-project.md#agent-模型等级) 使用 tier1。先保存 UTF-8 request JSON（`question`、`scope` 均为字符串，`content_budget` 为正整数字符预算），再调用独立派工入口：
+
+```powershell
+memory retrieval-dispatch --request '<project-root>/tmp/<run>/request.json' --slot 0
+```
+
+有宿主实时可用额度时加 `--available-subagents <A>`，显式改档用 `--tier <tier>`。按返回的 `task_name`、`model` 和 `reasoning_effort` 设置宿主参数，以干净历史派 worker，仅传上述英文启动句及 `render_command`；worker 自行运行 `retrieval-prompt`。同一问题继续用原句柄；多个独立并发问题传不同 slot，使用脚本返回的名称并保持干净历史。固定名称不能作为复用他人实例或任意加后缀的依据。零容量时返回 `executor='main'`，主 agent 运行同一渲染命令完成流程并如实报告执行者。
+
+检索与维护共享宿主容量，但独立检索不要求 receipt/control/owner，不启动 maintain 或维护协调者；短任务跳过自动维护仍可检索。rank 按依据版本、读取位置及实际表示去重，区分同一成员的历史版本/范围、摘要或标题更正及图片不同区域。词法分数与 agent 分数不同。超预算证据保留补读入口，不静默截掉条件；工作 agent 仍可自由补读。
 
 ## 备份与恢复
 

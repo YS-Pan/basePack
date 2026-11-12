@@ -1,6 +1,6 @@
 # 项目记忆实现
 
-源码面向0.10.0.dev1，实现SurrealDB多层文字、原图向量与语义关系、单owner全项目维护、使用反馈和随包英文提示词。首建和维护由宿主订阅agent阅读生成，程序提交成功即完成普通批次，默认无额外审计。当前实现、安装与限制见[维护改造结果](../../tasks/20261106-memory-system/maintenance-implementation-result.md)，完整历史沿[记忆专项进度](../../tasks/20261106-memory-system/progress.md)，用户流程见[记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
+源码面向0.11.0.dev1，实现SurrealDB多层文字、原图向量与语义关系、单owner全项目维护、使用反馈和随包英文提示词。本轮时长入口、容量快照与固定派工见[实施结果](../../tasks/20261106-memory-system/dispatch-implementation-result.md)。首建和维护由宿主订阅agent阅读生成，程序提交成功即完成普通批次，默认无额外审计。此前生命周期见[维护改造结果](../../tasks/20261106-memory-system/maintenance-implementation-result.md)，完整历史沿[记忆专项进度](../../tasks/20261106-memory-system/progress.md)，用户流程见[记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
 
 ## 职责与数据
 
@@ -32,15 +32,17 @@ brief、search 和 read 只读取已发布状态及其依据版本，不扫描�
 
 `memory maintain` 默认以项目 Git 清单（已跟踪与未忽略的未跟踪文件）加 source_scope 显式包含项发现原件；非 Git 项目使用声明范围。已登记来源、历史 pending/未接受范围与可归属 Codex 原件持续参与，`--scope` 只覆盖新文件发现。零行文字且无活动知识时仅登记来源；清空旧正文仍须处理旧成员及依赖，重新出现正文继续发现。机械候选按成员依据闭合共批，组外依据须为仍有效且原件版本一致的知识；不能证明闭合时转语义候选。完整回执保存深比较与机械等价证据；短结果报告 discovery 边界/缺口、receipt、control 及 worker 派工元数据。历史 stale 不能仅因最后一次事件为 detected_change 就恢复；枚举与机械更新不证明完整语义覆盖。
 
-`memory prompt --receipt <receipt> --control <control>` 只读项目配置、随包英文模板和回执，返回 prompt、角色、档位、实际模型映射及可重复运行的 render_command；不读取凭据、不连库或模型、不写控制与状态。默认 coordinator/tier2，`--role reader --paths ...` 默认 reader/tier1；显式 `--tier` 仅改模型档位。宿主先把返回的模型/推理强度设到派工接口，再给子 agent 一条英文启动句及命令，由其执行并遵循 prompt；角色详细逻辑在模板单一维护。
+安装agent取得不含主agent、包含后代的宿主容量及来源，写入项目AI配置，已有项目用config set-concurrency显式刷新。ProjectConfig统一解析；缺少快照的旧项目须先补齐，查询和普通资源用途不因此失败。[prompts.py](../../../experiments/20261106-basepack/src/basepack/memory/prompts.py)集中维护纯布局算法和固定名称；maintain --mode automatic/manual接收可得原始空闲额度，回执保存layout及AI快照。额度未知仅标组织上限。自动仅0队，手动仅满队，低预算由单coord兼reader；只有coord_0发布，其它队有界阅读合稿。数量边界及完整流程见用户说明。
 
-宿主提供生命周期和可取消子任务时，异步执行`maintain --holder <thread> --control <fresh-path>`，在预检前原子取得项目owner；被占用时继续业务，不另派维护。协调者持续处理固定回执内的下一批、reader与统一发布，显式维护须实际处置授权范围或报告阻塞。结束时stop自有control、取消自有后代、确认发布结束再release；stop不等待已获准提交，发布未明保留owner，不按锁年龄抢占。HTTP查询、问题报告不要求owner；CLI apply须用自有control，Python apply省略时仅在空闲项目取得短期owner。控制不终止共享服务或已开始的推理。
+`memory prompt --receipt <receipt> --control <control>` 只读配置、英文模板与已保存布局，返回task_name、角色、模型、推理强度和render_command；不读凭据、不连库或模型、不写状态。--team/--reader定位固定槽位，reader及非0队coord必须给限定paths；仅显式--tier改档，配置中途变化不重组本轮。宿主原样设置返回的名称/模型/推理强度，再给英文启动句及命令。pending-dispatch只缩减未启动清单，不重命名已启动实例，手动未启动新队不足满队时留空。角色逻辑由模板维护。
+
+主任务启动时直觉判断业务经过时间，约十分钟以内保留brief并跳过整个自动maintain；长任务且宿主支持生命周期和可取消子任务时，异步执行`maintain --mode automatic --holder <thread> --control <fresh-path>`。范围明显扩大时可首次启动，子任务不递归维护；直接显式维护不受门槛限制，默认manual。命令在预检前原子取得项目owner；被占用时继续业务，不另派维护。协调者持续接批，显式维护须实际处置授权范围或报告阻塞。结束stop、取消自有后代、确认发布结束再release；未明发布保留owner。HTTP查询、反馈不要求owner；CLI apply使用自有control，Python apply省略时仅在空闲项目取得短期owner。控制不终止共享服务或已开始的推理。
 
 [feedback.py](../../../experiments/20261106-basepack/src/basepack/memory/feedback.py)在新增feedback表持久保存观察版本、漏检查询和处理结果；报告可并发，无需维护owner，未决报告进入needs_semantic及固定回执。修复先据当前版本apply，再由owner解决报告；旧报告不覆盖新版，未决不假关闭，原生导出恢复保留。检索只做业务所需阅读，发现问题就报告；只有用户明确的审计意图启动手动审计。
 
 [reviewed.py](../../../experiments/20261106-basepack/src/basepack/memory/reviewed.py)把非空来源实际已读范围的无新增/重复处置及已读待细化保存在source_version，核相关表示版本。有效处置抑制未变首建，来源/依赖变化重新入队；部分范围不代表整源。粗层表示仍保留精选原文依据和mandatory，未读缺口不伪作已读。非空parent纳入共用版本和解析检查；依赖临时写guard防止快照隔离写偏斜，逻辑版本和未变历史不增加。
 
-[selection.py](../../../experiments/20261106-basepack/src/basepack/memory/selection.py) 按真实 worker 分数排序，去重同时考虑成员、依据版本、位置及实际 kind/title/text，原文覆盖只在同路径和版本内比较；区分同一成员的历史版本/范围、摘要或标题更正及图片不同 locator。按文字预算交付完整内容与省略入口，词法距离不冒充 agent 分数。已安装 [skill](../../../experiments/20261106-basepack/src/basepack/memory/SKILL.md) 驱动一次检索委托，宿主按 `config ai --purpose retrieval` 的结果派工（默认 tier1），没有模型 API 或后台 agent。
+[selection.py](../../../experiments/20261106-basepack/src/basepack/memory/selection.py) 按真实 worker 分数排序，去重考虑成员、依据版本、位置及实际内容；按文字预算交付内容与省略入口，词法距离不冒充agent分数。已安装[skill](../../../experiments/20261106-basepack/src/basepack/memory/SKILL.md)驱动一次完整检索委托；retrieval-dispatch及retrieval-prompt读取结构化question/scope/content_budget，返回固定bp_mem_search_s名称及检索档位（默认tier1），不绑定维护回执/control/owner。零空闲席位明确由主agent执行。独立问题使用干净历史；同名冲突只复用生命周期兼容的自有句柄，否则报告原错。没有模型API、后台agent或持久槽位登记表。
 
 memory init 安装原生 schema 并绑定项目 UUID，同时在项目 instructions 加入 brief 与已安装 skill 入口；普通 init 不建库。新进程按生成入口直接使用显式配置读取 brief，客户端与 launcher 读取同一密码文件，配置只接受回环 endpoint。入口同时定位本项目 launcher、cwd 和日志。数据库进程必须按项目独立物理目录启动，多聊天共用该进程。绑定核查防止误连另一项目；数据路径的实际归属仍须部署命令正确配置。
 

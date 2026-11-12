@@ -1,8 +1,8 @@
 # 记忆维护入口、并发与 worker 派工计划
 
-2026-11-12（北京时间）。状态：用户已选定 **T2 + N2 + S2**，待实施。S2 为安装保存宿主并发上限、运行时由纯函数计算组织并生成 prompt；本文件是后续实施合同的单一维护源，[评估](research/capacity-driven-prompts-20261112.md)保留选型依据。本轮只更新计划，尚未修改实际配置、入口、程序、提示词或安装包。现行安装基线仍为 0.10.0.dev1；历史交付见[实施结果](maintenance-implementation-result.md)。
+2026-11-12（北京时间）。用户已授权执行 **T2 + N2 + S2**。S2 为安装保存宿主并发上限、运行时由纯函数计算组织并生成 prompt；本文件保留已定设计合同，[评估](research/capacity-driven-prompts-20261112.md)保留选型依据。0.11.0.dev1的实际交付、验证和边界见[派工实施结果](dispatch-implementation-result.md)；此前0.10生命周期交付见[实施结果](maintenance-implementation-result.md)。
 
-## 用户要求与当前差距
+## 用户要求与改动前差距
 
 用户要求主 agent 在任务启动时凭直觉估计业务耗时：约十分钟以内不启动自动记忆维护，超过十分钟才启动，不要求准确预测。自动维护的专职协调者和执行者采用统一命名规则，不再由每个调用者自由起名。
 
@@ -10,9 +10,9 @@
 
 用户进一步提出低并发时只保留一个 coord 并兼做 reader。本计划采用这一最小组织：整轮维护可用预算较少时，默认只启动 `bp_mem_coord_0`，由它自己阅读、生成和发布；独立 reader 和额外队伍按工作收益与实际余量增加。
 
-当前 [AGENTS 模板](../../../experiments/20261106-basepack/src/basepack/project/templates/agents-enabled.md)及[本机入口模板](../../../experiments/20261106-basepack/src/basepack/project/templates/memory-enabled.md)默认直接启动 maintain，没有时长判断。[prompt_dispatch](../../../experiments/20261106-basepack/src/basepack/memory/prompts.py)返回角色、模型、推理强度和命令，没有 worker 名称。[协调者模板](../../../experiments/20261106-basepack/src/basepack/memory/prompts/coordinator.md)已有最多四名 reader、协调者唯一发布者及持续接批的约定，尚需统一名称，并为手动多队区分发布协调与阅读协调职责。
+改动前，[AGENTS 模板](../../../experiments/20261106-basepack/src/basepack/project/templates/agents-enabled.md)及[本机入口模板](../../../experiments/20261106-basepack/src/basepack/project/templates/memory-enabled.md)默认直接启动 maintain，没有时长判断；[prompt_dispatch](../../../experiments/20261106-basepack/src/basepack/memory/prompts.py)尚未返回 worker 名称。[协调者模板](../../../experiments/20261106-basepack/src/basepack/memory/prompts/coordinator.md)已有最多四名 reader、唯一发布者及持续接批约定，本轮在此基础上加入固定名称与手动多队职责。
 
-用户另要求把记忆检索 worker 纳入统一命名。当前[检索流程](../../../experiments/20261106-basepack/src/basepack/memory/SKILL.md#retrieve-in-one-delegation)只规定一次委托、默认 tier1、多轮检索／原文阅读／评分／rank，没有规定 task_name；`config ai --purpose retrieval` 仅返回 tier、model 和 reasoning_effort。以下新增检索命名与派工约定同样待实施。
+用户另要求把记忆检索 worker 纳入统一命名。改动前[检索流程](../../../experiments/20261106-basepack/src/basepack/memory/SKILL.md#retrieve-in-one-delegation)只规定一次委托、默认 tier1、多轮检索／原文阅读／评分／rank，没有规定 task_name；`config ai --purpose retrieval` 仅返回模型设置。本轮增加独立检索派工与渲染入口。
 
 ## 共同约束
 
@@ -31,7 +31,7 @@ T2 不以“已经过了十分钟”自动触发，也不把纯粹的估计误�
 
 十分钟作为随包入口里的默认约定，不新增 TOML 配置。若未来确有项目要求不同阈值，再提供单一配置来源；这不是本次需求的实施前提。
 
-拟议入口顺序为：主 agent 理解任务并粗判时长 → 按现有要求 brief → 短任务直接业务；长任务独立异步 maintain。brief 失败与维护启动是两项动作的各自失败，不能因同一段命令里前者 throw，就在未报告的情况下漏掉后者。
+入口顺序为：主 agent 理解任务并粗判时长 → 按现有要求 brief → 短任务直接业务；长任务独立异步 maintain。brief 失败与维护启动是两项动作的各自失败，不能因同一段命令里前者 throw，就在未报告的情况下漏掉后者。
 
 ## 二、已选 N2：短名称、队号与队内槽位
 
@@ -104,7 +104,7 @@ t、r 都从 0 开始。read 后严格两位数字：第一位 t 对应 coord �
 
 ## 三、检索 worker 的固定命名与脚本派工
 
-检索 worker 拟定名称为 `bp_mem_search_0`。同一父 agent 确需同时处理多个独立检索任务时，使用脚本给定的 `bp_mem_search_1`、`bp_mem_search_2` 等槽位；序号表示检索槽位，不是维护队号。它与 `bp_mem_coord_t`／`bp_mem_read_tr` 使用不同角色名。
+检索 worker 名称为 `bp_mem_search_0`。同一父 agent 确需同时处理多个独立检索任务时，使用脚本给定的 `bp_mem_search_1`、`bp_mem_search_2` 等槽位；序号表示检索槽位，不是维护队号。它与 `bp_mem_coord_t`／`bp_mem_read_tr` 使用不同角色名。
 
 - 一次检索委托默认一名 worker，负责全部必要 search、read、neighbors、评分和 rank，再交付内容、依据与缺口；查询改写、补读与重排不创建新名字，也不按系统上限自动拆成多个检索 worker。
 - 名称与维护命名共用程序维护源，增加独立的检索派工／prompt 渲染入口，统一返回 `task_name`、`model`、`reasoning_effort` 和 `render_command`。问题、项目范围及内容预算作为结构化输入，不拼进名称；调用者原样设置宿主参数，不自由起名。
@@ -119,11 +119,12 @@ t、r 都从 0 开始。read 后严格两位数字：第一位 t 对应 coord �
 
 ### 配置采集与刷新
 
-安装／项目接入 agent 从宿主有效配置或明确报告中取得容量 C，统一为“不含主 agent、包含全部后代”的 subagent 上限，写入项目 `.basepack/config.toml` 的 `[ai].max_concurrent_subagents`。这是待实施的新字段，例如：
+安装／项目接入 agent 从宿主有效配置或明确报告中取得容量 C，统一为“不含主 agent、包含全部后代”的 subagent 上限，写入项目 `.basepack/config.toml` 的 `[ai].max_concurrent_subagents`，并记录 `concurrency_source`。这是0.11.0.dev1新增字段，例如：
 
 ```toml
 [ai]
 max_concurrent_subagents = 12
+concurrency_source = "Host effective limit excluding main; collected during setup"
 ```
 
 容量与使用该项目的宿主绑定，不假设一次 Python 安装只有一种宿主配置。`ProjectConfig` 是唯一解析入口，`config show` 展示解析后的值及简短采集依据；各队和检索模板不复制容量。宿主未显式配置且无法取得实际值时，在接入阶段一次性取得明确值，不猜 3、13 等默认数。
@@ -170,7 +171,7 @@ C 是安装／接入快照。系统上限、profile 或宿主改变后，在升�
 
 ## 五、项目配置维护要点文档与入口
 
-实施时新增面向使用者及协助维护的 agent 的 `experiments/20261106-basepack/docs/project-config-maintenance.md`，记录维护 basePack 项目配置时的要点。具体盘点与当前机制见[配置维护依据](research/project-config-maintenance-20261112.md)，本轮先完成盘点和计划，不提前发布包含未实现 S2 字段的操作说明。
+新增面向使用者及协助维护agent的[项目配置维护要点](../../../experiments/20261106-basepack/docs/project-config-maintenance.md)。具体盘点依据见[配置维护依据](research/project-config-maintenance-20261112.md)，实际交付说明与0.11.0.dev1字段及读取机制保持一致。
 
 文档按变更事件组织，逐项交代配置来源／读取时机、会过时或不同步的原因、要联动的文件／服务／状态及最小确认：
 
@@ -184,14 +185,14 @@ C 是安装／接入快照。系统上限、profile 或宿主改变后，在升�
 
 ## 已定方案与实施顺序
 
-用户已定 **T2 + N2 + S2** 及上述命名，实施授权尚未给出。后续实施顺序：
+用户已定 **T2 + N2 + S2** 及上述命名，并已授权实施。交付顺序：
 
 1. 验证宿主并发配置、层级、名称和句柄复用边界；扩展安装／接入以采集容量，ProjectConfig 统一解析并展示快照，补齐已有项目配置。
 2. 在现有 prompt 路径加入纯组织函数，按 S2 生成和固定本轮布局；在 AGENTS 与详细入口模板加入 T2 时长判断，随包 memory skill 承接详情。直接 maintain 命令不增加程序“猜时长”或强制计时拦截，显式维护仍可直接使用。
 3. 扩展既有派工元数据，区分自动单队与手动多队、总协调与阅读协调的英文提示词及发布权限，使名称由同一来源生成、在实际创建时使用。明确零 reader 时 coord 亲自执行完整阅读与发布流程，低并发不强制派满 reader；保留默认 tier2 协调、独立 reader 默认 tier1 和第 0 队统一发布职责。增加检索 worker 独立派工／渲染入口，采用 `bp_mem_search_s` 固定槽位名与检索档位，不带维护所有权合同。
 4. 交付项目配置维护要点文档及条件阅读入口，补齐并发快照与本次盘点的联动事项；更新实际行为说明并复用既有入口刷新与 prompt 测试。通过下列场景后构建普通 wheel，按原 UUID、凭据和知识保留合同升级目标项目；刷新前先收尾旧版本维护，其它项目是否升级单独记录。
 
-当前部署没有应用这些步骤。本轮仅形成计划与进度入口，项目纲领保持原文。
+实际部署及检查以[派工实施结果](dispatch-implementation-result.md)为准，项目纲领保持原文。
 
 ## 验收与边界
 

@@ -4,9 +4,13 @@ from importlib.resources import files
 import json
 import os
 from pathlib import Path
+import re
 from string import Template
 import sys
+import tomllib
 from uuid import uuid4
+
+from .config import ProjectConfig, _validate_concurrency
 
 
 def template(name: str) -> str:
@@ -14,9 +18,11 @@ def template(name: str) -> str:
 
 
 def init_project(root: str | Path, machine_config: str | Path,
-                 config_name: str = ".basepack/config.toml", *, codex_project_id: str = "",
+                 config_name: str = ".basepack/config.toml", *, max_concurrent_subagents: int,
+                 concurrency_source: str, codex_project_id: str = "",
                  codex_other_project_roots: list[str] | None = None,
                  codex_registry_complete: bool = False) -> Path:
+    _validate_concurrency(max_concurrent_subagents, concurrency_source)
     root = Path(root).resolve()
     machine_config = Path(machine_config).resolve(strict=True)
     config = (root / config_name).resolve()
@@ -37,6 +43,8 @@ def init_project(root: str | Path, machine_config: str | Path,
         machine_config=json.dumps(str(machine_config), ensure_ascii=False),
         root=json.dumps(Path(os.path.relpath(root, config.parent)).as_posix(), ensure_ascii=False),
         memory_project_id=str(uuid4()),
+        max_concurrent_subagents=max_concurrent_subagents,
+        concurrency_source=json.dumps(concurrency_source, ensure_ascii=False),
         codex_project_id=json.dumps(codex_project_id, ensure_ascii=False),
         codex_other_project_roots=json.dumps([str(Path(path).resolve())
                                             for path in codex_other_project_roots or []], ensure_ascii=False),
@@ -45,6 +53,37 @@ def init_project(root: str | Path, machine_config: str | Path,
     _write_project_entry(root, config, Path(sys.executable))
     config.write_text(text, encoding="utf-8")
     return config
+
+
+def set_project_concurrency(config: ProjectConfig, *, max_concurrent_subagents: int,
+                            concurrency_source: str) -> dict:
+    """Update the host snapshot without regenerating project identity or entries."""
+    _validate_concurrency(max_concurrent_subagents, concurrency_source)
+    original = config.path.read_bytes().decode("utf-8")
+    newline = "\r\n" if "\r\n" in original else "\n"
+    settings = {"max_concurrent_subagents": max_concurrent_subagents, "concurrency_source": concurrency_source}
+    assignments = newline.join(f"{key} = {json.dumps(value, ensure_ascii=False)}" for key, value in settings.items()) + newline
+    header = re.search(r"(?m)^[ \t]*\[ai\][ \t]*(?:#[^\r\n]*)?\r?$", original)
+    if header:
+        opening = original.find("\n", header.end())
+        opening = len(original) if opening == -1 else opening + 1
+        following = re.search(r"(?m)^[ \t]*\[", original[opening:])
+        closing = opening + following.start() if following else len(original)
+        body = original[opening:closing]
+        for key in settings:
+            body = re.sub(rf"(?m)^[ \t]*(?:{key}|'{key}'|\"{key}\")[ \t]*=[^\r\n]*(?:\r?\n|$)", "", body)
+        prefix = original[:opening]
+        if not prefix.endswith("\n"):
+            prefix += newline
+        updated = prefix + assignments + body + original[closing:]
+    else:
+        separator = "" if not original or original.endswith("\n") else newline
+        updated = original + separator + newline + "[ai]" + newline + assignments
+    expected = {**config.raw, "ai": {**config.raw.get("ai", {}), **settings}}
+    if tomllib.loads(updated) != expected:
+        raise ValueError("Concurrency update changed unrelated project configuration; edit the [ai] snapshot explicitly")
+    config.path.write_bytes(updated.encode("utf-8"))
+    return settings
 
 
 def _write_project_entry(root: Path, config: Path, python: Path) -> None:

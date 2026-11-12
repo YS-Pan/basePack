@@ -1,7 +1,9 @@
 <a id="ai-resources"></a>
 ## AI 与资源
 
-宿主分配 AI 工作前，用本机 Python/配置前缀运行 `config ai` 解析日常默认，`config ai --purpose retrieval` 解析多轮检索、筛选与重排默认，或 `config ai --tier tier2` 显式选档；按返回的 `model` 与 `reasoning_effort` 派工。档位映射只在项目配置 `[ai]` 维护。[检索派工详情](<$skill#retrieve-in-one-delegation>)。
+宿主分配普通 AI 工作前，用本机 Python/配置前缀运行 `config ai` 解析日常默认，或 `config ai --tier tier2` 显式选档；按返回的 `model` 与 `reasoning_effort` 派工。记忆维护使用返回的 `worker`；检索使用独立 `memory retrieval-dispatch --request <JSON> --slot <槽位>`，按脚本返回的名称、模型和推理强度派工，不取得维护所有权。[检索派工详情](<$skill#retrieve-in-one-delegation>)。
+
+安装、升级或维护本项目 basePack 配置时，先读 [项目配置维护要点](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/project-config-maintenance.md)，按受影响的变更同步；普通业务沿现有配置执行。
 
 在其它工作目录调用时，显式传配置绝对路径；不搜索父目录。首次接入运行 `doctor`（默认 core）；选用图文或作业能力时，再显式运行 `doctor --facility embedding` 或 `doctor --facility condor`。资源调用按安装包的 `embed` 与 `jobs` 帮助使用。共享 embedding 由机器服务托管，客户端只连接；`embed --timeout` 只结束等待，已开始的共享推理仍可继续。服务未运行时由机器管理员启动。
 

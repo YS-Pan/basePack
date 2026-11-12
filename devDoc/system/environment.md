@@ -8,6 +8,10 @@
 
 选留证据现统一位于根 `artifacts/runs/`。前次临时材料整理的映射为 `artifacts/runs/tmp-reorganization-20261108/moves.json`，本次位置映射为 `artifacts/runs/20261109-project-layout/moves.json`；原始回执及下文历史路径保留当时含义，结合两轮映射回查长期副本，tmp 内容按可清除处理。
 
+## 2026-11-12 0.11.0.dev1入口与派工升级
+
+本项目独立环境`D:/AgentTools/envs/basepack-client-0.10/`保留路径，普通wheel升级0.11.0.dev1；有效Codex容量12（不含主agent）已采集并写入项目配置。最终安装52个包文件与源码/wheel逐字节一致，升级前后UUID、七表计数、meta、凭据及launcher摘要保持；入口自动刷新保留块外字节，随后定点更新本机版本说明。最终普通wheel相关226项通过，brief三条mandatory均fresh。实际单coord、检索、宿主层级及使用边界见[派工实施结果](../tasks/20261106-memory-system/dispatch-implementation-result.md)。所有自有owner已释放，没有执行数据库或共享模型重启，其它项目未升级。
+
 ## 2026-11-12 重启后的项目记忆库恢复
 
 Windows `LastBootUpTime` 为北京时间 2026-11-12 01:48:16。故障时本项目 18080 无监听；现存 SurrealDB 进程实际属于 array reconstruct 项目、监听 18089。本项目沿用普通用户手动进程，没有开机启动，重启后须重新运行 `.basepack/memory/serve.ps1`。受限宿主中的上一轮 Hidden 启动只返回脚本 PID，两份日志为空，随后连接仍被拒；不能据 PID 认定数据库就绪，也没有证据将该次启动失败归因于旧事务冲突。

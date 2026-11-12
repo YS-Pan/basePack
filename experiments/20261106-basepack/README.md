@@ -1,10 +1,10 @@
 # basePack
 
-`20261106-basepack` is the only active implementation route. The current source targets 0.10.0.dev1, in development, for Windows and Python 3.13+. Each project keeps its configuration, knowledge, source evidence, and job records in its own `.basepack/`; programs and models can be shared. Start with the clone, virtual environment, and installation commands in the root [README](../../README.md#install-the-lightweight-client).
+`20261106-basepack` is the only active implementation route. The current source targets 0.11.0.dev1, in development, for Windows and Python 3.13+. Each project keeps its configuration, knowledge, source evidence, and job records in its own `.basepack/`; programs and models can be shared. Start with the clone, virtual environment, and installation commands in the root [README](../../README.md#install-the-lightweight-client).
 
 This project's own source and documentation use the [MIT license](LICENSE), matching the root license. Third-party notices remain in the package.
 
-Memory uses SurrealDB 4. File summaries, actual sections, source excerpts, and images are searchable graph members. Host subscription agents read originals, choose boundaries, summarize, build relations and score results. The program checks source and knowledge dependencies and publishes knowledge with matching vectors in one native WebSocket transaction, transparently sending bounded messages. `search`, `brief`, and `read` read published knowledge only. Default whole-project maintenance acquires one owner, handles mechanical changes and dispatches a continuing coordinator when needed; other chats continue business. A successful publication completes ordinary maintenance without an additional audit. Use feedback persists for the next owner; an audit requires explicit user intent. Read dispositions and deferred refinement avoid repeated initial work. At business completion stop, cancel descendants and release after publication ends. New projects default to `vector` and can select `hybrid`. See the [implementation result](../../devDoc/tasks/20261106-memory-system/maintenance-implementation-result.md) for checks and limits.
+Memory uses SurrealDB 4. Host subscription agents read originals, choose boundaries, summarize, build relations and score results. The program checks dependencies and publishes knowledge with matching vectors in one native WebSocket transaction. `search`, `brief`, and `read` query published knowledge only. Keep brief for every task; intuitively short tasks (at most ten minutes) skip automatic maintenance, while longer tasks start one whole-project run and reassess when scope expands. The script supplies fixed names, models and capacity layouts: automatic mode uses team 0, manual mode can use full teams, and low capacity uses one coordinator who also reads. Team 0 alone publishes. Retrieval dispatch is independent of maintenance ownership. A successful publication completes ordinary maintenance; use feedback waits for the next owner and an audit requires explicit user intent. At business completion stop, cancel descendants and release after publication ends. New projects default to `vector` and can select `hybrid`. See the [memory guide](docs/memory.md) for the full contracts and the [implementation result](../../devDoc/tasks/20261106-memory-system/maintenance-implementation-result.md) for checks and limits.
 
 basePack is under development, and real use also serves as testing. Record problems using your project's conventions and draft an issue with the [feedback format](docs/setup-project.md#问题记录与反馈).
 
@@ -17,10 +17,10 @@ basePack is under development, and real use also serves as testing. Record probl
 | Ordinary heavy jobs | HTCondor single-machine pool and site capacity configuration; [administrator guide](docs/administrator.md) → [job guide](docs/resources.md) |
 | Independent skills | [Installation and discovery](docs/setup-project.md#独立-skills-安装与发现); general skills need no Python, database, or model |
 
-Text/image embedding reuses a persistent Qwen3-VL-Embedding-2B service. Its automatic device choice prefers available CUDA, otherwise CPU. HTCondor queues ordinary jobs. Prepare facilities with the [administrator guide](docs/administrator.md). Below, `$python` is the installed client's interpreter; after setup, use the actual path recorded in project instructions:
+Text/image embedding reuses a persistent Qwen3-VL-Embedding-2B service. Its automatic device choice prefers available CUDA, otherwise CPU. HTCondor queues ordinary jobs. Prepare facilities with the [administrator guide](docs/administrator.md). The setup agent obtains the effective host limit, normalized to subagents excluding the main agent and including all descendants; replace `<C>` and its source below. `$python` is the installed client's interpreter; after setup, use the actual path recorded in project instructions:
 
 ```powershell
-& $python -m basepack init --project-root '<absolute-project>' --machine-config '<absolute-machine-config>'
+& $python -m basepack init --project-root '<absolute-project>' --machine-config '<absolute-machine-config>' --max-concurrent-subagents <C> --concurrency-source '<effective host config and counting basis>'
 & $python -m basepack --config '<absolute-project>/.basepack/config.toml' config show
 & $python -m basepack --config '<absolute-project>/.basepack/config.toml' doctor
 ```
@@ -46,7 +46,7 @@ Resource tools can also be used without enabling memory:
 
 Business projects reuse the models and environments. Embedding clients connect to the service; `--timeout` ends client waiting while server inference that has started may continue. Native Condor users keep using `request_gpus = 1` and `gpus_minimum_memory = <peak> MB` without installing basePack.
 
-[Project setup](docs/setup-project.md) covers configuration, new shells, upgrades, relocation, and independent skill discovery. The [resource guide](docs/resources.md) includes Python APIs. The memory skill and English coordinator/reader prompts ship in the wheel, accessed through `memory guide` and `memory prompt`; the [resources skill](skills/resources/SKILL.md), three general skills, and examples come from the source repository. `init` and core `doctor` do not install or verify independent skills.
+[Project setup](docs/setup-project.md) covers new shells, upgrades, relocation, and independent skill discovery. Read [configuration maintenance](docs/project-config-maintenance.md) when installing, upgrading or changing project/host settings. The [resource guide](docs/resources.md) includes Python APIs. The memory skill and English role prompts ship in the wheel, accessed through `memory guide`, `memory prompt` and `memory retrieval-prompt`; the [resources skill](skills/resources/SKILL.md), three general skills, and examples come from the source repository. `init` and core `doctor` do not install or verify independent skills.
 
 ## Development checks and builds
 

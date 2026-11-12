@@ -135,7 +135,8 @@ def test_preflight_failure_retains_owner(tmp_path):
     from basepack.memory.cli import dispatch
 
     config = SimpleNamespace(memory_dir=tmp_path, raw={"memory": {"project_id": "project"}})
-    args = SimpleNamespace(memory_action="maintain", holder="thread", control=tmp_path / "control", output=None)
+    args = SimpleNamespace(memory_action="maintain", holder="thread", control=tmp_path / "control", output=None,
+                           mode="manual", available_subagents=None)
     with pytest.raises((AttributeError, KeyError)):
         dispatch(args, config)
     assert owner.status(tmp_path)["holder"] == "thread"
@@ -152,7 +153,7 @@ def test_stop_cli_loads_config_without_credentials_or_database(tmp_path):
 
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine))
+    config = load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
     assert not config.memory_password_file.exists()
     control = tmp_path / "control"
     owner.acquire(config.memory_dir, config.raw["memory"]["project_id"], "thread", control)

@@ -2,7 +2,7 @@
 <a id="startup"></a>
 ## 任务启动
 
-记忆已在本项目启用。每个新的 PowerShell 进程执行整段；客户端读取配置指定的原密码文件：
+记忆已在本项目启用。主任务先直觉粗判业务时长，再执行 brief；brief 与应启动的长任务维护各自报告失败。每个新的 PowerShell 进程执行整段；客户端读取配置指定的原密码文件：
 
 ```powershell
 $$ErrorActionPreference = 'Stop'
@@ -14,19 +14,21 @@ $$basepackConfig = '$config'
 if ($$LASTEXITCODE -ne 0) { throw "memory brief failed ($$LASTEXITCODE)" }
 ```
 
-后续命令复用本进程的 `$$basepackPython` 和 `$$basepackConfig`；新进程重新执行整段。搬迁后以新配置重新运行 `memory init` 刷新本段及 AGENTS。直接保留 mandatory；stale=true 按业务需要回源确认。brief/search/read 查询已发布知识及其依据快照。[启动详情](<$skill#start-and-stop>)。
+后续命令复用本进程的 `$$basepackPython` 和 `$$basepackConfig`；新进程重新执行整段。搬迁后核实际路径，再以新配置运行 `memory init` 刷新托管块；本文件块外的旧路径另行核对。直接保留 mandatory；stale=true 按业务需要回源确认。brief/search/read 查询已发布知识及其依据快照。[启动详情](<$skill#start-and-stop>)。
 
 本项目数据库的 launcher 为 `$memory_dir/serve.ps1`，cwd 为 `$memory_dir`，日志为其中 `logs/surreal.stdout.log` 与 `logs/surreal.stderr.log`。先检查 endpoint 的 `/ready`；不可用时查日志，由维护者显式启动 launcher。多聊天共用该进程，业务结束保持数据库运行。[首次部署](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/administrator.md#项目-surrealdb)、[恢复集合](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/memory.md#备份与恢复)；新增状态按本机 skill 的恢复说明保留。
 
 <a id="maintenance"></a>
 ## 自动维护
 
-宿主支持任务开始/完成事件与可取消子任务时，分配全新且稳定的 control（本项目 `$memory_dir/maintenance/` 内），以本 thread 身份运行 `memory maintain --holder <thread> --control <control>`，和业务并行。程序在预检前原子取得项目所有权；`acquired=false` 时报告已有 owner 并继续业务。默认全项目发现，不用当前业务文件缩小范围。缺少生命周期能力时说明自动维护不可用，使用显式维护任务。Codex 宿主每次先刷新项目注册清单，保留采集缺口。[所有权、来源与采集详情](<$skill#maintain-sources>)。
+主任务直觉预计不超过十分钟时，仅保留 brief，跳过整个自动 maintain；明显更长时，在宿主支持开始/完成事件与可取消子任务的条件下并行业务维护。范围明显扩大时重新判断，可首次启动；子任务遵循委托，不递归开维护。用户明确要求维护时直接按显式维护执行，不受时长门槛限制。
+
+启动时分配全新且稳定的 control（本项目 `$memory_dir/maintenance/` 内），以本 thread 身份运行 `memory maintain --mode automatic --holder <thread> --control <control>`；宿主已有本轮可用 subagent 额度时传 `--available-subagents <A>`，包含检索等占用后的额度，不提前扣脚本预留。程序在预检前原子取得项目所有权；`acquired=false` 时报告已有 owner 并继续业务。默认全项目发现，不用当前业务文件缩小范围。缺少生命周期能力时说明自动维护不可用，使用显式维护任务。Codex 宿主每次先刷新项目注册清单，保留采集缺口。[所有权、来源与采集详情](<$skill#maintain-sources>)。
 
 <a id="dispatch"></a>
 ## 维护派工
 
-仅 `acquired=true` 且 `needs_semantic=true` 时，以 `worker.model`/`worker.reasoning_effort` 实际派协调者；只给英文启动句和 `worker.render_command`，由其运行并遵循 JSON `prompt`。协调者持续接续固定回执内的批次，作者完成必要原文理解后交程序发布；已阅处置、粗层表示及待细化按同一合同计入进度。[派工与批次详情](<$skill#maintain-sources>)。
+仅 `acquired=true` 且 `needs_semantic=true` 并返回 worker 时，按 `worker.task_name`/`worker.model`/`worker.reasoning_effort` 实际派协调者；只给英文启动句和 `worker.render_command`，由其运行并遵循 JSON `prompt`。按回执固定的 `layout` 派工，自动维护仅第 0 队；零 reader 时协调者亲自阅读，仅第 0 队协调者发布。名额不足保留原错与未派项。协调者持续接续固定回执内的批次，作者完成必要原文理解后交程序发布；已阅处置、粗层表示及待细化按同一合同计入进度。[派工与批次详情](<$skill#maintain-sources>)。
 
 <a id="stop"></a>
 ## 维护收尾
@@ -36,7 +38,7 @@ if ($$LASTEXITCODE -ne 0) { throw "memory brief failed ($$LASTEXITCODE)" }
 <a id="explicit-maintenance"></a>
 ## 显式维护
 
-用户明确要求维护时，维护本身属于交付：按授权范围报告实际处置、阻塞和余项。已有 owner 时报告持有者，不能将跳过或少量优先批次当作完成。采用固定候选/聊天截点，每批 prepare 当前版本；回执外新增材料留后续。[完成口径](<$skill#maintain-sources>)。
+用户明确要求维护时，使用 `memory maintain --mode manual`，维护本身属于交付：按授权范围报告实际处置、阻塞和余项。已有 owner 时报告持有者，不能将跳过或少量优先批次当作完成。按脚本布局启用满队；低并发由单协调者亲读并发布。采用固定候选/聊天截点，每批 prepare 当前版本；回执外新增材料留后续。[完成口径](<$skill#maintain-sources>)。
 
 <a id="feedback"></a>
 ## 使用反馈

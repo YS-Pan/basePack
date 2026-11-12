@@ -14,7 +14,7 @@ def project_config(tmp_path):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
     return load_project_config(init_project(tmp_path / "中文 user's project-🚀", machine,
-                                            ".basepack/deep/user's-config.toml"))
+                                            ".basepack/deep/user's-config.toml", max_concurrent_subagents=12, concurrency_source="test fixture"))
 
 
 def refresh(config, enabled=True):

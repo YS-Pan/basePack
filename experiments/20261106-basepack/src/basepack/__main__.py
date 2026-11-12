@@ -12,6 +12,9 @@ def main():
     init.add_argument("--project-root", required=True)
     init.add_argument("--machine-config", required=True)
     init.add_argument("--config-name", default=".basepack/config.toml")
+    init.add_argument("--max-concurrent-subagents", required=True, type=int,
+                      help="Effective host limit excluding the main agent, including all descendants")
+    init.add_argument("--concurrency-source", required=True, help="Brief source and counting basis for the host limit")
     init.add_argument("--codex-project-id", default="", help="Host-provided Codex project ID")
     init.add_argument("--codex-other-project-root", action="append", default=[],
                       help="A different Codex project's registered root; repeat as needed")
@@ -20,6 +23,9 @@ def main():
     config = sub.add_parser("config")
     config_commands = config.add_subparsers(dest="config_action", required=True)
     config_commands.add_parser("show")
+    concurrency = config_commands.add_parser("set-concurrency", help="Refresh the explicitly collected host capacity snapshot")
+    concurrency.add_argument("--max-concurrent-subagents", required=True, type=int)
+    concurrency.add_argument("--concurrency-source", required=True)
     ai = config_commands.add_parser("ai", help="Resolve project AI settings for host dispatch")
     selection = ai.add_mutually_exclusive_group()
     selection.add_argument("--purpose", choices=["task", "retrieval"], default="task")
@@ -38,6 +44,7 @@ def main():
         from .project.init import init_project
         result = {"project_config": str(init_project(
             args.project_root, args.machine_config, args.config_name,
+            max_concurrent_subagents=args.max_concurrent_subagents, concurrency_source=args.concurrency_source,
             codex_project_id=args.codex_project_id, codex_other_project_roots=args.codex_other_project_root,
             codex_registry_complete=args.codex_registry_complete))}
     elif args.command == "embedding":
@@ -52,8 +59,14 @@ def main():
         from .project.config import load_project_config, describe
         config = load_project_config(args.config)
         if args.command == "config":
-            result = (describe(config) if args.config_action == "show"
-                      else config.resolve_ai(purpose=args.purpose, tier=args.tier))
+            if args.config_action == "show":
+                result = describe(config)
+            elif args.config_action == "set-concurrency":
+                from .project.init import set_project_concurrency
+                result = set_project_concurrency(config, max_concurrent_subagents=args.max_concurrent_subagents,
+                                                 concurrency_source=args.concurrency_source)
+            else:
+                result = config.resolve_ai(purpose=args.purpose, tier=args.tier)
         elif args.command == "doctor":
             from .project.doctor import doctor
             result = doctor(config, args.facility)

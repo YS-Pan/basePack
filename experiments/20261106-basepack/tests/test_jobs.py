@@ -21,7 +21,7 @@ def resource_client(tmp_path):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n[shared]\nstate_dir='state'\n"
                        "[htcondor]\nbin_dir='bin'\nconfig_file='native.conf'\n", encoding="utf-8")
-    client = CondorClient(load_project_config(init_project(tmp_path / "project", machine)))
+    client = CondorClient(load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture")))
     slot = {"Name": "slot1@local", "Machine": socket.gethostname().upper(),
             "MachineResources": "Cpus Memory Disk GPUs SiteGpuMiB",
             "TotalSlotCpus": 12, "TotalSlotMemory": 24576, "TotalSlotGPUs": 4,
@@ -201,7 +201,7 @@ def test_uncertain_submit_keeps_original_error_without_submitting_twice(tmp_path
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n[shared]\nstate_dir='state'\n"
                        "[htcondor]\nbin_dir='bin'\nconfig_file='native.conf'\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine))
+    config = load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
     client = CondorClient(config)
     client._check_request = lambda _: None
     calls = []

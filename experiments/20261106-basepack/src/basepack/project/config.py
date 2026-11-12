@@ -25,6 +25,13 @@ def _absolute(value: str, field: str) -> Path:
     return path.resolve()
 
 
+def _validate_concurrency(max_concurrent_subagents: int, concurrency_source: str) -> None:
+    if type(max_concurrent_subagents) is not int or max_concurrent_subagents < 0:
+        raise ValueError("ai.max_concurrent_subagents must be a nonnegative integer excluding the main agent")
+    if not isinstance(concurrency_source, str) or not concurrency_source.strip():
+        raise ValueError("ai.concurrency_source must describe the host capacity source and counting basis")
+
+
 @dataclass(frozen=True)
 class MachineConfig:
     path: Path
@@ -80,6 +87,24 @@ class ProjectConfig:
             tier = ai[{"task": "default_tier", "retrieval": "retrieval_tier"}[purpose]]
         settings = ai["tiers"][tier]
         return {"tier": tier, "model": settings["model"], "reasoning_effort": settings["reasoning_effort"]}
+
+    def resolve_concurrency(self) -> dict:
+        ai = self.raw.get("ai", {})
+        if "max_concurrent_subagents" not in ai or "concurrency_source" not in ai:
+            raise ValueError("Host concurrency snapshot is missing; obtain the effective subagent limit "
+                             "excluding the main agent and run config set-concurrency with "
+                             "--max-concurrent-subagents and --concurrency-source")
+        capacity, source = ai["max_concurrent_subagents"], ai["concurrency_source"]
+        _validate_concurrency(capacity, source)
+        return {"max_concurrent_subagents": capacity, "concurrency_source": source}
+
+    @property
+    def max_concurrent_subagents(self) -> int:
+        return self.resolve_concurrency()["max_concurrent_subagents"]
+
+    @property
+    def concurrency_source(self) -> str:
+        return self.resolve_concurrency()["concurrency_source"]
 
 
 def load_machine_config(path: str | Path) -> MachineConfig:
@@ -141,5 +166,7 @@ def describe(config: ProjectConfig) -> dict:
     if "jobs" in config.raw:
         result["jobs_dir"] = str(config.jobs_dir)
     if "ai" in config.raw:
-        result["ai"] = config.raw["ai"]
+        result["ai"] = dict(config.raw["ai"])
+        if {"max_concurrent_subagents", "concurrency_source"} <= result["ai"].keys():
+            result["ai"].update(config.resolve_concurrency())
     return result

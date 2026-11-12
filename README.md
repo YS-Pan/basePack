@@ -10,7 +10,7 @@ basePack gives agents project-local memory, shared compute coordination, and ind
 | file-structure | Organize project files by purpose and lifecycle | A host with skills |
 | engineering-judgment | Judge contracts, responsibilities, compatibility, and the work passed to users | A host with skills |
 
-The current source targets **0.10.0.dev1, in development**, for Windows and Python 3.13+. The host's subscription-based agents understand material, build relations, and score results; basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability. The [maintenance implementation result](devDoc/tasks/20261106-memory-system/maintenance-implementation-result.md) records current checks, installation and remaining limits.
+The current source targets **0.11.0.dev1, in development**, for Windows and Python 3.13+. The host's subscription-based agents understand material, build relations, and score results; basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability. The [maintenance implementation result](devDoc/tasks/20261106-memory-system/maintenance-implementation-result.md) records current checks, installation and remaining limits.
 
 **basePack is under development. Real use also serves as testing; record problems so they can inform subsequent fixes.**
 
@@ -33,12 +33,12 @@ Development wheels are available from [GitHub Releases](https://github.com/YS-Pa
 
 ## Enable project memory
 
-1. Follow [project setup](experiments/20261106-basepack/docs/setup-project.md) to create a minimal machine configuration and run `init` for your project. New projects default to `vector`; `hybrid` is also available. The default `doctor` checks core facilities.
+1. Follow [project setup](experiments/20261106-basepack/docs/setup-project.md) to create a minimal machine configuration, collect the host's subagent limit and source, and run `init` for your project. New projects default to `vector`; `hybrid` is also available. The default `doctor` checks core facilities.
 2. Follow [project SurrealDB setup](experiments/20261106-basepack/docs/administrator.md#项目-surrealdb) to select a separate directory and loopback IP/port, prepare its password file once, start an authenticated server, and check `/ready`.
 3. Follow [shared model deployment](experiments/20261106-basepack/docs/administrator.md) to prepare a CPU or CUDA embedding service, set its endpoint in the machine configuration, and verify one embedding request. Memory does not require HTCondor.
 4. Follow the [new-shell steps](experiments/20261106-basepack/docs/setup-project.md#新-shell-接续), run `memory init` and `memory brief`, then complete the [minimal read/write workflow](experiments/20261106-basepack/docs/memory.md#最小闭环示例). New shells and chats follow the generated `AGENTS.md → .basepack/instructions.md` entry to run a brief directly. The client reads the configured password file automatically; no shell variable is needed.
 
-Default background maintenance acquires one project owner, covers managed files, registered and historical work, owned Codex captures and unresolved use feedback, then returns a continuing coordinator command when needed. Other chats continue business. Authors read and generate knowledge once; successful program publication completes ordinary maintenance. There is no routine audit or publication readback. The host stops its owner, cancels its agents and releases after publication ends. Read dispositions and deferred refinement prevent unchanged work from repeatedly entering initial construction. See [maintenance and feedback](experiments/20261106-basepack/docs/memory.md#自动维护与手动维护) and [Codex chat setup](experiments/20261106-basepack/docs/setup-project.md#codex-项目聊天接入).
+Each task keeps its brief. Tasks intuitively expected to take at most ten minutes skip automatic maintenance entirely; longer tasks start one whole-project run alongside business work, reassessing if scope grows. Dispatched subtasks follow their briefs. Maintenance acquires one owner and uses the script's fixed names, models and capacity layout: automatic mode has one team, manual mode uses full teams, and a lone coordinator also reads. Only team 0 publishes. Retrieval has a separate dispatch entry and needs no maintenance owner. Authors read and generate knowledge once; successful publication completes ordinary maintenance. The host stops its owner, cancels its agents and releases after publication ends. See [maintenance and feedback](experiments/20261106-basepack/docs/memory.md#自动维护与手动维护) and [Codex chat setup](experiments/20261106-basepack/docs/setup-project.md#codex-项目聊天接入).
 
 Each project's configuration, password file, knowledge, database, and local entry point stay in that project's ignored directories. **Project memory is not distributed with this source repository.** A new clone creates its own configuration through `init`; recover existing knowledge from that project's backup.
 
@@ -59,6 +59,7 @@ The wheel includes the program, configuration and entry templates, memory schema
 | [Route README](experiments/20261106-basepack/README.md) | Capabilities, development, builds, and tests |
 | [Maintenance experiment](experiments/20261111-basepack-maintenance/README.md) | Isolated trial and consolidation record for the maintenance changes |
 | [Project setup](experiments/20261106-basepack/docs/setup-project.md) | Configuration, new shells, upgrades, relocation, and skill discovery |
+| [Configuration maintenance](experiments/20261106-basepack/docs/project-config-maintenance.md) | Changes to host capacity, paths, models, services, and project state |
 | [Memory guide](experiments/20261106-basepack/docs/memory.md) | Initial knowledge, retrieval, small-batch maintenance, and backup |
 | [Resource guide](experiments/20261106-basepack/docs/resources.md) | Text/image embedding, HTCondor jobs, and Python APIs |
 | [Administrator guide](experiments/20261106-basepack/docs/administrator.md) | Official facility sources, installation, services, and capacity |

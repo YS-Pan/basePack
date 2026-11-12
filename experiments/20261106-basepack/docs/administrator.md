@@ -1,6 +1,6 @@
 # 机器部署与维护
 
-本页供 Windows x64 机器维护者安装和管理共享设施。先安装轻量客户端；项目记忆需要每项目独立的 SurrealDB 和共享 embedding 模型服务，普通重任务需要 HTCondor。项目使用者从 [项目接入](setup-project.md) 开始。
+本页供 Windows x64 机器维护者安装和管理共享设施。先安装轻量客户端；项目记忆需要每项目独立的 SurrealDB 和共享 embedding 模型服务，普通重任务需要 HTCondor。项目使用者从 [项目接入](setup-project.md) 开始。修改设施、路径、账户或宿主配置时，按 [项目配置维护要点](project-config-maintenance.md) 同步受影响项目和运行状态。
 
 ## 官方来源与能力选择
 

@@ -1,6 +1,6 @@
 # 项目配置与部署合同
 
-更新：2026年11月11日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向0.10.0.dev1；隔离候选验证后已合回。本文维护部署边界，当前安装及检查见[维护改造结果](../tasks/20261106-memory-system/maintenance-implementation-result.md)，既有0.9.1条件见[一致性进度](../archive/20261111-consistency-review/progress.md)。操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入。
+更新：2026年11月12日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向0.11.0.dev1；本轮安装及检查见[派工实施结果](../tasks/20261106-memory-system/dispatch-implementation-result.md)，此前生命周期见[维护改造结果](../tasks/20261106-memory-system/maintenance-implementation-result.md)。本文维护部署边界；操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入，修改配置时按[维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)同步受影响状态。
 
 ## 位置与责任
 
@@ -15,7 +15,7 @@
 | 运行托管与日志 | 共享模型沿用 Shawl/SCM；项目库可由普通用户手动启动，也可选管理员 SCM；日志分别保存 |
 | 普通作业容量与策略 | HTCondor 独立安装并唯一维护 |
 
-本机共享服务沿R9使用`C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe`与`D:/AgentTools/state/basepack/embedding/logs/`；SurrealDB4.0.0 exe为`D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。本项目0.10客户端普通安装在独立稳定环境`D:/AgentTools/envs/basepack-client-0.10/`，仅本项目runtime.python切换；其它项目共用的`D:/AgentTools/envs/basepack-client/`仍为0.9.1，避免旧入口调用新生命周期。系统Python、0.5共享模型环境、图文依赖及服务保持原状。公共代码通过配置定位，不写死这些本机位置。
+本机共享服务沿R9使用`C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe`与`D:/AgentTools/state/basepack/embedding/logs/`；SurrealDB4.0.0 exe为`D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。本项目独立稳定客户端环境仍为`D:/AgentTools/envs/basepack-client-0.10/`，其中包已原位升级0.11.0.dev1，目录名不表示当前包版本；其它项目共用的`D:/AgentTools/envs/basepack-client/`仍为0.9.1。系统Python、0.5共享模型环境、图文依赖及服务保持原状。公共代码通过配置定位，不写死这些本机位置。
 
 根 file-structure、agent-team、engineering-judgment 独立维护，resources skill 归 active 实验。memory skill 与英文 coordinator/reader 提示词随包安装，分别通过无需配置的 `memory guide` 和显式配置的 `memory prompt` 使用；提示词渲染不要求数据库、密码文件或模型在线。独立技能选择完整目录复制到项目 `.agents/skills/`，或联接已有项目原件；同名冲突保留并报告，正确入口复用。`init` 与 core doctor 不安装或验收它们；忽略的本机联接在新检出后重建，核宿主实际发现。开发环境、构建缓存和夹具在根 tmp，交付及回滚 wheel 在实验 dist，选留原证在根 artifacts/runs；寿命见 [文档约定](../documentation.md)。
 
@@ -50,6 +50,7 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 | runtime.python、runtime.machine_config | 明确绝对路径 |
 | project.root | 相对项目配置文件 |
 | ai.default_tier、ai.retrieval_tier、ai.tiers | 项目维护用途默认等级及各等级模型和推理强度；宿主读取后派工 |
+| ai.max_concurrent_subagents、ai.concurrency_source | 安装agent采集的不含主agent、包含后代的容量及依据；config set-concurrency显式刷新，旧项目不猜默认。实时空闲额度另传本轮，配置快照不等于空闲数 |
 | memory.data_dir、jobs.jobs_dir | 相对项目根，受管理数据必须在该项目 .basepack 内 |
 | 机器配置中的相对设施路径 | 相对机器配置文件 |
 | embedding.endpoint | 显式共享 HTTP 地址，本机为 loopback 8765 |
@@ -59,13 +60,13 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 | memory.codex.project_id/other_project_roots/registry_complete | Codex 宿主项目绑定和完整注册根证据，独立于 basePack UUID；未取得时明确聊天缺口 |
 | memory.search_mode | CLI 未显式传 --mode 时采用的 hybrid/vector；新项目默认 vector |
 
-`memory guide/rank/stop` 只处理自身输入，在项目配置解析前分派。机器配置不再维护无消费者的 `[shared].state_dir`；模型日志由 SCM/Shawl 服务定义中的显式路径管理，jobs 材料仍归项目 jobs_dir。
+`memory guide/rank` 在项目配置解析前分派；stop/owner/release/recover-owner读配置定位状态但不读凭据。prompt、pending-dispatch和retrieval-dispatch/retrieval-prompt仅读各自输入。机器配置不再维护无消费者的 `[shared].state_dir`；模型日志由 SCM/Shawl 服务定义中的显式路径管理，jobs 材料仍归项目 jobs_dir。
 
 机器 embedding 节沿用 R9 endpoint、service_name、queue_timeout 及模型/预算设置。客户端以 username 和自动读取的 password_file 建立 Basic Authorization；config show 返回 memory_password_file 绝对路径而不读取或显示 secret。password_env 与手工 shell 桥退出。instructions 保留固定 Python、绝对配置和 brief 调用；guide/rank不读配置或凭据；owner/stop/release/recover-owner需配置但不读凭据或连库。project_id 随移动或恢复保留，误连另一身份的库会失败。config show 和 doctor 只作诊断，不能替代真实功能验收。
 
 ## 环境与服务
 
-项目 `.basepack` 的推荐内部结构、生产状态与临时/选留材料的边界见[本机数据目录约定](project-data-layout.md)；现行0.10的工作包进入根tmp，历史保留例外和已执行清理在该页区分。
+项目 `.basepack` 的推荐内部结构、生产状态与临时/选留材料的边界见[本机数据目录约定](project-data-layout.md)；现行工作包进入根tmp，历史保留例外和已执行清理在该页区分。
 
 依赖由 pyproject.toml 与 uv.lock 维护，CUDA 来源明确。系统环境不做清理式同步，共享服务环境不安装无关 MCP 集成。源码与 wheel 验证分别核导入位置；普通安装从源码外运行。
 
@@ -76,6 +77,8 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 搬迁先停止该项目库并确认进程退出，再移动完整项目、调整启动 cwd/日志/endpoint，保留 UUID 后复核。在线备份使用原生 export；恢复集合含 export、配置、原凭据文件、业务原件、受管聊天导出、codex-attachments 原件与定位回执、必要 assets。已接受语义与更正必须恢复，向量可以从保留表示重建。长期备份位置和保留周期由业务项目确定，Git 忽略和本机目录不代替备份。
 
 ## 升级与回退
+
+0.11.0.dev1增加时长入口判断、容量快照、固定布局和名称及独立检索派工。先收尾旧维护，保留UUID/凭据/知识后普通升级；旧项目运行config set-concurrency补容量和来源，再memory init刷新托管入口。仅托管块自动刷新，块外旧路径另行核对。容量或模型映射修改影响新一轮，已有回执layout保持；旧无layout回执先结束旧轮，不隐式重算续派。并发快照随宿主/profile改变显式同步，不建设每会话全量核查或监视器。操作见配置维护要点。
 
 0.9.1 修复维护依赖与空来源处理、聊天附件出处交接、历史快照回读及检索去重。新来源快照保存接受时路径并将路径纳入版本身份；旧快照保留同来源读取合同，跨来源以成员历史证明归属，不要求逐版本的成员接受记录。旧快照缺路径时仅使用可核的唯一路径，不强迁或重写已有知识。配置、UUID、原凭据、embedding 身份和共享服务保持既有合同，实际安装与验证沿 [本轮进度](../archive/20261111-consistency-review/progress.md) 接续。
 

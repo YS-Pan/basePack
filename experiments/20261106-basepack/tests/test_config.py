@@ -8,14 +8,14 @@ import pytest
 import basepack
 from basepack.project.config import describe, installation, load_machine_config, load_project_config
 from basepack.project.doctor import doctor
-from basepack.project.init import init_project, template
+from basepack.project.init import init_project, set_project_concurrency, template
 
 
 def test_two_projects_and_subdirectory_config(tmp_path, monkeypatch):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
     projects = [tmp_path / "项目 A", tmp_path / "项目 B"]
-    configs = [init_project(root, machine, ".basepack/config/deep/basepack.toml") for root in projects]
+    configs = [init_project(root, machine, ".basepack/config/deep/basepack.toml", max_concurrent_subagents=12, concurrency_source="test fixture") for root in projects]
     monkeypatch.chdir(tmp_path.parent)
     loaded = [load_project_config(path) for path in configs]
     assert [config.root for config in loaded] == projects
@@ -31,16 +31,16 @@ def test_two_projects_and_subdirectory_config(tmp_path, monkeypatch):
     instructions = (projects[0] / ".basepack/instructions.md").read_text(encoding="utf-8")
     assert ".basepack/config/deep/basepack.toml" in instructions
     assert sys.executable in instructions
-    assert "config ai --purpose retrieval" in instructions
+    assert "memory retrieval-dispatch" in instructions
     assert "config ai --tier tier2" in instructions
     assert "gpt-6" not in instructions
     assert (projects[0] / ".gitignore").read_text(encoding="utf-8") == "/.basepack/\n"
     assert not (projects[0] / ".basepack/memory").exists()
     assert not (projects[0] / ".basepack/jobs").exists()
     with pytest.raises(FileExistsError):
-        init_project(projects[0], machine, ".basepack/config/deep/basepack.toml")
+        init_project(projects[0], machine, ".basepack/config/deep/basepack.toml", max_concurrent_subagents=12, concurrency_source="test fixture")
     with pytest.raises(FileExistsError):
-        init_project(projects[0], machine, ".basepack/second.toml")
+        init_project(projects[0], machine, ".basepack/second.toml", max_concurrent_subagents=12, concurrency_source="test fixture")
 
 
 def test_init_preserves_existing_project_instructions(tmp_path):
@@ -52,7 +52,7 @@ def test_init_preserves_existing_project_instructions(tmp_path):
                                   "<!-- basepack:start -->\nOld generated entry.\n<!-- basepack:end -->\n"
                                   "Keep following instructions.\n", encoding="utf-8")
     (root / ".gitignore").write_text("/original/\n", encoding="utf-8")
-    path = init_project(root, machine)
+    path = init_project(root, machine, max_concurrent_subagents=12, concurrency_source="test fixture")
     assert path == root / ".basepack/config.toml"
     assert load_project_config(path).root == root
     assert (root / "AGENTS.md").read_text(encoding="utf-8").startswith("# Business\nKeep original instructions.")
@@ -78,13 +78,13 @@ def test_init_rejects_broken_host_entry_without_writing_files(tmp_path, markers)
                 + markers + "\r\nKeep following instructions.\r\n").encode("utf-8")
     agents.write_bytes(original)
     with pytest.raises(ValueError):
-        init_project(root, machine)
+        init_project(root, machine, max_concurrent_subagents=12, concurrency_source="test fixture")
     assert agents.read_bytes() == original
     assert not (root / ".basepack/config.toml").exists()
     assert not (root / ".basepack/instructions.md").exists()
     assert not (root / ".gitignore").exists()
     agents.write_text("# Business\nKeep original instructions.\n", encoding="utf-8")
-    assert load_project_config(init_project(root, machine)).root == root
+    assert load_project_config(init_project(root, machine, max_concurrent_subagents=12, concurrency_source="test fixture")).root == root
 
 
 def test_init_round_trips_nonbmp_paths(tmp_path, monkeypatch):
@@ -93,7 +93,7 @@ def test_init_round_trips_nonbmp_paths(tmp_path, monkeypatch):
     root = tmp_path / "project-🚀"
     python = tmp_path / "python-🚀" / "python.exe"
     monkeypatch.setattr(sys, "executable", str(python))
-    path = init_project(root, machine, ".basepack/config-🚀/basepack.toml")
+    path = init_project(root, machine, ".basepack/config-🚀/basepack.toml", max_concurrent_subagents=12, concurrency_source="test fixture")
     config = load_project_config(path)
     assert config.python == python
     assert config.machine_config == machine
@@ -105,7 +105,7 @@ def test_init_config_with_quote_is_a_valid_powershell_argument(tmp_path):
     machine.write_text("schema_version=1\n", encoding="utf-8")
     root = tmp_path / "project"
     config_name = ".basepack/user's.toml"
-    path = init_project(root, machine, config_name)
+    path = init_project(root, machine, config_name, max_concurrent_subagents=12, concurrency_source="test fixture")
     assert load_project_config(path).root == root
     instructions = (root / ".basepack/instructions.md").read_text(encoding="utf-8")
     command = instructions.split("```powershell\n", 1)[1].split("\n```", 1)[0]
@@ -125,7 +125,7 @@ def test_init_config_cannot_overwrite_instructions(tmp_path):
     machine.write_text("schema_version=1\n", encoding="utf-8")
     root = tmp_path / "project"
     with pytest.raises(ValueError, match="instructions.md"):
-        init_project(root, machine, ".basepack/instructions.md")
+        init_project(root, machine, ".basepack/instructions.md", max_concurrent_subagents=12, concurrency_source="test fixture")
     assert not root.exists()
 
 
@@ -133,7 +133,7 @@ def test_init_config_cannot_overwrite_instructions(tmp_path):
 def test_project_data_stays_in_managed_directory(tmp_path, target):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
-    path = init_project(tmp_path / "project", machine)
+    path = init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture")
     path.write_text(path.read_text(encoding="utf-8").replace(".basepack/memory", target), encoding="utf-8")
     config = load_project_config(path)
     with pytest.raises(ValueError, match="inside"):
@@ -145,7 +145,7 @@ def test_init_requires_config_under_basepack(tmp_path, name):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
     with pytest.raises(ValueError, match=".basepack"):
-        init_project(tmp_path / "project", machine, name)
+        init_project(tmp_path / "project", machine, name, max_concurrent_subagents=12, concurrency_source="test fixture")
 
 
 def test_embedding_only_configuration_has_no_other_facility_dependencies(tmp_path):
@@ -172,7 +172,7 @@ def test_package_root_and_installed_template_anchor(tmp_path, monkeypatch):
     assert basepack.__version__ == installation()["version"]
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine))
+    config = load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
     package = Path(basepack.__file__).resolve().parent
     monkeypatch.setattr("basepack.project.doctor.subprocess.check_output", lambda *args, **kwargs: str(package / "__init__.py"))
     result = doctor(config, "core")
@@ -189,7 +189,7 @@ def test_project_and_machine_schema_are_checked_separately(tmp_path):
     with pytest.raises(ValueError, match="schema_version"):
         load_machine_config(machine)
     machine.write_text("schema_version=1\n", encoding="utf-8")
-    path = init_project(tmp_path / "project", machine)
+    path = init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture")
     assert load_project_config(path).machine.raw["schema_version"] == 1
     path.write_text(path.read_text(encoding="utf-8").replace("schema_version = 2", "schema_version = 1"), encoding="utf-8")
     with pytest.raises(ValueError, match="schema_version"):
@@ -200,7 +200,7 @@ def test_project_and_machine_schema_are_checked_separately(tmp_path):
 def ai_config(tmp_path):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
-    return load_project_config(init_project(tmp_path / "project", machine))
+    return load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
 
 
 def _config_cli(config, *args):
@@ -210,6 +210,7 @@ def _config_cli(config, *args):
 
 def test_init_contains_project_ai_mapping(ai_config):
     assert ai_config.raw["ai"] == {
+        "max_concurrent_subagents": 12, "concurrency_source": "test fixture",
         "default_tier": "tier3", "retrieval_tier": "tier1", "tiers": {
             "tier1": {"model": "gpt-6-luna", "reasoning_effort": "max"},
             "tier2": {"model": "gpt-6.1-terra", "reasoning_effort": "ultra"},
@@ -258,6 +259,7 @@ def test_init_cli_saves_host_codex_binding_without_changing_basepack_uuid(tmp_pa
     other = tmp_path / "other 用户's 🚀"
     result = subprocess.run([sys.executable, "-m", "basepack", "init", "--project-root", str(project),
                              "--machine-config", str(machine), "--codex-project-id", "host-project-id",
+                             "--max-concurrent-subagents", "12", "--concurrency-source", "test fixture",
                              "--codex-other-project-root", str(other), "--codex-registry-complete"],
                             capture_output=True, text=True, encoding="utf-8", timeout=10)
     assert result.returncode == 0, result.stderr
@@ -301,7 +303,7 @@ def test_memory_tools_run_without_loading_project_configuration(tmp_path, config
     elif configured == "missing_secret":
         machine = tmp_path / "machine.toml"
         machine.write_text("schema_version=1\n", encoding="utf-8")
-        config = init_project(tmp_path / "project", machine)
+        config = init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture")
         assert not load_project_config(config).memory_password_file.exists()
         command += ["--config", str(config)]
     command += ["memory", action]
@@ -445,6 +447,108 @@ def test_config_show_cli_includes_project_ai_mapping(ai_config):
     result = _config_cli(ai_config, "show")
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["ai"] == ai_config.raw["ai"]
+
+
+@pytest.mark.parametrize("capacity", [0, 1, 3, 12, 13, 30])
+def test_concurrency_snapshot_is_explicit_and_used_after_reload(ai_config, capacity):
+    source = 'Codex profile "research": excludes main; all descendants; 已核'
+    before = ai_config.path.read_bytes()
+    result = set_project_concurrency(ai_config, max_concurrent_subagents=capacity, concurrency_source=source)
+    assert result == {"max_concurrent_subagents": capacity, "concurrency_source": source}
+    loaded = load_project_config(ai_config.path)
+    assert loaded.max_concurrent_subagents == capacity
+    assert loaded.concurrency_source == source
+    assert loaded.resolve_concurrency() == result
+    assert describe(loaded)["ai"]["max_concurrent_subagents"] == capacity
+    assert describe(loaded)["ai"]["concurrency_source"] == source
+    assert ai_config.max_concurrent_subagents == 12  # Existing config objects remain snapshots.
+    set_project_concurrency(loaded, **result)
+    assert load_project_config(ai_config.path).raw == loaded.raw
+    assert before != ai_config.path.read_bytes()
+
+
+@pytest.mark.parametrize("capacity,source", [(-1, "host"), (True, "host"), (1.5, "host"),
+                                             ("12", "host"), (12, ""), (12, " \t"), (12, None)])
+def test_invalid_host_capacity_is_rejected_before_init_or_refresh(ai_config, tmp_path, capacity, source):
+    root = tmp_path / "invalid-project"
+    before = ai_config.path.read_bytes()
+    with pytest.raises(ValueError, match="ai\\."):
+        init_project(root, ai_config.machine_config, max_concurrent_subagents=capacity, concurrency_source=source)
+    assert not root.exists()
+    with pytest.raises(ValueError, match="ai\\."):
+        set_project_concurrency(ai_config, max_concurrent_subagents=capacity, concurrency_source=source)
+    assert ai_config.path.read_bytes() == before
+
+
+@pytest.mark.parametrize("field", ["ai", "max_concurrent_subagents", "concurrency_source"])
+def test_missing_concurrency_is_actionable_only_for_capacity_use(ai_config, field):
+    if field == "ai":
+        del ai_config.raw["ai"]
+    else:
+        del ai_config.raw["ai"][field]
+    with pytest.raises(ValueError, match="config set-concurrency"):
+        ai_config.max_concurrent_subagents
+    assert ai_config.memory_search_mode == "vector"
+    if field == "ai":
+        assert "ai" not in describe(ai_config)
+    else:
+        assert field not in describe(ai_config)["ai"]
+
+
+def test_existing_project_cli_supplements_and_refreshes_only_capacity(ai_config):
+    original_text = ai_config.path.read_text(encoding="utf-8")
+    legacy_text = original_text.replace('max_concurrent_subagents = 12\n', '').replace(
+        'concurrency_source = "test fixture"\n', '')
+    ai_config.path.write_bytes(legacy_text.replace("\n", "\r\n").encode("utf-8"))
+    config = load_project_config(ai_config.path)
+    expected = config.raw
+    identity = config.raw["memory"]["project_id"]
+    config.memory_password_file.parent.mkdir(parents=True)
+    config.memory_password_file.write_text("existing-secret", encoding="utf-8")
+    knowledge = config.memory_dir / "knowledge-fixture.bin"
+    knowledge.write_bytes(b"existing knowledge")
+    entries = [config.root / "AGENTS.md", config.root / ".basepack/instructions.md"]
+    entry_bytes = [path.read_bytes() for path in entries]
+    assert json.loads(_config_cli(config, "show").stdout)["ai"] == expected["ai"]
+    assert config.resolve_ai()["tier"] == "tier3"
+    with pytest.raises(ValueError, match="config set-concurrency"):
+        config.resolve_concurrency()
+    for capacity in [12, 6]:
+        result = _config_cli(config, "set-concurrency", "--max-concurrent-subagents", str(capacity),
+                             "--concurrency-source", "Codex effective profile; excludes main; all descendants")
+        assert result.returncode == 0, result.stderr
+        config = load_project_config(config.path)
+        assert config.max_concurrent_subagents == capacity
+        expected["ai"].update(json.loads(result.stdout))
+        assert config.raw == expected
+        assert config.raw["memory"]["project_id"] == identity
+        assert config.memory_password_file.read_text(encoding="utf-8") == "existing-secret"
+        assert knowledge.read_bytes() == b"existing knowledge"
+        assert [path.read_bytes() for path in entries] == entry_bytes
+        assert config.path.read_bytes().count(b"[ai]\r\n") == 1
+
+
+def test_set_concurrency_adds_ai_to_resource_only_project(tmp_path):
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    project = tmp_path / "project.toml"
+    original = ("schema_version=2\n[runtime]\npython=" + json.dumps(sys.executable)
+                + "\nmachine_config=" + json.dumps(str(machine)) + "\n[project]\nroot='.'")
+    project.write_text(original, encoding="utf-8")
+    config = load_project_config(project)
+    set_project_concurrency(config, max_concurrent_subagents=0, concurrency_source="host explicitly disables subagents")
+    assert project.read_text(encoding="utf-8").startswith(original)
+    assert load_project_config(project).max_concurrent_subagents == 0
+
+
+def test_init_cli_requires_collected_host_capacity(tmp_path):
+    result = subprocess.run([sys.executable, "-m", "basepack", "init", "--project-root", str(tmp_path / "new"),
+                             "--machine-config", str(tmp_path / "machine.toml")],
+                            capture_output=True, text=True, encoding="utf-8", timeout=10)
+    assert result.returncode == 2
+    assert "--max-concurrent-subagents" in result.stderr
+    assert "--concurrency-source" in result.stderr
+    assert not (tmp_path / "new").exists()
 
 
 def test_legacy_project_resource_paths_do_not_require_ai(tmp_path):

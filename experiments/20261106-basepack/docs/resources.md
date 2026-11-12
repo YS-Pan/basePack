@@ -1,6 +1,6 @@
 # 资源使用
 
-先读项目 `.basepack/instructions.md` 和实际配置，用其中 runtime.python 启动工具，每次显式传配置绝对路径。以下 `python` 均指该解释器。记忆的 vector/hybrid 检索和图文编码都需要共享模型服务，普通重任务需要 HTCondor。新项目先按 [项目接入](setup-project.md) 初始化，设施由管理员按 [首次部署](administrator.md) 准备。
+先读项目 `.basepack/instructions.md` 和实际配置，用其中 runtime.python 启动工具，每次显式传配置绝对路径。以下 `python` 均指该解释器。记忆的 vector/hybrid 检索和图文编码都需要共享模型服务，普通重任务需要 HTCondor。新项目先按 [项目接入](setup-project.md) 初始化，设施由管理员按 [首次部署](administrator.md) 准备。变更配置、设施或作业路径时，按 [配置维护要点](project-config-maintenance.md) 核受影响入口与状态。
 
 ## 共享 embedding
 

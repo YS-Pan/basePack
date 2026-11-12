@@ -8,6 +8,9 @@ machine_config = $machine_config
 root = $root
 
 [ai]
+# Host snapshot: excludes the main agent and includes all descendant agents.
+max_concurrent_subagents = $max_concurrent_subagents
+concurrency_source = $concurrency_source
 default_tier = 'tier3'
 retrieval_tier = 'tier1'
 

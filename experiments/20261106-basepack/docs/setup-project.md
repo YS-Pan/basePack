@@ -1,6 +1,6 @@
 # 项目接入
 
-本文描述面向 0.9.0 的项目接入，包括既有认证与新的维护提示词交接；正式安装状态见 [交付进度](../../../devDoc/tasks/20261106-memory-system/progress.md)。按根 [安装步骤](../../../README.md#install-the-lightweight-client) 安装轻量客户端。项目记忆需要每项目独立的 SurrealDB 和共享 embedding 模型服务；普通重任务需要 HTCondor。设施由机器维护者按 [管理员说明](administrator.md) 准备。
+按根 [安装步骤](../../../README.md#install-the-lightweight-client) 安装轻量客户端。项目记忆需要每项目独立的 SurrealDB 和共享 embedding 模型服务；普通重任务需要 HTCondor。设施由机器维护者按 [管理员说明](administrator.md) 准备。安装、升级或修改配置时先读 [项目配置维护要点](project-config-maintenance.md)，按受影响事件同步。
 
 ## 首次接入
 
@@ -18,7 +18,7 @@ $machineConfig = '<absolute-machine-config>'
 & $python -c "from basepack.project.init import template; print(template('machine.toml'))"
 ```
 
-每个新项目执行一次；本页后续命令沿用同一 PowerShell 中的 `bp` 函数：
+接入 agent 先读取宿主有效并发配置或明确报告，将上限归一化为不含主 agent、包含全部后代的 subagent 数 C，并保存简短来源与口径；未知时先取得明确值。下面的 `<C>` 与来源替换为采集结果，不能猜默认数。每个新项目执行一次；本页后续命令沿用同一 PowerShell 中的 `bp` 函数：
 
 ```powershell
 $OutputEncoding = [Text.UTF8Encoding]::new($false)
@@ -27,13 +27,13 @@ function bp {
     & $python -X utf8 -m basepack @args
     if ($LASTEXITCODE -ne 0) { throw "basepack failed ($LASTEXITCODE)" }
 }
-bp init --project-root $project --machine-config $machineConfig
+bp init --project-root $project --machine-config $machineConfig --max-concurrent-subagents <C> --concurrency-source '<有效宿主配置位置与计数口径>'
 $config = Join-Path $project '.basepack/config.toml'
 bp --config $config config show
 bp --config $config doctor
 ```
 
-成功时生成 `.basepack/config.toml` 和 `.basepack/instructions.md`，根 AGENTS 加入入口指针，`.basepack/` 加入 Git 忽略。`config show` 应显示选定的 Python、机器文件和项目根，doctor 返回 core 检查；独立技能还需按下节安装并核宿主发现。文件已存在时 init 报错：继续使用已有入口，或为新项目选择正确目录；保留原配置与业务指令。
+成功时生成 `.basepack/config.toml` 和 `.basepack/instructions.md`，根 AGENTS 加入入口指针，`.basepack/` 加入 Git 忽略。`config show` 应显示选定的 Python、机器文件、项目根及并发快照/来源，doctor 返回 core 检查；独立技能还需按下节安装并核宿主发现。文件已存在时 init 报错：继续使用已有入口，或为新项目选择正确目录；保留原配置与业务指令。
 
 项目配置使用 schema 2，机器配置使用 schema 1，字段见 [项目模板](../src/basepack/project/templates/project.toml)。每次调用显式传配置路径；`runtime.python` 与 `runtime.machine_config` 使用绝对路径，项目数据目录在本项目 `.basepack/` 内。自定义配置可传 `--config-name .basepack/config/local.toml`。init 生成入口，不启动设施或创建数据库。
 
@@ -96,7 +96,7 @@ New-Item -ItemType Junction -Path $entry -Value $original | Out-Null
 
 ## Agent 模型等级
 
-项目配置 `[ai]` 维护日常与检索默认等级，以及各等级的 `model` 和 `reasoning_effort`。初始值见 [项目模板](../src/basepack/project/templates/project.toml)，按宿主实际可用模型调整：
+项目配置 `[ai]` 维护日常与检索默认等级，以及各等级的 `model` 和 `reasoning_effort`。模型映射每次读取项目配置，不在安装时冻结；初始值见 [项目模板](../src/basepack/project/templates/project.toml)，按宿主实际可用模型调整：
 
 ```powershell
 bp --config $config config ai
@@ -104,7 +104,9 @@ bp --config $config config ai --purpose retrieval
 bp --config $config config ai --tier tier2
 ```
 
-`config ai` 默认解析日常用途；多轮检索、筛选和重排序使用 `--purpose retrieval`。维护提示词的 coordinator/reader 角色分别默认 tier2/tier1，`memory prompt --tier` 可显式改档而保留角色。宿主在创建子 agent 前，向派工接口实际传入解析的 `model` 和 `reasoning_effort`；提示词文字不能替代宿主设置，basepack 不自行调用理解模型。维护交接见 [记忆使用](memory.md#自动维护与手动维护)。
+`config ai` 默认解析日常用途；`--purpose retrieval` 核检索映射。记忆维护使用 `maintain`/`prompt` 返回的派工元数据，检索使用独立 `memory retrieval-dispatch`；宿主创建时原样传入脚本给定的 `task_name`、`model` 和 `reasoning_effort`。协调者/reader 默认 tier2/tier1，显式 `--tier <tier>` 可改档并保留角色。提示词文字不能替代宿主参数，basePack 不自行调用理解模型。交接见 [维护](memory.md#自动维护与手动维护) 和 [检索](memory.md#启动与检索)。
+
+`[ai].max_concurrent_subagents` 与 `concurrency_source` 是宿主容量快照。修改宿主上限、切 profile/宿主或升级接入时，重新采集并用 `config set-concurrency --max-concurrent-subagents <C> --concurrency-source '<来源与口径>'` 更新受影响项目，再核 `config show`；不重跑普通 init、不迁移数据库。其它配置变更的联动见 [配置维护要点](project-config-maintenance.md)。
 
 ## 启用记忆
 
@@ -127,7 +129,7 @@ bp --config $config memory brief --task '当前任务'
 
 成功时 init 安装 schema、绑定数据库身份，并共用项目 init 的刷新入口更新 instructions 与 AGENTS 托管块；块外原字节保持，重复刷新幂等，损坏标记明确报错。普通 init 生成未启用记忆的指令，不要求连接数据库。guide 返回已安装流程的位置，空库 brief 返回空结果。误连另一 UUID 时修正 endpoint 和目录，保留原 UUID。按 [最小闭环](memory.md#最小闭环示例) 完成一次开发试用，核写入、检索及依据。
 
-brief、search、read 只读上次已发布知识及其依据快照。`memory maintain` 默认维护整个项目的受管来源：Git 项目发现已跟踪和未忽略的未跟踪文件，另加 `source_scope` 显式包含项；非 Git 项目使用声明范围。已登记来源、历史 pending/未接受范围和可归属聊天持续参与。日常调用通常不传 `--scope`；该参数只覆盖新文件发现。机械小批完成后，宿主按返回元数据启动持续协调者，由子 agent 自行运行渲染命令并读取英文提示词。自动维护、边界与缺口见 [记忆使用](memory.md#自动维护与手动维护)。
+brief、search、read 只读上次已发布知识及其依据快照。主任务直觉预计不超过十分钟时保留 brief 并跳过整个自动 maintain；更长任务在宿主生命周期支持下异步运行 `memory maintain --mode automatic`，范围明显扩大时重估，子任务不递归开维护。显式维护使用 `--mode manual`，不受时长门槛限制。维护默认发现整个项目，不用当前业务文件缩小范围；来源、固定布局和派工详情见 [记忆使用](memory.md#自动维护与手动维护)。
 
 ## Codex 项目聊天接入
 
@@ -155,13 +157,15 @@ if ($LASTEXITCODE -ne 0) { throw "brief failed ($LASTEXITCODE)" }
 if ($LASTEXITCODE -ne 0) { throw "search failed ($LASTEXITCODE)" }
 ```
 
-不再使用 password_env 或手工加载密码变量；缺文件、权限错误和错误密码直接保留原始失败。恢复正确文件或修正配置后重试，不自动生成替代密码，也不回退免认证。成功时 brief 和 search 返回已发布知识及其依据。连接失败时按生成入口检查本项目 `serve.ps1`、cwd 与日志，由项目维护者显式启动数据库。同项目多聊天共用数据库，聊天结束后保持运行。项目搬迁后更新 Python/配置绝对路径，或重新 `memory init` 刷新入口。
+不再使用 password_env 或手工加载密码变量；缺文件、权限错误和错误密码直接保留原始失败。恢复正确文件或修正配置后重试，不自动生成替代密码，也不回退免认证。成功时 brief 和 search 返回已发布知识及其依据。连接失败时按生成入口检查本项目 `serve.ps1`、cwd 与日志，由项目维护者显式启动数据库。同项目多聊天共用数据库，聊天结束后保持运行。项目搬迁后核实际 Python/配置及包装/服务路径，再运行 `memory init` 刷新托管块；instructions 块外旧路径另行核对。
 
 查编号、文件名或指定原文片段时使用 `memory search --mode hybrid --literal --text '<查找内容>'`：在 title、text 和 path 中做不区分大小写的子串查找，精确匹配优先，以 lexical_rank 标记，随后附语义候选。vector 模式不接受 `--literal`；模型或向量缺失时按原始错误修复设施或补建。
 
 ## 版本升级
 
-0.10.0.dev1已合入维护试验的改动。已有项目安装后执行`memory init`，同时刷新AGENTS短指令与本机入口，保留原UUID和托管块外字节。自动维护使用`maintain --holder <thread> --control <全新路径>`；同项目只由一个owner预检和发布，结束时stop、取消自有后代、确认发布结束后release。CLI的`apply`须传owner的control；Python省略control时仅在空闲项目取得短期owner，繁忙则明确失败。详见[自动维护](memory.md#自动维护与手动维护)、[反馈与审计](memory.md#使用反馈与手动审计)及随包skill。多项目共用解释器时逐项目安排入口升级，或先使用独立客户端环境；不让旧入口继续调用新生命周期接口。
+0.11.0.dev1 增加短任务跳过整个自动维护、固定名称派工、脚本容量布局和独立检索派工。升级先按 [配置维护要点](project-config-maintenance.md) 重新取得宿主并发上限/来源，用 `config set-concurrency` 补齐或更新旧项目，再执行 `memory init` 刷新 AGENTS 与 instructions 托管块，保留原 UUID 和块外字节。已有维护须先 stop、取消自有后代、确认发布结束并 release，再更换客户端/入口；多项目共用解释器时逐项目安排升级，或先用独立环境。
+
+自动维护显式使用 `--mode automatic`，手动维护使用 `--mode manual`（命令默认）；宿主按返回的名称、模型和推理强度派工。同项目仍由一个 owner 预检和发布。CLI 的 `apply` 须传 owner 的 control；Python 省略 control 时仅在空闲项目取得短期 owner，繁忙则明确失败。详见 [自动维护](memory.md#自动维护与手动维护)、[反馈与审计](memory.md#使用反馈与手动审计) 及随包 skill。
 
 先按 [备份步骤](memory.md#备份与恢复) 保留知识、配置和原件恢复集合，再由客户端维护者安装新包。已有配置保持 schema 2、机器 schema 1 和原 UUID。
 
@@ -192,7 +196,7 @@ bp --config $config memory search --mode vector --text '<代表性主题>'
 
 1. 保留旧 wheel、项目配置、原密码文件和 [完整恢复集合](memory.md#备份与恢复)。核 `username` 与 `password_file` 指向当前服务使用的同一凭据；默认位置不变时可省略 password_file，删除 password_env。
 2. 等正在调用的客户端完成后普通安装目标版本，更新配置中的 Python 路径（若解释器改变）。数据库、原密码、物理目录、端口与 UUID 保持；已有认证服务通常无需重启或迁库。
-3. 执行 `memory init` 刷新 instructions 与 AGENTS 托管块，删除项目手写说明和包装脚本中的旧环境变量加载。新 shell 直接 brief/search/read/neighbors，核原知识及依据；已有兼容向量无需重新编码。这是升级验证，日常知识批次按作者生成和程序提交完成。
+3. 重新采集宿主并发上限/来源，用 `config set-concurrency` 更新旧项目；执行 `memory init` 刷新 instructions 与 AGENTS 托管块。核 instructions 块外首段和包装脚本的实际路径，移除旧环境变量加载。新 shell 直接 brief/search/read/neighbors，核原知识及依据；已有兼容向量无需重新编码。这是升级验证，日常知识批次按作者生成和程序提交完成。
 
 密码文件缺失时恢复原凭据，不为已有库生成新密码。改写文件不等于轮换数据库中保存的账户密码；确需轮换时先由数据库管理员更新账户，再同步唯一凭据文件和 launcher。失败保留原错，按保留的 wheel 与配置回退；不清库或重新总结。
 
@@ -200,7 +204,7 @@ bp --config $config memory search --mode vector --text '<代表性主题>'
 
 ## 移动与重新检出
 
-移动启用记忆的项目时，先停止该项目数据库并确认进程退出，保留配置、业务原件和完整记忆数据；按新目录调整服务 cwd、日志与 endpoint，保留 project_id 后再启动并核 read/search。也可按 [原生备份恢复](memory.md#备份与恢复) 搬迁。Python 和机器配置绑定仍须有效；已保存作业材料中的绝对路径需按新位置修复，Condor 历史不会随目录移动。新检出通过 init 重建被忽略的配置和 instructions，AGENTS 与业务源码可正常提交；知识通过对应项目备份恢复。
+移动启用记忆的项目时，先收尾维护和未明发布，再停止该项目数据库并确认进程退出，保留配置、业务原件和完整记忆数据；按新目录调整服务 cwd、日志与 endpoint，保留 project_id 后再启动并核 read/search。也可按 [原生备份恢复](memory.md#备份与恢复) 搬迁。Python 和机器配置绑定仍须有效；已保存作业材料中的绝对路径需按新位置修复，Condor 历史不会随目录移动。按 [配置维护要点](project-config-maintenance.md) 核入口块外路径、宿主容量及受影响设施。新检出通过 init 重建被忽略的配置和 instructions，AGENTS 与业务源码可正常提交；知识通过对应项目备份恢复。
 
 开发安装、构建和产品回归见 [路线 README](../README.md)。
 

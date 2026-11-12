@@ -19,7 +19,7 @@ def test_memory_activation_preserves_business_text_and_updates_one_local_entry(t
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
     project = tmp_path / "中文 project"
-    config = load_project_config(init_project(project, machine))
+    config = load_project_config(init_project(project, machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
     instructions = project / ".basepack/instructions.md"
     original = instructions.read_text(encoding="utf-8").split("<!-- basepack-memory:start -->", 1)[0]
     _activate(config)
@@ -47,7 +47,7 @@ def test_broken_generated_boundary_fails_before_overwriting_instructions(tmp_pat
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
     project = tmp_path / "project"
-    config = load_project_config(init_project(project, machine))
+    config = load_project_config(init_project(project, machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
     instructions = project / ".basepack/instructions.md"
     text = "用户正文\n" + markers + "\n用户仍需的尾注\n"
     instructions.write_text(text, encoding="utf-8")
@@ -70,7 +70,7 @@ def _search_args(*options):
 def test_search_uses_project_mode_and_explicit_override(tmp_path, monkeypatch, configured, explicit, expected):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine))
+    config = load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
     if configured is None:
         del config.raw["memory"]["search_mode"]
     else:
@@ -95,7 +95,7 @@ def test_search_uses_project_mode_and_explicit_override(tmp_path, monkeypatch, c
 def test_default_search_requires_a_valid_explicit_project_setting(tmp_path, configured, error):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine))
+    config = load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
     _provision_password(config)
     if configured is None:
         del config.raw["memory"]["search_mode"]
@@ -115,7 +115,7 @@ def test_text_search_mode_is_not_a_cli_option():
 def test_vector_search_rejects_literal_before_retrieving(tmp_path, monkeypatch, explicit):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine))
+    config = load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
     _provision_password(config)
     monkeypatch.setattr("basepack.memory.store.Memory.vector_search",
                         lambda *args, **kwargs: pytest.fail("vector search accepted --literal"))
@@ -127,7 +127,7 @@ def test_vector_search_rejects_literal_before_retrieving(tmp_path, monkeypatch, 
 def test_hybrid_search_passes_literal_to_lexical_retrieval(tmp_path, monkeypatch):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine))
+    config = load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
     _provision_password(config)
     config.raw["memory"]["search_mode"] = "hybrid"
     calls = []
@@ -153,7 +153,7 @@ def test_generated_bootstrap_loads_config_in_fresh_shell_from_other_cwd(tmp_path
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
     project = tmp_path / "中文 user's project-🚀"
-    config = load_project_config(init_project(project, machine, ".basepack/deep/config.toml"))
+    config = load_project_config(init_project(project, machine, ".basepack/deep/config.toml", max_concurrent_subagents=12, concurrency_source="test fixture"))
     _activate(config)
     bootstrap = _activation_bootstrap(config)
     assert "password" not in bootstrap.lower()
@@ -169,14 +169,18 @@ def test_maintain_defaults_to_project_scope_and_passes_control(tmp_path, monkeyp
     monkeypatch.setattr("basepack.memory.discovery._git_repository", lambda root: False)
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine))
+    config = load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
     _provision_password(config)
     config.raw["memory"]["source_scope"] = ["docs"]
     (config.root / "docs").mkdir()
     (config.root / "docs/new.md").write_text("New source", encoding="utf-8")
     calls = []
+    receipt = config.memory_dir / "maintenance/receipt.json"
+    receipt.parent.mkdir(parents=True)
+    receipt.write_text('{"semantic": [], "pending_relations": []}', encoding="utf-8")
     monkeypatch.setattr("basepack.memory.store.Memory.maintain",
-                        lambda self, scope, **kwargs: calls.append((scope, kwargs)) or {"needs_semantic": 0})
+                        lambda self, scope, **kwargs: calls.append((scope, kwargs)) or
+                        {"needs_semantic": 0, "receipt": str(receipt)})
     parser = argparse.ArgumentParser()
     register_commands(parser.add_subparsers(dest="command"))
     args = parser.parse_args(["memory", "maintain", "--holder", "thread", "--control", "task.control"])
@@ -196,14 +200,83 @@ def _memory_args(*options):
     return parser.parse_args(["memory", *options])
 
 
+@pytest.mark.parametrize("mode,available,expected_teams,expected_name", [
+    ("automatic", 0, 0, None), ("automatic", 4, 1, "bp_mem_coord_0"),
+    ("automatic", 12, 1, "bp_mem_coord_0"), ("manual", 12, 2, "bp_mem_coord_0"),
+])
+def test_maintain_saves_layout_and_respects_zero_capacity(tmp_path, monkeypatch, mode, available,
+                                                       expected_teams, expected_name):
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    config = load_project_config(init_project(tmp_path / "project", machine,
+                                              max_concurrent_subagents=12, concurrency_source="test fixture"))
+    _provision_password(config)
+    receipt = config.memory_dir / "maintenance/receipt.json"
+    receipt.parent.mkdir()
+    receipt.write_text('{"semantic": [], "pending_relations": []}', encoding="utf-8")
+    monkeypatch.setattr("basepack.memory.cli._collect_codex", lambda *a, **kw:
+                        {"project_id": None, "paths": [], "status": "binding_unavailable"})
+    monkeypatch.setattr("basepack.memory.discovery.discover_sources", lambda *a:
+                        {"mode": "configured", "paths": [], "gaps": []})
+    monkeypatch.setattr("basepack.memory.store.Memory.maintain", lambda *a, **kw:
+                        {"needs_semantic": True, "receipt": str(receipt)})
+    result, status = dispatch(_memory_args("maintain", "--holder", "thread", "--control",
+                                          str(receipt.with_suffix(".control")), "--mode", mode,
+                                          "--available-subagents", str(available)), config)
+    assert status == 0
+    saved = json.loads(receipt.read_text(encoding="utf-8"))["layout"]
+    assert saved == result["layout"]
+    assert saved["capacity_status"] == "verified_available"
+    assert len(saved["teams"]) == expected_teams
+    if expected_name:
+        assert result["worker"]["task_name"] == expected_name
+        assert f"'--team' '0'" in result["worker"]["render_command"]
+    else:
+        assert "worker" not in result
+        assert result["needs_semantic"] and result["dispatch_blocked"]
+
+
+@pytest.mark.parametrize("available,executor", [(0, "main"), (1, "worker")])
+def test_independent_retrieval_cli_and_pending_layout_never_open_store(tmp_path, monkeypatch,
+                                                                    available, executor):
+    from basepack.memory.prompts import maintenance_layout
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    config = load_project_config(init_project(tmp_path / "project", machine,
+                                              max_concurrent_subagents=12, concurrency_source="test fixture"))
+    request = tmp_path / "question.json"
+    request.write_text(json.dumps({"question": "如何维护并发上限？", "scope": "docs", "content_budget": 3000}),
+                       encoding="utf-8")
+    monkeypatch.setattr("basepack.memory.store.Memory", lambda *a:
+                        pytest.fail("independent dispatch opened the store"))
+    for action in ("retrieval-dispatch", "retrieval-prompt"):
+        result, status = dispatch(_memory_args(action, "--request", str(request), "--slot", "1",
+                                              "--available-subagents", str(available)), config)
+        assert status == 0 and result["executor"] == executor
+        assert result["task_name"] == ("bp_mem_search_1" if available else None)
+        if action == "retrieval-prompt":
+            assert result["prompt"]
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text(json.dumps({"layout": maintenance_layout(config, mode="manual")}), encoding="utf-8")
+    pending, status = dispatch(_memory_args("pending-dispatch", "--receipt", str(receipt),
+                                           "--available-subagents", "2", "--started-task-names",
+                                           "bp_mem_coord_0"), config)
+    assert status == 0
+    assert [w["task_name"] for w in pending["workers"]] == ["bp_mem_read_00", "bp_mem_read_01"]
+    assert not config.memory_dir.exists()
+    assert not config.memory_password_file.exists()
+
+
 def test_prompt_cli_never_constructs_memory_or_creates_state(tmp_path, monkeypatch):
     import json
 
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine))
+    config = load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
     receipt = tmp_path / "receipt.json"
-    receipt.write_text(json.dumps({"semantic": [], "pending_relations": []}), encoding="utf-8")
+    from basepack.memory.prompts import maintenance_layout
+    receipt.write_text(json.dumps({"semantic": [], "pending_relations": [],
+                                   "layout": maintenance_layout(config)}), encoding="utf-8")
     control = config.memory_dir / "new control" / "task.control"
     monkeypatch.setattr("basepack.memory.store.Memory",
                         lambda *args: pytest.fail("rendering opened the memory store"))
@@ -222,7 +295,7 @@ def test_prompt_cli_never_constructs_memory_or_creates_state(tmp_path, monkeypat
 def test_maintain_discovers_git_project_and_emits_complete_worker_command(tmp_path, monkeypatch):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine))
+    config = load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
     _provision_password(config)
     subprocess.run(["git", "init", "-q"], cwd=config.root, check=True)
     (config.root / "outside-current-task.md").write_text("Project wide", encoding="utf-8")
@@ -253,12 +326,16 @@ def test_maintain_discovers_git_project_and_emits_complete_worker_command(tmp_pa
     assert material["codex"] == {"project_id": result["codex"]["project_id"],
                                   "capture_dir": str(config.memory_dir / "codex"),
                                   "attachment_dir": str(config.memory_dir / "codex-attachments")}
+    assert material["layout"] == result["layout"]
+    assert result["worker"]["task_name"] == "bp_mem_coord_0"
+    assert len(material["layout"]["teams"]) == 2
+    assert material["layout"]["unused_subagents"] == 2
 
 
 def test_maintain_receipt_keeps_current_and_retained_codex_provenance(tmp_path, monkeypatch):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine))
+    config = load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
     _provision_password(config)
     receipt = config.memory_dir / "maintenance" / "semantic.json"
     receipt.parent.mkdir()
@@ -289,7 +366,7 @@ def test_maintain_keeps_owned_retained_captures_when_collection_is_unavailable(t
 
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine))
+    config = load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
     _provision_password(config)
     config.raw["memory"]["codex"]["project_id"] = "owned-project"
     capture = config.memory_dir / "codex" / "old-thread.txt"
@@ -302,8 +379,11 @@ def test_maintain_keeps_owned_retained_captures_when_collection_is_unavailable(t
     attachment.parent.mkdir()
     attachment.write_bytes(b"image")
     calls = []
+    receipt = config.memory_dir / "maintenance/receipt.json"
+    receipt.parent.mkdir()
+    receipt.write_text('{"semantic": [], "pending_relations": []}', encoding="utf-8")
     monkeypatch.setattr("basepack.memory.store.Memory.maintain", lambda self, scope, **kwargs:
-                        calls.append(scope) or {"needs_semantic": False})
+                        calls.append(scope) or {"needs_semantic": False, "receipt": str(receipt)})
     result, _ = dispatch(_memory_args("maintain", "--holder", "thread", "--control", str(config.memory_dir / "maintenance" / "task.control"), "--scope", "no-new-discovery"), config)
     assert result["codex"]["status"] == "binding_unavailable"
     assert result["codex"]["retained_sources"] == 2
@@ -317,7 +397,7 @@ def test_codex_registry_is_used_for_maintenance_scope(tmp_path, monkeypatch):
     from basepack.memory import codex, codex_binding
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine))
+    config = load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
     registry = tmp_path / "registry.json"
     registry.write_text(json.dumps({"project_id": "host-project", "registry_complete": True,
                                     "other_project_roots": []}), encoding="utf-8")

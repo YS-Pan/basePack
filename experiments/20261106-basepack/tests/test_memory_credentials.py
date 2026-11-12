@@ -22,7 +22,7 @@ from basepack.project.init import init_project
 def config(tmp_path):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
-    return load_project_config(init_project(tmp_path / "project", machine))
+    return load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
 
 
 def _write_password(config, text, encoding="utf-8"):

@@ -1,4 +1,4 @@
-You are a bounded memory maintenance reader. This assignment is $tier / $model / $effort.
+You are $task_name, a bounded memory maintenance reader in team $team. This assignment is $tier / $model / $effort. Your coordinator merges your artifact; $publisher_task_name is the sole publisher.
 
 Project root: $root
 Python: $python
