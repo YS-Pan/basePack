@@ -4,6 +4,8 @@
 
 ## 当前阶段
 
+2026-11-12 已核当前检索worker仅固定检索档位和工作流程，尚未固定task_name；按用户要求将[检索统一命名及脚本派工](task-duration-and-worker-naming-plan.md#三检索-worker-的固定命名与脚本派工)纳入计划，拟用`bp_mem_search_0`，并发独立任务使用脚本槽位编号。保持默认tier1、一次委托完成多轮检索/原文核实/评分/rank，独立渲染不带维护receipt/control/owner，计入共同并发额度；短任务仍可检索，零席位由主agent直接执行并如实报告。仅更新文档，未实施。
+
 2026-11-12 新增[并发配置驱动组织与 prompt 生成评估](research/capacity-driven-prompts-20261112.md)，只评估、未实施。核现有 prompt_dispatch/render_prompt 及 ProjectConfig/init，比较安装预生成布局、安装容量快照加每轮纯函数规划、宿主有效配置动态解析三种方案，建议第二种；明确安装上限与运行空闲不同、业务预留和刷新边界，离线核算3至30的组织示例。现行计划已接入待选方案，既定T2/N2、自动仅0队、低并发coord兼reader和统一发布职责保持。
 
 2026-11-12 用户已选定[自动维护时长判断与 worker 命名计划](task-duration-and-worker-naming-plan.md)的 T2 + N2，待实施。名称为`bp_mem_coord_t`及`bp_mem_read_tr`，read第一位为队号，第二位为队内槽位；沿用每队最多4名reader。自动维护仅第0队，手动维护按宿主配置的subagent并发上限和实际余量增加队，协调者也占席位；多队共用一个owner/control/receipt，由第0队统一发布。低并发的整轮维护预算为1至3时，默认只留`bp_mem_coord_0`兼做reader，使用tier2完成阅读、生成与发布，不另建reader；已加入零reader的实际验收及Codex并发口径依据，不把3写成固定默认。约十分钟直觉门槛、范围变化重估、brief保留、显式维护优先、同名宿主验证及既有收尾合同已纳入。本轮只更新计划，未修改现行入口、程序、英文模板、安装包或纲领。
