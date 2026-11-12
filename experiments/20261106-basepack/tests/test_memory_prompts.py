@@ -380,3 +380,62 @@ def test_retrieval_request_boundary_errors_remain_visible(prompt_project, tmp_pa
     request.write_text(json.dumps(material), encoding="utf-8")
     with pytest.raises(ValueError, match=field):
         render_retrieval_prompt(prompt_project, request)
+
+
+@pytest.mark.parametrize("scope", ["", "devDoc/", "资料/中文 project/"])
+def test_scope_is_a_literal_path_prefix_not_the_business_question(prompt_project, tmp_path, scope):
+    request = tmp_path / "中文 request.json"
+    request.write_text(json.dumps({"question": "现在的科学目标是什么？", "scope": scope, "content_budget": 200}), encoding="utf-8")
+    first = render_retrieval_prompt(prompt_project, request)
+    second = render_retrieval_prompt(prompt_project, request)
+    assert first["scope"] == scope
+    assert first["delivery_id"] == second["delivery_id"] and first["work"] == second["work"]
+    assert f"Actual path-prefix filter: {json.dumps(scope, ensure_ascii=False)}" in first["prompt"]
+    if scope:
+        assert ("'--scope' '" + scope + "'" in first["search_command"] if os.name == "nt"
+                else "--scope" in first["search_command"])
+    else:
+        assert "--scope" not in first["search_command"]
+    assert "--knowledge-revision" in first["prompt"] and "endpoint_versions" in first["prompt"]
+    assert "host file-writing tool" in first["prompt"] and "incomplete stage" in first["prompt"]
+    assert not first["started"] and first["status"] == "prepared"
+
+
+@pytest.mark.parametrize("scope", ["../outside", "docs/../../outside", "/absolute", "C:/absolute", "C:relative", "\\\\server\\share"])
+def test_retrieval_scope_rejects_non_project_paths(prompt_project, tmp_path, scope):
+    request = tmp_path / "request.json"
+    request.write_text(json.dumps({"question": "Question", "scope": scope}), encoding="utf-8")
+    with pytest.raises(ValueError, match="scope.*project-relative"):
+        render_retrieval_prompt(prompt_project, request)
+
+
+def test_retrieval_request_defaults_and_backslash_prefix(prompt_project, tmp_path):
+    request = tmp_path / "request.json"
+    request.write_text(json.dumps({"question": "Question", "scope": "中文 project\\资料\\"}), encoding="utf-8")
+    result = render_retrieval_prompt(prompt_project, request)
+    assert result["scope"] == "中文 project/资料/"
+    assert "6000" in result["prompt"]
+
+
+def test_retrieval_request_directory_reports_the_file_contract(prompt_project, tmp_path):
+    with pytest.raises(ValueError, match="JSON file, got a directory"):
+        render_retrieval_prompt(prompt_project, tmp_path)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows PowerShell native argument passing")
+@pytest.mark.parametrize("scope", ["", "资料/中文 project/"])
+def test_rendered_search_native_arguments_keep_default_and_unicode_scope(prompt_project, tmp_path, scope):
+    request = tmp_path / "request.json"
+    request.write_text(json.dumps({"question": "为何改变目标？", "scope": scope}), encoding="utf-8")
+    command = render_retrieval_prompt(prompt_project, request)["search_command"]
+    probe = tmp_path / "argv probe.py"
+    probe.write_text("import json, sys\nprint(json.dumps(sys.argv[1:], ensure_ascii=False))\n", encoding="utf-8")
+    command = command.replace("'-m' 'basepack'", "'" + str(probe).replace("'", "''") + "'", 1)
+    output = subprocess.check_output(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+                                      "[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)\n" + command],
+                                     text=True, encoding="utf-8")
+    actual = json.loads(output)
+    expected = ["--config", str(prompt_project.path), "memory", "search", "--text", "<terms>"]
+    if scope:
+        expected += ["--scope", scope]
+    assert actual == expected

@@ -1,6 +1,6 @@
 # basePack 项目入口
 
-本项目配置为 `$config`，运行 Python 为 `$python`。从项目根运行：
+本项目配置为 `$config`，运行 Python 为 `$python`。任务启动与 shell 接续按下方托管入口执行。从项目根核配置：
 
 ```powershell
 & '$python' -m basepack --config '$config' config show

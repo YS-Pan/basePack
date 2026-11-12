@@ -3,10 +3,11 @@
 from importlib.metadata import version
 from urllib.parse import urlsplit
 
+from fastapi import HTTPException
 from litserve import LitAPI, LitServer
 
 from .identity import DTYPE, embedding_identity
-from .qwen3_vl import Qwen3VLEmbedder, resolve_device
+from .qwen3_vl import EmbeddingInputError, Qwen3VLEmbedder, resolve_device
 
 
 class EmbeddingAPI(LitAPI):
@@ -21,7 +22,10 @@ class EmbeddingAPI(LitAPI):
         return request["inputs"]
 
     def predict(self, inputs):
-        return self.model.embed(inputs)
+        try:
+            return self.model.embed(inputs)
+        except EmbeddingInputError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 def serve(machine):

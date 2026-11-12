@@ -18,9 +18,11 @@
 
 [service.py](../../../experiments/20261106-basepack/src/basepack/embedding/service.py) 只适配 LitAPI：setup 加载一份常驻模型，predict 调用编码器。LitServe 0.2.19 提供 HTTP、队列、健康检查和 worker 管理；单设备、单推理 worker、单 API 接入线程，跨请求批次为 1。请求内批次由模型库处理。`restart_workers=True` 负责重建失败 worker，失败请求不自动重投。
 
+编码器把已知输入合同错误标为 `EmbeddingInputError`，服务将其映射为 HTTP 422；其它模型故障保留原异常。token 超限仍由 forward 前的实际 attention_mask 拒绝；只在该失败路径重复预处理，给出原请求顺序的 token 数和超限索引，避免 Sentence Transformers 内部按长度重排后无法定位。无原文截断或推理重投。此错误呈现属于当前源码，旧服务需按管理员升级流程安装才生效。
+
 Shawl 1.9.0 由 Windows 服务管理器启动，在 Condor 作业树之外拥有整个服务进程树。选定配置为 `--no-restart --kill-process-tree --stop-timeout 3000`：主进程或 Shawl 故障使服务停止，管理员手动重启；管理员停止后保持停止。模型常驻，不再由客户端请求或空闲时限管理其存活。
 
-[EmbeddingClient](../../../experiments/20261106-basepack/src/basepack/embedding/client.py) 明确接收 MachineConfig，将输入发送至配置 endpoint 的原生 `/predict`，结果包含向量、worker PID 和语义身份。客户端 timeout 只限制等待；LitServe 的 queue_timeout 只判断排队请求是否过期，两者都不打断已经开始的推理，也不停止共享服务。传输和推理错误沿框架原始信息及服务日志定位。
+[EmbeddingClient](../../../experiments/20261106-basepack/src/basepack/embedding/client.py) 明确接收 MachineConfig，将输入发送至配置 endpoint 的原生 `/predict`，结果包含向量、worker PID 和语义身份。客户端 timeout 只限制等待；LitServe 的 queue_timeout 只判断排队请求是否过期，两者都不打断已经开始的推理，也不停止共享服务。HTTP 错误保留原异常、可读响应流，并附最多 4096 字节的正文；候选编码另附请求输入索引与成员 key、路径、范围。旧服务的通用 500 仍须结合服务原日志定位，不能仅靠客户端恢复被框架隐藏的内部错误。
 
 机器管理独立于项目：`embedding --machine-config <file> status` 读取 `/health` 和 `/info`，后者提供模型身份和依赖版本；`stop` 调用 `sc.exe stop`。停止请求被接受不等于进程已经回收，完成状态由 Windows 服务状态和实际进程检查确认。安装、日志位置和停止方法见管理员说明。
 

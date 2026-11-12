@@ -1,6 +1,6 @@
 # 系统结构与边界
 
-当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.10.0.dev1 的公共入口、项目记忆与资源工具；当前验证与安装见[维护改造结果](../tasks/20261106-memory-system/maintenance-implementation-result.md)。配置和安装合同见 [部署说明](deployment.md)，记忆实际完成边界见 [专项进度](../tasks/20261106-memory-system/progress.md)，资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。文件位置图见 [逻辑框图](diagrams.md)。
+当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.12.0.dev1 的公共入口、项目记忆与资源工具；当前验证与安装见[使用整改进度](../tasks/20261112-usage-rectification/progress.md)。配置和安装合同见 [部署说明](deployment.md)，记忆实际完成边界见 [专项进度](../tasks/20261106-memory-system/progress.md)，资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。文件位置图见 [逻辑框图](diagrams.md)。
 
 ## 当前组成
 
@@ -52,3 +52,5 @@ artifacts/runs/                    选留运行和迁移原证，Git 忽略
 - 后续路线复用明确版本的发行包或公开 HTTP/API；模型、环境和缓存可以显式共享，项目知识和试验状态分别保存。运行环境不依赖另一条路线的可变源码或临时工作区。
 
 数据库物理文件与图像快照属于业务项目；每项目独立进程/端口，多聊天共享。源码外普通安装和机器观测见 [环境说明](environment.md)；文件结构建议、宿主协作与项目知识分别由对应模块维护。
+
+知识版本归档与交付状态仍在同一项目数据库。原生同步事件为今后的 member/node/semantic 知识版本保留前后像，关系端点另外绑定知识版本；旧原证版本不冒充旧知识表示。交付短事务持久化稳定 delivery_id、实际观察版本和全局事件，独立于语义维护 owner 与向量输入。宿主负责实际派工/接收/确认，CLI 与 Python 共用内核；渲染、search、read 和 rank 不构成交付。权重只按交付事件惰性计算，不读取时钟、不传播强化。brief 不做任务相关检索，worker 同次阅读和综合评分；不新增跨来源的当前理解同步层。

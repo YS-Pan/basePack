@@ -45,6 +45,8 @@ def _memory(tmp_path):
     memory = Memory(config)
     memory.install_schema()
     memory._execute("DELETE feedback; DELETE semantic; DELETE node; DELETE member; DELETE source_version; DELETE source; DELETE change;")
+    # Deleting knowledge fires history events; clear their output afterwards.
+    memory._execute("DELETE knowledge_version; DELETE access_state; DELETE delivery; DELETE meta:access;")
     return memory
 
 
@@ -310,6 +312,7 @@ def test_real_node_correction_rejects_edge_only_draft_prepared_before_invalidati
 def test_real_wrong_project_init_preserves_existing_database_schema(memory):
     memory._execute("REMOVE TABLE semantic; REMOVE TABLE node; REMOVE TABLE member; "
                     "REMOVE TABLE source_version; REMOVE TABLE source; REMOVE TABLE change; REMOVE TABLE feedback; "
+                    "REMOVE TABLE knowledge_version; REMOVE TABLE access_state; REMOVE TABLE delivery; "
                     "REMOVE ANALYZER memory_zh;")
     before = memory._execute("INFO FOR DB;")[0]
     assert set(before["tables"]) == {"meta"}

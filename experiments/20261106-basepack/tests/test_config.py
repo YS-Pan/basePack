@@ -31,7 +31,9 @@ def test_two_projects_and_subdirectory_config(tmp_path, monkeypatch):
     instructions = (projects[0] / ".basepack/instructions.md").read_text(encoding="utf-8")
     assert ".basepack/config/deep/basepack.toml" in instructions
     assert sys.executable in instructions
-    assert "memory retrieval-dispatch" in instructions
+    assert "memory retrieve --question" in instructions
+    assert "`--scope` 仅为项目相对路径前缀" in instructions
+    assert "业务限制写入问题" in instructions
     assert "config ai --tier tier2" in instructions
     assert "gpt-6" not in instructions
     assert (projects[0] / ".gitignore").read_text(encoding="utf-8") == "/.basepack/\n"
@@ -310,6 +312,7 @@ def test_memory_tools_run_without_loading_project_configuration(tmp_path, config
     if action == "rank":
         scored = tmp_path / "scored.json"
         scored.write_text(json.dumps([{"id": "evidence", "text": "actual body", "score": 90,
+                                       "knowledge_revision": "observed-knowledge-v1",
                                        "kind": "chunk", "path": "source.md", "revision": "v1",
                                        "start_line": 1, "end_line": 1}]), encoding="utf-8")
         command += ["--input", str(scored)]
@@ -320,6 +323,7 @@ def test_memory_tools_run_without_loading_project_configuration(tmp_path, config
         assert Path(data["skill"]).is_file()
     elif action == "rank":
         assert data["items"][0]["text"] == "actual body"
+        assert data["items"][0]["knowledge_revision"] == "observed-knowledge-v1"
 
 
 @pytest.mark.parametrize("action, option", [("rank", "--input")])

@@ -1,5 +1,11 @@
 # 开发环境核验
 
+## 2026-11-12 0.12使用整改安装
+
+本项目稳定客户端路径仍为 `D:/AgentTools/envs/basepack-client-0.10/`，实际普通安装0.12.0.dev1，55个包文件与wheel/源码相同。原八表逐字段、配置/UUID/凭据和AGENTS块外正文保持；生成入口刷新为任务级直接brief和retrieve宿主协议。全套623通过、1跳过，专用CLI变量补齐后的反馈恢复文件另8项通过；真实阵列固定副本的11表恢复、精确知识版本及交付幂等通过。新客户端pip check和源码外实际查询通过，原证及取舍见[验收结果](../tasks/20261112-usage-rectification/acceptance-result.md)。
+
+开发locked同步因网络与缓存缺基础torch wheel停止，临时环境复用机器既有匹配版本依赖；不是干净机器全extras安装证明。首轮沙箱ACL回归未得到预期PermissionError，正常用户单项及最终全套通过；沙箱脱离进程的临时server未跨调用存活，主验收改用有生命周期session的独立内存server。正式项目库和共享0.5服务未重启，其它项目未升级。
+
 ## 当前开发入口与临时目录
 
 当前唯一 active 路线位于 `experiments/20261106-basepack/`；安装、构建与测试目标均为该实验工程，具体命令见 [路线 README](../../experiments/20261106-basepack/README.md)。从仓库根运行 pytest 时，显式指定实验的 pyproject、tests 和根 `tmp/<task>/pytest` 作为 basetemp。pytest 不保留持久缓存；构建 TEMP/TMP 和隔离验证环境也进入根 tmp。目录寿命见 [文档维护约定](../documentation.md)。

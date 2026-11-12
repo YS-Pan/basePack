@@ -1,6 +1,6 @@
 # 项目配置与部署合同
 
-更新：2026年11月12日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向0.11.0.dev1；本轮安装及检查见[派工实施结果](../tasks/20261106-memory-system/dispatch-implementation-result.md)，此前生命周期见[维护改造结果](../tasks/20261106-memory-system/maintenance-implementation-result.md)。本文维护部署边界；操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入，修改配置时按[维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)同步受影响状态。
+更新：2026年11月12日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向0.12.0.dev1；本轮安装及检查见[使用整改进度](../tasks/20261112-usage-rectification/progress.md)，此前固定派工见[实施结果](../tasks/20261106-memory-system/dispatch-implementation-result.md)。本文维护部署边界；操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入，修改配置时按[维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)同步受影响状态。
 
 ## 位置与责任
 
@@ -15,7 +15,7 @@
 | 运行托管与日志 | 共享模型沿用 Shawl/SCM；项目库可由普通用户手动启动，也可选管理员 SCM；日志分别保存 |
 | 普通作业容量与策略 | HTCondor 独立安装并唯一维护 |
 
-本机共享服务沿R9使用`C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe`与`D:/AgentTools/state/basepack/embedding/logs/`；SurrealDB4.0.0 exe为`D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。本项目独立稳定客户端环境仍为`D:/AgentTools/envs/basepack-client-0.10/`，其中包已原位升级0.11.0.dev1，目录名不表示当前包版本；其它项目共用的`D:/AgentTools/envs/basepack-client/`仍为0.9.1。系统Python、0.5共享模型环境、图文依赖及服务保持原状。公共代码通过配置定位，不写死这些本机位置。
+本机共享服务沿R9使用`C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe`与`D:/AgentTools/state/basepack/embedding/logs/`；SurrealDB4.0.0 exe为`D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。本项目独立稳定客户端环境仍为`D:/AgentTools/envs/basepack-client-0.10/`，其中包已原位升级0.12.0.dev1，目录名不表示当前包版本；其它项目共用的`D:/AgentTools/envs/basepack-client/`仍为0.9.1。系统Python、0.5共享模型环境、图文依赖及服务保持原状。公共代码通过配置定位，不写死这些本机位置。
 
 根 file-structure、agent-team、engineering-judgment 独立维护，resources skill 归 active 实验。memory skill 与英文 coordinator/reader 提示词随包安装，分别通过无需配置的 `memory guide` 和显式配置的 `memory prompt` 使用；提示词渲染不要求数据库、密码文件或模型在线。独立技能选择完整目录复制到项目 `.agents/skills/`，或联接已有项目原件；同名冲突保留并报告，正确入口复用。`init` 与 core doctor 不安装或验收它们；忽略的本机联接在新检出后重建，核宿主实际发现。开发环境、构建缓存和夹具在根 tmp，交付及回滚 wheel 在实验 dist，选留原证在根 artifacts/runs；寿命见 [文档约定](../documentation.md)。
 
@@ -77,6 +77,8 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 搬迁先停止该项目库并确认进程退出，再移动完整项目、调整启动 cwd/日志/endpoint，保留 UUID 后复核。在线备份使用原生 export；恢复集合含 export、配置、原凭据文件、业务原件、受管聊天导出、codex-attachments 原件与定位回执、必要 assets。已接受语义与更正必须恢复，向量可以从保留表示重建。长期备份位置和保留周期由业务项目确定，Git 忽略和本机目录不代替备份。
 
 ## 升级与回退
+
+0.12.0.dev1 新增知识版本归档同步事件、access_state/delivery 和全局交付序号，沿用项目配置 schema 2、UUID、凭据及向量身份。升级先结束旧维护并保存原生 export、新旧 wheel、配置及必要原证/managed 文件；普通安装后 memory init 更新 schema 和托管入口，不要求重算向量或重写全库知识。恢复需保留精确知识版本、全局事件、访问状态及原 delivery_id；存量未保存的历史不补造。代码/模板、数据和共享设施的恢复范围见[配置维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md#按变化边界准备恢复集合)。服务端输入422改进仅在对应服务包部署后生效；本轮沿用0.5共享服务，不自动重启。
 
 0.11.0.dev1增加时长入口判断、容量快照、固定布局和名称及独立检索派工。先收尾旧维护，保留UUID/凭据/知识后普通升级；旧项目运行config set-concurrency补容量和来源，再memory init刷新托管入口。仅托管块自动刷新，块外旧路径另行核对。容量或模型映射修改影响新一轮，已有回执layout保持；旧无layout回执先结束旧轮，不隐式重算续派。并发快照随宿主/profile改变显式同步，不建设每会话全量核查或监视器。操作见配置维护要点。
 

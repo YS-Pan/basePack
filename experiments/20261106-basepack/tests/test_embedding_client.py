@@ -68,6 +68,7 @@ def test_native_http_error_preserves_status_and_body(service):
     with pytest.raises(HTTPError) as error:
         service.client.embed(['error'], timeout=2)
     assert error.value.code == 503
+    assert 'native upstream failure' in ' '.join(error.value.__notes__)
     assert json.load(error.value) == {'detail': 'native upstream failure'}
     assert len(service.requests) == 1
 

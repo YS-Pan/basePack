@@ -5,7 +5,7 @@ from basepack.memory.selection import select_scored
 
 def candidate(identity, text, score, start=1, end=3, kind="chunk"):
     return {"id": identity, "text": text, "score": score, "kind": kind,
-            "path": "材料.md", "revision": "v1", "start_line": start, "end_line": end}
+            "path": "材料.md", "knowledge_revision": "k1", "revision": "v1", "start_line": start, "end_line": end}
 
 
 def test_scores_deliver_actual_content_and_keep_complementary_evidence():
@@ -94,5 +94,43 @@ def test_equivalent_image_locator_objects_still_deduplicate():
 
 @pytest.mark.parametrize("score", [float("nan"), float("inf")])
 def test_invalid_agent_score_is_visible(score):
-    with pytest.raises(ValueError, match="Non-finite"):
+    with pytest.raises(ValueError, match="finite"):
+        select_scored([candidate("invalid", "text", score)], 10)
+
+
+def test_rank_requires_observed_version_and_preserves_distinct_knowledge_versions():
+    first = candidate("stable", "同一来源里的适用条件", 90)
+    second = {**first, "knowledge_revision": "k2", "score": 80}
+    assert select_scored([first, second], 100)["items"] == [first, second]
+    del first["knowledge_revision"]
+    with pytest.raises(KeyError, match="knowledge_revision"):
+        select_scored([first], 100)
+
+
+def test_graph_versions_need_no_fake_source_location_and_use_the_same_budget():
+    node = {"record_type": "node", "id": "node:goal", "knowledge_revision": "node-v1",
+            "kind": "requirement", "title": "当前目标", "text": "用户要求", "score": 95}
+    relation = {"record_type": "semantic", "id": "semantic:replaces", "knowledge_revision": "edge-v1",
+                "kind": "supersedes", "text": "新目标替代旧目标", "score": 90,
+                "endpoint_versions": {"in": {"id": "node:goal", "knowledge_revision": "node-v1"}}}
+    old = {**node, "knowledge_revision": "node-v0", "score": 75, "text": "旧目标"}
+    result = select_scored([node, {**node, "score": 80}, relation, old], 20)
+    assert result["items"] == [node, relation, old]
+    assert result["omitted"][0]["reason"] == "duplicate"
+    assert all("path" not in item for item in result["items"])
+    limited = select_scored([node, relation, old], 7)
+    assert limited["items"] == [node, old]
+    assert limited["omitted"][0]["id"] == relation["id"]
+    assert limited["omitted"][0]["knowledge_revision"] == "edge-v1"
+
+
+def test_rank_uses_the_single_final_score_without_access_reweighting():
+    important = {**candidate("rare", "必要证据", 95), "access_weight": 0.01}
+    popular = {**candidate("hot", "常用背景", 80, 8, 9), "access_weight": 1.0}
+    assert select_scored([popular, important], 4)["items"] == [important]
+
+
+@pytest.mark.parametrize("score", [-1, 101, True])
+def test_scores_follow_the_common_zero_to_hundred_contract(score):
+    with pytest.raises(ValueError, match="0–100"):
         select_scored([candidate("invalid", "text", score)], 10)

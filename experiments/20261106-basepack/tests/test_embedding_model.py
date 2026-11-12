@@ -4,7 +4,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from basepack.embedding.qwen3_vl import Qwen3VLEmbedder, resolve_device
+from basepack.embedding.qwen3_vl import (
+    EmbeddingInputError, EmbeddingTokenLimitError, Qwen3VLEmbedder, resolve_device,
+)
 
 
 @pytest.fixture
@@ -107,3 +109,39 @@ def test_animated_image_is_rejected_before_encode(tmp_path):
     with pytest.raises(ValueError, match="static frame"):
         model.embed([{"image": str(image)}])
     model.model.encode.assert_not_called()
+
+
+def test_token_error_identifies_original_request_indices_without_retry():
+    import torch
+
+    model = Qwen3VLEmbedder.__new__(Qwen3VLEmbedder)
+    model.options = {"max_length": 4, "batch_size": 4}
+    model.model = Mock()
+    original = EmbeddingTokenLimitError("actual tokens [5, 3] exceed max_length=4; no forward performed")
+    model.model.encode.side_effect = original
+    model.model.preprocess.side_effect = [
+        {"attention_mask": torch.ones((1, count), dtype=torch.long)} for count in (3, 5)]
+    with pytest.raises(EmbeddingInputError, match=r"indices.*\[1\].*counts: \[3, 5\]") as failure:
+        model.embed(["short", "long"])
+    assert failure.value.__cause__ is original
+    model.model.encode.assert_called_once()
+
+
+def test_service_reports_known_input_errors_and_preserves_internal_errors():
+    from fastapi import HTTPException
+    from basepack.embedding.service import EmbeddingAPI
+
+    api = EmbeddingAPI({})
+    api.model = Mock()
+    invalid = EmbeddingInputError("actual tokens [2192] exceed max_length=2048")
+    api.model.embed.side_effect = invalid
+    with pytest.raises(HTTPException) as failure:
+        api.predict(["oversized input"])
+    assert failure.value.status_code == 422
+    assert failure.value.detail == str(invalid)
+    assert failure.value.__cause__ is invalid
+    internal = ValueError("unexpected model failure")
+    api.model.embed.side_effect = internal
+    with pytest.raises(ValueError) as failure:
+        api.predict(["valid input"])
+    assert failure.value is internal

@@ -1,12 +1,14 @@
 # basePack
 
-`20261106-basepack` is the only active implementation route. The current source targets 0.11.0.dev1, in development, for Windows and Python 3.13+. Each project keeps its configuration, knowledge, source evidence, and job records in its own `.basepack/`; programs and models can be shared. Start with the clone, virtual environment, and installation commands in the root [README](../../README.md#install-the-lightweight-client).
+`20261106-basepack` is the only active implementation route. The current source targets 0.12.0.dev1, in development, for Windows and Python 3.13+. Each project keeps its configuration, knowledge, source evidence, and job records in its own `.basepack/`; programs and models can be shared. Start with the clone, virtual environment, and installation commands in the root [README](../../README.md#install-the-lightweight-client).
 
 This project's own source and documentation use the [MIT license](LICENSE), matching the root license. Third-party notices remain in the package.
 
 Memory uses SurrealDB 4. Host subscription agents read originals, choose boundaries, summarize, build relations and score results. The program checks dependencies and publishes knowledge with matching vectors in one native WebSocket transaction. `search`, `brief`, and `read` query published knowledge only. Keep brief for every task; intuitively short tasks (at most ten minutes) skip automatic maintenance, while longer tasks start one whole-project run and reassess when scope expands. The script supplies fixed names, models and capacity layouts: automatic mode uses team 0, manual mode can use full teams, and low capacity uses one coordinator who also reads. Team 0 alone publishes. Retrieval dispatch is independent of maintenance ownership. A successful publication completes ordinary maintenance; use feedback waits for the next owner and an audit requires explicit user intent. At business completion stop, cancel descendants and release after publication ends. New projects default to `vector` and can select `hybrid`. See the [memory guide](docs/memory.md) for the full contracts and the [implementation result](../../devDoc/tasks/20261106-memory-system/maintenance-implementation-result.md) for checks and limits.
 
 basePack is under development, and real use also serves as testing. Record problems using your project's conventions and draft an issue with the [feedback format](docs/setup-project.md#问题记录与反馈).
+
+Brief reads published startup information once per task without search or embedding. `memory retrieve --question '...'` prepares a whole-project request with a 6000-character default budget and stable delivery identity; the host actually starts the worker, receives its final answer and confirms the delivered version manifest. Knowledge history and graph endpoints retain exact observed versions; access weights change only on confirmed delivery events, with no elapsed-time decay. The same worker uses access hints in its score and rank remains a pure selector. Schema upgrades and recovery follow [configuration maintenance](docs/project-config-maintenance.md#按变化边界准备恢复集合).
 
 ## Set up a capability
 

@@ -39,10 +39,10 @@
 <!-- basepack:start -->
 ## basePack
 
-- 开始或接续任务时，按本机 Python/配置运行 `memory brief`；保留 mandatory，待核内容按业务需要回源：[启动](.basepack/instructions.md#startup)。
+- 主任务开始时运行一次 `memory brief`；同任务接续沿用已有 brief，新 shell 仅初始化参数与 UTF-8。保留 mandatory，待核内容按需回源：[启动](.basepack/instructions.md#startup)。
 - 主任务直觉预计不超过十分钟时跳过整个自动维护；更长任务在宿主支持生命周期时异步运行全项目 `memory maintain --mode automatic`。范围明显扩大时重估，子任务不递归启动维护：[自动维护](.basepack/instructions.md#maintenance)。
 - 仅持有维护且 `needs_semantic=true` 时，按脚本返回的 `task_name`、模型和推理强度实际派协调者，持续接批：[派工](.basepack/instructions.md#dispatch)。
-- 业务结束时 stop 自有 control，取消自有协调者及后代，确认发布阶段结束后释放所有权；未明状态保留待处理：[收尾](.basepack/instructions.md#stop)。
+- 业务结束时独立于 brief 执行 stop 自有 control，取消自有协调者及后代，确认发布结束后释放所有权；未明状态保留待处理：[收尾](.basepack/instructions.md#stop)。
 - 用户明确要求维护时，将授权范围内的处置、实际阻塞和余项纳入交付：[显式维护](.basepack/instructions.md#explicit-maintenance)。
 - 检索 worker 或调用 agent 使用中发现问题时，轻量报告疑点和观察版本，交维护处理：[使用反馈](.basepack/instructions.md#feedback)。
 - 建立与普通维护在作者生成及程序提交后结束；仅用户明确要求记忆系统审计时按其范围审计：[手动审计](.basepack/instructions.md#audit)。

@@ -37,6 +37,11 @@ def test_memory_activation_preserves_business_text_and_updates_one_local_entry(t
     assert "`vector --literal` 明确拒绝" in updated
     assert f"{config.memory_dir.as_posix()}/serve.ps1" in updated
     assert "logs/surreal.stderr.log" in updated
+    startup = updated.split("<!-- basepack-memory:start -->", 1)[1].split("## 自动维护", 1)[0]
+    bootstrap = startup.split("```powershell\n", 1)[1].split("\n```", 1)[0]
+    assert "memory brief" not in bootstrap
+    assert startup.count("--config $basepackConfig memory brief") == 1
+    assert "新进程只重新初始化" in startup
 
 
 @pytest.mark.parametrize("markers", ["<!-- basepack-memory:start -->", "<!-- basepack-memory:end -->",
@@ -158,7 +163,7 @@ def test_generated_bootstrap_loads_config_in_fresh_shell_from_other_cwd(tmp_path
     bootstrap = _activation_bootstrap(config)
     assert "password" not in bootstrap.lower()
     result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
-                             bootstrap + "Write-Output $basepackConfig"],
+                             bootstrap + "\nWrite-Output $basepackConfig"],
                             cwd=tmp_path.parent, capture_output=True, text=True, encoding="utf-8", timeout=20)
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == str(config.path)
@@ -198,6 +203,63 @@ def _memory_args(*options):
     parser = argparse.ArgumentParser()
     register_commands(parser.add_subparsers(dest="command"))
     return parser.parse_args(["memory", *options])
+
+
+def test_retrieve_has_useful_defaults_stable_reuse_and_no_implied_host_execution(tmp_path, monkeypatch):
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    config = load_project_config(init_project(tmp_path / "中文 project", machine,
+                                              max_concurrent_subagents=12, concurrency_source="test fixture"))
+    monkeypatch.setattr("basepack.memory.store.Memory", lambda *a: pytest.fail("retrieve opened the store"))
+    empty, status = dispatch(_memory_args("retrieve"), config)
+    assert status == 0 and empty["status"] == "needs_input" and empty["required_input"] == "question"
+    assert not (config.root / "tmp").exists()
+    result, status = dispatch(_memory_args("retrieve", "--question", "过去要求为何改变？"), config)
+    assert status == 0 and result["status"] == "prepared" and not result["started"]
+    assert result["scope"] == "" and result["content_budget"] == 6000
+    request = json.loads(Path(result["request"]).read_text(encoding="utf-8"))
+    assert request["question"] == "过去要求为何改变？" and request["scope"] == ""
+    assert request["delivery_id"] == result["delivery_id"]
+    assert result["executor"] == "worker" and result["tier"] == config.resolve_ai(purpose="retrieval")["tier"]
+    assert not Path(result["delivery_receipt"]).exists()
+    again, _ = dispatch(_memory_args("retrieve", "--request", result["request"], "--available-subagents", "0"), config)
+    assert again["delivery_id"] == result["delivery_id"] and again["delivery_receipt"] == result["delivery_receipt"]
+    assert again["executor"] == "main" and again["model"] is None and not again["started"]
+    assert not config.memory_dir.exists()
+
+
+def test_observed_version_cli_and_final_delivery_pass_exact_identity(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    calls = []
+    memory = SimpleNamespace(**{name: (lambda *args, _name=name, **kwargs:
+                                      calls.append((_name, args, kwargs)) or {"ok": True})
+                               for name in ("knowledge", "history", "read", "neighbors", "access_hints", "record_delivery")})
+    monkeypatch.setattr("basepack.memory.store.Memory", lambda config: memory)
+    actions = [("knowledge", "member:m", "--knowledge-revision", "old"), ("history", "member:m"),
+               ("read", "member:m", "--knowledge-revision", "old"),
+               ("neighbors", "node:n", "--knowledge-revision", "node-old", "--include-stale")]
+    for options in actions:
+        assert dispatch(_memory_args(*options), None) == ({"ok": True}, 0)
+    manifest = [{"id": "member:m", "knowledge_revision": "old"}]
+    receipt = tmp_path / "delivered 中文.json"
+    receipt.write_text(json.dumps({"delivery_id": "stable-id", "items": manifest, "context": {"task": "检索"}}), encoding="utf-8")
+    dispatch(_memory_args("delivery", "--input", str(receipt)), None)
+    hints = tmp_path / "hints.json"
+    hints.write_text(json.dumps(manifest), encoding="utf-8")
+    dispatch(_memory_args("access-hints", "--input", str(hints)), None)
+    assert calls == [("knowledge", ("member:m",), {"knowledge_revision": "old"}),
+                     ("history", ("member:m",), {}),
+                     ("read", ("member:m",), {"knowledge_revision": "old", "source_version": None,
+                                               "start_line": None, "end_line": None, "locator": None}),
+                     ("neighbors", ("node:n",), {"knowledge_revision": "node-old", "include_stale": True}),
+                     ("record_delivery", ("stable-id", manifest), {"context": {"task": "检索"}}),
+                     ("access_hints", (manifest,), {})]
+
+
+def test_rank_directory_input_reports_the_file_contract(tmp_path):
+    with pytest.raises(ValueError, match="JSON file, got a directory"):
+        dispatch(_memory_args("rank", "--input", str(tmp_path)), None)
 
 
 @pytest.mark.parametrize("mode,available,expected_teams,expected_name", [

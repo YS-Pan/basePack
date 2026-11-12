@@ -8,11 +8,11 @@ def register_commands(subparsers):
     memory = subparsers.add_parser("memory", help="Project-local multilevel memory")
     commands = memory.add_subparsers(dest="memory_action", required=True)
     actions = {name: commands.add_parser(name) for name in
-               ("init", "guide", "sources", "prepare", "apply", "stop", "owner", "release", "recover-owner", "embed", "search", "read", "neighbors", "brief", "changes", "maintain", "prompt", "pending-dispatch", "retrieval-dispatch", "retrieval-prompt", "rank", "feedback-report", "feedback-list", "feedback-resolve")}
+               ("init", "guide", "sources", "prepare", "apply", "stop", "owner", "release", "recover-owner", "embed", "search", "read", "knowledge", "history", "neighbors", "brief", "changes", "maintain", "prompt", "pending-dispatch", "retrieve", "retrieval-dispatch", "retrieval-prompt", "rank", "delivery", "access-hints", "feedback-report", "feedback-list", "feedback-resolve")}
     actions["feedback-report"].add_argument("--kind", choices=["knowledge", "retrieval"], required=True)
     actions["feedback-report"].add_argument("--issue", required=True)
     actions["feedback-report"].add_argument("--target", help="Member, node or semantic edge ID")
-    actions["feedback-report"].add_argument("--observed-revision", help="Version returned when the target was observed")
+    actions["feedback-report"].add_argument("--observed-revision", help="knowledge_revision returned when the target was observed; put software version in --issue")
     actions["feedback-report"].add_argument("--query", help="Query, including for missed results")
     actions["feedback-report"].add_argument("--source", help="Original location or source clue")
     actions["feedback-report"].add_argument("--reporter", help="Reporting agent or worker")
@@ -33,7 +33,7 @@ def register_commands(subparsers):
     actions["recover-owner"].add_argument("--owner-ended", action="store_true", required=True, help="Attest that the previous owner and workers have ended")
     actions["recover-owner"].add_argument("--publication-resolved", action="store_true", required=True, help="Attest that each publication result has been verified")
     actions["search"].add_argument("--text", required=True)
-    actions["search"].add_argument("--scope", default="")
+    actions["search"].add_argument("--scope", default="", help="Project-relative path prefix; empty searches the whole project. Put business constraints in --text")
     actions["search"].add_argument("--limit", type=int, default=12)
     actions["search"].add_argument("--literal", action="store_true", help="With hybrid: prioritize case-insensitive path/title/text substring matches")
     actions["search"].add_argument("--mode", choices=["hybrid", "vector"],
@@ -42,13 +42,20 @@ def register_commands(subparsers):
     actions["embed"].add_argument("--ids", nargs="+", help="Member IDs; otherwise index current representations")
     actions["embed"].add_argument("--timeout", type=float, default=600)
     actions["read"].add_argument("id", help="Member ID; follow a knowledge node's evidence via neighbors")
-    actions["read"].add_argument("--source-version", help="Read an evidence source_version")
+    actions["read"].add_argument("--knowledge-revision", help="Read the observed knowledge version, including its original evidence")
+    actions["read"].add_argument("--source-version", help="Read an original evidence snapshot; use --knowledge-revision for the old accepted representation")
     actions["read"].add_argument("--start-line", type=int, help="Evidence start line (inclusive)")
     actions["read"].add_argument("--end-line", type=int, help="Evidence end line (inclusive)")
     actions["read"].add_argument("--locator", help="Image evidence locator as a JSON object")
     actions["neighbors"].add_argument("id")
+    actions["neighbors"].add_argument("--knowledge-revision", help="Expand the observed knowledge version")
     actions["neighbors"].add_argument("--include-stale", action="store_true", help="Explicit historical inspection")
-    actions["brief"].add_argument("--task", default="")
+    actions["knowledge"].add_argument("id", help="Member, node or semantic relation ID")
+    actions["knowledge"].add_argument("--knowledge-revision", help="Observed knowledge version; default is current")
+    actions["history"].add_argument("id", help="List retained knowledge versions and actual history coverage")
+    actions["delivery"].add_argument("--input", required=True, help="Host-confirmed final receipt: delivery_id, items [{id, knowledge_revision}], optional context")
+    actions["access-hints"].add_argument("--input", required=True, help="UTF-8 JSON array of observed {id, knowledge_revision} records")
+    actions["brief"].add_argument("--task", default="", help="Task label only; brief directly reads published startup knowledge without search or embedding")
     actions["brief"].add_argument("--limit", type=int, default=6)
     actions["changes"].add_argument("--scope", nargs="+", required=True)
     actions["changes"].add_argument("--deep", action="store_true")
@@ -78,6 +85,15 @@ def register_commands(subparsers):
         actions[name].add_argument("--slot", type=int, default=0, help="Parent-owned retrieval slot")
         actions[name].add_argument("--available-subagents", type=int, help="Host raw free subagent seats")
         actions[name].add_argument("--tier", choices=["tier1", "tier2", "tier3", "tier4"])
+    retrieve = actions["retrieve"]
+    request = retrieve.add_mutually_exclusive_group()
+    request.add_argument("--question", help="Business question; the host runs the returned retrieval assignment")
+    request.add_argument("--request", help="Reuse a prepared request and its stable delivery ID")
+    retrieve.add_argument("--scope", default="", help="Project-relative path prefix; empty means the whole project")
+    retrieve.add_argument("--budget", type=int, default=6000, help="Returned text character budget (default: 6000)")
+    retrieve.add_argument("--slot", type=int, default=0, help="Parent-owned retrieval slot")
+    retrieve.add_argument("--available-subagents", type=int, help="Host raw free subagent seats; zero uses the main agent")
+    retrieve.add_argument("--tier", choices=["tier1", "tier2", "tier3", "tier4"])
     actions["rank"].add_argument("--input", required=True, help="Read candidates with agent scores")
     actions["rank"].add_argument("--budget", type=int, default=6000, help="Returned text character budget")
     for name, command in actions.items():
@@ -88,6 +104,8 @@ def register_commands(subparsers):
 
 
 def dispatch(args, config):
+    from .query import load_json_file
+
     action = args.memory_action
     if action == "maintain":
         from .owner import acquire
@@ -118,7 +136,7 @@ def dispatch(args, config):
                   owner_ended=args.owner_ended, publication_resolved=args.publication_resolved)}
     elif action == "rank":
         from .selection import select_scored
-        result = select_scored(json.loads(Path(args.input).read_text(encoding="utf-8")), args.budget)
+        result = select_scored(load_json_file(args.input), args.budget)
     elif action == "prompt":
         from .prompts import render_prompt
         result = render_prompt(config, args.receipt, args.control,
@@ -134,6 +152,11 @@ def dispatch(args, config):
         render = retrieval_dispatch if action == "retrieval-dispatch" else render_retrieval_prompt
         result = render(config, args.request, slot=args.slot,
                         available_subagents=args.available_subagents, tier=args.tier)
+    elif action == "retrieve":
+        from .prompts import prepare_retrieval
+        result = prepare_retrieval(config, question=args.question, request_path=args.request,
+                                   scope=args.scope, budget=args.budget, slot=args.slot,
+                                   available_subagents=args.available_subagents, tier=args.tier)
     else:
         from .store import Memory
         memory = Memory(config)
@@ -171,11 +194,20 @@ def dispatch(args, config):
                 result = memory.hybrid_search(args.text, scope=args.scope, limit=args.limit,
                                               timeout=args.timeout, literal=args.literal)
         elif action == "read":
-            result = memory.read(args.id, source_version=args.source_version,
+            result = memory.read(args.id, knowledge_revision=args.knowledge_revision, source_version=args.source_version,
                                  start_line=args.start_line, end_line=args.end_line,
                                  locator=json.loads(args.locator) if args.locator else None)
         elif action == "neighbors":
-            result = memory.neighbors(args.id, include_stale=args.include_stale)
+            result = memory.neighbors(args.id, knowledge_revision=args.knowledge_revision, include_stale=args.include_stale)
+        elif action == "knowledge":
+            result = memory.knowledge(args.id, knowledge_revision=args.knowledge_revision)
+        elif action == "history":
+            result = memory.history(args.id)
+        elif action == "access-hints":
+            result = memory.access_hints(load_json_file(args.input))
+        elif action == "delivery":
+            receipt = load_json_file(args.input)
+            result = memory.record_delivery(receipt["delivery_id"], receipt["items"], context=receipt.get("context"))
         elif action == "brief":
             result = memory.brief(task=args.task, limit=args.limit)
         elif action == "changes":

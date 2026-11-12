@@ -242,6 +242,24 @@ class Memory:
     def _rows(self, table: str) -> list[dict]:
         return self._execute(f"SELECT * OMIT embedding FROM {table};")[0]
 
+    def knowledge(self, record_id: str, *, knowledge_revision: str | None = None) -> dict:
+        from .history import knowledge
+        return self.access_hints([knowledge(self, record_id, knowledge_revision=knowledge_revision)])[0]
+
+    def history(self, record_id: str) -> dict:
+        from .history import history
+        result = history(self, record_id)
+        result["versions"] = self.access_hints(result["versions"])
+        return result
+
+    def access_hints(self, items: list[dict]) -> list[dict]:
+        from .access import access_hints
+        return access_hints(self, items)
+
+    def record_delivery(self, delivery_id: str, items: list[dict], *, context: dict | None = None) -> dict:
+        from .access import record_delivery
+        return record_delivery(self, delivery_id, items, context=context)
+
     def _load_source(self, path: str, kind: str | None = None) -> SourceContent | ImageSource:
         if kind == "image" or Path(path).suffix.lower() in IMAGE_SUFFIXES:
             return read_image(self.config.root, path)
@@ -533,6 +551,7 @@ class Memory:
                 "title": title, "text": text, "stale": False, "retired": False,
                 "knowledge_revision": uuid4().hex,
                 "mandatory": item.get("mandatory", False), "coverage_gaps": item.get("coverage_gaps", []),
+                "conditions": item.get("conditions", ""), "claim_type": item.get("claim_type", ""),
             }
             if isinstance(source, ImageSource):
                 if item["kind"] != "image":
@@ -589,13 +608,22 @@ class Memory:
         for item in batch.get("members", []):
             value = submitted[_record(item["id"]).key]
             value["basis"] = basis(item.get("evidence", []))
+            if item.get("parent"):
+                parent_key = _record(item["parent"]).key
+                parent = submitted.get(parent_key) or existing.get(parent_key)
+                value["parent_version"] = {"id": _record(item["parent"]),
+                                           "knowledge_revision": parent["knowledge_revision"] if parent else None}
+            else:
+                value["parent_version"] = None
             writes.append((_record(item["id"]), value, "member"))
         for item in batch.get("nodes", []):
             if not item["evidence"]:
                 raise ValueError(f"Knowledge node requires original evidence: {item['id']}")
             writes.append((_record(item["id"], "node"), {
                 "kind": item["kind"], "text": item["text"], "basis": basis(item["evidence"]),
+                "conditions": item.get("conditions", ""), "claim_type": item.get("claim_type", ""),
                 "stale": False, "retired": False, "knowledge_revision": uuid4().hex}, "node"))
+        accepted_revisions = {record: value["knowledge_revision"] for record, value, _ in writes}
         for record, value, table in writes:
             statements.append(f"CREATE {_sql(_Record('change', uuid4().hex))} SET operation='accept', target={_sql(record)}, previous=(SELECT * OMIT embedding FROM ONLY {_sql(record)}), at=time::now(), context={_sql(context)};")
             if table == "node":
@@ -609,6 +637,25 @@ class Memory:
             record = _record(item["id"], "semantic")
             value = {"kind": item["kind"], "text": item["text"], "conditions": item.get("conditions", ""),
                      "basis": basis(item["evidence"]), "stale": False, "retired": False, "knowledge_revision": uuid4().hex}
+            endpoints = {}
+            for endpoint in ("in", "out"):
+                target = _record(item[endpoint])
+                pinned = item.get("endpoint_versions", {}).get(endpoint)
+                if pinned:
+                    if _record(pinned["id"]) != target:
+                        raise ValueError(f"Relation endpoint identity mismatch: {item['id']} {endpoint}")
+                    revision = pinned["knowledge_revision"]
+                    if accepted_revisions.get(target) != revision:
+                        self.knowledge(item[endpoint], knowledge_revision=revision)
+                else:
+                    revision = accepted_revisions.get(target)
+                    if revision is None:
+                        # Missing endpoints remain the native ENFORCED relation's
+                        # transaction error; no incomplete relation is published.
+                        revision = self._execute(
+                            f"SELECT VALUE knowledge_revision FROM ONLY {_sql(target)};")[0]
+                endpoints[endpoint] = {"id": target, "knowledge_revision": revision}
+            value["endpoint_versions"] = endpoints
             statements.append(f"CREATE {_sql(_Record('change', uuid4().hex))} SET operation='accept_edge', target={_sql(record)}, previous=(SELECT * FROM ONLY {_sql(record)}), at=time::now(), context={_sql(context)};")
             # Native endpoints are immutable. Recreate only this accepted edge
             # in the same transaction, after retaining its actual prior record.
@@ -662,6 +709,8 @@ class Memory:
 
     def search(self, text: str, *, scope: str = "", limit: int = 10, literal: bool = False) -> list[dict]:
         """Return lexical candidates for hybrid retrieval."""
+        from .query import normalize_scope
+        scope = normalize_scope(scope)
         if literal:
             match = (f"string::contains(string::lowercase(path + '\\n' + title + '\\n' + text), "
                      f"string::lowercase({_sql(text)}))")
@@ -669,19 +718,22 @@ class Memory:
         else:
             match = f"(text @1@ {_sql(text)} OR title @2@ {_sql(text)})"
             score = "search::score(1) + search::score(2)"
-        return self._execute(f"SELECT *, source_revision AS revision, {score} AS lexical_score OMIT {_CANDIDATE_OMIT} FROM member "
+        return self.access_hints(self._execute(f"SELECT *, source_revision AS revision, {score} AS lexical_score OMIT {_CANDIDATE_OMIT} FROM member "
                              f"WHERE stale=false AND retired!=true AND {match} "
                              f"AND string::starts_with(path, {_sql(scope)}) "
-                             f"ORDER BY lexical_score DESC LIMIT {int(limit)};")[0]
+                             f"ORDER BY lexical_score DESC LIMIT {int(limit)};")[0])
 
     def read(self, member_id: str, *, source_version: str | None = None,
              start_line: int | None = None, end_line: int | None = None,
-             locator: dict | None = None) -> dict:
+             locator: dict | None = None, knowledge_revision: str | None = None) -> dict:
         if _record(member_id).table != "member":
             raise ValueError("read requires a member ID; inspect node/edge evidence via neighbors")
-        member = self._execute(f"SELECT * OMIT embedding FROM ONLY {_sql(_record(member_id))};")[0]
-        if member is None:
-            raise ValueError(f"Member not found: {member_id}")
+        if knowledge_revision is None:
+            member = self._execute(f"SELECT * OMIT embedding FROM ONLY {_sql(_record(member_id))};")[0]
+            if member is None:
+                raise ValueError(f"Member not found: {member_id}")
+        else:
+            member = self.knowledge(member_id, knowledge_revision=knowledge_revision)
         version = source_version or member["source_version"]
         snapshot = self._execute(f"SELECT * FROM ONLY {_sql(_record(version, 'source_version'))};")[0]
         if snapshot is None:
@@ -718,7 +770,7 @@ class Memory:
                 raise ValueError(f"Image snapshot revision mismatch for {member_id}")
             if locator is None and source_version is None:
                 locator = member.get("locator")
-            return {"member": member, "original": {"path": path, "revision": revision,
+            return {"member": self.access_hints([member])[0], "original": {"path": path, "revision": revision,
                     "source_version": version, "image_path": str(asset), "locator": locator}}
         if source_version is None:
             start_line, end_line = member["start_line"], member["end_line"]
@@ -734,9 +786,20 @@ class Memory:
         if (self.config.root / path).resolve().parent == (self.config.memory_dir / "codex").resolve():
             from .codex_locator import message_locations
             original["chat_locations"] = message_locations(text, start_line, end_line)
-        return {"member": member, "original": original}
+        return {"member": self.access_hints([member])[0], "original": original}
 
-    def neighbors(self, record_id: str, *, include_stale: bool = False) -> dict:
+    def neighbors(self, record_id: str, *, include_stale: bool = False,
+                  knowledge_revision: str | None = None) -> dict:
+        if knowledge_revision is not None:
+            from .history import historical_neighbors
+            result = historical_neighbors(self, self.knowledge(record_id, knowledge_revision=knowledge_revision),
+                                          include_stale=include_stale)
+            for key in ("children", "edges", "unpinned_children", "unpinned_edges"):
+                result[key] = self.access_hints(result[key])
+            for key in ("record", "parent"):
+                if result[key] is not None:
+                    result[key] = self.access_hints([result[key]])[0]
+            return result
         record = _sql(_record(record_id))
         fresh = "" if include_stale else " AND stale=false AND retired!=true"
         current, children, edges = self._execute(
@@ -745,10 +808,12 @@ class Memory:
         parent = self._execute(f"SELECT * OMIT embedding FROM ONLY {_sql(_record(current['parent']))};")[0] if current and current.get("parent") else None
         if parent and (parent["stale"] or parent.get("retired")) and not include_stale:
             parent = None
-        return {"record": current, "parent": parent, "children": children, "edges": edges}
+        return {"record": self.access_hints([current])[0] if current else None,
+                "parent": self.access_hints([parent])[0] if parent else None,
+                "children": self.access_hints(children), "edges": self.access_hints(edges)}
 
     def brief(self, task: str = "", *, limit: int = 6) -> dict:
-        mode = self.config.memory_search_mode
+        """Read published startup material without searching or inspecting originals."""
         sources = self.sources()
         mandatory, stale_members, stale_nodes, stale_edges, gaps, overview = self._execute(
             "SELECT * OMIT embedding FROM member WHERE mandatory=true AND retired!=true; "
@@ -757,25 +822,34 @@ class Memory:
             "SELECT id,kind FROM semantic WHERE stale=true AND retired!=true; "
             "SELECT id,path,coverage_gaps AS gaps FROM member WHERE retired!=true AND array::len(coverage_gaps)>0; "
             f"SELECT * OMIT embedding FROM member WHERE stale=false AND retired!=true AND mandatory=false AND kind IN ['file','section','image'] ORDER BY kind,path LIMIT {int(limit)};")
-        related = []
-        if task and limit:
-            search = self.vector_search if mode == "vector" else self.hybrid_search
-            result = search(task, limit=limit)
-            related, coverage = result["matches"], result["vector_coverage"]
-        else:
-            from basepack.embedding.admin import status
-            from .vectors import vector_coverage
-            identity = status(self.config.machine)["model"]["embedding_identity"]
-            coverage = vector_coverage(self, identity)
+        registered = {_record(row["id"]): row for row in sources}
+        basis_versions = {_record(basis["source_version"], "source_version")
+                          for row in mandatory for basis in row.get("basis", [])}
+        snapshots = self._execute(
+            f"SELECT id,source,revision FROM source_version WHERE id IN {_sql(list(basis_versions))};")[0] if basis_versions else []
+        snapshots = {_record(row["id"]): row for row in snapshots}
+        for row in mandatory:
+            source = registered.get(_record(row["source"]))
+            mismatches = []
+            for basis in row.get("basis", []):
+                snapshot = snapshots.get(_record(basis["source_version"], "source_version"))
+                evidence_source = registered.get(_record(snapshot["source"])) if snapshot else None
+                if evidence_source and (evidence_source["revision"] != snapshot["revision"] or evidence_source["deleted"]):
+                    mismatches.append({"id": basis["member"], "source_version": basis["source_version"],
+                                       "accepted_source_revision": snapshot["revision"],
+                                       "registered_source_revision": evidence_source["revision"],
+                                       "registered_source_deleted": evidence_source["deleted"]})
+            row["known_unsynced"] = bool(mismatches or source and (
+                source["revision"] != row["source_revision"] or source["deleted"]))
+            row["sync_evidence"] = {"accepted_source_revision": row["source_revision"],
+                                    "registered_source_revision": source["revision"] if source else None,
+                                    "basis_mismatches": mismatches,
+                                    "note": "Registered source metadata only; originals not checked."}
         stale = stale_members + stale_nodes + stale_edges
-        mandatory_ids = {row["id"] for row in mandatory}
-        related = [row for row in related if row["id"] not in mandatory_ids]
-        related_limit = max(0, limit - max(1, limit // 3)) if related else 0
-        clues = [dict(row, clue_role="related") for row in related[:related_limit]]
-        selected_ids = {row["id"] for row in clues}
-        clues.extend(dict(row, clue_role="map") for row in overview if row["id"] not in selected_ids)
+        clues = [dict(row, clue_role="map") for row in overview]
         fields = {"id", "kind", "title", "text", "path", "source_revision", "source_version", "start_line", "end_line",
-                  "parent", "stale", "retired", "coverage_gaps", "locator", "clue_role", "knowledge_revision"}
+                  "parent", "parent_version", "stale", "retired", "coverage_gaps", "locator", "clue_role", "knowledge_revision",
+                  "conditions", "claim_type", "known_unsynced", "sync_evidence"}
         def startup_item(row):
             return {key: value for key, value in row.items() if key in fields}
         detail_limit = max(20, limit)
@@ -787,12 +861,13 @@ class Memory:
                             "note": "Brief does not collect chats. Discovery and collection do not mean semantic acceptance or vector coverage."}
         return {"mandatory": [startup_item(row) for row in mandatory],
                 "mandatory_pending_count": sum(row["stale"] for row in mandatory),
+                "mandatory_known_unsynced_count": sum(row["known_unsynced"] for row in mandatory),
                 "clues": [startup_item(row) for row in clues[:limit]],
                 "pending": stale[:detail_limit], "pending_count": len(stale),
                 "sources": [{key: row[key] for key in ("id", "path", "kind", "deleted")} for row in sources[:detail_limit]],
                 "source_count": len(sources),
                 "coverage_gaps": gaps[:detail_limit], "coverage_gaps_count": len(gaps),
-                "vector_coverage": coverage,
+                "vector_coverage": {"status": "not_checked"},
                 "codex_collection": codex_collection,
                 "discovery_scope": self.connection.get("source_scope", []),
                 "change_check": "not checked by brief; use memory changes for maintenance"}
@@ -823,9 +898,15 @@ class Memory:
 
     def vector_search(self, text: str, *, scope: str = "", limit: int = 12, timeout: float = 600):
         from .vectors import vector_search
-        return vector_search(self, text, scope=scope, limit=limit, timeout=timeout)
+        from .query import normalize_scope
+        result = vector_search(self, text, scope=normalize_scope(scope), limit=limit, timeout=timeout)
+        result["matches"] = self.access_hints(result["matches"])
+        return result
 
     def hybrid_search(self, text: str, *, scope: str = "", limit: int = 12, timeout: float = 600,
                       literal: bool = False):
         from .vectors import hybrid_search
-        return hybrid_search(self, text, scope=scope, limit=limit, timeout=timeout, literal=literal)
+        from .query import normalize_scope
+        result = hybrid_search(self, text, scope=normalize_scope(scope), limit=limit, timeout=timeout, literal=literal)
+        result["matches"] = self.access_hints(result["matches"])
+        return result

@@ -48,25 +48,23 @@ def test_vector_search_reports_missing_identity_instead_of_silent_text_fallback(
 
 
 @pytest.mark.parametrize("mode", ["vector", "hybrid"])
-def test_brief_uses_configured_related_and_does_not_scan(mode, tmp_path):
+def test_brief_reads_published_overview_without_search_or_model(mode, tmp_path, monkeypatch):
     password_file = tmp_path / "password.txt"
     password_file.write_text("test-password", encoding="utf-8")
     config = SimpleNamespace(memory_search_mode=mode, memory_password_file=password_file,
                              raw={"memory": {"username": "root", "source_scope": ["docs"]}})
     memory = Memory(config)
     memory.sources = lambda: []
-    memory._execute = lambda sql: [[], [], [], [], [], []]
+    memory._execute = lambda sql: [[], [], [], [], [], [{"id": "member:map", "title": "overview"}]]
     memory._check_changes = lambda *args, **kwargs: pytest.fail("brief scanned sources")
-    coverage = {"identity": "same-model", "total": 2, "compatible": 1, "pending": 1,
-                "pending_members": [{"id": "member:b", "path": "b.md"}]}
     for name in ("vector_search", "hybrid_search"):
-        setattr(memory, name, lambda *args, **kwargs: pytest.fail("brief used the wrong search mode"))
-    setattr(memory, mode + "_search", lambda task, **kwargs: {
-        "matches": [{"id": "member:a", "title": "related"}], "vector_coverage": coverage})
-    memory.search = lambda *args, **kwargs: pytest.fail("brief fell back to text")
+        setattr(memory, name, lambda *args, **kwargs: pytest.fail("brief searched"))
+    memory.search = lambda *args, **kwargs: pytest.fail("brief searched")
+    monkeypatch.setattr("basepack.embedding.admin.status", lambda *args, **kwargs: pytest.fail("brief inspected the model"))
     result = memory.brief("semantic task", limit=6)
-    assert result["clues"][0]["id"] == "member:a"
-    assert result["vector_coverage"] == coverage
+    assert result["clues"][0]["id"] == "member:map"
+    assert result["clues"][0]["clue_role"] == "map"
+    assert result["vector_coverage"] == {"status": "not_checked"}
     assert "vector_pending_count" not in result
     assert "changes" not in result
 
@@ -86,14 +84,14 @@ def test_vector_rebuild_reports_coverage_and_reuses_published_input(memory):
     assert partial["vector_coverage"]["total"] == 4
     assert partial["vector_coverage"]["compatible"] == 1
     assert partial["vector_coverage"]["pending"] == 3
-    assert memory.brief("数据库")["vector_coverage"]["pending"] == 3
+    assert memory.brief("数据库")["vector_coverage"] == {"status": "not_checked"}
     assert len(memory.embed_members()["embedded"]) == 3
     assert memory.vector_search("数据库")["vector_coverage"]["pending"] == 0
     assert memory.embed_members()["pending"] == []
     memory._execute("UPDATE member:storage SET embedding_identity='different-model';")
     coverage = memory.vector_search("数据库")["vector_coverage"]
     assert (coverage["compatible"], coverage["pending"]) == (3, 1)
-    assert memory.brief()["vector_coverage"]["pending"] == 1
+    assert memory.brief()["vector_coverage"] == {"status": "not_checked"}
     assert memory.embed_members()["embedded"] == ["member:storage"]
     memory._execute("UPDATE member:storage SET embedding=NONE;")
     assert memory.embed_members()["embedded"] == ["member:storage"]

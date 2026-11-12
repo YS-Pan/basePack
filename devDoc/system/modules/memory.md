@@ -1,6 +1,6 @@
 # 项目记忆实现
 
-源码面向0.11.0.dev1，实现SurrealDB多层文字、原图向量与语义关系、单owner全项目维护、使用反馈和随包英文提示词。本轮时长入口、容量快照与固定派工见[实施结果](../../tasks/20261106-memory-system/dispatch-implementation-result.md)。首建和维护由宿主订阅agent阅读生成，程序提交成功即完成普通批次，默认无额外审计。此前生命周期见[维护改造结果](../../tasks/20261106-memory-system/maintenance-implementation-result.md)，完整历史沿[记忆专项进度](../../tasks/20261106-memory-system/progress.md)，用户流程见[记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
+源码面向0.12.0.dev1，实现SurrealDB多层文字、原图向量与统一知识图、知识版本历史、单owner维护及纯访问状态。本轮入口、历史和访问实现见[使用整改进度](../../tasks/20261112-usage-rectification/progress.md)，固定派工沿[既有结果](../../tasks/20261106-memory-system/dispatch-implementation-result.md)。首建和维护由宿主订阅agent阅读生成，程序提交成功即完成普通批次，默认无额外审计。完整历史沿[记忆专项进度](../../tasks/20261106-memory-system/progress.md)，用户流程见[记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
 
 ## 职责与数据
 
@@ -26,9 +26,9 @@ read 以 member ID 和可选的依据版本、位置回读保留的原文或原�
 
 记录 ID 的单一转换入口统一原始字符串 key 与底座返回的规范 ID，保留数字 key 的类型及字符串转义；同一身份同时用于 SQL 与 Python 的 expected/依据集合比较。有限解码只覆盖现行字符串/整数合同，底座仍通过原生 type::record 构造记录。缺少文字成员起止行时，apply 在写入前报出成员、批次位置及字段；不存在的 read 目标明确报错。输入方式与最小批次见用户流程及随包 skill。
 
-brief、search 和 read 只读取已发布状态及其依据版本，不扫描原件或触发维护。brief 交付 mandatory、项目地图与按配置模式检索的相关线索；stale mandatory 仍交付并标待核。changes 由维护显式调用，发现来源变化不改已发布记录，避免旧检查覆盖新接受态。
+brief、search 和 read 只读取已发布状态及其依据版本，不扫描原件或触发维护。brief 直接交付 mandatory、现有文件/章节概况索引和已知缺口，不执行搜索或连接 embedding；task 只是标签。stale mandatory 仍交付并标待核，known_unsynced 独立比较已登记来源与该表示/直接依据的接受版本；未发现的原件变化保持未知，false 不证明现行。changes 由维护显式调用，发现来源变化不改已发布记录，避免旧检查覆盖新接受态。
 
-向量绑定实际输入版本及 embedding_identity；仅支持 vector/hybrid，默认 vector。search 和 brief 的相关通道报告已发布范围内相同 identity 的兼容与待建数量；缺少兼容向量时明确报错，真实空范围与空命中保持可辨。旧 text 配置须先改为 vector 或 hybrid，再 embed 补建索引；CPU/CUDA 的相同语义 identity 共用向量。apply 先准备候选向量，并在同一短事务发布内容和匹配向量；模型失败保留原错误并停止本批，不发布无匹配向量的内容。输入版本与 identity 未变化的向量可复用。
+向量绑定实际输入版本及 embedding_identity；仅支持 vector/hybrid，默认 vector。search 报告已发布范围内相同 identity 的兼容与待建数量，brief 明示未检查；缺少兼容向量时明确报错，真实空范围与空命中保持可辨。旧 text 配置须先改为 vector 或 hybrid，再 embed 补建索引；CPU/CUDA 的相同语义 identity 共用向量。apply 先准备候选向量，并在同一短事务发布内容和匹配向量；模型失败保留原错误并停止本批，不发布无匹配向量的内容。输入版本与 identity 未变化的向量可复用。
 
 `memory maintain` 默认以项目 Git 清单（已跟踪与未忽略的未跟踪文件）加 source_scope 显式包含项发现原件；非 Git 项目使用声明范围。已登记来源、历史 pending/未接受范围与可归属 Codex 原件持续参与，`--scope` 只覆盖新文件发现。零行文字且无活动知识时仅登记来源；清空旧正文仍须处理旧成员及依赖，重新出现正文继续发现。机械候选按成员依据闭合共批，组外依据须为仍有效且原件版本一致的知识；不能证明闭合时转语义候选。完整回执保存深比较与机械等价证据；短结果报告 discovery 边界/缺口、receipt、control 及 worker 派工元数据。历史 stale 不能仅因最后一次事件为 detected_change 就恢复；枚举与机械更新不证明完整语义覆盖。
 
@@ -44,7 +44,15 @@ brief、search 和 read 只读取已发布状态及其依据版本，不扫描�
 
 [selection.py](../../../experiments/20261106-basepack/src/basepack/memory/selection.py) 按真实 worker 分数排序，去重考虑成员、依据版本、位置及实际内容；按文字预算交付内容与省略入口，词法距离不冒充agent分数。已安装[skill](../../../experiments/20261106-basepack/src/basepack/memory/SKILL.md)驱动一次完整检索委托；retrieval-dispatch及retrieval-prompt读取结构化question/scope/content_budget，返回固定bp_mem_search_s名称及检索档位（默认tier1），不绑定维护回执/control/owner。零空闲席位明确由主agent执行。独立问题使用干净历史；同名冲突只复用生命周期兼容的自有句柄，否则报告原错。没有模型API、后台agent或持久槽位登记表。
 
-memory init 安装原生 schema 并绑定项目 UUID，同时在项目 instructions 加入 brief 与已安装 skill 入口；普通 init 不建库。新进程按生成入口直接使用显式配置读取 brief，客户端与 launcher 读取同一密码文件，配置只接受回环 endpoint。入口同时定位本项目 launcher、cwd 和日志。数据库进程必须按项目独立物理目录启动，多聊天共用该进程。绑定核查防止误连另一项目；数据路径的实际归属仍须部署命令正确配置。
+memory init 安装原生 schema 并绑定项目 UUID，同时刷新项目入口；普通 init 不建库。每个任务取得一次 brief，后续 shell 仅初始化该次所需参数，不为收尾再跑 brief。客户端与 launcher 读取同一密码文件，配置只接受回环 endpoint。入口同时定位本项目 launcher、cwd 和日志。数据库进程必须按项目独立物理目录启动，多聊天共用该进程。绑定核查防止误连另一项目；数据路径的实际归属仍须部署命令正确配置。
+
+## 知识历史与最终交付
+
+[history.py](../../../experiments/20261106-basepack/src/basepack/memory/history.py)按 `id + knowledge_revision` 返回精确知识表示，和 `source_version` 的原证回读分开。schema 的同步事件在知识版本推进时保留前后像，覆盖显式接受、失效、更正、退役及关系重建；向量不进入历史。已有未归档版本使用安装基线事件 0，未来新版本保存实际出生事件；首次归档旧版不能重置其已衰减权重。init 不全量扫描或补造旧版本；旧 change.previous 中可证明的前像仍可读，存量缺口明确报告。关系 `endpoint_versions` 与层级 `parent_version` 指向观察版本；历史 neighbors 精确展开已固定端点，未留 pin 的存量旁路另外标为未知，不能用当前 stable ID 替代旧端点。`claim_type`、`conditions` 由作者接受，不按日期或热度自动推断替代。
+
+[access.py](../../../experiments/20261106-basepack/src/basepack/memory/access.py)用独立短事务记录宿主已确认的最终清单，材料单位是 member/node/semantic 的知识版本。稳定 delivery_id 原子去重，清单变更报错，成功空清单留回执但不推进全局事件 G。非空事件强化清单中的版本，其余全项目版本按 G 惰性降权；首版 `S=8×(1+hits)`，`w=1/(1+(G-L)/S)`，新版本的 L 从诞生事件起。时间和向量输入不参与计算，旧版交付不奖励新版，不向依据/父子/邻居传播。跨调用重试使用同一 ID，结果未明保留原因及待核身份。默认值是首版工程选择，真实使用效果仍需长期观察。
+
+`memory retrieve --question` 提供空路径前缀/6000字预算/固定槽位的默认请求及稳定交付身份，缺问题返回 needs_input。scope 是项目相对路径前缀，中文和空格保持原值；业务范围写在 question。返回 prepared/started=false，宿主实际派 worker，接收最终内容后核实 manifest 并调用 delivery；现宿主没有可由 Python 直接订阅的最终交付回调，因此仍由宿主 agent 执行该协议，不能声称 CLI 自动启动了 agent。零席位由主 agent 执行同一完整流程。评分文件保存实际观察版本，原证版本/范围另列；node/semantic 用原生身份，不伪造路径。候选携带 access hints，原 tier1 同次综合评分，rank 只排序、去重与预算，不记交付。历史关系和低频关键旧成果仍由本次相关性与条件决定采用，不建设当前理解同步层。
 
 ## Codex 来源边界
 

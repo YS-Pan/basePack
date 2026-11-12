@@ -2,7 +2,7 @@
 <a id="startup"></a>
 ## 任务启动
 
-记忆已在本项目启用。主任务先直觉粗判业务时长，再执行 brief；brief 与应启动的长任务维护各自报告失败。每个新的 PowerShell 进程执行整段；客户端读取配置指定的原密码文件：
+记忆已在本项目启用。本节是任务启动与 shell 接续的维护源；其它说明按此入口执行。每个新的 PowerShell 进程只初始化该次命令所需参数与 UTF-8；客户端读取配置指定的原密码文件：
 
 ```powershell
 $$ErrorActionPreference = 'Stop'
@@ -10,11 +10,18 @@ $$OutputEncoding = [Text.UTF8Encoding]::new($$false)
 [Console]::OutputEncoding = $$OutputEncoding
 $$basepackPython = '$python'
 $$basepackConfig = '$config'
+```
+
+主任务开始时先直觉粗判业务时长，再执行一次 brief；与应启动的长任务维护各自报告失败：
+
+```powershell
 & $$basepackPython -X utf8 -m basepack --config $$basepackConfig memory brief --task '<当前任务>'
 if ($$LASTEXITCODE -ne 0) { throw "memory brief failed ($$LASTEXITCODE)" }
 ```
 
-后续命令复用本进程的 `$$basepackPython` 和 `$$basepackConfig`；新进程重新执行整段。搬迁后核实际路径，再以新配置运行 `memory init` 刷新托管块；本文件块外的旧路径另行核对。直接保留 mandatory；stale=true 按业务需要回源确认。brief/search/read 查询已发布知识及其依据快照。[启动详情](<$skill#start-and-stop>)。
+同一任务后续读写文件、反馈、stop/release 沿用已获 brief；任务目标或上下文实质变化时按需补取。后续命令复用本进程的参数，新进程只重新初始化。搬迁后核实际路径，再以新配置运行 `memory init` 刷新托管块；块外旧路径另核。
+
+brief 直接读取已发布 mandatory、已有文件／章节摘要和已知缺口，不做 embedding、任务搜索或原件扫描。直接保留 mandatory；stale=true 按业务需要回源确认。已知少量文件直接同批阅读；任务／项目概况、过去要求和跨历史依据的发现统一交 [检索 worker](<$skill#retrieve-in-one-delegation>)，同一委托完成多轮搜索、回源、综合评分与 rank。[客户端与凭据](<$skill#start-and-stop>)。
 
 本项目数据库的 launcher 为 `$memory_dir/serve.ps1`，cwd 为 `$memory_dir`，日志为其中 `logs/surreal.stdout.log` 与 `logs/surreal.stderr.log`。先检查 endpoint 的 `/ready`；不可用时查日志，由维护者显式启动 launcher。多聊天共用该进程，业务结束保持数据库运行。[首次部署](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/administrator.md#项目-surrealdb)、[恢复集合](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/memory.md#备份与恢复)；新增状态按本机 skill 的恢复说明保留。
 
@@ -33,7 +40,7 @@ if ($$LASTEXITCODE -ne 0) { throw "memory brief failed ($$LASTEXITCODE)" }
 <a id="stop"></a>
 ## 维护收尾
 
-持有者在业务结束时运行 `memory stop --control <自有control>`，取消自有协调者及后代，再以 `memory owner` 核执行状态并 `memory release --control <同一control>`。stop 不撤销已获准发布；确认发布阶段结束后才释放，失败或结果未明保留 owner 与原错，业务答复说明余项。异常恢复先独立核旧持有者已结束及发布已解决；他人不能解锁或按文件年龄抢占。[停止与恢复详情](<$skill#start-and-stop>)。
+持有者在业务结束时运行 `memory stop --control <自有control>`，取消自有协调者及后代，再以 `memory owner` 核执行状态并 `memory release --control <同一control>`。这些命令只需本项目配置，不依赖数据库、密码或重新 brief。stop 不撤销已获准发布；确认发布阶段结束后才释放，失败或结果未明保留 owner 与原错，业务答复说明余项。异常恢复先独立核旧持有者已结束及发布已解决；他人不能解锁或按文件年龄抢占。[停止与恢复详情](<$skill#start-and-stop>)。
 
 <a id="explicit-maintenance"></a>
 ## 显式维护

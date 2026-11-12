@@ -2,6 +2,7 @@
 
 import json
 import os
+from hashlib import sha256
 from pathlib import Path, PurePath
 import shlex
 from string import Template
@@ -227,33 +228,98 @@ def retrieval_dispatch(config, request_path, slot=0, available_subagents=None, t
         args.extend(["--available-subagents", available_subagents])
     if tier:
         args.extend(["--tier", tier])
-    return {"executor": "worker" if limit else "main", "task_name": f"bp_mem_search_{slot}" if limit else None,
+    return {"status": "prepared", "started": False,
+            "host_action": "Spawn the assigned worker and receive its final result" if limit else
+                           "Run the complete retrieval in the main agent; no subagent seat is available",
+            "executor": "worker" if limit else "main", "task_name": f"bp_mem_search_{slot}" if limit else None,
             "slot": slot, "configured_subagents": configured, "available_subagents": available_subagents,
             "capacity_status": "verified_available" if available_subagents is not None else "organization_ceiling",
             **worker, "render_command": memory_command(config, *args)}
 
 
+def _retrieval_request(request_path):
+    from .query import load_json_file, normalize_scope
+
+    request = load_json_file(request_path)
+    if not isinstance(request["question"], str) or not request["question"].strip():
+        raise ValueError("question must be a nonempty string")
+    request["scope"] = normalize_scope(request.get("scope", ""))
+    request["content_budget"] = request.get("content_budget", 6000)
+    if not _nonnegative(request["content_budget"], "content_budget"):
+        raise ValueError("content_budget must be positive")
+    # Existing request files remain read-only and acquire the same identity on every render.
+    identity = str(Path(request_path).resolve()) + "\n" + json.dumps(request, sort_keys=True, ensure_ascii=False)
+    request.setdefault("delivery_id", "retrieval-" + sha256(identity.encode("utf-8")).hexdigest())
+    if not isinstance(request["delivery_id"], str) or not request["delivery_id"].strip():
+        raise ValueError("delivery_id must be a nonempty string")
+    return request
+
+
+def prepare_retrieval(config, *, question=None, request_path=None, scope="", budget=6000,
+                      slot=0, available_subagents=None, tier=None):
+    """Prepare sensible defaults; the host owns actual execution and final receipt."""
+    from .query import normalize_scope
+
+    if question is None and request_path is None:
+        return {"status": "needs_input", "started": False, "required_input": "question",
+                "message": "Provide --question with the business question, or --request to reuse a prepared retrieval."}
+    if request_path is None:
+        if not isinstance(question, str) or not question.strip():
+            raise ValueError("question must be a nonempty string")
+        scope = normalize_scope(scope)
+        if not _nonnegative(budget, "content_budget"):
+            raise ValueError("content_budget must be positive")
+        # Resolve capacity/model and reject invalid host parameters before creating a request.
+        retrieval_dispatch(config, config.root / "tmp/request.json", slot, available_subagents, tier)
+        work = config.root / "tmp" / "basepack-retrieval" / uuid4().hex
+        request_path = work / "request.json"
+        work.mkdir(parents=True)
+        request_path.write_text(json.dumps({"question": question, "scope": scope, "content_budget": budget,
+                                           "delivery_id": "retrieval-" + uuid4().hex},
+                                          ensure_ascii=False, indent=2), encoding="utf-8")
+    request = _retrieval_request(request_path)
+    dispatch = retrieval_dispatch(config, request_path, slot, available_subagents, tier)
+    return {**dispatch, "request": str(Path(request_path).resolve()),
+            "delivery_id": request["delivery_id"], "scope": request["scope"],
+            "content_budget": request["content_budget"],
+            "work": str(_retrieval_work(config, request_path, request)),
+            "delivery_receipt": str(_retrieval_work(config, request_path, request) / "delivery.json"),
+            "delivery_command": memory_command(config, "delivery", "--input",
+                                                _retrieval_work(config, request_path, request) / "delivery.json")}
+
+
+def _retrieval_work(config, request_path, request):
+    path = Path(request_path).resolve()
+    if path.parent.parent == (config.root / "tmp" / "basepack-retrieval").resolve():
+        return path.parent
+    identity = str(path) + "\n" + request["delivery_id"]
+    return config.root / "tmp" / "basepack-retrieval" / sha256(identity.encode("utf-8")).hexdigest()[:32]
+
+
 def render_retrieval_prompt(config, request_path, slot=0, available_subagents=None, tier=None):
     """Read the retrieval request and template only; never claim or inspect maintenance state."""
     dispatch = retrieval_dispatch(config, request_path, slot, available_subagents, tier)
-    request = json.loads(Path(request_path).read_text(encoding="utf-8"))
-    if not isinstance(request["question"], str) or not request["question"].strip():
-        raise ValueError("question must be a nonempty string")
-    if not isinstance(request["scope"], str):
-        raise ValueError("scope must be a string")
-    if not _nonnegative(request["content_budget"], "content_budget"):
-        raise ValueError("content_budget must be positive")
-    work = config.root / "tmp" / "basepack-retrieval" / uuid4().hex
+    request = _retrieval_request(request_path)
+    work = _retrieval_work(config, request_path, request)
     template = Template((Path(__file__).with_name("prompts") / "retrieval.md").read_text(encoding="utf-8"))
     assignment = (f"retrieval worker {dispatch['task_name']}, assigned {dispatch['tier']} / "
                   f"{dispatch['model']} / {dispatch['reasoning_effort']}" if dispatch["executor"] == "worker"
                   else "main agent performing retrieval directly because no subagent seat is available")
+    search = ["search", "--text", "<terms>"]
+    if request["scope"]:
+        search.extend(["--scope", request["scope"]])
     values = {"assignment": assignment, "root": str(config.root), "config": str(config.path),
               "skill": str(Path(__file__).with_name("SKILL.md").resolve()),
               "request": json.dumps(request, ensure_ascii=False), "work": str(work),
-              "search_command": memory_command(config, "search", "--text", "<terms>", "--scope", request["scope"]),
-              "read_command": memory_command(config, "read", "<member-id>"),
-              "neighbors_command": memory_command(config, "neighbors", "<record-id>"),
+              "python": str(config.python), "delivery_id": request["delivery_id"],
+              "scope": json.dumps(request["scope"], ensure_ascii=False),
+              "search_command": memory_command(config, *search),
+              "read_command": memory_command(config, "read", "<member-id>", "--knowledge-revision", "<observed-knowledge-revision>"),
+              "knowledge_command": memory_command(config, "knowledge", "<record-id>", "--knowledge-revision", "<observed-knowledge-revision>"),
+              "history_command": memory_command(config, "history", "<record-id>"),
+              "neighbors_command": memory_command(config, "neighbors", "<record-id>", "--knowledge-revision", "<observed-knowledge-revision>"),
               "rank_command": memory_command(config, "rank", "--input", work / "scored.json",
                                                "--budget", request["content_budget"])}
-    return {"prompt": template.substitute(values), **dispatch}
+    return {"prompt": template.substitute(values), "delivery_id": request["delivery_id"],
+            "search_command": values["search_command"],
+            "work": str(work), "scope": request["scope"], **dispatch}

@@ -1,6 +1,8 @@
 """Publication isolation and task-scoped cancellation regressions."""
 from copy import deepcopy
+from io import BytesIO
 from threading import Event, Thread
+from urllib.error import HTTPError
 
 import pytest
 
@@ -88,6 +90,41 @@ def test_candidate_vectors_are_published_together_and_reused(memory, monkeypatch
     batch['expected'] = memory.prepare(['guide.md'])['expected']
     memory.apply(batch)
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize('failed_request', [1, 2])
+def test_candidate_http_failure_publishes_no_knowledge_or_vectors(memory, monkeypatch, failed_request):
+    memory.apply(batch_for(memory, '# 数据库\n旧条件。\n\n# 保留\n资料必须保留。\n'))
+    batch = batch_for(memory, '# 数据库\n新条件。\n\n# 保留\n资料必须保留。\n')
+    tables = ('source', 'source_version', 'member', 'node', 'semantic', 'change')
+
+    def snapshot():
+        return {table: sorted(memory._execute(f'SELECT * FROM {table};')[0], key=lambda row: row['id'])
+                for table in tables}
+
+    before = snapshot()
+    monkeypatch.setattr(candidate_vectors, 'MAX_REQUEST_INPUTS', 2)
+    monkeypatch.setattr(candidate_vectors, 'status', lambda _: {'model': {'embedding_identity': 'new'}})
+    calls = []
+    original = HTTPError('http://fixture/predict', 422, 'Unprocessable Entity', {},
+                         BytesIO(b'{"detail":"input exceeds token limit"}'))
+
+    class Client:
+        def __init__(self, machine): pass
+        def embed(self, inputs, *, timeout):
+            calls.append(inputs)
+            if len(calls) == failed_request:
+                raise original
+            return {'embedding_identity': 'new', 'vectors': [[1.0, 0.0] for _ in inputs]}
+
+    monkeypatch.setattr(candidate_vectors, 'EmbeddingClient', Client)
+    with pytest.raises(HTTPError) as failure:
+        memory.apply(batch)
+    assert failure.value is original
+    assert len(calls) == failed_request
+    notes = '\n'.join(original.__notes__)
+    assert 'guide.md' in notes and ('storage' if failed_request == 2 else 'guide') in notes
+    assert snapshot() == before
 
 
 def test_correction_without_replacement_excludes_known_error(memory):
