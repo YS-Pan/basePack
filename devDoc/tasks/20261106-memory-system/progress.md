@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-2026-11-12 已按用户要求制定[自动维护时长判断与 worker 命名计划](task-duration-and-worker-naming-plan.md)，待选择、未实施。比较启动时一次判断、范围变化重估及必要查阅后判断，以及短名、固定产品角色槽位和带运行标识三种命名；建议 T2 + N2，由主 agent 直觉判断约十分钟门槛、程序统一提供 task_name。明确短任务跳过整个 maintain、brief 保留、显式维护优先、同名宿主验证及既有收尾合同。未修改现行入口、程序、英文模板、安装包或纲领。
+2026-11-12 用户已选定[自动维护时长判断与 worker 命名计划](task-duration-and-worker-naming-plan.md)的 T2 + N2，待实施。名称为`bp_mem_coord_t`及`bp_mem_read_tr`，read第一位为队号，第二位为队内槽位；沿用每队最多4名reader。自动维护仅第0队，手动维护按宿主配置的subagent并发上限和实际余量增加队，协调者也占席位；多队共用一个owner/control/receipt，由第0队统一发布。约十分钟直觉门槛、范围变化重估、brief保留、显式维护优先、同名宿主验证及既有收尾合同已纳入。本轮只更新计划，未修改现行入口、程序、英文模板、安装包或纲领。
 
 2026-11-12 自用连接故障已定位并恢复：Windows 01:48:16 重启后，本项目手动数据库未重新启动，18080 无监听，`memory brief` 报 WinError 10061。上一轮耗时查询的受限 Hidden 启动未验证 ready，且将 maintain 串在失败即 throw 的 brief 之后，实际没有执行维护，也漏报了阻塞。本轮在普通用户上下文重开原 store，跨调用 ready=200、brief 三条 fresh mandatory 通过，恢复时 owner=null。默认全项目维护实际取得所有权，完成7机械批次、复用57块，57个语义候选仍待处理；已按回执档位启动协调者，诊断业务完成后stop并取消，确认无在途发布后release，最终owner=null，未宣称语义维护完成。本轮control为`.basepack/memory/maintenance/db-recovery-01a1cd40-20261112.control`，回执为`3592c604a4d74c9cb325c9c0c4bd9e30`。既有18089实例属于其它项目，未操作；环境证据与手动启动边界见[环境记录](../../system/environment.md#2026-11-12-重启后的项目记忆库恢复)。
 
