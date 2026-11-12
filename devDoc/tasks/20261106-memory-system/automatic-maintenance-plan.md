@@ -2,6 +2,8 @@
 
 2026-11-11（北京时间）。用户已要求执行[调查聊天](codex://threads/01a1c97f-f5db-76c0-852f-b1db986b02f7)的修改。本计划已进入交付：独立候选完整回归482通过、5跳过，验证代码合回唯一active路线[20261106-basepack](../../../experiments/20261106-basepack/README.md)，版本0.10.0.dev1。本项目独立客户端接入、清理和显式记忆维护按[实施结果](maintenance-implementation-result.md)继续收敛；该结果是实际状态及余项的维护入口。
 
+2026-11-12 后续入口、并发和 worker 派工变更以[现行维护计划](task-duration-and-worker-naming-plan.md)为单一维护源，用户已选 T2 + N2 + S2，仍待实施；包括短任务门槛、统一名称、安装保存宿主容量和脚本生成组织／prompt。下文保留 0.10.0.dev1 已交付基线，不表示后续规则已安装。
+
 ## 范围与维护源
 
 候选从固定0.9.1基线`490b1c219ef92b625dd3075a0516ce6c761c5f80`独立导入，在独立环境和数据库验证后合回，不长期双写源码。[候选入口](../../../experiments/20261111-basepack-maintenance/README.md)保留试验与收敛记录；精确受测源码、迁入清单和原证保存在根artifacts。项目纲领保持原文。
