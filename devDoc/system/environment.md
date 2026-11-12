@@ -8,6 +8,12 @@
 
 选留证据现统一位于根 `artifacts/runs/`。前次临时材料整理的映射为 `artifacts/runs/tmp-reorganization-20261108/moves.json`，本次位置映射为 `artifacts/runs/20261109-project-layout/moves.json`；原始回执及下文历史路径保留当时含义，结合两轮映射回查长期副本，tmp 内容按可清除处理。
 
+## 2026-11-12 重启后的项目记忆库恢复
+
+Windows `LastBootUpTime` 为北京时间 2026-11-12 01:48:16。故障时本项目 18080 无监听；现存 SurrealDB 进程实际属于 array reconstruct 项目、监听 18089。本项目沿用普通用户手动进程，没有开机启动，重启后须重新运行 `.basepack/memory/serve.ps1`。受限宿主中的上一轮 Hidden 启动只返回脚本 PID，两份日志为空，随后连接仍被拒；不能据 PID 认定数据库就绪，也没有证据将该次启动失败归因于旧事务冲突。
+
+本轮在普通用户上下文以原 launcher 和原 store 隐藏启动，跨调用 `/ready` 返回 200，0.10.0.dev1 客户端 `memory brief` 成功，三条 mandatory 均 fresh；恢复时 owner 为 null。数据库保持运行，日志为 `.basepack/memory/logs/surreal.stdout.log` 与 `surreal.stderr.log`；未改变自启动策略。
+
 ## 2026-11-11 0.10.0.dev1维护改造与本项目接入
 
 候选隔离验证后合回唯一active路线。本项目普通wheel安装在独立稳定环境`D:/AgentTools/envs/basepack-client-0.10/`，Python3.13.17、psutil7.2.2、websocket-client1.9.2；原共用客户端仍为0.9.1。本项目runtime.python和两份托管入口刷新，原UUID、三条fresh mandatory、刷新前后七表计数及块外字节通过；最终50个包文件与源码和安装逐字节相同。
