@@ -4,6 +4,10 @@
 
 ## 当前阶段
 
+2026-11-12 按用户要求结合当前讨论及[相关聊天](codex://threads/01a1cee9-f91b-7cf0-82d0-2e8c8a570a1e)六轮（含新增 tier1 prompt 建议）更新[维护计划第六节](task-duration-and-worker-naming-plan.md#六后续知识维护与检索闭环)与[整改 D/I](../20261112-usage-rectification/plan.md#d持续整理当前理解图中保留演变)。程序负责纯交付事件权重，历史图与交付清单共用精确知识身份，现有 tier1 参考访问线索给综合分，rank 不二次脚本加权；旧固定融合只留研究对照。[当前理解三选项](../20261112-usage-rectification/research/current-understanding-options-20261112.md)比较作者主题条目、程序图视图、图支撑作者投影，推荐第三项但未选定。明确历史端点／边前像、node／主题检索及候选格式缺口；计划／文档检查完成，未实施产品、修改纲领、迁库或选定曲线默认。
+
+本轮自用维护回执 `988e2df935f741c4bad4333b3a023fe8` 的 98 个固定候选完成 11 个 initial（3 源9成员、8 源无知识处置），87 个留后续；模板批次因 `Evidence source revision mismatch for experiments/20261106-basepack/src/basepack/__main__.py` 拒绝，无部分发布，重读修复未完成。重复 ID 的关联知识结构已在本轮前修好，产品漏检反馈仍 pending。stop 后全部自有维护后代结束，无在途发布后 release，最终 owner=null；不计作本次计划功能交付。
+
 2026-11-12 用户询问访问权重干扰的优雅改法，已作[有界排序候选比较](../20261112-usage-rectification/research/access-only-weights-20261112.md#限制访问偏好干扰的候选2026-11-12)。同12种输入测试近分偏好、有界加分及查询指纹代理；近分2分预算在中央案例保留弱乘法接近的收益并限制可见分让步，但零噪声等反例仍有代价。建议讨论有界介入及用途条件化，具体参数与产品方案未采纳；原证在`artifacts/runs/20261112-access-ranking-options/`。
 
 2026-11-12 按用户要求追加[现实启发的混合相关性研究与仿真](../20261112-usage-rectification/research/access-only-weights-20261112.md#现实启发的混合相关性2026-11-12)：文献支持任务持续、交错、恢复及材料再用，未提供AI项目的实测混合比例。新增持久价值/主题适配/逐问变化与独立评分噪声，在同一事件流内组合；中央假设alpha=0.2损失2.7364→2.7347且配对区间跨0，弱偏置有小幅收益。12种敏感性设定、180轨迹独立复算及输入哈希通过；未选定产品参数或验证真实收益。工作沿原tmp目录追加，原证另存`artifacts/runs/20261112-mixed-relevance/`。
