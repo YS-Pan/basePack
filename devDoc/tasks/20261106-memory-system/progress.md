@@ -4,6 +4,8 @@
 
 ## 当前阶段
 
+2026-11-12 用户认为独立当前理解层性价比低、倾向去掉，评估后已从[维护接续](task-duration-and-worker-naming-plan.md#六后续知识维护与检索闭环)及[整改 D/I](../20261112-usage-rectification/plan.md#d知识演变与历史追溯)移除跨源主题短文／投影、主题身份、自动同步／刷新及专用缓存。[退出评估及原选项](../20261112-usage-rectification/research/current-understanding-options-20261112.md#退出本轮建设的评估)保留历史，撤回 C 默认主体推荐。现有多层摘要、mandatory、原证、统一知识图历史关系、纯访问调权和 tier1 综合评分保留；worker 按问题整合，明确的新目标／授权仍及时定点更正。代价是重复问题可能重复整合，未承诺始终最新或量化 token 净收益。本次仅改计划／研究，未删内容、改产品／数据库／纲领；短任务只读取 brief，未启动自动维护。
+
 2026-11-12 按用户要求结合当前讨论及[相关聊天](codex://threads/01a1cee9-f91b-7cf0-82d0-2e8c8a570a1e)六轮（含新增 tier1 prompt 建议）更新[维护计划第六节](task-duration-and-worker-naming-plan.md#六后续知识维护与检索闭环)与[整改 D/I](../20261112-usage-rectification/plan.md#d持续整理当前理解图中保留演变)。程序负责纯交付事件权重，历史图与交付清单共用精确知识身份，现有 tier1 参考访问线索给综合分，rank 不二次脚本加权；旧固定融合只留研究对照。[当前理解三选项](../20261112-usage-rectification/research/current-understanding-options-20261112.md)比较作者主题条目、程序图视图、图支撑作者投影，推荐第三项但未选定。明确历史端点／边前像、node／主题检索及候选格式缺口；计划／文档检查完成，未实施产品、修改纲领、迁库或选定曲线默认。
 
 本轮自用维护回执 `988e2df935f741c4bad4333b3a023fe8` 的 98 个固定候选完成 11 个 initial（3 源9成员、8 源无知识处置），87 个留后续；模板批次因 `Evidence source revision mismatch for experiments/20261106-basepack/src/basepack/__main__.py` 拒绝，无部分发布，重读修复未完成。重复 ID 的关联知识结构已在本轮前修好，产品漏检反馈仍 pending。stop 后全部自有维护后代结束，无在途发布后 release，最终 owner=null；不计作本次计划功能交付。

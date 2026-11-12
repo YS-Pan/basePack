@@ -20,7 +20,7 @@
 | 配置、安装与数据位置 | [部署合同](../../system/deployment.md)；复用 ProjectConfig/init，不另建安装、配置或服务发现骨架 |
 | 基座接入与历史依据 | [SurrealDB 接入依据](research/backend-review.md)；P0 验公开接口与数据合同，历史比较不再作为首期待办 |
 | 多层次表示的证据与取舍 | [专项调研](research/multilevel-retrieval.md)；区分位置层级、摘要索引与语义图，检索策略和成本按本项目样例验证 |
-| 后续知识维护与检索改进 | [维护接续](task-duration-and-worker-naming-plan.md#六后续知识维护与检索闭环)及[整改 D/I](../20261112-usage-rectification/plan.md#d持续整理当前理解图中保留演变)；纯访问调权、历史关系、tier1 参考访问线索及当前理解选项均为待实施，不覆盖本文已交付行为 |
+| 后续知识维护与检索改进 | [维护接续](task-duration-and-worker-naming-plan.md#六后续知识维护与检索闭环)及[整改 D/I](../20261112-usage-rectification/plan.md#d知识演变与历史追溯)；纯访问调权、历史关系、tier1 参考访问线索待实施；独立当前理解层已退出本轮，现有摘要／mandatory 保留，不覆盖本文已交付行为 |
 | 旧项目思想、事故与证据边界 | [调研索引](../20261106-rebuild/research/sources.md)、[近期历史](../20261106-rebuild/legacy-history.md)、[多层代码核查](research/legacy-multilevel.md)；借鉴精确回源与未变片段复用，不把旧结构加工链或语义 note 当作三层方案已实现 |
 | 共性取舍、分发与协作 | [重建总览](../20261106-rebuild/plan.md)、[agent-team](../../../skills/agent-team/SKILL.md)、[file-structure](../../../skills/file-structure/SKILL.md)；本任务使用它们，不承接独立团队研发验收 |
 
