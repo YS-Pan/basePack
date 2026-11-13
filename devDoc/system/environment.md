@@ -1,5 +1,11 @@
 # 开发环境核验
 
+## 2026-11-13 三工具共用系统 Python
+
+用量统计 0.2.0、AIGC 0.10.0、TTS 1.2.0 已普通安装到系统 Python 3.13 的机器 site-packages；新增 97 包、原 232 份全局版本保留，pip check 和实际调用通过。模型复用至 `D:/AgentTools/models/{aigc-detect,tts}`，用量状态在 `D:/AgentTools/state/codex-usage`，原源码位置不变，未新增常驻工具虚拟环境。完整检查、回退定位及限制见 [迁移结果](../archive/20261113-agenttools-migration/result.md)。
+
+本轮 Condor 普通 GPU 池实测为 7164 MiB。槽账户不能读取私人 user-site，也没有普通用户 profile；不要用环境变量伪装 ysPan。测试按实际账户设置名称、显式传入可写缓存，HTTP/TTS 作业内禁用现有 Pydantic `logfire-plugin` 后实际运行通过；没有改变全机插件、ACL 或资源预算。更早各节的池额、安装位置与服务状态保留其历史时点。
+
 ## 2026-11-12 0.12使用整改安装
 
 本项目稳定客户端路径仍为 `D:/AgentTools/envs/basepack-client-0.10/`，实际普通安装0.12.0.dev1，55个包文件与wheel/源码相同。原八表逐字段、配置/UUID/凭据和AGENTS块外正文保持；生成入口刷新为任务级直接brief和retrieve宿主协议。全套623通过、1跳过，专用CLI变量补齐后的反馈恢复文件另8项通过；真实阵列固定副本的11表恢复、精确知识版本及交付幂等通过。新客户端pip check和源码外实际查询通过，原证及取舍见[验收结果](../tasks/20261112-usage-rectification/acceptance-result.md)。

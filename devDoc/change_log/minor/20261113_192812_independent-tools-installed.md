@@ -4,4 +4,4 @@
 
 约 55 GB AIGC 模型和 4.77 GB TTS 模型/音色已复用至用户选定的 `D:/AgentTools/models/`；用量设置、缓存与报告归集到独立 state。原源码、旧环境和原业务成果保留恢复定位，Codex project 与聊天设置未改。
 
-候选已完成中英文检测数值、Neo/Falcon、默认十模型 CLI、语音 CPU/GPU 与恢复、用量合成及真实增量验证。正式安装后的调用方检查继续按 [迁移进度](../../tasks/20261113-agenttools-migration/progress.md) 收尾；语音自动 QA 不等同于人工听审。
+候选已完成中英文检测数值、Neo/Falcon、默认十模型 CLI、语音 CPU/GPU 与恢复、用量合成及真实增量验证。正式安装后的调用方检查继续按 [迁移进度](../../archive/20261113-agenttools-migration/progress.md) 收尾；语音自动 QA 不等同于人工听审。
