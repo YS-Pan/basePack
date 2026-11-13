@@ -1,20 +1,20 @@
-# AgentTools 三工具迁移计划
+# 三工具独立安装与资源归集计划
 
-2026-11-13。状态：已完成本轮评估，实施待启动。本轮仅交付计划；用户要求尽量共用系统 Python，并将 Codex 用量统计一并归集。实际进度与使用故障见 [progress.md](progress.md)。
+2026-11-13 修订。状态：已完成评估与计划，实施待启动。用户进一步明确：三工具须可完全独立安装使用；代码安装为 Python 包；默认仅安装轻量代码，大文件首次使用时询问保存位置后下载，建议目录为 AgentTools。实际进度与使用故障见 [progress.md](progress.md)。
 
 ## 推荐方案与范围
 
-三个工具独立维护、普通安装到共用系统 Python；basePack 复用现有资源提交能力。先验证依赖与真实功能，再移动源码、共享资产和调用入口。推荐交付顺序：**共同准备 → Codex 用量统计 → AIGC → TTS → 调用方联合验收与退役旧入口**。TTS 的兼容调查可与前两项并行，不成为它们交付的前置。
+三个工具分别发行标准 Python 包，可在没有 AgentTools、basePack、HTCondor 或开发仓库的机器上安装和使用。本机优先共用系统 Python；AgentTools 只是建议的大文件保存根，basePack 是可选资源调度入口。先验证依赖与真实功能，再切换安装和调用入口。推荐交付顺序：**共同准备 → Codex 用量统计 → AIGC → TTS → 调用方联合验收与退役旧入口**。TTS 的兼容调查可与前两项并行，不成为它们交付的前置。
 
-| 工具 | 现维护源 | 目标维护源 | Python 路线 |
+| 工具 | 现维护源 | 正式运行代码 | Python 路线 |
 | --- | --- | --- | --- |
-| Codex 用量统计 | `D:/project/trifles/20260829 codex usage` | `D:/AgentTools/tools/codex-usage` | 系统 3.13；补打包和显式运行目录，改掉自动创建项目环境 |
-| AIGC 检测 | `D:/project/20260928 aigc detect` | `D:/AgentTools/tools/aigc-detect` | 优先适配系统现有 Transformers 5，保留模型、profile 和输出含义 |
-| TTS | `D:/project/20261004 text to speech` | `D:/AgentTools/tools/tts` | 先验证系统 3.13 上的 Kokoro/Misaki、CosyVoice 及配套音频依赖 |
+| Codex 用量统计 | `D:/project/trifles/20260829 codex usage` | 所选 Python 的 `codex_usage` 包 | 系统 3.13；补打包和显式运行目录，改掉自动创建项目环境 |
+| AIGC 检测 | `D:/project/20260928 aigc detect` | 所选 Python 的 `aigc_detector` 包 | 优先适配系统现有 Transformers 5，保留模型、profile 和输出含义 |
+| TTS | `D:/project/20261004 text to speech` | 所选 Python 的 `local_tts` 包 | 先验证系统 3.13 上的 Kokoro/Misaki、CosyVoice 及配套音频依赖 |
 
 用户原意见 [11 月 4 日「梳理项目任务依赖」](codex://threads/01a1a488-6632-7842-9c8f-11326461a416)。旧方案的资源入口前置已由 basePack 交付，按 [当前资源实现](../../system/modules/resources.md)、[部署合同](../../system/deployment.md) 和 [资源使用](../../../experiments/20261106-basepack/docs/resources.md) 接入，无需重做资源管理或先完成记忆系统后续工作。
 
-工具核心、模型选择与业务规则仍归各工具。首期沿用 CLI/Python 与现有 skill；AIGC 的既有 HTTP 调用按需要保留并接入同一执行入口。模型、共享状态、业务输入输出分别定位；项目记忆与 Codex 原日志维持原归属。
+工具核心、模型选择与业务规则仍归各工具。首期沿用 CLI/Python 与现有 skill；AIGC 的既有 HTTP 调用按需要保留。独立执行与 basePack 调度调用同一核心，选择调度后失败须直接报告，不能静默改成直接执行。模型、共享状态、业务输入输出分别定位；项目记忆与 Codex 原日志维持原归属。
 
 ## 本轮已核事实与待验证部分
 
@@ -35,31 +35,39 @@ AIGC 的接口变化依据 [Transformers 5 官方迁移指南](https://github.co
 
 系统路线若遇到有复现依据、短期无法解决的 TTS 阻塞，明确保留未达目标部分；可暂用已有已验 TTS 3.12 入口，或将必要兼容运行时作为机器共享例外另行确定。其余两个工具继续交付。旧 AIGC/TTS 的 Transformers 锁也不同，不能直接假定把它们放进同一个 3.12 环境即可解决。每个工具新建一套环境不作为默认方案。
 
-## 目标布局与安装责任
+## 包、资源与运行数据的归属
+
+代码通过普通 wheel 安装到所选解释器的 site-packages，符合 [Python 包声明与命令入口](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/) 的常规做法。纯 Python 代码、小型 profile、模板、必要 skill/使用说明与资源索引随包发布；小资源通过 [importlib.resources](https://docs.python.org/3/library/importlib.resources.html) 等包资源接口读取。必要 vendor 代码随包或作为明确的版本依赖交付，不依赖仓库内 sys.path 注入。
+
+开发仓库保留源码、测试与发布定义，位置由开发者选择；普通用户无须保留它。此前将三个源码根统一迁入 AgentTools/tools 的安排改为可选的本机整理，不作为安装、运行或验收前提。
 
 ```text
-D:/AgentTools/
-  tools/
-    codex-usage/                 独立源码、测试、文档、发布定义
-    aigc-detect/
-    tts/                        含固定来源的必要 vendor 代码
-  models/                       权重按现有身份与 revision 共用
-  state/
-    codex-usage/                本机设置、SQLite 缓存、默认报告
-    aigc-detect/                机器配置、日志与可重建 scratch
-    tts/                       机器配置与工具缓存
-    basepack/                  沿现状保留
-  constraints/
-    system-python313.txt       本机已联合验证的共用依赖约束
-  bin/、envs/、profile/          沿现状按用途维护
-  basepack.toml                 仍只维护 basePack 资源设施配置
+所选 Python/site-packages/
+  codex_usage/、aigc_detector/、local_tts/   代码与小型静态资源
+
+用户确认的大文件根/                        本机建议 D:/AgentTools
+  models/                                 模型、音色等固定资源
+  bin/                                    必要且尚未安装的外部二进制
+
+各工具的用户配置/缓存目录/                 保存已确认路径与运行状态
+调用方指定输出目录/                       报告、音频等业务成果
 ```
 
-工具 pyproject 声明各自需求；本机约束集中维护共用依赖的实际版本与必要 wheel 来源。安装使用标准 pip/uv 与普通 wheel，运行入口从选定系统解释器的 site-packages 导入；源码维护根与安装位置各有职责。对外分发仍保留工具自己的依赖声明。
+工具 pyproject 声明各自的基础依赖及按功能选择的可选重依赖；基础安装不能因传递依赖自动拉取 Torch 等大型运行库。轻量入口能够显示帮助、列出资源需求并启动准备流程，无需提前导入推理库。准备阶段复用兼容的已安装依赖，缺失运行库通过标准 pip/uv 装入所选 Python；模型目录选择不改变 Python 包的安装位置，不使用 no-deps 掩盖冲突。本机可集中维护已联合验证的版本约束，各包仍保留独立可解析的依赖声明。
 
-模型 manifest、revision、来源和必要校验信息随工具维护，权重通过明确配置定位共享 models。保持 Hugging Face snapshot/相对目录及 vendor 的来源、许可证和版本，迁移先保留原布局可识别性，再按需要归一。配置由各工具唯一解析，不向 basePack 的机器 schema 塞入无消费者的通用工具注册系统。
+模型资源索引、revision、来源和必要校验信息随工具维护，下载后的资源记录与权重放在已确认目录。复用已有兼容模型及 FFmpeg，保持版本、许可证和来源；仅下载当前功能缺少的资源。每个工具自己解析并保存资源根，独立安装不读取 basePack 配置，也不要求 AgentTools 的目录或配置文件存在。
 
-业务报告和音频按调用方显式路径保存；用量统计的本机默认报告归 state/codex-usage。工具日志和缓存可写目录由配置定位，普通安装后不能由 __file__ 推导到 site-packages 写入。
+配置、日志、SQLite 缓存及 scratch 默认使用工具自己的用户目录，可配置到 AgentTools/state 等位置；报告和音频按调用方显式路径保存，用量统计的默认报告目录也可设置。运行时不能由 __file__ 推导到 site-packages 写入。已有 AgentTools 模型和 state 保留原有消费者，通过显式路径复用。
+
+## 安装与首次资源准备
+
+1. **安装代码：** 标准包安装只准备轻量代码及必要小依赖，不下载模型、音色、大型外部二进制或重型运行库。包安装钩子不进行交互或资源下载。
+2. **人工首次使用：** 使用需要尚未准备资源的功能时，列出缺少的资源、可获得的下载大小/空间需求及所选 Python 的缺失重依赖，询问“大文件保存在哪里？建议 D:/AgentTools”。用户明确接受建议或输入路径后才下载；取消则结束准备。配置保存该选择，后续复用。用户已在本次安装指令中明确给出目录时直接沿用，不重复询问。
+3. **Agent 安装：** agent 可连续完成代码安装与首次资源准备；下载前向用户询问实际目录，收到答案后将其显式传给同一准备入口，再验证首次运行。无人回应不能当作接受默认路径。
+4. **库、HTTP 与无人值守：** 缺资源时返回明确的“需要准备资源”错误和准备入口，不在这些调用中读取 stdin 或隐式下载。交互 CLI/GUI 负责上述询问；无人值守仅凭用户已明确提供的目录与下载授权调用准备。批处理或 Condor worker 使用已准备的资源。
+5. **复用及后续使用：** 可指定本地已有资源，符合所需版本时免下载。需要新模型时只准备该模型；已有目录选择及下载授权按其原范围复用。下载失败保留原错误与原有可用资源，重试由调用者显式发起。
+
+准备逻辑随各工具安装包交付，复用上游下载库与标准包管理器；人工和 agent 使用同一流程。用量统计通常没有模型下载，其已有缓存是运行状态，按迁移阶段处理。验收覆盖基础安装不触发大下载、帮助/准备入口可用、指定任意根、取消无下载、已有资产免下载及非交互明确失败。
 
 ## 实施阶段与完成条件
 
@@ -69,10 +77,11 @@ D:/AgentTools/
 - 先在可丢弃候选环境中复用或安装同版本依赖，做合并解析、Windows cp313 wheel 可得性、必要 import 与最短功能试验。候选环境仅用于验证，最终运行目标仍是系统 Python。Torch/torchaudio 版本与 CUDA 来源成对选择。
 - TTS 先尝试固定上游兼容提交和最小代码适配，维持 CosyVoice 中文、Kokoro 英文；需要的模型、G2P 资源和 vendor 依赖明确登记。不以换掉现有语音能力来隐去兼容问题。
 - 形成实际可满足的依赖集合及系统变更清单；有冲突的部分列出复现与下一步。**完成：候选路线和未解决项清楚，所选最短功能链确实运行，而非只有 resolver 或 pip check 成功。**
+- 先验证基础 wheel 的轻安装与首次准备，再验证所选功能依赖；在没有 AgentTools/basePack 的候选机器目录中执行同一安装流程。
 
 ### 2. Codex 用量统计先交付
 
-补 pyproject 和安装命令，保留 `python -m codex_usage`；启动器显式使用系统解释器，移除创建、修复工具专用 .venv 的日常流程。GUI 设置、缓存、报告及 query 的增量默认缓存共用一个路径解析源。
+补 pyproject 和安装命令，保留 `python -m codex_usage`；启动器使用所选解释器，本机优先系统 Python，移除创建、修复工具专用 .venv 的日常流程。GUI 设置、缓存、报告及 query 的增量默认缓存共用一个路径解析源。绘图、动画和压缩日志依赖按所选功能准备；优先复用已有 FFmpeg。
 
 迁移 SQLite 前结束该工具的写入进程，连同必要 WAL/SHM 或原生一致性备份一起处理；保留设置、旧报告与 invalid 备份的恢复定位。当前缓存约 691 MB，属于已有本机状态，不是源码或小样例；本阶段不顺带清理。原始 `.codex` 日志保持原位。默认 query 继续只读扫描、不创建缓存；显式 cache/output 继续有效。
 
@@ -82,15 +91,17 @@ D:/AgentTools/
 
 保留现有模型 revision、自定义 loader、窗口覆盖与 profile。修正 fast tokenizer 的特殊 token/窗口构造和 v5 加载接口，收敛模型根与 scratch 配置；同步独立 HTTP 端口、client、启停及健康入口。
 
-GPU 推理和重 CPU/内存统计通过 basePack `jobs run` 一次提交完整任务，采用工具原有 CLI/核心；保持调用方 cwd、输入、报告与真实退出码。普通参数准备、已有结果重合并等轻任务可直接运行。若保留 HTTP，前端调用同一作业执行路径，模型驻留与资源许可同生命周期；首期优先任务结束释放模型的模式。现有进程内推理锁不能充当跨工具 GPU 协调。
+独立安装提供直接 CLI/Python 执行。选择本机 basePack 接入时，GPU 推理和重 CPU/内存统计通过 `jobs run` 一次提交完整任务，保持调用方 cwd、输入、报告与真实退出码；轻任务直接运行。若保留 HTTP，按选定执行方式调用同一核心，选择调度时模型驻留与资源许可同生命周期；首期优先任务结束释放模型的模式。独立直接执行不宣称具备跨工具资源协调，现有进程内推理锁不能提供该能力。
+
+把仓库 scripts 中的下载、资源核验和服务入口纳入已安装命令；models/准备命令不能依赖先导入 engine/torch。资源根与 scratch 均由工具配置定位。
 
 **完成：** 旧锁环境与系统候选在固定样例上比较中英文原始 detect、中文十模型 annotate、英文默认融合及自定义 loader，核 token/特殊符号、切窗、原始与融合分、标签和完整报告；预先说明合理数值容差，门限附近的标签变化须处理。复用已有 smoke/deployment 测试并补实际差异回归。Neo/Falcon 统计路径另验峰值、卸载及 scratch，模型与 profile 不因迁移自动更换。
 
 ### 4. TTS 适配与资源接入
 
-将模型、vendor、缓存、FFmpeg/ffprobe 和实际解释器显式配置；修复 doctor 对 root/.venv 的硬编码及按源码根找模型的行为。保留现有输出身份、显式覆盖、分块复用、损坏块恢复与失败回执。
+将模型、缓存、FFmpeg/ffprobe 和实际解释器显式配置；vendor 代码随包或作为固定依赖交付，包内资源按包接口定位。修复 doctor 对 root/.venv 的硬编码及按源码根找模型的行为。保留现有输出身份、显式覆盖、分块复用、损坏块恢复与失败回执。
 
-GPU 与长文重任务沿同一 basePack jobs 入口；继承 Condor 的 CUDA_VISIBLE_DEVICES，逻辑 cuda:0 只表示进程可见设备。测整个应用树的 RAM/显存峰值后申报，既往短音频的 Torch allocated 不能替代总峰值。FFmpeg 路径与 MP3 编码器在执行账户下实测。
+独立执行可直接合成；选择 basePack 接入时，GPU 与长文重任务沿其 jobs 入口，继承 Condor 的 CUDA_VISIBLE_DEVICES，逻辑 cuda:0 只表示进程可见设备。测整个应用树的 RAM/显存峰值后申报，既往短音频的 Torch allocated 不能替代总峰值。FFmpeg 路径与 MP3 编码器在实际执行账户下实测。
 
 **完成：** 固定中文、英文及混读样例实际离线生成音频、解码并抽听；代表长文完整覆盖，原输入重跑可复用、损坏单块可重建、设置改变按原合同处理；CPU 路径与 Condor GPU 路径分别验证。原有模型和语音能力保持，新的依赖集合与恢复身份有证据。
 
@@ -100,9 +111,9 @@ GPU 与长文重任务沿同一 basePack jobs 入口；继承 Condor 的 CUDA_VI
 
 候选通过后，结束使用受影响系统解释器的任务，再由一个安装者应用已定版本，保存变更包和可执行回退点。按本次实际依赖变化回验受影响工具与系统消费者；已有独立 embedding 服务只在自身实现或依赖确需改变时调整。
 
-同卷移动源码及所需资产，保留各自 Git 历史、未跟踪必要材料和本地修改；虚拟环境按旧版恢复需要保留，不当成可直接改路径的正式新安装。更新配置、普通安装、启动器、快捷方式、dissertation 的两个 skill junction 及正文、huangzetao 的 external_projects 登记与 handoff；核三个 Codex project 路径和接续聊天 cwd，历史聊天和旧回执保留原义。
+代码通过普通包安装，不手动复制到 site-packages；开发源码先保留现有仓库与本地修改，若另行整理位置再同步 Git/Codex project 与聊天 cwd。所需大文件按用户确认的根定位或同卷归集；旧环境按恢复需要保留。更新工具配置、启动器、快捷方式、dissertation 的两个 skill 发现入口及正文、huangzetao 的 external_projects 登记与 handoff，使运行只依赖已安装包及配置。历史聊天和旧回执保留原义。
 
-用调用方和另一中文/空格 cwd 验证最终入口：用量 query、检测完整报告、中文与英文音频。AIGC/TTS 与 embedding 验并发准入、排队、超时取消和进程回收；按实测声明预算。若 7B 或长音频需求超过当前普通池，验证可用的 CPU/offload 路线；确需改机器预算时单列设施调整，不能绕过准入或私自占用背景预留。
+从源码不可见且未配置 AgentTools/basePack 的目录验证独立 wheel：用量 query、检测完整报告、中文与英文音频，资源使用用户选定路径。本机接入另验调用方中文/空格 cwd，以及 AIGC/TTS 与 embedding 的并发准入、排队、超时取消和进程回收。按实测声明预算；若 7B 或长音频需求超过当前普通池，验证可用的 CPU/offload 路线，确需改机器预算时单列设施调整。
 
 **完成：** 三工具逐项记录实际安装版本/解释器、调用命令、输入输出位置、真实功能与回收证据，恢复材料可用；已知调用方实际切换。随后退役已无人使用的旧运行入口和依赖，不删除原业务成果或改写历史回执。某工具仍有兼容阻塞时只报告已完成部分，其余继续交付。
 
@@ -110,4 +121,4 @@ GPU 与长文重任务沿同一 basePack jobs 入口；继承 Condor 的 CUDA_VI
 
 主负责人维护共用依赖、系统安装窗口与最终集成；工具分支可并行准备代码和样例，系统环境切换由一人统一执行。实施记录回到各工具原有文档，跨工具状态在本任务接续，避免三处维护同一环境结论。
 
-本轮交付为以上评估与计划。依赖解析安装、候选推理、目录移动、消费者修改和真实迁移验收均属于后续实施；现有 tools 目标目录尚未创建。
+本轮交付为以上评估与修订计划。依赖解析安装、首次资源准备、候选推理、目录整理、消费者修改和真实迁移验收均属于后续实施。

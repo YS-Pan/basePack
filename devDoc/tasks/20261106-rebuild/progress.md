@@ -47,7 +47,7 @@
 
 ## 下一步
 
-2026-11-13 已按用户要求形成 [AgentTools 三工具迁移计划](../20261113-agenttools-migration/plan.md)，涵盖 AIGC、TTS 及 Codex 用量统计，优先共用系统 Python，复用现有资源入口；本轮仅评估，兼容试验和迁移待启动，实际状态见 [专项进度](../20261113-agenttools-migration/progress.md)。
+2026-11-13 已按用户要求形成 [三工具独立安装与资源归集计划](../20261113-agenttools-migration/plan.md)，涵盖 AIGC、TTS 及 Codex 用量统计，优先共用系统 Python，代码随包、首次资源下载先询问目录；AgentTools 和 basePack 为可选接入。本轮仅评估，兼容试验和迁移待启动，实际状态见 [专项进度](../20261113-agenttools-migration/progress.md)。
 
 已执行[实际使用整改计划](../20261112-usage-rectification/plan.md)，源码及本项目普通客户端为0.12.0.dev1，已交付检索入口、任务级brief、精确知识历史和纯访问状态；真实业务采用、安装与恢复见[验收结果](../20261112-usage-rectification/acceptance-result.md)。共享服务部署、外部项目修正及长期效果边界沿[整改进度](../20261112-usage-rectification/progress.md)接续。
 
