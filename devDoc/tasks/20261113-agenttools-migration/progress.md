@@ -1,0 +1,25 @@
+# AgentTools 迁移进度
+
+更新：2026-11-13。范围与阶段见 [plan.md](plan.md)。
+
+## 当前状态
+
+仅完成三工具迁移评估与实施计划，尚未迁移、安装依赖或修改外部工具。用户追加的 `D:/project/trifles/20260829 codex usage` 已纳入。
+
+已由两个 tier2 分别核 AIGC、TTS，一个 tier3 核用量统计；主 agent 核当前 basePack/AgentTools 安装、接口、官方上游与调用方，整合为系统 Python 优先路线。实际使用模型与推理强度来自本项目 config ai：tier2 为 gpt-6.1-terra/ultra，tier3 为 gpt-6.1-sol/ultra。团队用量不可得，未作成本结论。
+
+已确认 AIGC 的 Transformers 5 tokenizer 接口差异、TTS 发布包的 Python/Transformers 约束、8765 配置冲突，以及用量统计自动创建 .venv/源码目录持久写入需要调整。候选实际模型行为与共享依赖集合尚未验证。
+
+下一步按计划先固定起点并做共同依赖试验，先交付用量统计，再 AIGC、TTS；本次授权是计划，不启动实施。
+
+## 检查与限制
+
+- 已检查源代码、锁及普通安装元数据、工具 launcher/路径、已知消费者、官方兼容资料；未加载模型、合成音频、读取用量原始对话或改动机器配置。
+- 计划文档完成 UTF-8、相关本地链接及 Git 差异检查；不运行无关产品回归。
+- 当前系统包为 basePack 0.5.0，本项目客户端 0.12.0.dev1，共享服务保持原安装，分别记录，未将版本混为统一全机状态。
+
+## basePack 使用反馈
+
+2026-11-13，0.12.0.dev1 客户端按现有配置运行任务 brief，`http://127.0.0.1:18080` 连接被拒（WinError 10061）；本轮无法取得 mandatory。与 [环境记录](../../system/environment.md#2026-11-12-重启后的项目记忆库恢复) 的重启/受限后台进程边界相符，业务沿原文件核查，数据库当前恢复仍待处理。
+
+本任务预计超过十分钟，已用完整项目注册清单尝试 automatic maintain；在 Codex App Server 初始化用户 sqlite 状态时因沙箱权限失败，保留原错误，未静默缩范围或转成手动维护。自有 run `ebe667f4dcba467292eb46bcdfc13f84` 未发布、未派维护协调者；已 stop，owner 返回 publications=[]，随后 release 成功。本轮没有完成记忆维护或恢复共享服务。
