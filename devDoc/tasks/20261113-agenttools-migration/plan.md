@@ -63,6 +63,14 @@ AIGC 的接口变化依据 [Transformers 5 官方迁移指南](https://github.co
 
 配置、日志、SQLite 缓存及 scratch 默认使用工具自己的用户目录，可配置到 AgentTools/state 等位置；报告和音频按调用方显式路径保存，用量统计的默认报告目录也可设置。运行时不能由 __file__ 推导到 site-packages 写入。已有 AgentTools 模型和 state 保留原有消费者，通过显式路径复用。
 
+## 现有 Codex project 与持续开发
+
+用户要求迁移后继续在各工具原有 Codex project 中修改对应项目。推荐保留表中三个源码目录及原 Codex project，源码与开发资料保持原位；迁移针对普通安装包与大文件位置，不需要重建、合并或删除这些 project/聊天。各项目继续维护自己的 Git、AGENTS、文档和后续独立 GitHub 仓库。
+
+开发流程为：在对应 Codex project 改源码 → 运行相关检查 → 构建普通 wheel → 更新系统 Python 中该工具的安装包 → 从源码目录之外验证实际安装版本和模块路径。源码修改在重新安装后进入正式运行包；site-packages 是安装产物，不直接作为开发项目编辑。开发时可验证源码，安装验收须排除本地源码遮蔽安装包的影响。
+
+本轮不迁移源码根。以后若用户另行整理源码位置，先核项目绑定、Git 与未提交资料，再通过 Codex 的 Edit project 更新主文件夹并验证新聊天；旧聊天记录保留原工作目录，接续时单独核实际 cwd，目录移动不视为聊天自动迁移。官方行为依据见 [OpenAI Docs：Projects and chats](https://learn.chatgpt.com/docs/projects)。
+
 ## 安装与首次资源准备
 
 1. **安装代码：** 标准包安装只准备轻量代码及必要小依赖，不下载模型、音色、大型外部二进制或重型运行库。包安装钩子不进行交互或资源下载。
