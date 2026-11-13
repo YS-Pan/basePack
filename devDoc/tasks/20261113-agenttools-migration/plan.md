@@ -43,7 +43,7 @@ AIGC 的接口变化依据 [Transformers 5 官方迁移指南](https://github.co
 
 代码通过普通 wheel 安装到所选解释器的 site-packages，符合 [Python 包声明与命令入口](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/) 的常规做法。纯 Python 代码、小型 profile、模板、必要 skill/使用说明与资源索引随包发布；小资源通过 [importlib.resources](https://docs.python.org/3/library/importlib.resources.html) 等包资源接口读取。必要 vendor 代码随包或作为明确的版本依赖交付，不依赖仓库内 sys.path 注入。
 
-开发仓库保留源码、测试与发布定义，位置由开发者选择；普通用户无须保留它。此前将三个源码根统一迁入 AgentTools/tools 的安排改为可选的本机整理，不作为安装、运行或验收前提。
+开发仓库保留源码、测试与发布定义，本次保持三个源码根的现有位置；普通用户无须保留开发仓库。迁移只调整普通安装及大文件位置。
 
 ```text
 所选 Python/site-packages/
@@ -69,7 +69,7 @@ AIGC 的接口变化依据 [Transformers 5 官方迁移指南](https://github.co
 
 开发流程为：在对应 Codex project 改源码 → 运行相关检查 → 构建普通 wheel → 更新系统 Python 中该工具的安装包 → 从源码目录之外验证实际安装版本和模块路径。源码修改在重新安装后进入正式运行包；site-packages 是安装产物，不直接作为开发项目编辑。开发时可验证源码，安装验收须排除本地源码遮蔽安装包的影响。
 
-本轮不迁移源码根。以后若用户另行整理源码位置，先核项目绑定、Git 与未提交资料，再通过 Codex 的 Edit project 更新主文件夹并验证新聊天；旧聊天记录保留原工作目录，接续时单独核实际 cwd，目录移动不视为聊天自动迁移。官方行为依据见 [OpenAI Docs：Projects and chats](https://learn.chatgpt.com/docs/projects)。
+本次不迁移源码根，现有 Codex project 和开发入口保持原样。计划不包含修改 Codex 项目设置、重绑主文件夹、迁移聊天或改写历史记录，也不将这些应用操作列为迁移步骤或验收前置。
 
 ## 安装与首次资源准备
 
@@ -123,7 +123,7 @@ AIGC 的接口变化依据 [Transformers 5 官方迁移指南](https://github.co
 
 候选通过后，结束使用受影响系统解释器的任务，再由一个安装者应用已定版本，保存变更包和可执行回退点。按本次实际依赖变化回验受影响工具与系统消费者；已有独立 embedding 服务只在自身实现或依赖确需改变时调整。
 
-代码通过普通包安装，不手动复制到 site-packages；开发源码先保留现有仓库与本地修改，若另行整理位置再同步 Git/Codex project 与聊天 cwd。所需大文件按用户确认的根定位或同卷归集；旧环境按恢复需要保留。更新工具配置、启动器、快捷方式、dissertation 的两个 skill 发现入口及正文、huangzetao 的 external_projects 登记与 handoff，使运行只依赖已安装包及配置。历史聊天和旧回执保留原义。
+代码通过普通包安装，不手动复制到 site-packages；开发源码及仓库保持原目录和本地修改。所需大文件按用户确认的根定位或同卷归集；旧环境按恢复需要保留。更新工具配置、启动器、快捷方式、dissertation 的两个 skill 发现入口及正文、huangzetao 的 external_projects 登记与 handoff，使运行只依赖已安装包及配置。旧回执保留原义。
 
 分别仅安装一个工具及其所需第三方依赖，从源码不可见且没有另外两工具、AgentTools/basePack 配置的目录验证独立 wheel：用量 query、检测完整报告、中文与英文音频，资源使用用户选定路径。各自 README 能独立指导安装、资源准备与首次使用。本机接入另验调用方中文/空格 cwd，以及 AIGC/TTS 与 embedding 的并发准入、排队、超时取消和进程回收。按实测声明预算；若 7B 或长音频需求超过当前普通池，验证可用的 CPU/offload 路线，确需改机器预算时单列设施调整。
 
@@ -133,4 +133,4 @@ AIGC 的接口变化依据 [Transformers 5 官方迁移指南](https://github.co
 
 主负责人维护共用依赖、系统安装窗口与最终集成；工具分支可并行准备代码和样例，系统环境切换由一人统一执行。实施记录回到各工具原有文档，跨工具状态在本任务接续，避免三处维护同一环境结论。
 
-本轮交付为以上评估与修订计划。依赖解析安装、首次资源准备、候选推理、目录整理、消费者修改和真实迁移验收均属于后续实施。
+本轮交付为以上评估与修订计划。依赖解析安装、首次资源准备、候选推理、资源位置调整、消费者修改和真实迁移验收均属于后续实施。
