@@ -8,9 +8,20 @@
 
 已由两个 tier2 分别核 AIGC、TTS，一个 tier3 核用量统计；主 agent 核当前 basePack/AgentTools 安装、接口、官方上游与调用方，整合为系统 Python 优先路线。实际使用模型与推理强度来自本项目 config ai：tier2 为 gpt-6.1-terra/ultra，tier3 为 gpt-6.1-sol/ultra。团队用量不可得，未作成本结论。
 
-已确认 AIGC 的 Transformers 5 tokenizer 接口差异、TTS 发布包的 Python/Transformers 约束、8765 配置冲突，以及用量统计自动创建 .venv/源码目录持久写入需要调整。候选实际模型行为与共享依赖集合尚未验证。
+三个工具的独立包、候选真实功能与共享依赖集合已完成验证；用户已执行管理员机器安装，正式系统 Python 的三工具导入和全机 pip check 通过。当前进行机器安装后的调用方与入口收尾。
 
-下一步先交付用量统计，再 AIGC、TTS；分支候选通过必要检查后统一安装和切换，不把兼容声明或单元测试当作真实功能验收。
+源码仍在三个原项目。用量统计已提交 main@edda407；AIGC 原有大量未提交工作与 TTS 无 Git 的状态保持，迁移文件已应用且原内容保存在任务备份。下一步完成正式安装包的异目录/HTTP/GUI/消费者检查，保留实际限制并记录恢复入口。
+
+### 正式系统安装与资源归集
+
+- 最终发行：codex-usage-plot 0.2.0、local-aigc-detectors 0.10.0、local-kokoro-tts 1.2.0。三个包分别独立，基础 wheel 不含模型或大型运行库；本机按完整功能显式安装依赖，共用 `C:/Program Files/Python313/python.exe`，无新增常驻工具虚拟环境。
+- 曾先装入 user-site 的包在 ysPan 下可用，但 Condor 的独立槽账户读取私人 Roaming 返回 WinError 5；不能通过设置用户环境变量授予权限。已准备离线机器包并实际预检后，请用户完成必要的 Windows 管理员写入。用户已执行，97 个包新增、原 232 份全局登记版本保留，正式 pip check 通过；三工具从系统 `Lib/site-packages` 导入。本任务旧 user-site 副本已卸载，普通导入也来自系统包。
+- 离线包与唯一管理员步骤保留在 `D:/AgentTools/installers/20261113-three-tools/`；含 wheel 哈希、来源、约束、安装前后计划、日志和用户路径回执。模型没有随此安装下载。ysPan 的普通 Roaming 配置已由实际桌面 PowerShell 登记，三个工具均指向本次确认的 D 盘位置；Codex 宿主上下文也沿用相同选择。
+- AIGC 179 个现有资源文件（55,458,054,087 B）同卷移至 `D:/AgentTools/models/aigc-detect`；TTS 25 个现有模型/音色文件（4,769,138,640 B）同卷移至 `D:/AgentTools/models/tts`。前后相对文件清单、长度、时间和 manifest 哈希相同；源码保留小 manifest。AIGC 中文准备入口复核哈希通过，TTS 两后端 `--use-existing` 均 ready、downloads=[]。用量状态与报告在 `D:/AgentTools/state/codex-usage`，原缓存/备份/报告保留恢复定位。
+- 原源码已按快照校验应用：用量 33 项、AIGC 38 项、TTS 41 项。TTS 固定 vendor 源码、许可和默认小参考录音不再被 Git 忽略；旧 venv 安装/修复及无法重放新补丁的源码安装入口明确退役。未创建或修改任何 Codex project/聊天设置。
+- 另以真正普通 AIGC CLI 默认缓存运行十模型中文标注（14384.0），完整报告和输入哈希检查通过、进程回收已确认。Torch reserved 峰值 6,891,241,472 B，明显高于逐模型清缓存的数值对照测试；申报使用整普通 GPU 池 7164 MiB，不能拿后者的低峰值代替实际 CLI 预算。此短样本不证明所有长度或并发上限。
+
+正式文件应用前的备份、模型移动回执及选留功能证据已保存在 `artifacts/runs/20261113-tool-migration/`；临时候选环境只用于本轮验证。新旧公开样本 WAV 在该目录的 `audio/`，自动 QA 及恢复已验，主观听审未完成；不以自动检查代替发音和自然度判断。
 
 ### 18:35 实施检查点
 
@@ -21,6 +32,14 @@
 - Condor 实测普通 GPU 池为 7164 MiB，旧计划引用的 5116 MiB 不再作为本轮申报依据。测试实际暴露 worker 缺少用户环境变量，以及 librosa/platformdirs 在 worker 账户访问 Windows Known Folder 失败；已保存原错误，使用明确的任务缓存目录与真实用户环境进行对照，未修改工具业务逻辑来掩盖故障。
 
 实施脚本、候选与测试原证暂在 `tmp/20261113-tool-migration-impl/`；正式应用前的原文件备份在 `artifacts/runs/20261113-tool-migration/source-backup/`。任务收尾时保留所需运行原证和短结论。
+
+### 实际功能验证补充
+
+用量统计正式 0.2.0 已用旧缓存完成增量：7247 文件复用、0 重读、0 解析失败；旧 399340 个 event 指纹及 6388 个 session 全部保留，新增 7784 个 event。源缓存、设置、32 份旧报告及三项本地媒体的前后哈希不变；目标缓存为 SQLite 原生一致性备份，并经 quick_check。普通桌面与 Codex/MSIX 的 APPDATA 配置可见性继续核对，不能只以宿主中的路径保存成功验收。
+
+AIGC 分类器旧版任务 14363.0 与候选任务 14365.0 完整通过并确认进程回收。公开中英文样本的默认 annotate、Desklib/CoCoDet 与两组 raw 检测：31 组 token/offset/window 事件一致，在 abs/rel=1e-4 下分数与标签无差异（整数和 token 严格相等）。系统已普通安装 0.10.0，第三方依赖无变更；统计后端和正式资产位置仍待验。安装审阅发现并修复 CLI 在准备前未拒绝不合法分类器 ID、仅 wheel 用户无法定位 skill 等问题。
+
+TTS 原 3.12 基线任务 14366.0 已实际生成中文混读 23.76 秒、英文 22.91 秒音频，自动 QA 通过并确认进程回收；未将自动 QA 当作人工听审。系统 3.13 依赖验证发现 HyperPyYAML 1.2.3 与系统 mdformat_frontmatter 2.2.0 的 ruamel 约束无交集，且旧 Loader 在 ruamel 0.19.1 实际缺少 max_depth。候选将原 YAML 辅助源码纳入私有命名空间、使用公开 loader 参数适配，两代 ruamel 的标签和真实配置占位构造通过；完整新运行时音频仍待验，不降级系统 Markdown 依赖。
 
 实施工作区为 `tmp/20261113-tool-migration-impl/`，`source-baseline.json` 保存起点、原 Git 状态和候选文件哈希。用量 main@48efc99 的三个媒体本地改动原样保留。AIGC main@0136784 之后已有大量工作树/未跟踪的 0.9 代码，候选使用现行工作树，不能按旧 HEAD 覆盖。TTS 原目录尚无 Git；源码/vendor 副本排除模型、环境和输出。
 
@@ -36,7 +55,7 @@
 
 ## 检查与限制
 
-- 已检查源代码、锁及普通安装元数据、工具 launcher/路径、已知消费者、官方兼容资料；未加载模型、合成音频、读取用量原始对话或改动机器配置。
+- 评估阶段检查源代码、锁及普通安装元数据、工具 launcher/路径、已知消费者和官方兼容资料；实施阶段的真实模型、音频与系统安装范围以本页检查点为准。用量工具只读取统计元数据，不输出原始对话正文。
 - 计划文档完成 UTF-8、相关本地链接及 Git 差异检查；不运行无关产品回归。
 - 当前系统包为 basePack 0.5.0，本项目客户端 0.12.0.dev1，共享服务保持原安装，分别记录，未将版本混为统一全机状态。
 
@@ -44,4 +63,6 @@
 
 2026-11-13，0.12.0.dev1 客户端初次 brief 在沙箱内连接 `http://127.0.0.1:18080` 被拒（WinError 10061）。随后以正常用户恢复原数据库服务，brief 成功返回 3 条 mandatory，已用于本轮实施。数据库继续作为项目常驻入口保留。
 
-自动维护早期尝试遇到 Codex App Server sqlite ACL、随后 embedding 服务停止；失败记录已保留，相应 control 均按 stop/owner/release 收尾。用户已以管理员启动原 BasepackEmbedding，健康检查恢复 200。最新自有 run `d55e5a71470845d2b95614621eb32c7b` 已按脚本返回的模型与推理强度派出协调者，全项目扫描 1248 个 Git 来源，当前处理中；业务收尾时独立执行 stop、确认发布结束、释放所有权，再记录实际覆盖。
+自动维护早期尝试遇到 Codex App Server sqlite ACL、随后 embedding 服务停止；失败记录已保留，相应 control 均按 stop/owner/release 收尾。用户已以管理员启动原 BasepackEmbedding，健康检查恢复 200。最新自有 run `d55e5a71470845d2b95614621eb32c7b` 按脚本返回的模型与推理强度派出协调者，全项目扫描 1248 个 Git 来源，固定语义回执 45 来源已处置 42（35 initial、7 existing-change），发布均成功；剩余 3 条原始聊天捕获缺口不可恢复，重复 member ID 入口校验缺陷反馈仍 pending。协调者已结束，主 agent 已 stop 自有 control，owner 核 publications=[] 后 release 成功。维护原证在 `tmp/basepack-maintenance/812cbdf9557c45cabd7b9873594e1ddc/9a553459f2904853a3a3d6ccf465f438/`。
+
+资源客户端 0.12.0.dev1 使用反馈：观察排队任务 `jobs wait 14367.0 --timeout 45` 时，内部 `condor_wait -wait 4` 约 4.04 秒触发原始 subprocess.TimeoutExpired；这不是任务失败。已保留 traceback，本轮按 status 观察原任务，未重提任务；等待调用的进程超时预算问题待资源工具所属后续修复。
