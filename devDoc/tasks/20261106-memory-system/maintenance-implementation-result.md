@@ -63,8 +63,12 @@
 
 2026-11-14 按用户要求核查并清理 `experiments/20261111-basepack-maintenance`。保留记录支持以下过程：
 
+已直接回读[原始请求](codex://threads/01a1c97f-f5db-76c0-852f-b1db986b02f7)、[实施聊天](codex://threads/01a1cad7-01e6-7c32-bec9-b5442d561b95)及[候选测试分支](codex://threads/01a1cad9-1c6e-7b01-8e46-37b65b8c84ba)：用户要求新建experiment进行试验，后续确实建立独立源码与测试数据库，再按计划收敛。0.9.1于11月11日19:01发布时仍只有候选入口，源码实施发生在之后；这解释了早期发布记录与最终实施记录的阶段差异。
+
 - 11月11日18:52，提交 `15d17b8` 先建立候选 README，约定从固定0.9.1基线导入源码、独立运行与验证；当时尚未实施，见[创建记录](../../change_log/minor/20261111_185037_plan-maintenance-experiment.md)。
 - 后续实际建立候选源码。[完整套件记录](../../../artifacts/runs/20261111-maintenance-implementation/suite/README.md)明确记载实际导入候选目录的 `src/basepack/__init__.py`、使用独立端口19083的内存数据库，并记录482通过、5跳过。原完整stdout未另存；受测[源码ZIP](../../../artifacts/runs/20261111-maintenance-implementation/candidate-source-tested.zip)及[收敛哈希清单](../../../artifacts/runs/20261111-maintenance-implementation/consolidation.json)仍保留。
 - 11月11日22:39，提交 `5abb8f9` 将候选改动合回 `20261106-basepack`，候选目录改为仅留结案README。Git在该候选路径只提交过README；未提交中间候选源码不代表没有隔离试验。实现与安装沿上文接续。
 
 本次核对源码ZIP整体及38项候选文件哈希均与清单一致；按Git换行规范比较合回提交，35项与清单对应，其余3项仅调整候选/现行说明与路线引用。清理前目录仅有1199字节README，无隐藏附属材料、嵌套Git或联接，工作树干净，配置及进程无活动引用。已删除该README及空目录，将公开入口和相关文档链接改指本结果；原创建记录、Git历史、候选源码快照和运行原证保留。未修改现行实现、安装、数据库或服务。
+
+检索限制：0.14.0的 `memory freshness` 在受限shell中报Codex App Server无法打开 `C:/Users/ysPan/.codex/state_5.sqlite`（SQLite code 14），未取得全项目清单或逐聊天新鲜度截点；以上相关聊天由宿主直接回读。现象已报 `feedback:0fbd4bfef4254cb2969a91f69d22c7b4`，待维护核实入口/权限责任；不据此认定产品逻辑缺陷。
