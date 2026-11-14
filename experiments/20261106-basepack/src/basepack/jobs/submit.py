@@ -69,8 +69,7 @@ def prepare_submission(config, spec: JobSpec, encoding: str):
     folder.mkdir(parents=True)
     transfer = bool(spec.transfer_inputs or spec.transfer_outputs)
     payload = folder / "basepack-job.json"
-    receipt = folder / "worker.json"
-    metadata = {"submission_id": token, "spec": asdict(spec), "worker_receipt": str(receipt)}
+    metadata = {"submission_id": token, "spec": asdict(spec)}
     payload.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
     env = {"OMP_NUM_THREADS": str(spec.cpus), "MKL_NUM_THREADS": str(spec.cpus),
            "OPENBLAS_NUM_THREADS": str(spec.cpus), "NUMEXPR_NUM_THREADS": str(spec.cpus),
@@ -88,7 +87,6 @@ def prepare_submission(config, spec: JobSpec, encoding: str):
         f"request_memory = {spec.memory_mib} MB", f"request_disk = {spec.disk_mib} MB",
         f"request_gpus = {int(bool(spec.gpu_memory_mib))}", f"requirements = {requirement}",
         f'+BasePackSubmissionId = "{token}"', f'+BasePackPayload = {json.dumps(payload.as_posix(), ensure_ascii=False)}',
-        f"+BasePackQueueTimeout = {spec.queue_timeout}", f"+BasePackRunTimeout = {spec.run_timeout}",
         f"allowed_execute_duration = {spec.run_timeout}",
         "periodic_remove = "
         f"(JobStatus == 1 && time() - QDate >= {spec.queue_timeout}) || "

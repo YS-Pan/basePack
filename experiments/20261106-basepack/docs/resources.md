@@ -56,7 +56,7 @@ python -m basepack --config '<project-config>' jobs capacity
 python -m basepack --config '<project-config>' jobs run --spec '<project>/job.json'
 ```
 
-`capacity` 只读查询父 slot 的总容量与当前剩余量，来源是 HTCondor 实际发布的资源。`cpus`、`memory_mib`、`gpus` 为标准键；纯 CPU 节点未发布 GPU 数量时显示 0。`MachineResources` 中其余资源在总量和剩余数量均有发布时，按原名和原生单位展示。采用随包单卡策略时，`gpus` 表示同卡共享名额。资源匹配与准入由 Condor 及其站点策略负责；当前资源不足的有效申请排队，无法匹配时用 `status --analyze` 查看原因。`run` 返回 job ID、终态、应用退出码及 stdout/stderr/event log 定位；应用失败、超时或未确认回收时 CLI 退出 1，原始应用退出码保留在 JSON。示例应写出内容为 499500 的 result.txt；检查实际内容，应用退出 0 只说明正常退出。轻任务可直接运行，无需全部接入。
+`capacity` 只读查询父 slot 的总容量与当前剩余量，来源是 HTCondor 实际发布的资源。`cpus`、`memory_mib`、`gpus` 为标准键；纯 CPU 节点未发布 GPU 数量时显示 0。`MachineResources` 中其余资源在总量和剩余数量均有发布时，按原名和原生单位展示。采用随包单卡策略时，`gpus` 表示同卡共享名额。资源匹配与准入由 Condor 及其站点策略负责；当前资源不足的有效申请排队，无法匹配时用 `status --analyze` 查看原因。`run` 返回 job ID、观察到的状态、应用退出码及 stdout/stderr/event log 定位；未观察到业务成功时 CLI 退出 1，原始应用退出码保留在 JSON。示例应写出内容为 499500 的 result.txt；检查实际内容，应用退出 0 只说明正常退出。轻任务可直接运行，无需全部接入。
 
 `memory_mib`、`disk_mib`、`gpu_memory_mib` 均用 MiB；disk 是执行 scratch 需求，提交前也查项目输出盘容量。GPU 任务增加正的 `gpu_memory_mib`，声明整个应用进程树的峰值，含 CUDA context、框架缓存和 workspace，并自行限制预分配。适配器只将它转换为官方 `request_gpus = 1` 与 `gpus_minimum_memory = <峰值> MB`。Condor 按本站点策略预订显存，并在名额和显存均足够时安排同卡共享。声明额度不等于驱动硬隔离，也不保证多作业加速。保留 Condor 分配的 CUDA_VISIBLE_DEVICES。
 
@@ -71,7 +71,7 @@ gpus_minimum_memory = 3000 MB
 
 采用随包单卡策略时，申请 GPU 而省略显存会预订整个普通池，与其他 GPU 作业串行；显式 `undefined`、零、负值、不支持的表达式、超过全池或 `request_gpus > 1` 在提交时拒绝，错误使用官方参数名。资源暂时不足的有效申请排队。节点策略及背景预留由 [管理员](administrator.md#condor-容量与策略) 维护。
 
-可用 `environment` 传显式环境。入口按 cpus 提供常用框架线程变量，但 starter 仍可能注入其他线程限制；worker 继承其最终值并记录，应用并行参数由调用者自行设置。Windows 中文、空格、引号与空参数经 UTF-8 任务文件交给随包薄 worker，避免参数数组经过 submit 的有损转换。
+可用 `environment` 传显式环境。入口按 cpus 提供常用框架线程变量，但 starter 仍可能注入其他线程限制；worker 继承其最终值，应用并行参数由调用者自行设置。Windows 中文、空格、引号与空参数经 UTF-8 任务文件交给随包薄 worker，避免参数数组经过 submit 的有损转换。
 
 长任务接续：
 
@@ -82,17 +82,17 @@ python -m basepack --config '<project-config>' jobs wait '<cluster.proc>' --time
 python -m basepack --config '<project-config>' jobs cancel '<cluster.proc>'
 ```
 
-`wait --timeout` 只是本次观察时限，到期返回 observation_expired，作业继续运行。任务的 queue_timeout/run_timeout 是作业时限；run 到期撤销并确认回收，原生 Condor 时限在客户端离开后仍生效，但有策略检查间隔。timeout 与 cleanup_confirmed 分别表示时限结果和资源回收确认；cleanup_error 保留撤销或确认失败的原始信息，不能把 timeout 当作已释放。
+`wait --timeout` 只限制本次观察，到期返回 job ID、当前状态和 `observation_expired=true`，不取消作业。`run` 提交一次并等待，观察预算为 queue_timeout + run_timeout + 30 秒，到期采用相同合同；等待时间含整数秒取整、命令启动和状态查询开销。作业的 queue_timeout/run_timeout 由 Condor 原生策略执行，周期评估及状态转换存在延迟，客户端离开后策略仍生效。held 单独返回，调用者可查看原因并决定后续操作。
 
-`cleanup_scope` 说明回收确认的依据：`known_processes_and_condor_history` 表示已有原生历史且 `checked_pids` 中进程均已消失；`condor_history_never_started` 表示原生历史明确记录执行次数为 0。曾执行或执行记录不完整、又缺少 worker PID 时，返回 `cleanup_confirmed=false` 和 `condor_history_only`，从任务目录的 worker 回执及 Condor 日志继续定位。
+`cancel` 由 `condor_rm` 提交撤销请求：`cancellation_requested=true` 表示请求成功，返回的 state/terminal 是随后观察到的状态；已有终态时为 false。需要确认终态时继续调用 status 或 wait。命令错误保留原始输出。作业停止和清理由 Condor 负责；返回值不另行保证操作系统进程族回收。
 
-时间差直接保留原生时间的计算结果，负值可用于定位时钟或记录异常，未发布的时间为 `null`。超时分类依据实际观察到的作业时限或原生 hold code；终态原因无法分类时 `timeout=null`，保留 `reason`、`hold_reason_code` 和 `hold_reason_subcode`，供调用方诊断。
+时间差直接保留原生时间的计算结果，负值可用于定位时钟或记录异常，未发布的时间为 `null`。超时分类依据原生 hold code；终态原因无法分类时 `timeout=null`，保留 `reason`、`hold_reason_code` 和 `hold_reason_subcode`，供调用方诊断。
 
 `status --analyze` 返回原生匹配诊断。partitionable slot 当前资源不足时，Condor会模拟排空后分析，因此“可匹配”不等于当前有空闲配额；任务仍可处于queued。[Condor分析说明](https://htcondor.readthedocs.io/en/25.0/man-pages/condor_q.html#analyze)
 
 默认同机共享目录访问，不传输模型、环境或源码。需要 scratch 隔离时填写 transfer_inputs 和 transfer_outputs：输入路径相对 cwd，按原生 basename 语义进入 scratch；要保留层级可传整个目录，应用用其目录名访问。输出路径相对 scratch，显式列出嵌套输出目录可回传到 cwd；正常或应用失败退出时回传，取消时不保证。submit 字段须能用本机原生编码表示，文件清单拒绝逗号、控制字符和 `$(...)` 宏；应用参数通过 UTF-8 JSON 传递，不受 submit 编码限制。显式输出缺件可能导致 Condor hold。
 
-从项目 `.basepack/jobs/<submission-id>/` 的提交材料、stdout、stderr、事件日志和 worker.json 定位失败。worker 回执直接写共享项目目录，记录 launcher/应用 PID、实际 CUDA/线程环境和退出结果，不依赖取消时回传；关键应用回执也可写项目共享绝对路径。保留 job ID，可用 status --analyze 查看无匹配原因。
+从项目 `.basepack/jobs/<submission-id>/` 的提交材料、stdout、stderr 和事件日志定位失败；关键应用回执可写项目共享绝对路径。保留 job ID，可用 status --analyze 查看无匹配原因。
 
 Python 同样可一次调用：
 

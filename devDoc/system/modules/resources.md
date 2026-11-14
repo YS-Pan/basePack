@@ -28,7 +28,7 @@ Shawl 1.9.0 由 Windows 服务管理器启动，在 Condor 作业树之外拥有
 
 ## 普通重任务
 
-[jobs/](../../../experiments/20261106-basepack/src/basepack/jobs) 公开 JobSpec 与 CondorClient。client 编排 run/submit/status/wait/cancel，submit 集中字段编码、局部规范化和提交材料；psutil 只观察本任务已知 PID 及其子树，回收确认不逐项读取全系统进程属性。payload 只保存一份 spec，薄 UTF-8 worker 从中读取 executable/arguments；参数与日志留在项目 `[jobs].jobs_dir`。提交响应不确定时按唯一提交标识查询，避免重复提交。
+[jobs/](../../../experiments/20261106-basepack/src/basepack/jobs) 公开 JobSpec 与 CondorClient。client 编排 run/submit/status/wait/cancel，submit 集中字段编码、局部规范化和提交材料。payload 只保存一份 spec，薄 UTF-8 worker 从中读取 executable/arguments；参数与日志留在项目 `[jobs].jobs_dir`。提交响应不确定时按唯一提交标识查询，避免重复提交。
 
 HTCondor 是普通容量与策略权威。`capacity` 只观察实际父 slot 的总量和剩余量：标准 CPU/RAM/GPU 映射为 cpus/memory_mib/gpus，纯 CPU 节点未发布 GPU 字段时为 0；其他 MachineResources 在总量和剩余均发布时按原名和单位展示。客户端保留请求正值与输出盘空间检查，将匹配、资源准入和排队交给 Condor；项目配置不镜像普通额度。
 
@@ -40,10 +40,10 @@ GPU JobSpec 只生成官方 `request_gpus = 1` 和 `gpus_minimum_memory = <峰�
 
 Windows Condor 参数转换会丢失空参数，因此 worker 从 UTF-8 JSON 读取完整参数数组，再由系统进程 API 启动应用；它和应用后代属于 Condor 作业树，继承最终 starter 环境并保留 GPU 可见性，stdout/stderr 由 Condor 接管。
 
-run 管理排队与执行时限，并写入 Condor 原生策略；wait 只观察，观察过期保留作业。超时只按客户端实际观测的期限，或当前 held/从 held 删除的原生 HoldReasonCode 46/47 分类；其它终态原因保留原文与结构字段，timeout 为 null。过去的 hold code 不影响后续执行态。时间差保留负值，缺失时间保持 null。
+提交材料使用 Condor 的 `periodic_remove` 和 `allowed_execute_duration` 管理排队与执行时限；策略有周期及状态转换延迟。wait 只观察，观察到期保留作业；run 提交一次后按 queue_timeout + run_timeout + 30 秒观察，仍未终态时返回 observation_expired，不撤销。原生 held 单独返回；仅当前 held 或从 held 删除的 HoldReasonCode 46/47 标识执行超时，其它终态原因保留原文与结构字段，timeout 为 null。时间差保留负值，缺失时间保持 null。
 
-取消和完成后的回收确认分别表达三种证据：history 且已知 PID 消失为 known_processes_and_condor_history；history 明确 NumJobStarts=0 且无执行日期为 condor_history_never_started；曾执行或执行记录缺失又无 PID 为 condor_history_only，cleanup_confirmed=false。空 PID 集不声称完成进程检查。jobs CLI 负责成功及回收退出码，根 CLI 只组合命令和输出。提交反查失败时保留原提交错误并附反查错误链；调用者仍需检查有意义的业务结果。
+cancel 调用 condor_rm，`cancellation_requested` 与随后观察到的终态分开报告；失败保留命令错误。Condor 管理作业停止与清理，客户端不检查进程族。jobs CLI 的 run 根据业务成功设置退出码；提交反查失败时保留原提交错误并附反查错误链；调用者仍需检查有意义的业务结果。
 
 ## 验证入口
 
-当前资源查询边界、正常用户 CPU 作业与 GPU/共享 embedding 并存复核见[运行环境](../environment.md)及其原证；GPU 并存的证据范围以该页说明为准。功能结果和进程回收按实际业务结果核验，测试数量不替代验收。运行原证按批次选留于根 `artifacts/runs/`；历史 R8 的取消、空闲退出与私有 RPC 证据只适用于当时实现，见 [R8 结果](../../archive/20261107-resource-coordination/maintenance-result.md)。
+当前资源查询边界、正常用户 CPU 作业与 GPU/共享 embedding 并存复核见[运行环境](../environment.md)及其原证；GPU 并存的证据范围以该页说明为准。功能结果按实际业务结果核验，测试数量不替代验收。运行原证按批次选留于根 `artifacts/runs/`；历史 R8 的取消、空闲退出与私有 RPC 证据只适用于当时实现，见 [R8 结果](../../archive/20261107-resource-coordination/maintenance-result.md)。

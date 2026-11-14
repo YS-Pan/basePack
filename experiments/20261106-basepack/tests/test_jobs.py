@@ -110,6 +110,9 @@ def test_cpu_submit_needs_no_gpu_attributes_and_gpu_submit_uses_official_fields(
     resource_client._ads = lambda *args: [slot]
     cpu = resource_client.submit(JobSpec(executable=sys.executable))
     cpu_submit = (Path(cpu["job_dir"]) / "job.sub").read_text(encoding=resource_client.encoding)
+    assert "allowed_execute_duration = 600" in cpu_submit
+    assert "periodic_remove =" in cpu_submit and "time() - QDate >= 300" in cpu_submit
+    assert "BasePackRunTimeout" not in cpu_submit and "BasePackQueueTimeout" not in cpu_submit
     assert "request_gpus = 0\n" in cpu_submit
     assert "gpus_minimum_memory" not in cpu_submit
     assert resource_client.capacity()["slots"][0]["total"]["gpus"] == 0
@@ -132,7 +135,7 @@ def test_submit_reuses_relative_spec_in_each_project_without_changing_it(resourc
     for client in (resource_client, second):
         submitted = client.submit(spec)
         payload = json.loads(Path(submitted["payload"]).read_text(encoding="utf-8"))
-        assert set(payload) == {"submission_id", "spec", "worker_receipt"}
+        assert set(payload) == {"submission_id", "spec"}
         assert payload["spec"]["cwd"] == str((client.config.root / "work").resolve())
         assert "basepack.jobs.worker" in (Path(submitted["job_dir"]) / "job.sub").read_text(encoding=client.encoding)
         assert spec == original
@@ -274,16 +277,13 @@ def test_worker_preserves_windows_argv_and_application_exit(tmp_path):
     """The Condor Windows argv conversion dropped empty arguments in the real probe."""
     values = ["two spaces 中文", "single'quote", 'double"quote', "", "trailing\\", "$(literal)"]
     output = tmp_path / "actual.json"
-    receipt = tmp_path / "worker.json"
     code = "import json,sys; from pathlib import Path; Path(sys.argv[1]).write_text(json.dumps(sys.argv[2:]),encoding='utf-8'); sys.exit(7)"
     payload = tmp_path / "payload.json"
     payload.write_text(json.dumps({"spec": {"executable": sys.executable,
-                                   "arguments": ["-c", code, str(output), *values]},
-                                   "worker_receipt": str(receipt)}, ensure_ascii=False), encoding="utf-8")
+                                   "arguments": ["-c", code, str(output), *values]}}, ensure_ascii=False), encoding="utf-8")
     result = subprocess.run([sys.executable, "-m", "basepack.jobs.worker", str(payload)])
     assert result.returncode == 7
     assert json.loads(output.read_text(encoding="utf-8")) == values
-    assert json.loads(receipt.read_text(encoding="utf-8"))["exit_code"] == 7
 
 
 @pytest.mark.parametrize("exit_code,returned,success", [(0, True, True), (7, True, False), (0, False, False)])

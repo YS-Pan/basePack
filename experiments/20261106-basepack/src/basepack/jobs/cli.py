@@ -36,7 +36,5 @@ def dispatch(args, config):
     else:
         result = client.cancel(args.job_id)
     if action == "run":
-        return result, 0 if result.get("success") and result.get("cleanup_confirmed") else 1
-    if action == "cancel":
-        return result, 0 if result["cleanup_confirmed"] else 1
+        return result, 0 if result.get("success") else 1
     return result, 0

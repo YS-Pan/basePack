@@ -1,4 +1,4 @@
-"""One submit, native queue/history state, bounded observation and confirmed cleanup."""
+"""One submit and native queue/history state with bounded observation."""
 
 from datetime import datetime
 import json
@@ -11,8 +11,6 @@ import shutil
 import socket
 import subprocess
 import time
-
-import psutil
 
 from .submit import JobSpec, normalize_spec, prepare_submission
 
@@ -146,103 +144,46 @@ class CondorClient:
             result["analysis"] = diagnostic.stdout + diagnostic.stderr
         return result
 
-    def _confirm_cleanup(self, job_id: str, timeout=30, expected_pids=()) -> dict:
-        deadline = time.monotonic() + timeout
-        expected_pids = set(expected_pids)
-        while True:
-            ad, history = self._ad(job_id)
-            if not expected_pids:
-                # A not-yet-started worker can publish its fixed PIDs while we wait.
-                expected_pids = _worker_pids(ad)
-            try:
-                worker_gone = not any(psutil.pid_exists(pid) for pid in expected_pids)
-            except OSError as error:
-                return {"cleanup_confirmed": False, "cleanup_error": str(error)}
-            if history and expected_pids and worker_gone:
-                return {"cleanup_confirmed": True, "cleanup_scope": "known_processes_and_condor_history",
-                        "checked_pids": sorted(expected_pids)}
-            if history and not expected_pids:
-                if ad.get("NumJobStarts") == 0 and not ad.get("JobCurrentStartExecutingDate"):
-                    return {"cleanup_confirmed": True, "cleanup_scope": "condor_history_never_started"}
-                return {"cleanup_confirmed": False, "cleanup_scope": "condor_history_only",
-                        "cleanup_error": "No worker PIDs available to confirm process cleanup"}
-            if time.monotonic() >= deadline:
-                return {"cleanup_confirmed": False, "cleanup_error": "Queue/history or local worker still active at cleanup deadline"}
-            time.sleep(1)
-
-    def cancel(self, job_id: str, *, cleanup_timeout=30) -> dict:
-        ad, history = self._ad(job_id)
-        expected_pids = _worker_pids(ad)
-        if not history:
-            for pid in tuple(expected_pids):
-                try:
-                    expected_pids.update(child.pid for child in psutil.Process(pid).children(recursive=True))
-                except psutil.NoSuchProcess:
-                    pass
-            result = self._call("condor_rm", job_id, check=False)
-            if result.returncode:
-                return self.status(job_id) | {"cleanup_confirmed": False, "cleanup_error": result.stdout + result.stderr}
-        cleanup = self._confirm_cleanup(job_id, cleanup_timeout, expected_pids)
-        return self.status(job_id) | cleanup
+    def cancel(self, job_id: str) -> dict:
+        result = self.status(job_id)
+        if result["terminal"]:
+            return result | {"cancellation_requested": False}
+        self._call("condor_rm", job_id)
+        return self.status(job_id) | {"cancellation_requested": True}
 
     def wait(self, job_id: str, *, timeout=300) -> dict:
         """Observe native state; expiry leaves the job running."""
-        return self._observe(job_id, timeout=timeout)
-
-    def _observe(self, job_id: str, *, timeout, enforce_limits=False) -> dict:
         deadline = time.monotonic() + timeout
         while True:
             result = self.status(job_id)
-            if result["terminal"]:
-                return result | self._confirm_cleanup(job_id)
-            if result["state"] == "held":
-                if enforce_limits:
-                    cleanup = self.cancel(job_id)
-                    return cleanup | {"original_state": "held", "reason": result["reason"],
-                                      "hold_reason_code": result["hold_reason_code"],
-                                      "hold_reason_subcode": result["hold_reason_subcode"],
-                                      **({"timeout": result["timeout"]} if "timeout" in result else {})}
+            if result["terminal"] or result["state"] == "held":
                 return result
-            if enforce_limits:
-                ad, _ = self._ad(job_id)
-                started = ad.get("JobCurrentStartExecutingDate")
-                if started and time.time() - started >= ad["BasePackRunTimeout"]:
-                    return self.cancel(job_id) | {"timeout": "execution"}
-                if not started and time.time() - ad["QDate"] >= ad["BasePackQueueTimeout"]:
-                    return self.cancel(job_id) | {"timeout": "queue"}
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 return result | {"observation_expired": True}
-            wait_start = time.monotonic()
-            self._call("condor_wait", "-wait", max(1, min(5, math.ceil(remaining))), result["event_log"], job_id,
-                       check=False, timeout=min(7, max(2, remaining + 1)))
-            if time.monotonic() - wait_start < 0.1:
-                time.sleep(min(1, remaining))
+            waited = self._call("condor_wait", "-wait", max(1, math.ceil(remaining)),
+                                result["event_log"], job_id, check=False, timeout=None)
+            if waited.returncode:
+                if waited.returncode != 1 or (waited.stdout + waited.stderr).strip() != "Time expired.":
+                    raise RuntimeError(f"condor_wait exited {waited.returncode}\n{waited.stdout}{waited.stderr}")
+                result = self.status(job_id)
+                if result["terminal"] or result["state"] == "held":
+                    return result
+                return result | {"observation_expired": True}
+            # The event may precede its queue-to-history transition.
+            time.sleep(min(1, max(0, deadline - time.monotonic())))
 
     def run(self, spec: JobSpec) -> dict:
         submitted = self.submit(spec)
-        result = self._observe(submitted["job_id"], timeout=spec.queue_timeout + spec.run_timeout + 30, enforce_limits=True)
-        if result.get("observation_expired"):
-            result = self.cancel(submitted["job_id"]) | {"timeout": "overall"}
+        result = self.wait(submitted["job_id"], timeout=spec.queue_timeout + spec.run_timeout + 30)
         return submitted | result
-
-
-def _worker_pids(ad: dict) -> set[int]:
-    if "BasePackPayload" not in ad:
-        return set()
-    payload = json.loads(Path(ad["BasePackPayload"]).read_text(encoding="utf-8"))
-    receipt = Path(payload["worker_receipt"])
-    if not receipt.exists():
-        return set()
-    worker = json.loads(receipt.read_text(encoding="utf-8"))
-    return {worker[key] for key in ("pid", "child_pid")}
 
 
 def _terminal_time(ad: dict, encoding: str) -> int | None:
     if ad.get("CompletionDate"):
         return ad["CompletionDate"]
     # Removed jobs can retain QDate as EnteredCurrentStatus. The native abort event
-    # records the removal time; process-family cleanup is confirmed separately.
+    # records the removal time.
     log = Path(ad["UserLog"])
     if not log.exists():
         return None
