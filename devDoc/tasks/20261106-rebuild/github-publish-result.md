@@ -1,6 +1,6 @@
 # basePack GitHub 发布结果
 
-最新公开开发版为 [v0.9.1](https://github.com/YS-Pan/basePack/releases/tag/v0.9.1)，发布与验证见文末；下文保留 0.6.3 首发及 0.6.4 许可补丁的历史条件。
+最新公开开发版为[v0.13.0.dev1](https://github.com/YS-Pan/basePack/releases/tag/v0.13.0.dev1)，2026-11-14北京时间15:28:44按用户明确授权发布。tag为`e62333f`，附普通wheel、独立离线恢复工具zip及SHA256清单，三个附件重新下载后均与本地哈希相同。源码已同步，main随后补发布记录；618项全套、普通安装、本项目UUID迁移及共享服务更新的实际结果和升级边界见[0.13交付](../20261114-delivery-closeout/result.md)。下文保留0.6.3首发、0.6.4许可补丁与0.9.1等历史条件。
 
 2026 年 11 月 10 日（北京时间）。本任务按 [发布计划](github-publish-plan.md) 准备 [YS-Pan/basePack](https://github.com/YS-Pan/basePack) 的首次源码发布。用户明确要求当前项目的记忆留在本机。
 

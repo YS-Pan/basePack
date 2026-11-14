@@ -1,6 +1,6 @@
 # 0.13.0.dev1工程交付
 
-2026-11-14（北京时间）。按[原计划](plan.md)完成本轮工程实现、普通安装、本项目UUID库切换和共享服务更新。源码及本项目客户端、共享embedding服务均为0.13.0.dev1。公开Release仍须按计划获得授权；独立三工具沿各自项目接续，未在本轮改写其源码或发布状态。
+2026-11-14（北京时间）。按[原计划](plan.md)完成本轮工程实现、普通安装、本项目UUID库切换和共享服务更新。源码及本项目客户端、共享embedding服务均为0.13.0.dev1；用户后续明确授权推送并发布后，已公开[v0.13.0.dev1开发版](https://github.com/YS-Pan/basePack/releases/tag/v0.13.0.dev1)。独立三工具沿各自项目接续，未在本轮改写其源码或发布状态。
 
 ## 产品变化与检查
 
@@ -24,6 +24,8 @@
 
 正常wheel没有迁移入口。离线脚本、旧执行wheel、说明及哈希清单作为恢复资料选留于`artifacts/runs/20261114-delivery-closeout/migration-tools/`及上述备份的`migration/tools/`；可审阅发行附件为`experiments/20261106-basepack/dist/basepack-member-identity-v2-tools.zip`。工具面向本次已核的SurrealDB4原生导出和十一表知识/访问schema；更老schema不自动转换，须在所属项目先准备相应升级及恢复。旧批次、旧语义回执和未确认交付不得重放到新库，需重新prepare；本次已确认的delivery按迁后等价清单验证。映射只留恢复，不供日常查询。
 
+切换并完成event4/反馈结案后，另保留原生`migration/accepted-v2.surql`（341,784,774字节，SHA256`cc181aa21d193eb55d827a3f2a3f6755f90b02d83d609f047d07444b3b0ec3a3`）、当前入口/launcher和0.13 wheel。`migration/v2-recovery-manifest.json`说明如何复用同一基底中的凭据和未变原件恢复最终UUID状态；原0.12导出仍是旧系统回滚点，二者不混用。
+
 ## 实际检索与反馈
 
 已从新安装客户端实际派出tier1 / gpt-6-luna / max检索worker，请求为`3988d87038834a83ab5a1b3d8621e58c`。完成多轮搜索、原文/图/历史回读、命名聊天及AIGC后续发布任务核实，7个实际观察版本评分后全部入选rank，4766/6000字符。主agent实际收到所选内容后确认清单，delivery为`retrieval-916569a1666f42a3aa682bf7a9e11dce`、event=4。
@@ -41,3 +43,7 @@
 用户继续收集收益、长期质量/成本、协作效果和新机部署反馈；本轮不组织这些评测，也未启动语义审计。团队按项目映射使用根agent、4个实现/准备分支（身份分支含3个worker）和实际tier1检索。总token/费用、主agent上下文/往返计量及完整团队耗时未由宿主提供，记为未知。
 
 主要原证在`artifacts/runs/20261114-delivery-closeout/`：`verified.json`、`read-verification.json`、`installation-verification.json`、`wheel-flow.json`、`pytest-final.log`、`skills-list.json`及`condor/`、`service/`。数据库恢复export/映射/凭据仍在配置指定memory目录。发行wheel SHA256为`df7f34299a2af62401180cc77a76734a4d33b0f387398794a835db67c527c9d9`，恢复工具zip及校验清单与wheel同在dist。
+
+## GitHub交付
+
+源码已推送至YS-Pan/basePack；[v0.13.0.dev1](https://github.com/YS-Pan/basePack/releases/tag/v0.13.0.dev1)于北京时间15:28:44发布，prerelease=true、draft=false，tag指向`e62333f9916ee7eec8bb99d74d99b5f70b4ddced`。三个附件逐一重新下载，wheel、恢复工具zip及校验清单与本地SHA256均相同；工具zip SHA256为`abc377167b41c44f5bd0a772f09194abecff8687d14a746de24b564098d4d909`。main随后只补本发布记录。GitHub插件不提供Release附件上传，使用本机Git/gh及既有Git凭据在进程内认证，未输出或持久保存令牌；未发布项目记忆、凭据、模型或运行产物。
