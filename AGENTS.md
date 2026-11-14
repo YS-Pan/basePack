@@ -13,6 +13,7 @@
 - basePack 仍在开发，实际使用同时作为测试样本。发现使用问题时，在所属任务进度记录现象、版本、必要复现条件与处理状态，修复后补验证；无所属任务的问题先记入 [总进度](devDoc/tasks/20261106-rebuild/progress.md)。外部项目沿使用者已有记录约定，并按 [反馈格式](experiments/20261106-basepack/docs/setup-project.md#问题记录与反馈) 形成 Issue 草稿，由用户提交或明确授权 agent 提交。
 - 新建、调整或归档开发文档时读 [文档维护约定](devDoc/documentation.md)。
 - 推荐、设计或整理项目文件结构时使用 [file-structure](skills/file-structure/SKILL.md)。
+- 机密业务原件与人工分析放根 `private/`，由独立本机 Git 保存；公共引用可选，公开内容保持自足。读取或公开私有资料、处理记忆返回的 `private` 标记时，按 [私有上下文边界](skills/file-structure/references/private-context.md) 执行。
 - 每项任务开始或接续时应用 [agent-team](skills/agent-team/SKILL.md) 的组织判断；当前上下文已有有效规则时直接复用。
 
 ## 实施

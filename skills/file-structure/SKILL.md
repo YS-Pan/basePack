@@ -1,6 +1,6 @@
 ---
 name: file-structure
-description: "Recommend or reorganize project file layouts for development documentation, experiment routes, and temporary or retained material. Use for structure decisions and requested file moves; ordinary prose or algorithm edits alone are outside scope."
+description: "Recommend or reorganize project file layouts for development documentation, experiment routes, private development context, and temporary or retained material. Use for structure decisions and requested file moves; ordinary prose or algorithm edits alone are outside scope."
 ---
 
 # File structure
@@ -20,7 +20,8 @@ Choose a layout by purpose, maintenance lifecycle, and execution or delivery bou
 | --- | --- |
 | Long-term guidance, current implementation, active work, and history are mixed | [Development documentation](references/dev-docs.md) |
 | Experiment routes have tangled code, dependencies, data, or results | [Experiment routes](references/experiment-packages.md) |
-| Both problems occur | Read both references together and combine the layers |
+| Confidential development context needs a separate local version and publication boundary | [Private context](references/private-context.md) |
+| Documentation and experiment problems occur together | Read both references together and combine the layers |
 | Another layout problem | Propose the smallest layout that fits its purpose, lifecycle, and execution or delivery boundaries |
 
 Use the task and existing entry points to locate relevant directories, version-control boundaries, and materials. Batch known reads and reuse valid context. For a large repository, start with relevant indexes and retain locations for deeper reading; follow up when the findings require it.

@@ -17,6 +17,7 @@ htmlcov/
 /experiments/*/.basepack/
 
 # Project memory, local assets and development artifacts
+/private/
 .memory/
 /.cache/
 /artifacts/

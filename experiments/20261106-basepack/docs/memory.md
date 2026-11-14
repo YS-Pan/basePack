@@ -10,7 +10,7 @@
 
 ## 首建与维护
 
-可重建的 reading、batch、排名和一次性验证放项目根 `tmp/<任务或运行标识>/`；选留原证放根 `artifacts/runs/<运行标识>/`。数据库、凭据、原件/assets、control、仍在使用或恢复必要的回执保持配置指定的稳定位置；反馈在数据库内持久保存。控制文件可能早于回执创建，发布未明时不能清除。以下函数使依赖命令非零即停止；JSON 使用 UTF-8，保存成 `.ps1` 时为 Windows PowerShell 5.1 使用 UTF-8 BOM：
+可重建的 reading、batch、排名和一次性验证放项目根受忽略的 `tmp/<任务或运行标识>/`；选留原证放根 `artifacts/runs/<运行标识>/`。数据库、凭据、原件/assets、control、仍在使用或恢复必要的回执保持配置指定的稳定位置；反馈在数据库内持久保存。这些受管副本和工作包可含机密内容，保管与公开边界见 [私有资料](#私有资料与分享边界)。控制文件可能早于回执创建，发布未明时不能清除。以下函数使依赖命令非零即停止；JSON 使用 UTF-8，保存成 `.ps1` 时为 Windows PowerShell 5.1 使用 UTF-8 BOM：
 
 ```powershell
 $python = '<instructions 中的 absolute-python.exe>'
@@ -56,7 +56,9 @@ apply 核对来源版本，以及本批改写、退役、更正目标、实际�
 memory maintain --mode automatic --holder '<本thread身份>' --control '<memory.data_dir>/maintenance/<全新标识>.control' --output '<project-root>/tmp/<run>/summary.json'
 ```
 
-默认面向整个项目的受管来源，不按当前业务任务的文件缩小维护范围。Git 项目枚举项目内已跟踪和未忽略的未跟踪文件，并加入 `memory.source_scope` 显式包含项，排除工具状态、环境与缓存；非 Git 项目使用声明的 `source_scope`。所有已登记来源、历史 pending/未接受范围和可归属 Codex 原件持续参与维护。`--scope <文件或目录> ...` 只覆盖本轮新文件发现，不把历史来源限制到该范围。无需为日常维护递归扫描 `.`；不支持的二进制材料留缺口，读取失败保留原错。
+默认面向整个项目的受管来源，不按当前业务任务的文件缩小维护范围。Git 项目枚举项目内已跟踪和未忽略的未跟踪文件，并加入 `memory.source_scope` 显式包含项；非 Git 项目使用声明的 `source_scope`。默认发现还自动加入根 `private/` 独立 Git 的已跟踪及未忽略新文件，尊重内层忽略规则，无需逐项配置 source_scope；它们仍属同一项目 UUID、数据库与维护生命周期。不存在 `private/` 时正常完成默认发现。各范围排除 `.git/`、工具状态、环境与缓存。
+
+所有已登记来源、历史 pending/未接受范围和可归属 Codex 原件持续参与维护。`--scope <文件或目录> ...` 只覆盖本轮新文件发现，不自动追加 private 范围，也不把历史来源限制到所选范围；已登记私有来源的缺失仍按既有合同处理。无需为日常维护递归扫描 `.`；不支持的二进制材料留缺口，读取失败保留原错。
 
 零行文字来源且没有活动知识时，只需登记来源，不创建无效行范围的 member。已有正文被清空时，仍须退役旧成员并处理依赖；完成后不反复派发该空来源，重新出现正文会继续发现。
 
@@ -143,7 +145,7 @@ CLI 只准备派工。宿主实际按返回的 `task_name`、`model` 和 `reason
 
 一次实际委托由同一 worker 完成 search → 必要原文与图关系回读 → 0–100 综合评分 → UTF-8 `scored.json` 落盘 → rank → 可用内容与版本清单。`access_weight` 只是历史使用辅助线索，相关性、适用条件和证据价值为主；低权重关键材料仍可进入。rank 直接按综合分排序、去重与字符预算选择，不做第二次访问调权，也不记交付。worker 实际用宿主文件工具或本机 Python 保存评分文件；保存或 rank 失败时保留原错、已读证据和未完成阶段。
 
-候选、read/knowledge、scored、rank 与最终清单一路保留实际观察的 `id`／`knowledge_revision`，原证的 `source_version`／`revision`、范围或图片 locator 另记。`record_type:'node'|'semantic'` 的独立知识节点／语义关系可无路径和行号，保留实际 basis、endpoint_versions；不能伪造来源来套成员格式。关系与条件用于判断本次适用性，区分用户要求、助手假设、代码事实和实验观察；旧要求热度不使其恢复现行身份，仍有效的旧实验可继续影响当前回答。完整评分形状与宿主步骤见 [随包 skill](../src/basepack/memory/SKILL.md#retrieve-in-one-delegation)。
+候选、read/knowledge、scored、rank 与最终清单一路保留实际观察的 `id`／`knowledge_revision` 及已有 `private` 标记，原证的 `source_version`／`revision`、范围或图片 locator 另记。`record_type:'node'|'semantic'` 的独立知识节点／语义关系可无路径和行号，保留实际 basis、endpoint_versions；不能伪造来源来套成员格式。关系与条件用于判断本次适用性，区分用户要求、助手假设、代码事实和实验观察；旧要求热度不使其恢复现行身份，仍有效的旧实验可继续影响当前回答。完整评分形状与宿主步骤见 [随包 skill](../src/basepack/memory/SKILL.md#retrieve-in-one-delegation)。
 
 宿主确认最终内容已经实际收到后，将最终实交付项写入返回的 delivery_receipt 路径，再执行：
 
@@ -179,6 +181,16 @@ memory search --text 'memory-example.md' --mode hybrid --literal
 
 brief、search、knowledge 和 read 只读已发布知识及所存依据；来源已登记不等于知识已更新。`changes --scope` 显式发现原件变化，维护负责后续接受；查询不会等待维护或默认审计。预算外材料保留补读入口，实际问题用 [反馈](#使用反馈与手动审计) 留待单一维护 owner 处理。
 
+## 私有资料与分享边界
+
+程序为新写的 source、source_version、member、node 和 semantic 关系计算布尔字段 `private`。来源及其快照按规范化项目相对路径是否位于根 `private/` 判定；成员结合自身来源版本和已固定的 basis，节点依 basis，关系同时依 basis 和固定版本端点。有一项私有依据时整条知识标 true；公私混合也标 true。引用依据和端点的已保存版本，而非其当前标记；stale、退役及历史保留沿原标记。公开正文只含可选私有路径引用，不等于使用了私有正文。
+
+检索、brief、回读及交接保留所见版本的 `private`；scored、rank 和最终清单继续携带。`read.original.private` 表示所读来源快照，可与带跨来源私有依据的 member.private 不同。旧记录缺标表示未确认，不能视为已核公开。标记不提供 ACL 或全文隐私分类，也不净化内容；公开写入按项目公开口径提炼可公开结论，机密原件和人工维护的分析、摘录留在 private。受管记忆和工作包仍在既有受忽略的 `.basepack/`、`tmp/` 等位置，作为本机私有运行材料保管。
+
+存量补标仅依据已确认的迁移映射与固定版本依据作限定范围的元数据升级，覆盖能确认的当前及历史副本，保留原件字节、历史路径、UUID、知识/输入版本及未变向量；未覆盖和无法确认的旧记录保留范围说明。它不代替全库语义审计，未声明的暗含机密仍需人工判断。升级边界见 [配置维护](project-config-maintenance.md#按变化边界准备恢复集合)。
+
+现有原生导出和普通备份保留全部公私内容；数据库导出本身不包含全部外部文件。需要公开时另建筛选后的分享副本，公开导出工具尚未提供。除当前知识外，来源快照、图片 assets、旧知识版本、change.previous、聊天/反馈/交付 context 也可能含机密；不能只删除当前私有 member 就宣称可公开。
+
 ## 备份与恢复
 
 basePack 客户端自动读凭据；原生 SurrealDB CLI 使用自己的 SURREAL_USER/PASS。下面只为该次原生导出临时设置它们，不把这段加入新 shell 的记忆入口：
@@ -200,6 +212,6 @@ try {
 
 恢复时先为新的物理目录/端口启动认证服务，保留原 project_id；从该目标配置读取用户名及同一密码文件，再以原生 `import` 替换上述 `export`。缺失凭据先恢复正确文件，不给已有库重新生成密码。恢复后核快照、图关系和检索。
 
-恢复集合包括 export、配置、原凭据、业务原件、受管 Codex 导出、codex-attachments 原件与定位回执、`memory.data_dir` 下的 assets 图片快照。数据库内的知识版本、演变关系、依据、更正、旧快照、已阅/延期细化处置、反馈、访问状态及 delivery_id 去重记录随 export 恢复；旧版备份不会凭空补齐后来新增的状态或缺失历史。新目录保留 project_id，使用独立目录/端口，再验证原文定位、知识版本、关系、检索、反馈及同 delivery_id 重试。兼容向量可随 export 恢复，或从接受表示与原图重新 embed；访问记账不要求重建向量。运行中的库使用原生 export；复制物理目录先停写、停止服务。长期备份由明确恢复需求决定目的地与保留周期，不默认叠加完整备份。凭据不随源码发行；清理前核原件/旧依据引用及活跃控制/未明发布。
+恢复集合包括 export、配置、原凭据、公私业务原件、private 独立 Git 及其忽略但仍需保留的附件、受管 Codex 导出、codex-attachments 原件与定位回执、`memory.data_dir` 下的 assets 图片快照。数据库内的知识版本、演变关系、依据、private 标记、更正、旧快照、已阅/延期细化处置、反馈、访问状态及 delivery_id 去重记录随 export 恢复；旧版备份不会凭空补齐后来新增的状态或缺失历史。新目录保留 project_id，使用独立目录/端口，再验证原文定位、知识版本、关系、检索、反馈及同 delivery_id 重试。兼容向量可随 export 恢复，或从接受表示与原图重新 embed；访问记账不要求重建向量。运行中的库使用原生 export；复制物理目录先停写、停止服务。长期备份由明确恢复需求决定目的地与保留周期，不默认叠加完整备份；这些是完整私有恢复材料，按实际公开范围另做分享副本。凭据不随源码发行；清理前核原件/旧依据引用及活跃控制/未明发布。
 
 `memory freshness [--codex-registry <json>] [--thread <id>]` 只读项目归属、分页、采集回执与原文比较，不取得 owner、不写原件、不生成向量或发布知识。按相关候选及用户点名聊天补读；跨项目引用使用宿主读取。回执时间不是全局截止，端点和 `updatedAt` 不是正文证明；报告未摄入、待语义快照、实际补读和未知。预检 pending 是历史快照，不代表当前语义状态。

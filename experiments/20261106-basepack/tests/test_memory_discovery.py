@@ -37,6 +37,69 @@ def test_git_inventory_and_explicit_additions(tmp_path):
                       "gaps": [], "mode": "git"}
 
 
+def test_default_inventory_adds_independent_ignored_private_repository(tmp_path, monkeypatch):
+    git(tmp_path, "init", "-q")
+    put(tmp_path, ".gitignore", b"/private/\nignored/\n")
+    put(tmp_path, "public.md")
+    put(tmp_path, "ignored/not-selected.md")
+    put(tmp_path, "ignored/selected.md")
+    nested = tmp_path / "other-repository"
+    nested.mkdir()
+    git(nested, "init", "-q")
+    put(nested, "not-selected.md")
+    private = tmp_path / "private"
+    private.mkdir()
+    git(private, "init", "-q")
+    put(private, ".gitignore", b"scratch/\n")
+    put(private, "tracked.md")
+    git(private, "add", ".gitignore", "tracked.md")
+    put(private, "new.md")
+    put(private, "scratch/ignored.md")
+    put(private, ".basepack/local.txt")
+    put(private, ".venv/environment.txt")
+    put(private, "__pycache__/cached.txt")
+    put(private, "generated.pyc", b"\0")
+
+    def unexpected_walk(*args, **kwargs):
+        raise AssertionError("Git discovery must not recursively walk ignored trees")
+
+    monkeypatch.setattr("basepack.memory.discovery.os.walk", unexpected_walk)
+    assert discover_sources(config(tmp_path, ["ignored/selected.md"])) == {
+        "paths": [".gitignore", "ignored/selected.md", "private/.gitignore",
+                  "private/new.md", "private/tracked.md", "public.md"],
+        "gaps": [], "mode": "git"}
+
+
+def test_default_inventory_with_no_private_directory(tmp_path):
+    git(tmp_path, "init", "-q")
+    put(tmp_path, "public.md")
+    assert discover_sources(config(tmp_path)) == {
+        "paths": ["public.md"], "gaps": [], "mode": "git"}
+
+
+def test_non_git_project_adds_private_inventory_without_scanning_root(tmp_path, monkeypatch):
+    monkeypatch.setattr("basepack.memory.discovery._git_repository", lambda root: False)
+    put(tmp_path, "configured.md")
+    put(tmp_path, "outside-scope.md")
+    private = tmp_path / "private"
+    private.mkdir()
+    git(private, "init", "-q")
+    put(private, ".gitignore", b"scratch/\n")
+    put(private, "new.md")
+    put(private, "scratch/ignored.md")
+    assert discover_sources(config(tmp_path, ["configured.md"])) == {
+        "paths": ["configured.md", "private/.gitignore", "private/new.md"],
+        "gaps": [], "mode": "configured"}
+
+
+def test_private_directory_requires_its_own_git_repository(tmp_path):
+    git(tmp_path, "init", "-q")
+    put(tmp_path, ".gitignore", b"/private/\n")
+    put(tmp_path, "private/context.md")
+    with pytest.raises(subprocess.CalledProcessError):
+        discover_sources(config(tmp_path))
+
+
 def test_explicit_scope_overrides_inventory_and_config(tmp_path):
     git(tmp_path, "init", "-q")
     put(tmp_path, "whole.md")
@@ -46,8 +109,13 @@ def test_explicit_scope_overrides_inventory_and_config(tmp_path):
     put(tmp_path, "selected/.git/no.md")
     put(tmp_path, "selected/__pycache__/no.pyc")
     put(tmp_path, "selected/generated.pyc")
+    put(tmp_path, "private/context.md")
     result = discover_sources(config(tmp_path, ["configured.md"]), ["selected"])
     assert result == {"paths": ["selected/yes.md"], "gaps": [], "mode": "explicit"}
+    assert discover_sources(config(tmp_path, ["configured.md"]), ["private/context.md"]) == {
+        "paths": ["private/context.md"], "gaps": [], "mode": "explicit"}
+    assert discover_sources(config(tmp_path, ["configured.md"]), []) == {
+        "paths": [], "gaps": [], "mode": "explicit"}
 
 
 def test_non_git_scopes_and_unsupported_files(tmp_path, monkeypatch):
@@ -68,10 +136,15 @@ def test_non_git_scopes_and_unsupported_files(tmp_path, monkeypatch):
 
 def test_git_repository_parent_respects_project_root(tmp_path):
     git(tmp_path, "init", "-q")
+    put(tmp_path, ".gitignore", b"/project/private/\n")
     put(tmp_path, "other.md")
     root = tmp_path / "project"
     put(root, "own.md")
-    assert discover_sources(config(root))["paths"] == ["own.md"]
+    private = root / "private"
+    private.mkdir()
+    git(private, "init", "-q")
+    put(private, "new.md")
+    assert discover_sources(config(root))["paths"] == ["own.md", "private/new.md"]
 
 
 def test_scope_outside_root_is_rejected(tmp_path):

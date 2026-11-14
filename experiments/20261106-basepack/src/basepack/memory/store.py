@@ -16,6 +16,7 @@ from uuid import uuid4
 from basepack.project.config import ProjectConfig
 from .content import SourceContent, _project_path, detect_changes, numbered_text, read_source, reading_units
 from .images import IMAGE_SUFFIXES, ImageSource, read_image, retain_image
+from .privacy import derive_private, source_private
 
 
 _CANDIDATE_OMIT = "embedding,basis,raw_revision"
@@ -27,8 +28,10 @@ class _Record:
     key: str | int
 
 
-def _record(value: str, table: str = "member") -> _Record:
+def _record(value: str | _Record, table: str = "member") -> _Record:
     """Keep bare string keys literal; decode native table-qualified IDs."""
+    if isinstance(value, _Record):
+        return value
     if ":" not in value:
         return _Record(table, value)
     table, value = value.split(":", 1)
@@ -294,8 +297,10 @@ class Memory:
                 if Path(path).as_posix() not in known:
                     raise
                 item = {"path": Path(path).as_posix(), "deleted": True}
+                item["private"] = known[item["path"]].get("private", source_private(item["path"]))
             else:
                 item = {"path": source.path, "revision": source.revision, "size": source.size,
+                        "private": source_private(source.path),
                         "mtime_ns": source.mtime_ns}
                 if isinstance(source, ImageSource):
                     item.update({"kind": "image", "image_path": str(self.config.root / source.path)})
@@ -317,6 +322,7 @@ class Memory:
                     item["previous"] = {"revision": old.revision, "numbered_text": numbered_text(old)}
                 item["previous"].update({key: snapshot[key] for key in ("dispositions", "deferred_refinement")
                                          if key in snapshot})
+                item["previous"]["private"] = snapshot.get("private", source_private(snapshot.get("path", previous["path"])))
             prepared.append(item)
             ids.extend(member["id"] for member in item["members"])
         edges = self._execute("SELECT * FROM semantic WHERE "
@@ -474,6 +480,7 @@ class Memory:
         current = {}
         sources = {}
         versions = {}
+        snapshots = {}
         assets = {}
         statements = ["BEGIN;"]
         targets = {_record(item["id"], table) for table, key in
@@ -534,7 +541,8 @@ class Memory:
             sources[source.path], versions[source.path] = record, version
             if previous:
                 statements.append(f"IF {_sql(record)}.version != {_sql(_record(previous['version']))} {{ THROW 'Concurrent source version changed'; }};")
-            snapshot = {"source": record, "revision": source.revision, "path": source.path}
+            snapshot = {"source": record, "revision": source.revision, "path": source.path,
+                        "private": source_private(source.path)}
             if previous and _record(previous["version"]) == version:
                 old_snapshot = self._execute(f"SELECT * FROM ONLY {_sql(version)};")[0]
                 snapshot.update({key: old_snapshot[key] for key in ("dispositions", "deferred_refinement")
@@ -548,7 +556,8 @@ class Memory:
             else:
                 snapshot.update({"kind": kind, "text": source.text})
             statements.append(f"UPSERT {_sql(version)} CONTENT {_sql(snapshot)};")
-            statements.append(f"UPSERT {_sql(record)} CONTENT {_sql({'path':source.path, 'kind':kind, 'revision':source.revision, 'size':source.size, 'mtime_ns':source.mtime_ns, 'version':version, 'deleted':False})};")
+            snapshots[version] = snapshot
+            statements.append(f"UPSERT {_sql(record)} CONTENT {_sql({'path':source.path, 'kind':kind, 'revision':source.revision, 'size':source.size, 'mtime_ns':source.mtime_ns, 'version':version, 'deleted':False, 'private':snapshot['private']})};")
         existing = {_record(item["id"]).key: item for item in before_members}
         affected = self._affected(current, before_members)
         for item in batch.get("members", []):
@@ -655,6 +664,30 @@ class Memory:
                 "conditions": item.get("conditions", ""), "claim_type": item.get("claim_type", ""),
                 "stale": False, "retired": False, "knowledge_revision": uuid4().hex}, "node"))
         accepted_revisions = {record: value["knowledge_revision"] for record, value, _ in writes}
+        accepted = {(record, value["knowledge_revision"]): value for record, value, _ in writes}
+
+        def source_version(version):
+            record = _record(version, "source_version")
+            if record not in snapshots:
+                snapshots[record] = self._execute(f"SELECT * FROM ONLY {_sql(record)};")[0]
+            return snapshots[record]
+
+        def knowledge_version(record, revision):
+            target = _record(record)
+            key = (target, revision)
+            if key not in accepted:
+                from .history import knowledge
+                accepted[key] = knowledge(self, target, knowledge_revision=revision)
+            return {**accepted[key], "id": target}
+
+        def mark_private(value):
+            marker = derive_private(value, source_version=source_version, knowledge_version=knowledge_version)
+            if marker is None:
+                raise ValueError("Private marker requires retained version-pinned provenance")
+            value["private"] = marker
+
+        for _, value, _ in writes:
+            mark_private(value)
         for record, value, table in writes:
             statements.append(f"CREATE {_sql(_Record('change', uuid4().hex))} SET operation='accept', target={_sql(record)}, previous=(SELECT * OMIT embedding FROM ONLY {_sql(record)}), at=time::now(), context={_sql(context)};")
             if table == "node":
@@ -687,6 +720,7 @@ class Memory:
                             f"SELECT VALUE knowledge_revision FROM ONLY {_sql(target)};")[0]
                 endpoints[endpoint] = {"id": target, "knowledge_revision": revision}
             value["endpoint_versions"] = endpoints
+            mark_private(value)
             statements.append(f"CREATE {_sql(_Record('change', uuid4().hex))} SET operation='accept_edge', target={_sql(record)}, previous=(SELECT * FROM ONLY {_sql(record)}), at=time::now(), context={_sql(context)};")
             # Native endpoints are immutable. Recreate only this accepted edge
             # in the same transaction, after retaining its actual prior record.
@@ -804,6 +838,7 @@ class Memory:
             if locator is None and source_version is None:
                 locator = member.get("locator")
             return {"member": self.access_hints([member])[0], "original": {"path": path, "revision": revision,
+                    "private": snapshot.get("private", source_private(path)),
                     "source_version": version, "image_path": str(asset), "locator": locator}}
         if source_version is None:
             start_line, end_line = member["start_line"], member["end_line"]
@@ -814,6 +849,7 @@ class Memory:
             raise ValueError(f"Text snapshot revision mismatch for {member_id}")
         content = SourceContent(path, revision, len(text.encode("utf-8")), 0, text)
         original = {"member_id": member["id"], "path": path, "revision": revision,
+                    "private": snapshot.get("private", source_private(path)),
                     "source_version": version, "start_line": start_line, "end_line": end_line,
                     "text": _original(content, start_line, end_line)}
         if (self.config.root / path).resolve().parent == (self.config.memory_dir / "codex").resolve():
@@ -850,10 +886,10 @@ class Memory:
         sources = self.sources()
         mandatory, stale_members, stale_nodes, stale_edges, gaps, overview = self._execute(
             "SELECT * OMIT embedding FROM member WHERE mandatory=true AND retired!=true; "
-            "SELECT id,path,kind FROM member WHERE stale=true AND retired!=true; "
-            "SELECT id,kind FROM node WHERE stale=true AND retired!=true; "
-            "SELECT id,kind FROM semantic WHERE stale=true AND retired!=true; "
-            "SELECT id,path,coverage_gaps AS gaps FROM member WHERE retired!=true AND array::len(coverage_gaps)>0; "
+            "SELECT id,path,kind,private FROM member WHERE stale=true AND retired!=true; "
+            "SELECT id,kind,private FROM node WHERE stale=true AND retired!=true; "
+            "SELECT id,kind,private FROM semantic WHERE stale=true AND retired!=true; "
+            "SELECT id,path,private,coverage_gaps AS gaps FROM member WHERE retired!=true AND array::len(coverage_gaps)>0; "
             f"SELECT * OMIT embedding FROM member WHERE stale=false AND retired!=true AND mandatory=false AND kind IN ['file','section','image'] ORDER BY kind,path LIMIT {int(limit)};")
         registered = {_record(row["id"]): row for row in sources}
         basis_versions = {_record(basis["source_version"], "source_version")
@@ -882,7 +918,7 @@ class Memory:
         clues = [dict(row, clue_role="map") for row in overview]
         fields = {"id", "kind", "title", "text", "path", "source_revision", "source_version", "start_line", "end_line",
                   "parent", "parent_version", "stale", "retired", "coverage_gaps", "locator", "clue_role", "knowledge_revision",
-                  "conditions", "claim_type", "known_unsynced", "sync_evidence"}
+                  "conditions", "claim_type", "known_unsynced", "sync_evidence", "private"}
         def startup_item(row):
             return {key: value for key, value in row.items() if key in fields}
         detail_limit = max(20, limit)
@@ -897,7 +933,8 @@ class Memory:
                 "mandatory_known_unsynced_count": sum(row["known_unsynced"] for row in mandatory),
                 "clues": [startup_item(row) for row in clues[:limit]],
                 "pending": stale[:detail_limit], "pending_count": len(stale),
-                "sources": [{key: row[key] for key in ("id", "path", "kind", "deleted")} for row in sources[:detail_limit]],
+                "sources": [{key: row[key] for key in ("id", "path", "kind", "deleted", "private") if key in row}
+                            for row in sources[:detail_limit]],
                 "source_count": len(sources),
                 "coverage_gaps": gaps[:detail_limit], "coverage_gaps_count": len(gaps),
                 "vector_coverage": {"status": "not_checked"},
@@ -907,7 +944,7 @@ class Memory:
 
     def sources(self) -> list[dict]:
         """List source metadata for explicit inventory or deep-maintenance sampling."""
-        return self._execute("SELECT id,path,revision,size,mtime_ns,deleted,kind FROM source ORDER BY path;")[0]
+        return self._execute("SELECT id,path,revision,size,mtime_ns,deleted,kind,private FROM source ORDER BY path;")[0]
 
     def changes(self, scope: list[str], *, deep: bool = False) -> list[dict]:
         return self._check_changes(self.sources(), scope, deep=deep)

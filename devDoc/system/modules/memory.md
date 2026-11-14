@@ -1,6 +1,6 @@
 # 项目记忆实现
 
-源码面向0.12.0.dev1，实现SurrealDB多层文字、原图向量与统一知识图、知识版本历史、单owner维护及纯访问状态。本轮入口、历史和访问实现见[使用整改进度](../../tasks/20261112-usage-rectification/progress.md)，固定派工沿[既有结果](../../tasks/20261106-memory-system/dispatch-implementation-result.md)。首建和维护由宿主订阅agent阅读生成，程序提交成功即完成普通批次，默认无额外审计。完整历史沿[记忆专项进度](../../tasks/20261106-memory-system/progress.md)，用户流程见[记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
+源码面向0.14.0，实现SurrealDB多层文字、原图向量与统一知识图、知识版本历史、单owner维护及纯访问状态。本轮私有来源发现、标记与实际安装/补标状态见[本轮进度](../../tasks/20261114-next-maintenance/progress.md)，此前入口、历史和访问实现见[使用整改进度](../../tasks/20261112-usage-rectification/progress.md)，固定派工沿[既有结果](../../tasks/20261106-memory-system/dispatch-implementation-result.md)。首建和维护由宿主订阅agent阅读生成，程序提交成功即完成普通批次，默认无额外审计。完整历史沿[记忆专项进度](../../tasks/20261106-memory-system/progress.md)，用户流程见[记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
 
 ## 职责与数据
 
@@ -11,6 +11,10 @@
 - `source_version` 保存文字原文快照或图片快照引用及接受时路径，新版本身份包含路径；图片原字节在 `memory.data_dir` 下的 assets 中。`member` 同时承载来源层级、智能块/摘要、范围及默认检索表示。`node` 表达实体/决定，`semantic` 使用有属性原生 relation；`change` 保存实际旧记录、时间及宿主可取得的执行信息。
 - [images.py](../../../experiments/20261106-basepack/src/basepack/memory/images.py) 保留原图 hash 快照与定位，完整写入并核 hash 后原子发布，已有损坏快照仍报错；[vectors.py](../../../experiments/20261106-basepack/src/basepack/memory/vectors.py) 复用现有 EmbeddingClient 批量编码，查询使用原生 cosine 与排名融合，普通返回省略数值大数组。图文模型和服务沿 R9 共用。
 - 原字节 revision 识别来源；input_revision 绑定实际编码输入（文字为 title 加 text，图片为原字节），description_revision 独立跟踪图片识读文字；knowledge_revision 用于逐记录乐观写入，embedding_identity 绑定模型语义空间。apply 核本批改写、退休、更正目标及实际使用的既有依据成员、关系两端的 expected；不核无关条目，保留无关并行。同批新建记录走不存在检查，不能省略已有依赖的版本。
+
+[privacy.py](../../../experiments/20261106-basepack/src/basepack/memory/privacy.py)集中计算布尔字段`private`。新写`source`与`source_version`按规范化的项目相对路径判断是否位于根`private/`；成员、节点及关系沿自身来源版本、`basis`与固定知识版本端点传播，有一项私有依据即整条标为true。旧版本依据使用其当时标记，状态更新保留标记；正文仅含可选私有路径引用不触发传播。prepare、检索、brief、知识历史与原证回读交付相应标记，成员和原证的标记分别保留。
+
+存量补标只修改可确认记录及历史副本的元数据，保留ID、知识/编码输入版本与未变向量；旧依据不足时报告未知，缺标不代表已确认为公开。完整库继续保存公私资料，受管快照、聊天和工作包沿[本机目录约定](../project-data-layout.md)保留。标记不提供访问控制或净化原生导出；公开分享副本的筛选工具留待后续。
 
 ## 已有行为
 
@@ -30,7 +34,7 @@ brief、search 和 read 只读取已发布状态及其依据版本，不扫描�
 
 向量绑定实际输入版本及 embedding_identity；仅支持 vector/hybrid，默认 vector。search 报告已发布范围内相同 identity 的兼容与待建数量，brief 明示未检查；缺少兼容向量时明确报错，真实空范围与空命中保持可辨。旧 text 配置须先改为 vector 或 hybrid，再 embed 补建索引；CPU/CUDA 的相同语义 identity 共用向量。apply 先准备候选向量，并在同一短事务发布内容和匹配向量；模型失败保留原错误并停止本批，不发布无匹配向量的内容。输入版本与 identity 未变化的向量可复用。
 
-`memory maintain` 默认以项目 Git 清单（已跟踪与未忽略的未跟踪文件）加 source_scope 显式包含项发现原件；非 Git 项目使用声明范围。已登记来源、历史 pending/未接受范围与可归属 Codex 原件持续参与，`--scope` 只覆盖新文件发现。零行文字且无活动知识时仅登记来源；清空旧正文仍须处理旧成员及依赖，重新出现正文继续发现。机械候选按成员依据闭合共批，组外依据须为仍有效且原件版本一致的知识；不能证明闭合时转语义候选。完整回执保存深比较与机械等价证据；短结果报告 discovery 边界/缺口、receipt、control 及 worker 派工元数据。历史 stale 不能仅因最后一次事件为 detected_change 就恢复；枚举与机械更新不证明完整语义覆盖。
+`memory maintain` 默认以项目 Git 清单（已跟踪与未忽略的未跟踪文件）加 source_scope 显式包含项发现原件，并自动加入根`private/`独立Git的已跟踪与未忽略新文件，尊重内层忽略并排除Git存储、工具状态、环境和缓存；私有区不存在时正常发现其它来源。私有资料沿外层项目UUID、数据库与维护生命周期处理，无需另配source_scope。非 Git 项目使用声明范围。显式`--scope`替换新文件发现范围，不自动追加私有区；已登记来源、历史 pending/未接受范围与可归属 Codex 原件持续参与。零行文字且无活动知识时仅登记来源；清空旧正文仍须处理旧成员及依赖，重新出现正文继续发现。机械候选按成员依据闭合共批，组外依据须为仍有效且原件版本一致的知识；不能证明闭合时转语义候选。完整回执保存深比较与机械等价证据；短结果报告 discovery 边界/缺口、receipt、control 及 worker 派工元数据。历史 stale 不能仅因最后一次事件为 detected_change 就恢复；枚举与机械更新不证明完整语义覆盖。
 
 安装agent取得不含主agent、包含后代的宿主容量及来源，写入项目AI配置，已有项目用config set-concurrency显式刷新。ProjectConfig统一解析；缺少快照的旧项目须先补齐，查询和普通资源用途不因此失败。[prompts.py](../../../experiments/20261106-basepack/src/basepack/memory/prompts.py)集中维护纯布局算法和固定名称；maintain --mode automatic/manual接收可得原始空闲额度，回执保存layout及AI快照。额度未知仅标组织上限。自动仅0队，手动仅满队，低预算由单coord兼reader；只有coord_0发布，其它队有界阅读合稿。数量边界及完整流程见用户说明。
 

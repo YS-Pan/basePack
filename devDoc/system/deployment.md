@@ -1,6 +1,6 @@
 # 项目配置与部署合同
 
-更新：2026年11月14日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向0.13.0.dev1；本轮安装及检查见[交付进度](../tasks/20261114-delivery-closeout/progress.md)，此前固定派工见[实施结果](../tasks/20261106-memory-system/dispatch-implementation-result.md)。本文维护部署边界；操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入，修改配置时按[维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)同步受影响状态。
+更新：2026年11月14日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向0.14.0；本轮安装及检查见[交付进度](../tasks/20261114-next-maintenance/progress.md)，0.13身份切换见[上批交付](../tasks/20261114-delivery-closeout/result.md)。本文维护部署边界；操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入，修改配置时按[维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)同步受影响状态。
 
 ## 位置与责任
 
@@ -15,7 +15,7 @@
 | 运行托管与日志 | 共享模型沿用 Shawl/SCM；项目库可由普通用户手动启动，也可选管理员 SCM；日志分别保存 |
 | 普通作业容量与策略 | HTCondor 独立安装并唯一维护 |
 
-本机共享服务沿R9使用`C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe`与`D:/AgentTools/state/basepack/embedding/logs/`；SurrealDB4.0.0 exe为`D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。本项目独立稳定客户端环境仍为`D:/AgentTools/envs/basepack-client-0.10/`，其中包已原位升级0.13.0.dev1，目录名不表示包版本；本项目库已迁至`.basepack/memory/store-0.13`并由原serve.ps1监听18080，旧store只作恢复。共享embedding服务同步升级0.13，原模型/identity/依赖版本和Shawl定义保持，仅补必要websocket-client。其它项目共用的`D:/AgentTools/envs/basepack-client/`仍为0.9.1，未代迁其数据库。公共代码通过配置定位，不写死这些本机位置。
+本机共享服务沿R9使用`C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe`与`D:/AgentTools/state/basepack/embedding/logs/`；SurrealDB4.0.0 exe为`D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。本项目独立稳定客户端环境仍为`D:/AgentTools/envs/basepack-client-0.10/`，其中包已原位升级0.14.0，目录名不表示包版本；本项目库已迁至`.basepack/memory/store-0.13`并由原serve.ps1监听18080，旧store只作恢复。共享embedding服务同步升级0.13，原模型/identity/依赖版本和Shawl定义保持，仅补必要websocket-client。其它项目共用的`D:/AgentTools/envs/basepack-client/`仍为0.9.1，未代迁其数据库。公共代码通过配置定位，不写死这些本机位置。
 
 根 file-structure、agent-team、engineering-judgment 独立维护，resources skill 归 active 实验。memory skill 与英文 coordinator/reader 提示词随包安装，分别通过无需配置的 `memory guide` 和显式配置的 `memory prompt` 使用；提示词渲染不要求数据库、密码文件或模型在线。独立技能选择完整目录复制到项目 `.agents/skills/`，或联接已有项目原件；同名冲突保留并报告，正确入口复用。`init` 与 core doctor 不安装或验收它们；忽略的本机联接在新检出后重建，核宿主实际发现。开发环境、构建缓存和夹具在根 tmp，交付及回滚 wheel 在实验 dist，选留原证在根 artifacts/runs；寿命见 [文档约定](../documentation.md)。
 
@@ -77,6 +77,8 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 搬迁先停止该项目库并确认进程退出，再移动完整项目、调整启动 cwd/日志/endpoint，保留 UUID 后复核。在线备份使用原生 export；恢复集合含 export、配置、原凭据文件、业务原件、受管聊天导出、codex-attachments 原件与定位回执、必要 assets。已接受语义与更正必须恢复，向量可以从保留表示重建。长期备份位置和保留周期由业务项目确定，Git 忽略和本机目录不代替备份。
 
 ## 升级与回退
+
+0.14.0 将根 `private/` 独立 Git 的已跟踪及未忽略资料默认纳入同一项目，按来源、固定版本依据与端点写入 `private` 布尔标记；显式 scope 仍仅控制本轮新文件发现。沿用项目配置 schema 2、成员身份版本 2、UUID、数据库和向量输入；源码变更不要求共享 embedding 服务同步升级。普通安装后刷新 memory 托管入口，存量补标在结束旧维护并保存恢复集合后按可确认版本作元数据升级，不改知识身份或向量。无标记的旧记录保留未核含义，完整恢复备份须包含数据库及必要原件/图片等文件。独立私有 Git 不复用公共 remote，公开分享副本另行处理；本版没有自动净化导出命令。
 
 0.13.0.dev1的member身份版本为2，普通init/apply/查询拒绝未迁移库。先隔离安装新wheel，再停写、保存完整恢复集合并将原生导出迁入独立物理库；迁移统一转换当前/退役/历史身份及结构化引用、版本/访问派生键和delivery清单，保留知识版本、原证、向量与事件含义。完整比对与功能回读通过后才设置新标记、同时切换客户端和库并恢复写入。旧库、旧wheel和冻结映射只作恢复材料；正常运行没有旧协议或在线别名。具体停写、回执作废与恢复工具见[项目升级](../../experiments/20261106-basepack/docs/setup-project.md#版本升级)和[本轮交付](../tasks/20261114-delivery-closeout/result.md)。项目配置schema 2、UUID和凭据保持。
 

@@ -10,7 +10,7 @@ Work directory: $work
 Batch artifact: $batch
 Bounded receipt hints: $hints
 Receipt cutoff: $semantic_count semantic sources and $relations_count pending relations. Work only on the coordinator's bounded assignment from this receipt.
-This receipt and the parent lifecycle define this maintenance assignment. Read the batch and evidence contract in the installed memory workflow at $skill; do not start a new task-level maintain or recapture. The coordinator resolves unassigned pending relations; handle the selected sources and their neighborhoods.
+This receipt and the parent lifecycle define this maintenance assignment. Read the batch and evidence contract and the private source and publication rules in the installed memory workflow at $skill; preserve returned private flags and keep confidential material within its local work and handoff boundary. Do not start a new task-level maintain or recapture. The coordinator resolves unassigned pending relations; handle the selected sources and their neighborhoods.
 
 1. Create the work directory above and prepare the assigned project-relative files:
 

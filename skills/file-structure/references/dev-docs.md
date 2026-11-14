@@ -31,7 +31,7 @@ project/
   artifacts/                  Selected evidence and outputs retained for later review; Git-ignored
 ```
 
-Keep one development-documentation tree at the project root, retaining an existing directory name in place of `devDoc`. Always keep its `archive/` directory, even when empty; use a `.gitkeep` when Git must retain it. Create other parts only for real content. Divide README and AGENTS responsibilities by their readers and entry points. A short plan can also hold progress and closure.
+Keep one public development-documentation tree at the project root, retaining an existing directory name in place of `devDoc`. For confidential evidence, combine [private context](private-context.md); its private documentation does not duplicate public task state. Always keep the public tree's `archive/` directory, even when empty; use a `.gitkeep` when Git must retain it. Create other parts only for real content. Divide README and AGENTS responsibilities by their readers and entry points. A short plan can also hold progress and closure.
 
 - Maintain lasting guidance across work stages. Update `system/` with implemented behavior; keep proposals in `tasks/`.
 - For [experiment routes](experiment-packages.md), keep current system and task documents aligned with active routes. Retired routes contribute selected history to this root tree rather than separate maintained documentation.

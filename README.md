@@ -10,7 +10,7 @@ basePack gives agents project-local memory, shared compute coordination, and ind
 | file-structure | Organize project files by purpose and lifecycle | A host with skills |
 | engineering-judgment | Judge contracts, responsibilities, compatibility, and the work passed to users | A host with skills |
 
-The current source targets **0.13.0.dev1, in development**, for Windows and Python 3.13+. The host's subscription-based agents understand material, build relations, and score results; basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability. The [delivery progress](devDoc/tasks/20261114-delivery-closeout/progress.md) records current checks, installation and remaining limits.
+The current source targets **0.14.0, in development**, for Windows and Python 3.13+. Completed versions use plain numeric versions; `.devN` is reserved for intermediate builds. The host's subscription-based agents understand material, build relations, and score results; basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability. The [current delivery progress](devDoc/tasks/20261114-next-maintenance/progress.md) records checks, installation and remaining limits.
 
 **basePack is under development. Real use also serves as testing; record problems so they can inform subsequent fixes.**
 
@@ -43,6 +43,8 @@ Each task keeps its brief. Tasks intuitively expected to take at most ten minute
 Each project's configuration, password file, knowledge, database, and local entry point stay in that project's ignored directories. **Project memory is not distributed with this source repository.** A new clone creates its own configuration through `init`; recover existing knowledge from that project's backup.
 
 `memory brief` directly reads published mandatory information, summary indexes and known gaps without searching or contacting the model. Use `memory retrieve --question '...'` for task-related evidence: it prepares the default whole-project request and host dispatch, and the host executes the complete retrieval. Exact knowledge versions and evolution relations support historical reading. After actual final delivery the host confirms the observed version manifest; a program transaction records it once and adjusts project-wide access weights by delivery events, without time decay. The existing retrieval worker considers those hints in its score; `rank` applies no second weighting. See the [memory guide](experiments/20261106-basepack/docs/memory.md).
+
+Confidential development context can live in a project-root `private/` with its own local Git repository, excluded from public Git and releases. Memory automatically discovers that repository's tracked and nonignored files within the same project and carries a `private` boolean through version-pinned provenance. Public documents remain self-contained with optional private references. Full recovery backups remain private; the marker does not make a raw database export safe to publish. See the [private-context pattern](skills/file-structure/references/private-context.md).
 
 ## Independent skills
 

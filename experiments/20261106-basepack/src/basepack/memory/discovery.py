@@ -40,13 +40,30 @@ def _git_repository(root: Path) -> bool:
     return any((directory / ".git").exists() for directory in (root, *root.parents))
 
 
+def _git_files(root: Path, directory: Path, *, git_dir=None):
+    command = ["git"]
+    if git_dir is not None:
+        command.extend(["--git-dir", str(git_dir), "--work-tree", str(directory)])
+    output = subprocess.run([*command, "ls-files", "--cached", "--others",
+                             "--exclude-standard", "-z", "--", "."],
+                            cwd=directory, check=True, stdout=subprocess.PIPE).stdout
+    for entry in output.split(b"\0"):
+        if entry:
+            relative = directory.relative_to(root) / os.fsdecode(entry)
+            if _allowed(relative):
+                target = _project_path(root, relative.as_posix())
+                if target.is_file():
+                    yield target
+
+
 def discover_sources(config, scope=None) -> dict:
     """Return readable files and explicit gaps for this maintenance discovery.
 
     A Git project's default inventory includes tracked and untracked nonignored
-    files. Configured scopes can add local originals; an explicit scope replaces
-    both the inventory and configured scopes. Registered history is maintained
-    separately by the caller.
+    files, plus the root private/ repository's own inventory when present.
+    Configured scopes can add local originals; an explicit scope replaces both
+    inventories and configured scopes. Registered history is maintained separately
+    by the caller.
     """
     root = Path(config.root).resolve()
     candidates = set()
@@ -55,20 +72,15 @@ def discover_sources(config, scope=None) -> dict:
         scopes = scope
     elif _git_repository(root):
         mode = "git"
-        output = subprocess.run(["git", "ls-files", "--cached", "--others",
-                                 "--exclude-standard", "-z", "--", "."],
-                                cwd=root, check=True, stdout=subprocess.PIPE).stdout
-        for entry in output.split(b"\0"):
-            if entry:
-                relative = Path(os.fsdecode(entry))
-                if _allowed(relative):
-                    target = _project_path(root, relative.as_posix())
-                    if target.is_file():
-                        candidates.add(target)
+        candidates.update(_git_files(root, root))
         scopes = config.raw["memory"]["source_scope"]
     else:
         mode = "configured"
         scopes = config.raw["memory"]["source_scope"]
+    if scope is None:
+        private = _project_path(root, "private")
+        if private.exists():
+            candidates.update(_git_files(root, private, git_dir=private / ".git"))
     candidates.update(_selected_files(root, scopes))
 
     paths, gaps = [], []

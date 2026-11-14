@@ -1,12 +1,14 @@
 # 系统实现概览
 
-唯一active路线是[20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向0.13.0.dev1；当前入口、统一身份与资源收敛的安装/验证状态见[交付进度](../tasks/20261114-delivery-closeout/progress.md)，此前知识历史与访问状态见[使用整改进度](../tasks/20261112-usage-rectification/progress.md)。代码、依赖锁、测试、产品文档、示例和随包skill位于实验工程；根devDoc维护现行实现和活动工作。实测和历史边界见[环境记录](environment.md)，共享资源基线见[R9结果](../archive/20261107-resource-coordination/r9-result.md)。
+唯一active路线是[20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向0.14.0；本轮私有开发上下文、同库标记与实际安装/验证状态见[本轮进度](../tasks/20261114-next-maintenance/progress.md)，此前统一身份与资源收敛见[交付进度](../tasks/20261114-delivery-closeout/progress.md)，知识历史与访问状态见[使用整改进度](../tasks/20261112-usage-rectification/progress.md)。代码、依赖锁、测试、产品文档、示例和随包skill位于实验工程；根devDoc维护现行实现和活动工作。实测和历史边界见[环境记录](environment.md)，共享资源基线见[R9结果](../archive/20261107-resource-coordination/r9-result.md)。
 
-本仓库提供三项可独立使用的 skill：[engineering-judgment](../../skills/engineering-judgment/SKILL.md) 用于设计、错误处理、兼容和使用流程的工程取舍，保留独立形态，通过长期使用反馈维护；[file-structure](../../skills/file-structure/SKILL.md) 推荐或整理开发文档和实验工程布局；[agent-team](../../skills/agent-team/SKILL.md) 为每项任务选择组织，按完整交付过程判断独立完成、简单协作或清晰分层，并使用宿主已有的订阅 subagent 能力。安装时选择完整目录放入目标 `.agents/skills/`，或把已有项目原件联接到该发现目录，核对相对引用与宿主实际列表；`init` 与 core doctor 不覆盖这项验收。完整步骤见 [项目接入](../../experiments/20261106-basepack/docs/setup-project.md#独立-skills-安装与发现)。组织选择与协作已有指令层实现，复杂广读的质量与总成本对照仍见 [专项记录](../tasks/20261106-rebuild/research/agent-team.md)。
+本仓库提供三项可独立使用的 skill：[engineering-judgment](../../skills/engineering-judgment/SKILL.md) 用于设计、错误处理、兼容和使用流程的工程取舍，保留独立形态，通过长期使用反馈维护；[file-structure](../../skills/file-structure/SKILL.md) 推荐或整理开发文档、实验工程及私有开发上下文布局；[agent-team](../../skills/agent-team/SKILL.md) 为每项任务选择组织，按完整交付过程判断独立完成、简单协作或清晰分层，并使用宿主已有的订阅 subagent 能力。安装时选择完整目录放入目标 `.agents/skills/`，或把已有项目原件联接到该发现目录，核对相对引用与宿主实际列表；`init` 与 core doctor 不覆盖这项验收。完整步骤见 [项目接入](../../experiments/20261106-basepack/docs/setup-project.md#独立-skills-安装与发现)。组织选择与协作已有指令层实现，复杂广读的质量与总成本对照仍见 [专项记录](../tasks/20261106-rebuild/research/agent-team.md)。
 
 `basepack` 的公共入口包括项目 `init`、`config show`、`config ai`、`doctor`，项目 `memory`，共享图文 `embed` 及普通重任务 `jobs`。项目接入源码和模板统一在 [project/](../../experiments/20261106-basepack/src/basepack/project)，[config.py](../../experiments/20261106-basepack/src/basepack/project/config.py) 唯一解析配置。`config ai` 按项目配置解析 tier 对应的模型与推理强度；宿主读取结果并在派工时实际传递，程序不自行调用模型。日常默认 tier3，检索、筛选和重排序默认 tier1；配置和命令见 [项目接入](../../experiments/20261106-basepack/docs/setup-project.md#agent-模型等级)。项目使用 schema 2 的 `.basepack/config.toml` 和 `.basepack/instructions.md`，根 AGENTS 直接呈现关键动作及详情链接；机器格式保持 schema 1，旧项目需补入 AI 配置。客户端兼容 0.5.0 embedding 服务，部署与旧格式迁移见 [部署合同](deployment.md)。
 
 [项目记忆](modules/memory.md) 使用唯一 SurrealDB 基座。一个 member 同时表示文件、实际章节、智能原文块或图片，也是默认检索表示及图节点；另有实体/决定/条件节点和带依据的原生语义边。宿主订阅 agent 同读完成分块、摘要、识图与关系，程序核源与逐记录知识版本后原子接受。多层全文、图文向量、严格回源、语义展开、人工更正及原生恢复共用这份持久知识。
+
+根`private/`是公共Git忽略的独立本机仓库，机密原件和人工分析按内容归入；公共开发说明继续自足。默认来源发现自动加入其内层Git清单，私有资料进入原项目记忆，`private`标记沿固定版本依据和关系端点传播并随检索/回读交付。存量补标保留知识身份与未变向量，无法确认的旧记录留未知。受管记忆与工作包沿现有忽略目录保留，完整恢复仍需数据库导出和相应文件；标记及原生导出不构成公开分享副本。详见[记忆模块](modules/memory.md)与[本机目录](project-data-layout.md)。
 
 member新建由freeze分配UUID并解析草稿局部位置引用，更新沿用prepare中的UUID与expected；冻结批次重试复用相同身份，apply只接受新协议。未迁移库明确拒绝，不自动转换或解析旧别名。存量按项目停写、备份、离线转换与验证后同步切换，原文/向量/知识版本及交付访问状态保留。
 

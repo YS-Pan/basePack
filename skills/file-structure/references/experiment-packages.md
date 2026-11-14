@@ -10,7 +10,7 @@ An experiment groups a route's code, dependencies, configuration and stable inpu
 project/
   AGENTS.md                     Project conventions and direct entry points
   README.md                     Goal, active route and experiment index
-  devDoc/                       One documentation set for the active route
+  devDoc/                       Public documentation for the active route
     archive/                    Always present; may be empty
   experiments/
     YYYYMMDD-short-topic/
@@ -29,7 +29,7 @@ Adapt names and create parts as needed, while keeping `devDoc/archive/` present 
 
 Apply the shared [material lifecycle](../SKILL.md#temporary-and-retained-material). Use the project-root `tmp/` by default for trial runs and evaluations, and select retained evidence into project-root `artifacts/runs/`. A run may refer to one or several experiments; evaluation is a run purpose, not a separate output hierarchy.
 
-Use the [development documentation layout](dev-docs.md) once at the project root. Keep current implementation, plans and progress focused on active work. When a route ends, preserve useful conclusions and switch reasons in root history, update current documents, and link them from experiment READMEs. Experiment folders hold their implementation and brief entry points; maintain detailed plans, progress and results in root `devDoc/`.
+Use the [development documentation layout](dev-docs.md) once at the project root as the public maintenance source. Confidential originals, derivatives and evidence use the [private context](private-context.md) boundary. Keep current implementation, plans and progress focused on active work. When a route ends, preserve useful conclusions and switch reasons in root history, update current documents, and link them from experiment READMEs. Experiment folders hold their implementation and brief entry points; maintain detailed plans, progress and results in root `devDoc/`.
 
 ## Choose isolation and packaging
 
@@ -58,7 +58,7 @@ Keep project state local while referencing shared weights and environments exter
 
 ## Sources and limits
 
-This pattern separates candidate implementations while keeping one active development direction and one documentation set per project. The active-route and material-location choices are project conventions; the sources below inform code, data and dependency organization rather than prescribing that exact tree. Treat legacy layouts as structural references and use the current project's task state, authorization and acceptance criteria.
+This pattern separates candidate implementations while keeping one active development direction and one public documentation set per project. The active-route and material-location choices are project conventions; the sources below inform code, data and dependency organization rather than prescribing that exact tree. Treat legacy layouts as structural references and use the current project's task state, authorization and acceptance criteria.
 
 - The [research compendium paper](https://faculty.washington.edu/bmarwick/PDFs/Marwick-Boettiger-Mullen-2018-TAS-research-compendia.pdf) supports separating data, methods, and outputs with environment documentation; it does not require a formal package for every unit.
 - [PyPA's src/flat comparison](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/) explains packaging and import tradeoffs; [inline script metadata](https://packaging.python.org/en/latest/specifications/inline-script-metadata/) offers dependency declarations for small scripts.
