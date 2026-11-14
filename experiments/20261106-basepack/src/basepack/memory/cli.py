@@ -8,7 +8,7 @@ def register_commands(subparsers):
     memory = subparsers.add_parser("memory", help="Project-local multilevel memory")
     commands = memory.add_subparsers(dest="memory_action", required=True)
     actions = {name: commands.add_parser(name) for name in
-               ("init", "guide", "sources", "prepare", "apply", "stop", "owner", "release", "recover-owner", "embed", "search", "read", "knowledge", "history", "neighbors", "brief", "changes", "maintain", "prompt", "pending-dispatch", "retrieve", "retrieval-dispatch", "retrieval-prompt", "rank", "delivery", "access-hints", "feedback-report", "feedback-list", "feedback-resolve")}
+               ("init", "guide", "sources", "prepare", "freeze", "apply", "stop", "owner", "release", "recover-owner", "embed", "search", "read", "knowledge", "history", "neighbors", "brief", "changes", "maintain", "prompt", "pending-dispatch", "retrieve", "retrieval-dispatch", "retrieval-prompt", "freshness", "rank", "delivery", "access-hints", "feedback-report", "feedback-list", "feedback-resolve")}
     actions["feedback-report"].add_argument("--kind", choices=["knowledge", "retrieval"], required=True)
     actions["feedback-report"].add_argument("--issue", required=True)
     actions["feedback-report"].add_argument("--target", help="Member, node or semantic edge ID")
@@ -24,7 +24,8 @@ def register_commands(subparsers):
     actions["feedback-resolve"].add_argument("--expected-revision", help="Target version confirmed after handling")
     actions["prepare"].add_argument("--paths", nargs="+", required=True,
                                     help="Project-relative files; enumerate directories first")
-    actions["apply"].add_argument("--batch", required=True, help="Agent-produced UTF-8 JSON batch")
+    actions["freeze"].add_argument("--drafts", nargs="+", required=True, help="Reader-scoped UTF-8 JSON drafts")
+    actions["apply"].add_argument("--batch", required=True, help="Frozen UTF-8 JSON batch")
     actions["apply"].add_argument("--control", required=True, help="Current owner control file")
     actions["apply"].add_argument("--timeout", type=float, default=600, help="Candidate embedding timeout")
     actions["stop"].add_argument("--control", required=True, help="The task's unique control file")
@@ -94,6 +95,8 @@ def register_commands(subparsers):
     retrieve.add_argument("--slot", type=int, default=0, help="Parent-owned retrieval slot")
     retrieve.add_argument("--available-subagents", type=int, help="Host raw free subagent seats; zero uses the main agent")
     retrieve.add_argument("--tier", choices=["tier1", "tier2", "tier3", "tier4"])
+    actions["freshness"].add_argument("--codex-registry", help="Host project binding and complete registered roots as UTF-8 JSON")
+    actions["freshness"].add_argument("--thread", help="Read and compare one project-owned chat by ID")
     actions["rank"].add_argument("--input", required=True, help="Read candidates with agent scores")
     actions["rank"].add_argument("--budget", type=int, default=6000, help="Returned text character budget")
     for name, command in actions.items():
@@ -119,6 +122,17 @@ def dispatch(args, config):
                 return {"output": str(path)}, 0
             return claim, 0
         layout = maintenance_layout(config, mode=args.mode, available_subagents=args.available_subagents)
+    if action == "freeze":
+        from .draft import freeze, validate_batch
+        if not args.output:
+            raise ValueError('memory freeze requires --output for the frozen batch')
+        batch = freeze([load_json_file(path) for path in args.drafts])
+        validate_batch(batch)
+        path = Path(args.output).resolve()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open('x', encoding='utf-8') as stream:
+            json.dump(batch, stream, ensure_ascii=False, indent=2)
+        return {"output": str(path), "batch_id": batch['batch_id']}, 0
     if action == "guide":
         result = {"skill": str(Path(__file__).with_name("SKILL.md"))}
     elif action == "stop":
@@ -152,6 +166,9 @@ def dispatch(args, config):
         render = retrieval_dispatch if action == "retrieval-dispatch" else render_retrieval_prompt
         result = render(config, args.request, slot=args.slot,
                         available_subagents=args.available_subagents, tier=args.tier)
+    elif action == "freshness":
+        from .freshness import inspect_codex
+        result = inspect_codex(config, registry_path=args.codex_registry, thread_id=args.thread)
     elif action == "retrieve":
         from .prompts import prepare_retrieval
         result = prepare_retrieval(config, question=args.question, request_path=args.request,

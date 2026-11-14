@@ -36,7 +36,7 @@ control = project.memory_dir / "maintenance" / (run_id + ".control")
 owner = run("maintain", "--holder", run_id, "--control", str(control))
 if not owner["acquired"]:
     raise RuntimeError(f"Project maintenance is owned by {owner['owner']}")
-reading_path, batch_path = work / "reading.json", work / "batch.json"
+reading_path, draft_path, batch_path = work / "reading.json", work / "draft.json", work / "batch.json"
 run("prepare", "--paths", source_path, "--output", str(reading_path))
 reading = json.loads(reading_path.read_text(encoding="utf-8"))
 source = reading["sources"][0]
@@ -45,22 +45,24 @@ batch = {
     "expected": reading["expected"],
     "sources": [{"path": source["path"], "revision": source["revision"]}],
     "members": [
-        {"id": "example-file", "kind": "file", "path": source_path, "parent": None,
+        {"kind": "file", "path": source_path, "parent": None,
          "start_line": 1, "end_line": 4, "title": "试用说明",
-         "text": "试用问题 A-17 留在开发记录；项目数据库按项目隔离。", "evidence": ["member:`example-chunk`"]},
-        {"id": "example-section", "kind": "section", "path": source_path, "parent": "member:`example-file`",
+         "text": "试用问题 A-17 留在开发记录；项目数据库按项目隔离。", "evidence": [{"member": 2}]},
+        {"kind": "section", "path": source_path, "parent": {"member": 0},
          "start_line": 2, "end_line": 4, "title": "约定",
-         "text": "保留试用记录，并使用独立项目数据库。", "evidence": ["member:`example-chunk`"]},
-        {"id": "example-chunk", "kind": "chunk", "path": source_path, "parent": "member:`example-section`",
+         "text": "保留试用记录，并使用独立项目数据库。", "evidence": [{"member": 2}]},
+        {"kind": "chunk", "path": source_path, "parent": {"member": 1},
          "start_line": 3, "end_line": 4, "title": "试用与隔离约定", "evidence": []},
     ],
 }
-batch_path.write_text(json.dumps(batch, ensure_ascii=False, indent=2), encoding="utf-8")
+draft_path.write_text(json.dumps(batch, ensure_ascii=False, indent=2), encoding="utf-8")
+run("freeze", "--drafts", str(draft_path), "--output", str(batch_path))
+frozen = json.loads(batch_path.read_text(encoding="utf-8"))
 run("apply", "--batch", str(batch_path), "--control", str(control))
 run("stop", "--control", str(control))
 run("release", "--control", str(control))
 run("search", "--text", "A-17", "--mode", "hybrid", "--literal")
 run("search", "--text", source_path, "--mode", "hybrid", "--literal")
-run("read", "member:`example-chunk`")
-run("neighbors", "member:`example-section`")
+run("read", frozen["members"][2]["id"])
+run("neighbors", frozen["members"][1]["id"])
 print(f"UTF-8 reading and batch: {work}", flush=True)

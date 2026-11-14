@@ -314,6 +314,7 @@ def render_retrieval_prompt(config, request_path, slot=0, available_subagents=No
               "python": str(config.python), "delivery_id": request["delivery_id"],
               "scope": json.dumps(request["scope"], ensure_ascii=False),
               "search_command": memory_command(config, *search),
+              "freshness_command": memory_command(config, "freshness"),
               "read_command": memory_command(config, "read", "<member-id>", "--knowledge-revision", "<observed-knowledge-revision>"),
               "knowledge_command": memory_command(config, "knowledge", "<record-id>", "--knowledge-revision", "<observed-knowledge-revision>"),
               "history_command": memory_command(config, "history", "<record-id>"),

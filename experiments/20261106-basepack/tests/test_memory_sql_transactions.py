@@ -1,11 +1,13 @@
 """Native WebSocket transaction regressions; use a disposable SurrealDB server."""
 
 import json
+from uuid import uuid4
 
 import pytest
 import websocket
 
-from basepack.memory.store import PublicationOutcomeUnknown, SqlResponseError, _sql
+from basepack.memory.store import PublicationOutcomeUnknown, SqlResponseError, _record, _sql
+from basepack.memory.draft import freeze
 from basepack.memory import owner
 from test_memory_store import batch_for, deterministic_vector, EMBEDDING_IDENTITY, memory
 
@@ -114,11 +116,12 @@ def test_public_apply_large_originals_and_vectors(memory, monkeypatch, source_co
     for path, text in originals.items():
         (memory.config.root / path).write_text(text, encoding="utf-8", newline="")
     prepared = memory.prepare(list(originals))
-    members = [{"id": f"large{i}", "kind": "chunk", "path": path, "parent": None,
+    members = [{"kind": "chunk", "path": path, "parent": None,
                 "start_line": 1, "end_line": 1, "title": f"Title {i}"}
                for i, path in enumerate(originals)]
     batch = {"sources": [{"path": row["path"], "revision": row["revision"]}
                          for row in prepared["sources"]], "expected": prepared["expected"], "members": members}
+    batch = freeze([batch])
     messages = trace(monkeypatch)
     result = memory.apply(batch)
     assert result["sources"] == result["members"] == source_count
@@ -129,8 +132,9 @@ def test_public_apply_large_originals_and_vectors(memory, monkeypatch, source_co
     snapshots = memory._execute("SELECT path,text FROM source_version ORDER BY path;")[0]
     assert {row["path"]: row["text"] for row in snapshots} == originals
     for i in range(source_count):
-        assert memory.read(f"large{i}")["original"]["text"] == f"Line {i}\n"
-        member = memory._execute(f"SELECT * FROM ONLY member:large{i};")[0]
+        identity = batch["members"][i]["id"]
+        assert memory.read(identity)["original"]["text"] == f"Line {i}\n"
+        member = memory._execute(f"SELECT * FROM ONLY {_sql(_record(identity))};")[0]
         assert member["embedding_identity"] == EMBEDDING_IDENTITY
         assert member["embedding"] == deterministic_vector(f"Title {i}\nLine {i}\n")
         assert member["embedded_revision"] == member["input_revision"]
@@ -170,52 +174,63 @@ def test_marker_verification_failure_retains_both_errors(memory, monkeypatch):
 
 def test_parent_must_exist_and_requires_current_revision(memory):
     text = "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n"
-    batch = batch_for(memory, text)
-    batch["members"][1]["parent"] = "missing"
-    with pytest.raises(RuntimeError, match="Parent member does not exist"):
-        memory.apply(batch)
+    draft = batch_for(memory, text)
+    draft["members"][1]["parent"] = "member:" + uuid4().hex
+    with pytest.raises(ValueError, match="Existing dependencies require prepare"):
+        memory.apply(freeze([draft]))
     assert memory._rows("member") == []
 
-    batch = batch_for(memory, text)
+    batch = freeze([batch_for(memory, text)])
     memory.apply(batch)
+    guide = batch["members"][0]["id"]
     prepared = memory.prepare(["guide.md"])
-    replacement = dict(batch["members"][2], id="new_child", parent="guide")
+    replacement = dict(batch["members"][2], parent=guide)
+    del replacement["id"]
     without_parent_revision = dict(prepared["expected"])
-    del without_parent_revision["member:guide"]
-    with pytest.raises(RuntimeError, match="requires expected revision"):
-        memory.apply({"sources": batch["sources"], "expected": without_parent_revision,
-                      "members": [replacement]})
-    assert all(row["id"] != "member:new_child" for row in memory._rows("member"))
-    memory.apply({"sources": batch["sources"], "expected": prepared["expected"],
-                  "members": [replacement]})
-    assert memory.neighbors("new_child")["parent"]["id"] == "member:guide"
+    del without_parent_revision[guide]
+    rejected = freeze([{"sources": batch["sources"], "expected": without_parent_revision,
+                        "members": [replacement]}])
+    with pytest.raises(ValueError, match="Existing dependencies require prepare"):
+        memory.apply(rejected)
+    child = rejected["members"][0]["id"]
+    assert all(row["id"] != child for row in memory._rows("member"))
+    accepted = freeze([{"sources": batch["sources"], "expected": prepared["expected"],
+                        "members": [replacement]}])
+    memory.apply(accepted)
+    assert memory.neighbors(accepted["members"][0]["id"])["parent"]["id"] == guide
 
 
 def test_concurrent_parent_change_prevents_child_publication(memory, monkeypatch):
     text = "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n"
-    batch = batch_for(memory, text)
+    batch = freeze([batch_for(memory, text)])
     memory.apply(batch)
+    guide = batch["members"][0]["id"]
     prepared = memory.prepare(["guide.md"])
-    replacement = dict(batch["members"][2], id="concurrent_child", parent="guide")
+    replacement = dict(batch["members"][2], parent=guide)
+    del replacement["id"]
+    child_batch = freeze([{"sources": batch["sources"], "expected": prepared["expected"],
+                           "members": [replacement]}])
+    child = child_batch["members"][0]["id"]
     messages = trace(monkeypatch, before_commit=lambda: memory._execute(
-        "UPDATE member:guide SET knowledge_revision='concurrent-update';"))
+        f"UPDATE {_sql(_record(guide))} SET knowledge_revision='concurrent-update';"))
     with pytest.raises(RuntimeError, match="Transaction conflict"):
-        memory.apply({"sources": batch["sources"], "expected": prepared["expected"],
-                      "members": [replacement]})
+        memory.apply(child_batch)
     assert sum(msg["method"] == "commit" for msg, _ in messages) == 1
-    assert memory._execute("SELECT * FROM ONLY member:concurrent_child;")[0] is None
-    assert memory._execute("SELECT * FROM ONLY member:guide;")[0]["knowledge_revision"] == "concurrent-update"
+    assert memory._execute(f"SELECT * FROM ONLY {_sql(_record(child))};")[0] is None
+    assert memory._execute(f"SELECT * FROM ONLY {_sql(_record(guide))};")[0]["knowledge_revision"] == "concurrent-update"
 
 
 def test_apply_retains_uncertain_publication_owner_and_marker_id(memory, monkeypatch):
     text = "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n"
-    batch = batch_for(memory, text)
+    batch = freeze([batch_for(memory, text)])
     memory.apply(batch)
     assert owner.status(memory.config.memory_dir) is None
 
     prepared = memory.prepare(["guide.md"])
-    child = dict(batch["members"][2], id="uncertain_child", parent="guide")
-    next_batch = {"sources": batch["sources"], "expected": prepared["expected"], "members": [child]}
+    child = dict(batch["members"][2], parent=batch["members"][0]["id"])
+    del child["id"]
+    next_batch = freeze([{"sources": batch["sources"], "expected": prepared["expected"], "members": [child]}])
+    child_id = next_batch["members"][0]["id"]
     messages = trace(monkeypatch, commit_loss="before_send")
     with pytest.raises(PublicationOutcomeUnknown, match="outcome unknown") as caught:
         memory.apply(next_batch)
@@ -227,7 +242,7 @@ def test_apply_retains_uncertain_publication_owner_and_marker_id(memory, monkeyp
     assert any(f'publication_{publication}' in msg["params"][0]
                for msg, _ in messages if msg["method"] == "query")
     assert memory._execute(f'SELECT * FROM ONLY type::record("meta", "publication_{publication}");')[0] is None
-    assert memory._execute("SELECT * FROM ONLY member:uncertain_child;")[0] is None
+    assert memory._execute(f"SELECT * FROM ONLY {_sql(_record(child_id))};")[0] is None
     assert sum(msg["method"] == "commit" for msg, _ in messages) == 1
     with pytest.raises(RuntimeError, match="already owned"):
         memory.apply(next_batch)

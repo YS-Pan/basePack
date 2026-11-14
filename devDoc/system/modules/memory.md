@@ -24,7 +24,7 @@ vector/hybrid 的 Python 与 CLI 检索统一返回 `matches` 和 `vector_covera
 
 read 以 member ID 和可选的依据版本、位置回读保留的原文或原图快照。同 source 保留读取该来源任意已发布版本的合同；跨 source 由 change.previous 或其 members 历史证明成员曾属该来源，不要求成员精确接受过请求版本。路径优先使用 snapshot.path；旧快照缺路径时，优先取请求版本的成员历史路径，否则使用已证明同 source 的当前/历史成员唯一路径，多路径歧义报错。不强制改写旧快照，也不宣称能恢复未记录的精确历史路径。核语义关系时必须沿 basis 的 source_version 与文字范围或图片 locator 回读 original，stable ID 的当前 member 不能替换已保存的旧依据。快照缺失或损坏直接失败。neighbors 默认过滤 stale 的父子/语义展开，历史复核显式 include_stale。
 
-记录 ID 的单一转换入口统一原始字符串 key 与底座返回的规范 ID，保留数字 key 的类型及字符串转义；同一身份同时用于 SQL 与 Python 的 expected/依据集合比较。有限解码只覆盖现行字符串/整数合同，底座仍通过原生 type::record 构造记录。缺少文字成员起止行时，apply 在写入前报出成员、批次位置及字段；不存在的 read 目标明确报错。输入方式与最小批次见用户流程及随包 skill。
+成员使用程序生成的 UUID。`freeze` 为各 reader 独立 draft 中的新成员分配身份，解析草稿位置作用域与跨草稿引用，将一对一映射保留在冻结批次；更新使用 prepare 返回的 UUID 与 expected。apply 拒绝旧协议、重复更新及未迁移库，已提交的相同冻结批次返回事务回执。项目元数据的 member_identity_version 门禁要求先完成离线迁移，不在线解析旧 ID。缺少文字成员起止行时，apply 在写入前报出成员、批次位置及字段；不存在的 read 目标明确报错。输入方式与最小批次见用户流程及随包 skill。
 
 brief、search 和 read 只读取已发布状态及其依据版本，不扫描原件或触发维护。brief 直接交付 mandatory、现有文件/章节概况索引和已知缺口，不执行搜索或连接 embedding；task 只是标签。stale mandatory 仍交付并标待核，known_unsynced 独立比较已登记来源与该表示/直接依据的接受版本；未发现的原件变化保持未知，false 不证明现行。changes 由维护显式调用，发现来源变化不改已发布记录，避免旧检查覆盖新接受态。
 
@@ -57,3 +57,5 @@ memory init 安装原生 schema 并绑定项目 UUID，同时刷新项目入口�
 ## Codex 来源边界
 
 `maintain` 可读取宿主提供的项目 ID 和完整注册项目根目录清单，或使用配置的绑定；缺少绑定时报告不可用并继续文件维护。采集通过 Codex App Server 受支持的线程与消息分页，显式项目 ID 优先；缺失 ID 时以项目根目录及 Git worktree/common-dir 判断归属，其他注册根冲突或无法取得 cwd 留待核。语义回执的 codex 与 reader 提示只交接项目 ID、采集回执及保留聊天/附件目录，身份记录仍以采集回执和 framed 原件为唯一依据；缺少可核归属留 gap。采集的受管 UTF-8 文件进入同一维护路径，采集不等于语义接受；历史来源、附件、继承身份与精确回源仍按实际能力和验收结果报告。查询不触发采集。
+
+`memory freshness` 只读项目归属、分页、采集回执及原文比较，不取 owner、不写原件或发布；按相关候选和用户点名聊天补读，跨项目引用用宿主读取。最新捕获及可关联预检提供线索，预检 pending 为历史快照，不是当前语义状态；回执时间、端点及 updatedAt 不能单独证明全局正文覆盖。输出保留未摄入、待语义、补读及未知。

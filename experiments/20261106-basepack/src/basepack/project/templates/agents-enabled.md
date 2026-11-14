@@ -1,3 +1,4 @@
+- 判断项目现状、剩余工作、待决策或历史要求时先完成一次跨历史检索；点名聊天直接读并沿引用核后续发布：[检索](.basepack/instructions.md#startup)。
 - 主任务开始时运行一次 `memory brief`；同任务接续沿用已有 brief，新 shell 仅初始化参数与 UTF-8。保留 mandatory，待核内容按需回源：[启动](.basepack/instructions.md#startup)。
 - 主任务直觉预计不超过十分钟时跳过整个自动维护；更长任务在宿主支持生命周期时异步运行全项目 `memory maintain --mode automatic`。范围明显扩大时重估，子任务不递归启动维护：[自动维护](.basepack/instructions.md#maintenance)。
 - 仅持有维护且 `needs_semantic=true` 时，按脚本返回的 `task_name`、模型和推理强度实际派协调者，持续接批：[派工](.basepack/instructions.md#dispatch)。

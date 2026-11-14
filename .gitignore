@@ -29,6 +29,7 @@ htmlcov/
 /.agents/skills/agent-team/
 /.agents/skills/engineering-judgment/
 /.agents/skills/resources/
+/.agents/skills/basepack-setup/
 /models/
 /weights/
 *.db

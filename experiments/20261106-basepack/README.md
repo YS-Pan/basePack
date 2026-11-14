@@ -1,6 +1,6 @@
 # basePack
 
-`20261106-basepack` is the only active implementation route. The current source targets 0.12.0.dev1, in development, for Windows and Python 3.13+. Each project keeps its configuration, knowledge, source evidence, and job records in its own `.basepack/`; programs and models can be shared. Start with the clone, virtual environment, and installation commands in the root [README](../../README.md#install-the-lightweight-client).
+`20261106-basepack` is the only active implementation route. The current source targets 0.13.0.dev1, in development, for Windows and Python 3.13+. Each project keeps its configuration, knowledge, source evidence, and job records in its own `.basepack/`; programs and models can be shared. Start with the clone, virtual environment, and installation commands in the root [README](../../README.md#install-the-lightweight-client). Existing memory databases require the explicit offline member-identity migration before switching clients; see [upgrades](docs/setup-project.md#版本升级).
 
 This project's own source and documentation use the [MIT license](LICENSE), matching the root license. Third-party notices remain in the package.
 

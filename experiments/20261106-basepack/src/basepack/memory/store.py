@@ -100,8 +100,12 @@ class Memory:
     def _execute(self, sql: str, *, check_project: bool = True) -> list:
         connection = self.connection
         if check_project:
-            sql = (f"IF meta:project.project_id != {_sql(connection['project_id'])} "
-                   "{ THROW 'Memory database belongs to another project or is not initialized'; };\n" + sql)
+            # SurrealDB executes later statements after a failed IF. Complete
+            # the gate separately so a rejected request cannot still write.
+            self._execute(f"IF meta:project.project_id != {_sql(connection['project_id'])} "
+                          "{ THROW 'Memory database belongs to another project or is not initialized'; };\n"
+                          "IF meta:project.member_identity_version = NONE OR meta:project.member_identity_version != 2 "
+                          "{ THROW 'Memory member identity migration required'; };", check_project=False)
         body = sql.encode("utf-8")
         request = Request(connection["endpoint"].rstrip("/") + "/sql", body, {
             "Authorization": self._authorization,
@@ -119,7 +123,7 @@ class Memory:
         errors = [statement["result"] for statement in statements if statement["status"] != "OK"]
         if errors:
             raise SqlResponseError("\n".join(str(error) for error in errors))
-        return [statement["result"] for statement in statements][1 if check_project else 0:]
+        return [statement["result"] for statement in statements]
 
     def _publish(self, statements: list[str], *, control: str | None = None) -> None:
         """Send complete SQL statements in bounded messages in one native transaction."""
@@ -128,7 +132,9 @@ class Memory:
         limit = 2112 * 1024
         marker = _Record("meta", "publication_" + uuid4().hex)
         project_check = (f"IF meta:project.project_id != {_sql(self.connection['project_id'])} "
-                         "{ THROW 'Memory database belongs to another project or is not initialized'; };")
+                         "{ THROW 'Memory database belongs to another project or is not initialized'; };\n"
+                         "IF meta:project.member_identity_version = NONE OR meta:project.member_identity_version != 2 "
+                         "{ THROW 'Memory member identity migration required'; };")
         statements = [project_check, *statements[1:-1],
                       f"CREATE {_sql(marker)} SET committed=true RETURN NONE;"]
         # Measure the actual JSON wire message, including escaped SQL and transaction id.
@@ -230,13 +236,18 @@ class Memory:
         namespace = "`" + self.connection["namespace"].replace("`", "\\`") + "`"
         database = "`" + self.connection["database"].replace("`", "\\`") + "`"
         self._execute(f"DEFINE NAMESPACE IF NOT EXISTS {namespace}; USE NS {namespace}; "
-                      f"DEFINE DATABASE IF NOT EXISTS {database};", check_project=False)
+                      f"DEFINE DATABASE IF NOT EXISTS {database}; DEFINE TABLE IF NOT EXISTS meta SCHEMALESS;",
+                      check_project=False)
         schema = Path(__file__).with_name("schema.surql").read_text(encoding="utf-8")
         project_id = _sql(self.connection["project_id"])
-        self._execute("BEGIN;\n" + schema + "\n"
-                      f"IF meta:project.project_id != NONE AND meta:project.project_id != {project_id} "
-                      "{ THROW 'Memory database belongs to another project'; }; "
-                      f"UPSERT meta:project SET project_id={project_id}; COMMIT;", check_project=False)
+        gates = (f"IF meta:project.project_id != NONE AND meta:project.project_id != {project_id} "
+                 "{ THROW 'Memory database belongs to another project'; }; "
+                 "IF meta:project.project_id != NONE AND (meta:project.member_identity_version = NONE OR "
+                 "meta:project.member_identity_version != 2) "
+                 "{ THROW 'Memory member identity migration required'; }; ")
+        self._execute(gates, check_project=False)
+        self._execute("BEGIN;\n" + gates + schema + "\n"
+                      f"UPSERT meta:project SET project_id={project_id}, member_identity_version=2; COMMIT;", check_project=False)
         return {"namespace": self.connection["namespace"], "database": self.connection["database"]}
 
     def _rows(self, table: str) -> list[dict]:
@@ -429,9 +440,18 @@ class Memory:
         original, never from generated prose. Corrections retain actual old data.
         """
         self.config.memory_search_mode
+        from .draft import validate_batch
+        validate_batch(batch)
         if control:
             from .maintenance import check
             check(control)
+        batch_hash = _digest(json.dumps(batch, ensure_ascii=False, sort_keys=True, separators=(',', ':')))
+        receipt = _Record('meta', 'batch_' + batch['batch_id'])
+        prior = self._execute(f"SELECT * FROM ONLY {_sql(receipt)};")[0]
+        if prior:
+            if prior['batch_hash'] != batch_hash:
+                raise ValueError('Frozen batch ID already used with different content')
+            return prior['result']
         for field in ("dispositions", "deferred_refinement"):
             if field in batch:
                 raise ValueError(f"{field} must be inside the relevant sources[] entry, not at batch root")
@@ -443,6 +463,13 @@ class Memory:
         known = self._rows("source")
         by_path = {source["path"]: source for source in known}
         by_id = {source["id"]: source for source in known}
+        resolved_sources = []
+        for source in batch['sources']:
+            previous = by_id[source['id']] if 'id' in source else by_path.get(source['path'])
+            if previous:
+                resolved_sources.append(_record(previous['id']))
+        if len(resolved_sources) != len(set(resolved_sources)):
+            raise ValueError('Duplicate source identity in batch')
         before_members = self._rows("member")
         current = {}
         sources = {}
@@ -467,6 +494,10 @@ class Memory:
         expected = {_record(key): value for key, value in batch.get("expected", {}).items()}
         from .reviewed import dependencies as review_dependencies
         dependencies.update(review_dependencies(self, batch, before_members, targets, expected))
+        missing = dependencies - targets - expected.keys()
+        if missing:
+            raise ValueError('Existing dependencies require prepare UUID and expected revision: ' +
+                             ', '.join(sorted(_sql(value) for value in missing)))
         for target in sorted(targets | dependencies, key=lambda value: (value.table, _sql(value.key))):
             record = _sql(target)
             if target in expected:
@@ -692,6 +723,9 @@ class Memory:
             record = _sql(parent)
             statements.append(f"IF {record}.id = NONE OR {record}.retired = true "
                               "{ THROW 'Parent member does not exist or is retired'; };")
+        result = {"sources": len(current), "members": len(submitted), "nodes": len(batch.get("nodes", [])),
+                  "edges": len(batch.get("edges", [])), "invalidated": sorted(retired)}
+        statements.append(f"CREATE {_sql(receipt)} CONTENT {_sql({'batch_hash': batch_hash, 'result': result})};")
         statements.append("COMMIT;")
         # Encoding may take time; never publish a candidate from a changed original.
         for expected in batch["sources"]:
@@ -704,8 +738,7 @@ class Memory:
                 if source.revision != expected["revision"]:
                     raise ValueError(f"Source revision mismatch for {source.path}: expected {expected['revision']}, found {source.revision}")
         self._publish(statements, control=control)
-        return {"sources": len(current), "members": len(submitted), "nodes": len(batch.get("nodes", [])),
-                "edges": len(batch.get("edges", [])), "invalidated": sorted(retired)}
+        return result
 
     def search(self, text: str, *, scope: str = "", limit: int = 10, literal: bool = False) -> list[dict]:
         """Return lexical candidates for hybrid retrieval."""

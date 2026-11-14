@@ -3,7 +3,8 @@ from types import SimpleNamespace
 import pytest
 
 from basepack.memory import vectors
-from basepack.memory.store import Memory, _sql
+from basepack.memory.draft import freeze
+from basepack.memory.store import Memory, _record, _sql
 from test_memory_store import deterministic_vector, memory
 
 
@@ -72,13 +73,14 @@ def test_brief_reads_published_overview_without_search_or_model(mode, tmp_path, 
 def test_vector_rebuild_reports_coverage_and_reuses_published_input(memory):
     from test_memory_store import batch_for
 
-    batch = batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n")
+    batch = freeze([batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n")])
+    storage = batch['members'][2]['id']
     memory.apply(batch)
     assert len(memory.embed_members()["reused"]) == 4
     memory._execute("UPDATE member SET embedding=NONE, embedding_identity=NONE, embedded_revision=NONE;")
     (memory.config.root / "guide.md").write_text("原件已有新变化，已发布知识仍可补建。\n", encoding="utf-8")
-    first = memory.embed_members(["storage"])
-    assert first["embedded"] == ["member:storage"]
+    first = memory.embed_members([storage])
+    assert first["embedded"] == [storage]
     assert len(first["pending"]) == 3
     partial = memory.vector_search("数据库")
     assert partial["vector_coverage"]["total"] == 4
@@ -88,35 +90,37 @@ def test_vector_rebuild_reports_coverage_and_reuses_published_input(memory):
     assert len(memory.embed_members()["embedded"]) == 3
     assert memory.vector_search("数据库")["vector_coverage"]["pending"] == 0
     assert memory.embed_members()["pending"] == []
-    memory._execute("UPDATE member:storage SET embedding_identity='different-model';")
+    memory._execute(f"UPDATE {_sql(_record(storage))} SET embedding_identity='different-model';")
     coverage = memory.vector_search("数据库")["vector_coverage"]
     assert (coverage["compatible"], coverage["pending"]) == (3, 1)
     assert memory.brief()["vector_coverage"] == {"status": "not_checked"}
-    assert memory.embed_members()["embedded"] == ["member:storage"]
-    memory._execute("UPDATE member:storage SET embedding=NONE;")
-    assert memory.embed_members()["embedded"] == ["member:storage"]
+    assert memory.embed_members()["embedded"] == [storage]
+    memory._execute(f"UPDATE {_sql(_record(storage))} SET embedding=NONE;")
+    assert memory.embed_members()["embedded"] == [storage]
 
 
 @pytest.mark.parametrize("query", ["docs/ADR-0042.md", "ADR-0042.md", "0042"])
 def test_hybrid_literal_prioritizes_path_filename_and_identifier_matches(memory, query):
     from test_memory_store import batch_for
 
-    memory.apply(batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n"))
+    memory.apply(freeze([batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n")]))
     path = memory.config.root / "docs" / "ADR-0042.md"
     path.parent.mkdir()
     path.write_text("归档决定的原文依据。\n", encoding="utf-8")
     prepared = memory.prepare(["docs/ADR-0042.md"])
-    memory.apply({"sources": [{"path": "docs/ADR-0042.md", "revision": prepared["sources"][0]["revision"]}],
+    batch = freeze([{"sources": [{"path": "docs/ADR-0042.md", "revision": prepared["sources"][0]["revision"]}],
                   "expected": prepared["expected"], "members": [
-                      {"id": "zz_archive", "kind": "chunk", "path": "docs/ADR-0042.md", "title": "归档条目",
-                       "start_line": 1, "end_line": 1}]})
-    # The literal match falls outside the vector limit. Its RRF score ties the
-    # first semantic-only hit, whose ID would sort earlier without literal priority.
+                      {"kind": "chunk", "path": "docs/ADR-0042.md", "title": "归档条目",
+                       "start_line": 1, "end_line": 1}]}])
+    archive = batch['members'][0]['id']
+    memory.apply(batch)
+    # The literal match falls outside the vector limit and ties the first
+    # semantic-only hit on RRF score.
     vector = deterministic_vector(query)
     memory._execute(f"UPDATE member SET embedding={_sql(vector)}; "
-                    f"UPDATE member:zz_archive SET embedding={_sql([-value for value in vector])};")
+                    f"UPDATE {_sql(_record(archive))} SET embedding={_sql([-value for value in vector])};")
     hits = memory.hybrid_search(query, literal=True, limit=3)["matches"]
-    assert hits[0]["id"] == "member:zz_archive"
+    assert hits[0]["id"] == archive
     assert hits[0]["lexical_rank"] == 1
     assert "vector_rank" not in hits[0]
     supplements = hits[1:]

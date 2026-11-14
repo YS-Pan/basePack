@@ -25,7 +25,7 @@ At business completion run `memory stop --control <own-path>`, cancel the coordi
 
 ## Retrieve in one delegation
 
-When a task names a few known files, read them together directly. Use retrieval to discover locations, prerequisites or cross-material evidence, including current goals, earlier requirements and past experiments. Parent summaries supply missing context rather than repeat selected chunks.
+When a task names a few known files, read them together directly. Before judging project status, remaining work, pending decisions or historical requirements, use one complete retrieval delegation to establish prior decisions before forming options. Read named chats directly and follow related publication work. Use retrieval also to discover locations, prerequisites and cross-material evidence. Parent summaries supply missing context rather than repeat selected chunks.
 
 Run the unified entry with the project's Python/config prefix:
 
@@ -45,7 +45,7 @@ Run the following command and follow the `prompt` field in its JSON output:
 
 Use `--available-subagents <A>` when the host exposes shared capacity and distinct `--slot` indices for independent concurrent questions. Reuse an owned handle for further rounds of the same question. An explicit `--tier <tier>` changes the configured mapping. Preserve name, capacity and mapping errors. `prepared`/`started=false` is not a dispatched worker. When `executor='main'` or the host cannot spawn, the main agent executes the same rendered flow and reports the actual executor. Retrieval uses no maintenance owner/control and shares host capacity with maintenance.
 
-One executor owns all search rounds, reading, integration, scoring and ranking:
+One executor owns all search rounds, current-state evidence, reading, integration, scoring and ranking. Run `memory freshness` and inspect its new, possibly changed, covered and unknown classes, receipt and endpoints; for relevant candidates and named chats run `memory freshness --thread <id>` to read and compare actual paginated text. Use the host chat reader for named or linked chats outside this project, including publication follow-ups. Timestamps and endpoints are clues, not proof of body equality; unknown candidates, non-text parts and semantic acceptance remain explicit. This probe does not acquire an owner, capture sources, embed or publish knowledge. Return the per-chat cutoff, known uncaptured/changed material, actual supplementary reads and unknowns with the answer:
 
 1. Run `search --text <terms>` and inspect `matches` and `vector_coverage`. Scope uses the same path-prefix meaning in search. Search defaults to the project's `memory.search_mode`; `--mode vector|hybrid` overrides it. For identifiers, filenames or intact phrases use `--mode hybrid --literal`; direct substring matches carry `lexical_rank` before semantic supplements. Keep configuration, model and compatible-index errors visible.
 2. Preserve every candidate's observed `id` and `knowledge_revision`. Use `knowledge <id> --knowledge-revision <version>` for that accepted representation, `history <id>` for available versions, and `neighbors <id> --knowledge-revision <version>` for relationships; `--include-stale` explicitly includes stale relationships. Check applicability using accepted evolution relations, task conditions and necessary original evidence, distinguishing user requirements, working assumptions, implementation facts and experiment observations. Follow each saved `basis` through `read <basis.member> --knowledge-revision <observed-version> --source-version <basis.source_version>` plus its saved line range or image `--locator`; open `original.image_path` for images. A knowledge version identifies the representation; `source_version`/`revision` and locators identify its original evidence. Only provably retained versions are available; history does not promise complete reconstruction at every past time.
@@ -59,7 +59,7 @@ Report completed stages from evidence. If saving or ranking fails, preserve the 
 
 Record the selected tier and actual model when available; do not invent usage or price. Keep reading, ranking and batch intermediates under the project root's `tmp/<task-or-run>/`, uniquely named for concurrent work. Retain selected long-term evidence under root `artifacts/runs/<run>/`. Configuration, credentials, database, managed originals/assets, active controls, receipts and capture identity records stay in their configured persistent locations. Cleanup must preserve current and historical source references and unresolved publication state.
 
-The ID contract supports string and integer keys. An ID without a table prefix is a raw string key. A full `member:`/`node:` ID is canonical database syntax; reuse returned IDs unchanged. Raw `123` and canonical `member:123` are different string/integer keys; the canonical string is ``member:`123` ``. Use a full canonical ID for a key containing a colon. A missing read target reports the requested ID and fails.
+Members use program-generated UUIDs; reuse their returned IDs unchanged. Other record tables may use string or integer keys; reuse their full returned IDs, especially when a key contains a colon. A missing read target reports the requested ID and fails.
 
 ## Maintain sources
 
@@ -87,15 +87,20 @@ For an explicit batch, run `prepare --paths <affected-files-and-related-material
 
 A zero-line text source needs no text member: registering its prepared source revision is sufficient when it has no active knowledge. When an existing source becomes empty, retire its old text members and resolve dependent knowledge through retirements or corrected evidence in the same batch. Text member ranges remain 1-based and inclusive; an empty source has no valid range.
 
-Acquire project ownership as above, write the batch and run `apply --batch <batch.json> --control <same-path>`. Reuse stable IDs for unchanged members. The program checks sources, knowledge and parent dependencies, prepares candidate vectors and publishes knowledge with matching vectors atomically. A changed source requires preparing and reading that batch again; preserve the actual error. Successful publication completes the batch. Report uncovered ranges, dispositions, deferred refinement and remaining candidates; failed or uncertain publication is unresolved.
+Acquire project ownership as above and write one draft per reader. Run `memory freeze --drafts <draft1.json> <draft2.json> --output <new-batch.json>`, then `apply --batch <new-batch.json> --control <same-path>`. The output must not already exist. Freeze allocates member UUIDs and records their mapping in the batch; keep that exact file for retry or outcome verification. Apply recognizes an already committed identical batch and returns its receipt. A changed batch requires a new freeze. Existing members are updated using their UUID and expected revision returned by prepare. The program checks sources, knowledge and parent dependencies, prepares candidate vectors and publishes knowledge with matching vectors atomically. A changed source requires preparing and reading that batch again; preserve the actual error. Successful publication completes the batch. Report uncovered ranges, dispositions, deferred refinement and remaining candidates; failed or uncertain publication is unresolved.
 
-Batch fields:
+Draft fields (freeze resolves scoped member references into the persisted batch):
+
+- For a new member omit `id`. For an update use its UUID returned by prepare; never invent one. `{"member": 0}` refers to the first member in the same draft. To refer to another draft, use `{"draft": 1, "member": 0}`: both indexes are zero-based and `draft` follows the exact `--drafts` order. Each reader retains a separate draft scope; a coordinator co-reads cross-reader evidence before authoring relations. Identical titles or positions across scopes do not identify the same object. Duplicate updates and conflicting expected revisions fail rather than merge.
+- References in member `parent`/`evidence` and node/edge `evidence`, edge `in`/`out` accept these scoped objects or existing IDs from prepare. Source dispositions and historical endpoint pins refer only to already published IDs and versions.
+
+Other fields:
 
 - `expected`: copy this object unchanged from prepare. Apply checks the versions of targets written, retired or corrected, existing evidence members actually used, and relation endpoints. Unused expected entries do not block unrelated writes. Missing versions permit only records created in this batch, protected by an absence check; existing dependencies require versions too. Writes and invalidations advance knowledge versions. On a stale draft conflict, prepare and read the affected material again.
 - `sources`: `{path, revision}` from prepare, never the null revision of a fast changes check; image sources add `kind:'image'`. An accepted missing source adds `deleted:true` and its previous revision.
 - A source may add `dispositions: [{kind:'no_knowledge'|'duplicate', start_line, end_line, reason, representations:[{id, knowledge_revision}]}]` for actually read ranges. Images use `whole_image:true` instead of line ranges. Duplicate representations require their current versions from prepare. Valid same-version dispositions avoid repeated initial work; partial reading covers only its ranges. Source changes invalidate old dispositions; relevant representation changes reopen duplicate work.
 - `deferred_refinement: [{start_line, end_line, reason, gaps:[{member, gap, knowledge_revision}]}]` records read coverage whose finer representation is deferred, separate from unread gaps and dispositions. Images use `whole_image:true`. Each gap names the exact current fresh member version and exact `coverage_gaps` text; changing that member in the same batch requires publishing it before deferring its gap. Deferred text counts as handled only where current fresh file/section summaries cover it; a chunk plus defer cannot stand in for coarse delivery. Existing selected chunks still support summaries. Preserve unique facts and fine knowledge, and explicitly retain mandatory flags when rewriting members. Same-version omitted dispositions/refinement remain; a new source revision does not inherit them.
-- `members`: `{id, kind, path, parent, start_line, end_line, title, text, evidence, mandatory, coverage_gaps}`; optional `conditions` and `claim_type` state applicability and claim identity. The program pins `parent_version` to the accepted parent. Text kinds are `file`, `section`, `chunk`; line ranges are 1-based and inclusive. A full file summary spans line 1 through the source's final line, including framing/header lines; its evidence chunks may cover the meaningful body. A partial file summary declares actual `coverage_gaps`. Summary evidence names the covered chunks. For chunks, omit text and let the program take exact original bytes/line endings; explicitly supplied text is strictly checked. Images use `kind:'image'`, actual visual description/OCR as text, and `locator` for page/region/origin as available; no invented line range. Mark only explicitly required startup information mandatory.
+- `members`: `{kind, path, parent, start_line, end_line, title, text, evidence, mandatory, coverage_gaps}` plus `id` only for an existing member; optional `conditions` and `claim_type` state applicability and claim identity. The program pins `parent_version` to the accepted parent. Text kinds are `file`, `section`, `chunk`; line ranges are 1-based and inclusive. A full file summary spans line 1 through the source's final line, including framing/header lines; its evidence chunks may cover the meaningful body. A partial file summary declares actual `coverage_gaps`. Summary evidence names the covered chunks. For chunks, omit text and let the program take exact original bytes/line endings; explicitly supplied text is strictly checked. Images use `kind:'image'`, actual visual description/OCR as text, and `locator` for page/region/origin as available; no invented line range. Mark only explicitly required startup information mandatory.
 - `nodes`: optional `{id, kind, text, evidence, conditions, claim_type}` for entities, decisions and conditions.
 - `edges`: optional `{id, in, out, kind, text, conditions, evidence}`. Endpoints name `member:<id>` or `node:<id>`; evidence names member IDs read together. Optional `endpoint_versions:{in:{id,knowledge_revision},out:{id,knowledge_revision}}` links retained historical endpoints; when omitted the program pins the actual versions accepted in this batch. Edit an existing edge by its ID; adding one preserves other edges.
 - `delete_members`, `delete_nodes`, `delete_edges`: explicit IDs retired by this batch. `corrections`: `{id, target, reason}`; the program captures the previous record.
@@ -125,6 +130,7 @@ $source = Join-Path $projectRoot 'memory-example.md'
 New-Item -ItemType File -Path $source | Out-Null
 [IO.File]::WriteAllText($source, "# 试用说明`n## 约定`n试用问题 A-17 留在开发记录。`n项目数据库按项目隔离。`n", [Text.UTF8Encoding]::new($false))
 $reading = Join-Path $work 'reading.json'
+$draft = Join-Path $work 'draft.json'
 $batch = Join-Path $work 'batch.json'
 memory prepare --paths 'memory-example.md' --output $reading
 @'
@@ -138,24 +144,26 @@ batch = {
     "expected": reading["expected"],
     "sources": [{"path": path, "revision": source["revision"]}],
     "members": [
-        {"id": "example-file", "kind": "file", "path": path, "parent": None,
+        {"kind": "file", "path": path, "parent": None,
          "start_line": 1, "end_line": 4, "title": "试用说明",
-         "text": "试用问题 A-17 留在开发记录；项目数据库按项目隔离。", "evidence": ["member:`example-chunk`"]},
-        {"id": "example-section", "kind": "section", "path": path, "parent": "member:`example-file`",
+         "text": "试用问题 A-17 留在开发记录；项目数据库按项目隔离。", "evidence": [{"member": 2}]},
+        {"kind": "section", "path": path, "parent": {"member": 0},
          "start_line": 2, "end_line": 4, "title": "约定",
-         "text": "保留试用记录，并使用独立项目数据库。", "evidence": ["member:`example-chunk`"]},
-        {"id": "example-chunk", "kind": "chunk", "path": path, "parent": "member:`example-section`",
+         "text": "保留试用记录，并使用独立项目数据库。", "evidence": [{"member": 2}]},
+        {"kind": "chunk", "path": path, "parent": {"member": 1},
          "start_line": 3, "end_line": 4, "title": "试用与隔离约定", "evidence": []},
     ],
 }
 Path(sys.argv[2]).write_text(json.dumps(batch, ensure_ascii=False, indent=2), encoding="utf-8")
-'@ | & $python -X utf8 - $reading $batch
+'@ | & $python -X utf8 - $reading $draft
 if ($LASTEXITCODE -ne 0) { throw "Batch creation failed ($LASTEXITCODE)" }
+memory freeze --drafts $draft --output $batch
 memory apply --batch $batch --control $control
 memory search --text 'A-17' --mode hybrid --literal
 memory search --text 'memory-example.md' --mode hybrid --literal
-memory read 'member:`example-chunk`'
-memory neighbors 'member:`example-section`'
+$frozen = Get-Content -Raw -Encoding UTF8 $batch | ConvertFrom-Json
+memory read $frozen.members[2].id
+memory neighbors $frozen.members[1].id
 memory stop --control $control
 memory release --control $control
 ```

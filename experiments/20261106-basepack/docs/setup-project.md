@@ -55,6 +55,7 @@ bp --config $config doctor
 | file-structure | `skills/file-structure/` | 支持 skills 的宿主 |
 | engineering-judgment | `skills/engineering-judgment/` | 支持 skills 的宿主 |
 | resources | `experiments/20261106-basepack/skills/resources/` | 已接入的 embedding 或 HTCondor 工具 |
+| basepack-setup | `experiments/20261106-basepack/skills/basepack-setup/` | 安装或升级所选 basePack 能力 |
 
 这些独立技能不在 wheel 内；仅安装 wheel 的使用者可另取对应版本源码中的所选目录，无需重装客户端。记忆 skill 与协调者/reader 的英文维护提示词随 wheel 安装，通过 `memory guide`、`memory prompt` 与生成的 instructions 使用。
 
@@ -68,7 +69,7 @@ bp --config $config doctor
 $repo = '<absolute-matching-source-checkout>'
 $project = '<absolute-target-project>'
 $name = 'agent-team' # 替换为所选技能名称。
-$source = Join-Path $repo "skills/$name" # resources 使用上表中的实验目录。
+$source = Join-Path $repo "skills/$name" # resources 和 basepack-setup 改为 Join-Path $repo "experiments/20261106-basepack/skills/$name"。
 $skillRoot = Join-Path $project '.agents/skills'
 $entry = Join-Path $skillRoot $name
 New-Item -ItemType Directory -Force -Path $skillRoot | Out-Null
@@ -152,6 +153,12 @@ Codex 宿主按项目归属默认接入可取得的聊天，不要求逐 thread 
 已知少量文件直接同批读取；需要发现资料时用 `memory retrieve --question '<业务问题>'`，不传 scope 为全项目，路径限制可用 `--scope 'devDoc/'`，中文及带空格前缀也可。宿主负责实际派工、接收最终结果与 delivery 回执，完整流程见 [检索](memory.md#启动与检索)。
 
 ## 版本升级
+
+0.13.0.dev1统一使用程序分配的member UUID与冻结批次协议。**已有记忆库先停写并离线迁移，通过后同时切换库和客户端**；不要先覆盖现用环境再连接旧库，`memory init`也不自动迁移。先在隔离环境检查新wheel，保留原生export、旧wheel、配置/凭据、原文/图片和身份回执；用该版配套的离线恢复工具冻结一对一映射，转换成员引用、历史、图端点、交付/访问派生键并在独立物理副本完整比对。知识版本、原文与向量输入不变时保留，迁移不重新接受知识或计访问。工具与映射只作离线恢复材料，正常包无旧ID解析或双协议；尚未取得工具或迁移未通过时继续保留旧环境。具体交付和工具位置见[本次交付记录](../../../devDoc/tasks/20261114-delivery-closeout/result.md)。
+
+切换前结清或明确作废持有旧ID的批次、维护回执和未确认交付；保留其恢复原件，后续重新prepare生成UUID引用。新建草稿省略永久ID，用局部数组位置引用，`memory freeze --drafts ... --output ...`分配并冻结UUID；更新复用prepare返回的UUID与expected，失败核实和重试沿用同一冻结文件。切换后执行`memory init`刷新生成入口，核旧知识/原证、历史与交付去重，并完成一次新建/更新流程。项目UUID、原凭据、配置schema 2和向量identity保留，外部项目各自安排迁移。
+
+资源调用方同时更新worker所在的Python安装：jobs结果移除`cleanup_confirmed`，等待到期返回`observation_expired`且不取消作业，停止和限时由Condor原生策略负责。共享embedding的422及原请求索引诊断须服务端更新才生效，按[管理员流程](administrator.md#升级与回滚)处理；客户端安装不代表服务已更新。
 
 0.11.0.dev1 增加短任务跳过整个自动维护、固定名称派工、脚本容量布局和独立检索派工。升级先按 [配置维护要点](project-config-maintenance.md) 重新取得宿主并发上限/来源，用 `config set-concurrency` 补齐或更新旧项目，再执行 `memory init` 刷新 AGENTS 与 instructions 托管块，保留原 UUID 和块外字节。已有维护须先 stop、取消自有后代、确认发布结束并 release，再更换客户端/入口；多项目共用解释器时逐项目安排升级，或先用独立环境。
 

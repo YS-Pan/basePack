@@ -24,8 +24,9 @@ function memory {
 memory maintain --mode manual --holder '<本thread身份>' --control '<memory.data_dir>/maintenance/<全新标识>.control'
 # 仅 acquired=true 时继续；已有 owner 时报告持有者。
 memory prepare --paths '说明.md' '决定.md' --output '<project-root>/tmp/<run>/reading.json'
-# 阅读 prepare 输出，写出 agent-batch.json 后继续。
-memory apply --batch '<agent-batch.json>' --control '<同一control>'
+# 阅读 prepare 输出，每个 reader 写出独立 draft。
+memory freeze --drafts '<draft.json>' --output '<新batch.json>'
+memory apply --batch '<新batch.json>' --control '<同一control>'
 memory stop --control '<同一control>'
 memory release --control '<同一control>'
 memory changes --scope '资料目录'
@@ -34,6 +35,8 @@ memory changes --scope '资料目录'
 `prepare --paths` 接受文件而非目录。需要处理目录时先枚举文件，再传项目相对路径，例如：`Get-ChildItem -File 资料目录 | ForEach-Object { Resolve-Path -Relative $_.FullName }`。SQL 事务与自动分包使用当前安装的程序/部署合同，真实失败保留原错；调用 agent 不承担例行 SQL 大小审核或拆包。
 
 prepare 时包括本批所用依据与关系两端的材料；它提供新旧编号原文、已有与关联成员、节点、关系及 expected 知识版本，图片返回可打开的原图路径。关联记录的来源原文仍需 read 或扩充 prepare 范围核实。将材料交给订阅 agent，在同次阅读中选择最终块边界并生成摘要、节点和图边；结构备读单元只用于定位。批次 JSON 合同与操作流程在 `memory guide` 返回的已安装 skill 中，源码维护源为 [SKILL.md](../src/basepack/memory/SKILL.md)。
+
+新成员省略 ID，freeze 按各 draft 的成员位置分配 UUID 并解析引用；更新只使用 prepare 返回的 UUID 和 expected。跨 reader 保留 draft 作用域，重复更新报错。冻结 batch 及其映射必须保留，重试复用同一文件，已提交的相同批次返回原回执。旧写入协议与未迁移库明确拒绝；升级存量项目先停写并完成离线迁移。详细位置引用见[批次合同](../src/basepack/memory/SKILL.md#direct-batch-interface)。
 
 apply 核对来源版本，以及本批改写、退役、更正目标、实际依据、父引用和关系端点的 expected 版本，再原子写入；无关 expected 不阻塞，缺 expected 仅允许本批新建记录。chunk 按范围取原词；摘要、依据、更正和旧快照持久保存。旧草稿冲突重新 prepare、阅读后提交。作者完成必要理解、生成批次并由程序成功发布即完成普通批次，不追加独立语义复核、例行回读/检索抽查。失败或结果未明保持未决。
 
@@ -102,7 +105,7 @@ Codex 维护采集真实用户消息与可取得的助手文字，保留 thread/
 
 ## 最小闭环示例
 
-在已完成 init/brief 且共享模型服务可用的干净试用项目执行 [memory_minimal.py](../examples/memory_minimal.py)。配置 `memory.search_mode` 为 `vector` 或 `hybrid`。它新建四行 UTF-8 的 `memory-example.md`，拒绝覆盖同名文件，并依次 prepare → 生成完整批次 → apply（含编码）→ 按编号和文件名查询 → read/neighbors；每个子命令使用 `subprocess.run(check=True)`，apply 失败后即停止。该脚本用于检查命令闭环，真实材料的理解与批次制作由宿主 agent 按 skill 完成。
+在已完成 init/brief 且共享模型服务可用的干净试用项目执行 [memory_minimal.py](../examples/memory_minimal.py)。配置 `memory.search_mode` 为 `vector` 或 `hybrid`。它新建四行 UTF-8 的 `memory-example.md`，拒绝覆盖同名文件，并依次 prepare → 生成草稿 → freeze → apply（含编码）→ 按编号和文件名查询 → read/neighbors；每个子命令使用 `subprocess.run(check=True)`，apply 失败后即停止。该脚本用于检查命令闭环，真实材料的理解与批次制作由宿主 agent 按 skill 完成。
 
 ```powershell
 $python = '<instructions 中的 absolute-python.exe>'
@@ -115,9 +118,9 @@ if ($LASTEXITCODE -ne 0) { throw "memory example failed ($LASTEXITCODE)" }
 
 | 成员 ID / kind | 行范围 | parent | evidence |
 | --- | --- | --- | --- |
-| `example-file` / file | 1–4 | 无 | ``member:`example-chunk` `` |
-| `example-section` / section | 2–4 | ``member:`example-file` `` | ``member:`example-chunk` `` |
-| `example-chunk` / chunk | 3–4 | ``member:`example-section` `` | 空 |
+| 位置 0 / file | 1–4 | 无 | `{"member":2}` |
+| 位置 1 / section | 2–4 | `{"member":0}` | `{"member":2}` |
+| 位置 2 / chunk | 3–4 | `{"member":1}` | 空 |
 
 随包 [skill](../src/basepack/memory/SKILL.md#minimal-batch) 也保留不依赖仓库文件的完整批次例子。文字成员缺起止行字段会报告批次位置、成员 ID 与字段；不存在的 read 目标会明确报出 ID。修正输入后重新运行，失败批次没有部分写入；保留原错误，不继续下游命令。
 
@@ -164,7 +167,7 @@ memory read '<basis.member>' --knowledge-revision '<该成员实见版本>' --so
 memory access-hints --input '<items.json>'
 ```
 
-neighbors 的 `unpinned_children`／`unpinned_edges` 是存量端点版本未知的线索，按 basis 回源核实并保留缺口，不能当作精确历史链接。access-hints 输入为 `[{"id":"<id>","knowledge_revision":"<实见版本>"}]`。Python 对应 `Memory.knowledge/history/read/neighbors/access_hints/record_delivery`；复用返回的 canonical ID 和版本值，不在交付时回查当前记录补旧版身份。无表名前缀的 ID 是原始字符串 key；字符串 `123` 与数字 canonical `member:123` 不同，前者的完整形式为 ``member:`123` ``。
+neighbors 的 `unpinned_children`／`unpinned_edges` 是存量端点版本未知的线索，按 basis 回源核实并保留缺口，不能当作精确历史链接。access-hints 输入为 `[{"id":"<id>","knowledge_revision":"<实见版本>"}]`。Python 对应 `Memory.knowledge/history/read/neighbors/access_hints/record_delivery`；复用返回的 canonical ID 和版本值，不在交付时回查当前记录补旧版身份。成员 ID 是程序分配的 UUID；直接使用返回的完整身份。
 
 ```powershell
 memory search --text '主题'
@@ -198,3 +201,5 @@ try {
 恢复时先为新的物理目录/端口启动认证服务，保留原 project_id；从该目标配置读取用户名及同一密码文件，再以原生 `import` 替换上述 `export`。缺失凭据先恢复正确文件，不给已有库重新生成密码。恢复后核快照、图关系和检索。
 
 恢复集合包括 export、配置、原凭据、业务原件、受管 Codex 导出、codex-attachments 原件与定位回执、`memory.data_dir` 下的 assets 图片快照。数据库内的知识版本、演变关系、依据、更正、旧快照、已阅/延期细化处置、反馈、访问状态及 delivery_id 去重记录随 export 恢复；旧版备份不会凭空补齐后来新增的状态或缺失历史。新目录保留 project_id，使用独立目录/端口，再验证原文定位、知识版本、关系、检索、反馈及同 delivery_id 重试。兼容向量可随 export 恢复，或从接受表示与原图重新 embed；访问记账不要求重建向量。运行中的库使用原生 export；复制物理目录先停写、停止服务。长期备份由明确恢复需求决定目的地与保留周期，不默认叠加完整备份。凭据不随源码发行；清理前核原件/旧依据引用及活跃控制/未明发布。
+
+`memory freshness [--codex-registry <json>] [--thread <id>]` 只读项目归属、分页、采集回执与原文比较，不取得 owner、不写原件、不生成向量或发布知识。按相关候选及用户点名聊天补读；跨项目引用使用宿主读取。回执时间不是全局截止，端点和 `updatedAt` 不是正文证明；报告未摄入、待语义快照、实际补读和未知。预检 pending 是历史快照，不代表当前语义状态。

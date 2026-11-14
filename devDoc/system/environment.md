@@ -1,5 +1,11 @@
 # 开发环境核验
 
+## 2026-11-14 0.13交付与本项目切换
+
+本项目稳定客户端与共享embedding服务已普通安装0.13.0.dev1；客户端保留原`D:/AgentTools/envs/basepack-client-0.10/`路径，57包文件与最终wheel/源码一致。项目UUID/凭据保留，旧0.12库停写导出后经独立18153/18152进程逐表比对和功能回读，现由原serve.ps1在18080打开`.basepack/memory/store-0.13`；旧store仅留恢复。本轮18150测试与18153恢复副本进程均结束，正式库保持普通用户隐藏进程。
+
+最终源码在正常用户上下文以独立测试库跑完618 passed、0 skipped（314.10秒），含真实模型、原生恢复和ACL用例；普通wheel另核创建/检索/回读/更新/重放/冲突。真实CPU作业14393.0/14394.0核参数、观察到期继续运行、显式取消与原生history，两项收尾。共享服务经UAC管理员替包及重启，冷启动约66秒；图文200、identity/59项原依赖不变，超限422准确给原索引[1]和token数，空输入422。工具与包、恢复集合、边界和原证位置见[本轮结果](../tasks/20261114-delivery-closeout/result.md)。这些是现机功能证据，不代表新机、长期驻留、收益或峰值重测。
+
 ## 2026-11-13 三工具共用系统 Python
 
 用量统计 0.2.0、AIGC 0.10.0、TTS 1.2.0 已普通安装到系统 Python 3.13 的机器 site-packages；新增 97 包、原 232 份全局版本保留，pip check 和实际调用通过。模型复用至 `D:/AgentTools/models/{aigc-detect,tts}`，用量状态在 `D:/AgentTools/state/codex-usage`，原源码位置不变，未新增常驻工具虚拟环境。完整检查、回退定位及限制见 [迁移结果](../archive/20261113-agenttools-migration/result.md)。

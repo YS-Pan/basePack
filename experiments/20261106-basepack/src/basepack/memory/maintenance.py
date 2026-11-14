@@ -225,9 +225,10 @@ def maintain(memory, scope, *, control=None, timeout=600):
         if not closed:
             mechanical_dependency_pending.update(accepted_ids)
             continue
-        receipts.append(memory.apply({'sources': [candidates[path]['source'] for path in sorted(group)],
+        from .draft import freeze
+        receipts.append(memory.apply(freeze([{'sources': [candidates[path]['source'] for path in sorted(group)],
                                       'expected': {row['id']: row['knowledge_revision'] for row in members},
-                                      'members': accepted}, control=control, timeout=timeout))
+                                      'members': accepted}]), control=control, timeout=timeout))
         reused_chunks.extend(member for path in sorted(group) for member in candidates[path]['reused'])
         known = memory._rows('source')
         by_path = {row['path']: row for row in known if not row.get('deleted')}

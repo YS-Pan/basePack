@@ -21,7 +21,7 @@ if ($$LASTEXITCODE -ne 0) { throw "memory brief failed ($$LASTEXITCODE)" }
 
 同一任务后续读写文件、反馈、stop/release 沿用已获 brief；任务目标或上下文实质变化时按需补取。后续命令复用本进程的参数，新进程只重新初始化。搬迁后核实际路径，再以新配置运行 `memory init` 刷新托管块；块外旧路径另核。
 
-brief 直接读取已发布 mandatory、已有文件／章节摘要和已知缺口，不做 embedding、任务搜索或原件扫描。直接保留 mandatory；stale=true 按业务需要回源确认。已知少量文件直接同批阅读；任务／项目概况、过去要求和跨历史依据的发现统一交 [检索 worker](<$skill#retrieve-in-one-delegation>)，同一委托完成多轮搜索、回源、综合评分与 rank。[客户端与凭据](<$skill#start-and-stop>)。
+brief 直接读取已发布 mandatory、已有文件／章节摘要和已知缺口，不做 embedding、任务搜索或原件扫描。直接保留 mandatory；stale=true 按业务需要回源确认。已知少量文件直接同批阅读；判断项目现状、剩余工作、待决策或历史要求时，先用一次完整检索核既有决定，再形成选项；已点名聊天直接读并沿引用核后续发布。此类跨历史依据的发现统一交 [检索 worker](<$skill#retrieve-in-one-delegation>)，同一委托完成多轮搜索、回源、综合评分与 rank。[客户端与凭据](<$skill#start-and-stop>)。
 
 本项目数据库的 launcher 为 `$memory_dir/serve.ps1`，cwd 为 `$memory_dir`，日志为其中 `logs/surreal.stdout.log` 与 `logs/surreal.stderr.log`。先检查 endpoint 的 `/ready`；不可用时查日志，由维护者显式启动 launcher。多聊天共用该进程，业务结束保持数据库运行。[首次部署](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/administrator.md#项目-surrealdb)、[恢复集合](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/memory.md#备份与恢复)；新增状态按本机 skill 的恢复说明保留。
 

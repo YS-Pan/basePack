@@ -7,14 +7,17 @@ from urllib.error import HTTPError
 import pytest
 
 from basepack.memory import candidate_vectors
+from basepack.memory.draft import freeze
 from basepack.memory.maintenance import MaintenanceStopped, stop
 from test_memory_store import batch_for, memory
 
 
 def test_change_detection_cannot_invalidate_a_newer_accept(memory, monkeypatch):
     from basepack.memory import store
-    memory.apply(batch_for(memory, '# 数据库\n旧条件。\n\n# 保留\n资料必须保留。\n'))
-    new_batch = batch_for(memory, '# 数据库\n新条件。\n\n# 保留\n资料必须保留。\n')
+    initial = freeze([batch_for(memory, '# 数据库\n旧条件。\n\n# 保留\n资料必须保留。\n')])
+    memory.apply(initial)
+    storage = initial['members'][2]['id']
+    new_batch = freeze([batch_for(memory, '# 数据库\n新条件。\n\n# 保留\n资料必须保留。\n', previous=initial)])
     original = store.detect_changes
 
     def interleaved(*args, **kwargs):
@@ -24,16 +27,18 @@ def test_change_detection_cannot_invalidate_a_newer_accept(memory, monkeypatch):
 
     monkeypatch.setattr(store, 'detect_changes', interleaved)
     assert memory.changes(['guide.md'])[0]['kind'] == 'modified'
-    current = memory.read('storage')['member']
+    current = memory.read(storage)['member']
     assert current['stale'] is False
     assert '新条件' in current['text']
 
 
 @pytest.mark.parametrize('event', ['stop', 'change'])
 def test_candidate_not_published_after_stop_or_source_change(memory, tmp_path, monkeypatch, event):
-    memory.apply(batch_for(memory, '# 数据库\n旧条件。\n\n# 保留\n资料必须保留。\n'))
-    batch = batch_for(memory, '# 数据库\n新条件。\n\n# 保留\n资料必须保留。\n')
-    old = deepcopy(memory.read('storage')['member'])
+    initial = freeze([batch_for(memory, '# 数据库\n旧条件。\n\n# 保留\n资料必须保留。\n')])
+    memory.apply(initial)
+    batch = freeze([batch_for(memory, '# 数据库\n新条件。\n\n# 保留\n资料必须保留。\n', previous=initial)])
+    storage = initial['members'][2]['id']
+    old = deepcopy(memory.read(storage)['member'])
     ready, release = Event(), Event()
     monkeypatch.setattr(candidate_vectors, 'status', lambda _: {'model': {'embedding_identity': 'same'}})
 
@@ -57,7 +62,7 @@ def test_candidate_not_published_after_stop_or_source_change(memory, tmp_path, m
     worker = Thread(target=publish)
     worker.start()
     assert ready.wait(10)
-    assert memory.read('storage')['member'] == old
+    assert memory.read(storage)['member'] == old
     if event == 'stop':
         stop(control)
     else:
@@ -67,12 +72,13 @@ def test_candidate_not_published_after_stop_or_source_change(memory, tmp_path, m
     assert not worker.is_alive()
     assert len(failures) == 1
     assert isinstance(failures[0], MaintenanceStopped if event == 'stop' else ValueError)
-    assert memory.read('storage')['member'] == old
+    assert memory.read(storage)['member'] == old
 
 
 def test_candidate_vectors_are_published_together_and_reused(memory, monkeypatch):
-    memory.apply(batch_for(memory, '# 数据库\n旧条件。\n\n# 保留\n资料必须保留。\n'))
-    batch = batch_for(memory, '# 数据库\n新条件。\n\n# 保留\n资料必须保留。\n')
+    initial = freeze([batch_for(memory, '# 数据库\n旧条件。\n\n# 保留\n资料必须保留。\n')])
+    memory.apply(initial)
+    batch = freeze([batch_for(memory, '# 数据库\n新条件。\n\n# 保留\n资料必须保留。\n', previous=initial)])
     calls = []
     monkeypatch.setattr(candidate_vectors, 'status', lambda _: {'model': {'embedding_identity': 'same'}})
 
@@ -87,15 +93,16 @@ def test_candidate_vectors_are_published_together_and_reused(memory, monkeypatch
     rows = memory._execute('SELECT * FROM member WHERE stale=false;')[0]
     assert all(row['embedding_identity'] == 'same' and row['embedded_revision'] == row['input_revision']
                and row['embedding'] == [1.0, 0.0] for row in rows)
-    batch['expected'] = memory.prepare(['guide.md'])['expected']
-    memory.apply(batch)
+    replay = batch_for(memory, '# 数据库\n新条件。\n\n# 保留\n资料必须保留。\n', previous=initial)
+    memory.apply(freeze([replay]))
     assert len(calls) == 1
 
 
 @pytest.mark.parametrize('failed_request', [1, 2])
 def test_candidate_http_failure_publishes_no_knowledge_or_vectors(memory, monkeypatch, failed_request):
-    memory.apply(batch_for(memory, '# 数据库\n旧条件。\n\n# 保留\n资料必须保留。\n'))
-    batch = batch_for(memory, '# 数据库\n新条件。\n\n# 保留\n资料必须保留。\n')
+    initial = freeze([batch_for(memory, '# 数据库\n旧条件。\n\n# 保留\n资料必须保留。\n')])
+    memory.apply(initial)
+    batch = freeze([batch_for(memory, '# 数据库\n新条件。\n\n# 保留\n资料必须保留。\n', previous=initial)])
     tables = ('source', 'source_version', 'member', 'node', 'semantic', 'change')
 
     def snapshot():
@@ -123,17 +130,20 @@ def test_candidate_http_failure_publishes_no_knowledge_or_vectors(memory, monkey
     assert failure.value is original
     assert len(calls) == failed_request
     notes = '\n'.join(original.__notes__)
-    assert 'guide.md' in notes and ('storage' if failed_request == 2 else 'guide') in notes
+    member_key = batch['members'][2 if failed_request == 2 else 0]['id'].split(':', 1)[1]
+    assert 'guide.md' in notes and member_key in notes
     assert snapshot() == before
 
 
 def test_correction_without_replacement_excludes_known_error(memory):
-    memory.apply(batch_for(memory, '# 数据库\n错误条件。\n\n# 保留\n资料必须保留。\n'))
+    initial = freeze([batch_for(memory, '# 数据库\n错误条件。\n\n# 保留\n资料必须保留。\n')])
+    memory.apply(initial)
+    storage = initial['members'][2]['id']
     expected = memory.prepare(['guide.md'])['expected']
-    memory.apply({'sources': [], 'expected': expected,
-                  'corrections': [{'id': 'known_error', 'target': 'member:storage', 'reason': '已知错误'}]})
-    assert memory.read('storage')['member']['stale'] is True
-    assert 'member:storage' not in {item['id'] for item in memory.search('错误条件', literal=True)}
+    memory.apply(freeze([{'sources': [], 'expected': expected,
+                  'corrections': [{'id': 'known_error', 'target': storage, 'reason': '已知错误'}]}]))
+    assert memory.read(storage)['member']['stale'] is True
+    assert storage not in {item['id'] for item in memory.search('错误条件', literal=True)}
     assert memory.neighbors('node:local')['record']['stale'] is True
     previous = memory._execute('SELECT * FROM ONLY change:known_error;')[0]['previous']
     assert previous['stale'] is False

@@ -10,7 +10,7 @@ basePack gives agents project-local memory, shared compute coordination, and ind
 | file-structure | Organize project files by purpose and lifecycle | A host with skills |
 | engineering-judgment | Judge contracts, responsibilities, compatibility, and the work passed to users | A host with skills |
 
-The current source targets **0.12.0.dev1, in development**, for Windows and Python 3.13+. The host's subscription-based agents understand material, build relations, and score results; basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability. The [usage rectification progress](devDoc/tasks/20261112-usage-rectification/progress.md) records current checks, installation and remaining limits.
+The current source targets **0.13.0.dev1, in development**, for Windows and Python 3.13+. The host's subscription-based agents understand material, build relations, and score results; basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability. The [delivery progress](devDoc/tasks/20261114-delivery-closeout/progress.md) records current checks, installation and remaining limits.
 
 **basePack is under development. Real use also serves as testing; record problems so they can inform subsequent fixes.**
 
@@ -29,7 +29,7 @@ $python = (Resolve-Path '.venv/Scripts/python.exe').Path
 
 The Python package lives in `experiments/20261106-basepack`; include that directory when installing from the repository root. These commands install the lightweight client. Project memory connects to a shared model service whose dependencies belong in its service environment. General skills can be used independently. This virtual environment belongs to the current clone; after moving or deleting it, recreate the client and update project instructions.
 
-Development wheels are available from [GitHub Releases](https://github.com/YS-Pan/basePack/releases). To build a normal wheel from the current source, see the [route README](experiments/20261106-basepack/README.md#development-checks-and-builds). For an existing project, follow the [upgrade steps](experiments/20261106-basepack/docs/setup-project.md#版本升级) to back up its data and refresh its entry point.
+Development wheels are available from [GitHub Releases](https://github.com/YS-Pan/basePack/releases). To build a normal wheel from the current source, see the [route README](experiments/20261106-basepack/README.md#development-checks-and-builds). Existing memory projects need the explicit offline member-identity migration before switching to 0.13; follow the [upgrade steps](experiments/20261106-basepack/docs/setup-project.md#版本升级) and preserve the old client and recovery set.
 
 ## Enable project memory
 
@@ -46,7 +46,7 @@ Each project's configuration, password file, knowledge, database, and local entr
 
 ## Independent skills
 
-Choose only the skills you need. [agent-team](skills/agent-team/SKILL.md), [file-structure](skills/file-structure/SKILL.md), and [engineering-judgment](skills/engineering-judgment/SKILL.md) need no Python package or database. The [resources skill](experiments/20261106-basepack/skills/resources/SKILL.md) guides use of configured resource tools.
+Choose only the skills you need. [agent-team](skills/agent-team/SKILL.md), [file-structure](skills/file-structure/SKILL.md), and [engineering-judgment](skills/engineering-judgment/SKILL.md) need no Python package or database. The [resources skill](experiments/20261106-basepack/skills/resources/SKILL.md) guides use of configured resource tools; [basepack-setup](experiments/20261106-basepack/skills/basepack-setup/SKILL.md) guides installation and upgrades.
 
 Follow the complete [skill installation and discovery procedure](experiments/20261106-basepack/docs/setup-project.md#独立-skills-安装与发现): copy each complete directory into the target project's `.agents/skills/`, or create a junction to existing project-owned originals. Check references and the host's actual project-scoped skill list. Reuse correct installations; preserve conflicting user skills and report them. `init` and core `doctor` do not install or verify independent skills.
 
