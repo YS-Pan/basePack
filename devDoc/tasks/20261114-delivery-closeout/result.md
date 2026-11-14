@@ -26,7 +26,11 @@
 
 ## 实际检索与反馈
 
-已从新安装客户端实际派出tier1 / gpt-6-luna / max检索worker，使用请求`3988d87038834a83ab5a1b3d8621e58c`。当前等待完整结果和精确清单，尚未写成已交付或确认访问。本轮反馈结案状态在该结果收妥后补齐。
+已从新安装客户端实际派出tier1 / gpt-6-luna / max检索worker，请求为`3988d87038834a83ab5a1b3d8621e58c`。完成多轮搜索、原文/图/历史回读、命名聊天及AIGC后续发布任务核实，7个实际观察版本评分后全部入选rank，4766/6000字符。主agent实际收到所选内容后确认清单，delivery为`retrieval-916569a1666f42a3aa682bf7a9e11dce`、event=4。
+
+同一worker在受限环境运行freshness时遭遇Codex状态SQLite code14和临时目录拒绝访问，保留原错后，以正常用户上下文执行同一命令成功。初始清单为new5、possibly_changed5、covered0、unknown198，另336项cwd_unavailable、binding gaps为0。对原计划聊天实际比较64个parts，发现正文/端点变化并保留4条subagent父子缺口；分发聊天实际比较10个parts，正文已覆盖且无缺口。未逐条读取其它未知聊天，不把清单等同语义全覆盖。原聊天仍称“待实现”的解释属于计划阶段时态；本轮源码/安装和真实脚本成功是后续实施依据。
+
+当前外部事实沿原证补核：AIGC源码已在GitHub的`5bb4580`，不可重新列为首次发布待办；用量统计远端仍为`48efc99`；两仓库latest Release查询均404，不能把源码上传等同GitHub Release或PyPI。TTS远端目标仍未确认。本轮没有修改三工具仓库。反馈`677ef790e3aa44d1879c83e151537489`与`75870b6ec943456cbe12de35330128a6`在产品修复、正式迁移和上述真实交付后，以单owner标记fixed；stop后publications为空并release，最终owner=null、pending=[]。修复的是所选工作流，仍不保证agent必然遵循指令。
 
 ## 运行与分发边界
 
