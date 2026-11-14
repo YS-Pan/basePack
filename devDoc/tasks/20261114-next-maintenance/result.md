@@ -1,6 +1,6 @@
 # 0.14.0 私有上下文与记忆标记交付
 
-2026-11-14（北京时间）。按[计划](plan.md)实施，源码、普通 wheel 与本项目稳定客户端为 `0.14.0`，完成版本使用普通数字命名。旧 `v0.13.0.dev1` 及其恢复资料保持历史身份；本批未推送 GitHub 或创建远端发行。
+2026-11-14（北京时间）。按[计划](plan.md)实施，源码、普通 wheel 与本项目稳定客户端为 `0.14.0`，完成版本使用普通数字命名。旧 `v0.13.0.dev1` 及其恢复资料保持历史身份；后续按用户明确授权推送源码并发布[常规版v0.14.0](https://github.com/YS-Pan/basePack/releases/tag/v0.14.0)，具体附件与验证见[GitHub发行](#github发行)。
 
 ## 结果
 
@@ -25,8 +25,26 @@
 
 ## 交付、恢复与余项
 
-wheel 为 `experiments/20261106-basepack/dist/0.14.0/basepack-0.14.0-py3-none-any.whl`，SHA256 为 `670454e98caf724b2a94baa90064371665008b6e16211a236eec651b710fa73f`，校验清单与包同目录。构建和测试临时内容在根 tmp，选留结果在 `artifacts/runs/20261114-private-0.14.0/`。
+本机工程交付时的wheel为 `experiments/20261106-basepack/dist/0.14.0/basepack-0.14.0-py3-none-any.whl`，SHA256为 `670454e98caf724b2a94baa90064371665008b6e16211a236eec651b710fa73f`，校验清单与包同目录；该包保留原身份，后续发行重包见下文。构建和测试临时内容在根 tmp，选留结果在 `artifacts/runs/20261114-private-0.14.0/`。
 
 本机恢复集合位于 `.basepack/memory/backups/private-0.14.0-20261114/`：新鲜原生导出、原客户端 wheel、配置/原凭据/入口、必要受管原件和图片、清单及私有 Git bundle。恢复须向独立库导入，不覆盖活动库；同盘恢复副本不代替设备故障备份，真实私有资料的外部备份按其需要确定。
 
 自动维护分别遇沙箱状态库访问错误、业务并发修改的来源版本拒绝，以及源码稳定后发布前读取成员时的连接超时（WinError10060），未进入语义派工，不计作语义接受。三次维护和补标control均已安全停止释放，最终owner为空；后续客户端brief成功，正式库继续运行。测试服务器18214已停止。完整收尾见[进度](progress.md)。普通备份仍是完整私有恢复材料；未来公开记忆须另生成分享副本并处理历史/图片/context，单个字段及原生导出不构成自动净化。收益、新机部署和外部项目验证继续由用户真实反馈提供。
+
+## GitHub发行
+
+用户在源码推送后进一步明确授权发布Release。[v0.14.0](https://github.com/YS-Pan/basePack/releases/tag/v0.14.0)于2026-11-14 21:40:26（北京时间）公开发布，`draft=false`、`prerelease=false`，已设为Latest；tag指向`81805086c7c24a925822287255feb5cac3daa811`。本次按常规数字版本选择正式发行标志，项目仍在开发及升级边界保留在[发行说明](release-notes.md)，不把命名当作新机或长期质量承诺。
+
+从该提交的隔离Git归档构建最终wheel，58个包文件与归档逐字节一致，66项包清单/RECORD及许可证、版本、Python要求和依赖检查通过。两个构建进程结束后，以磁盘上最终字节重新检查并在全新轻量环境普通安装，实际导入为site-packages中的0.14.0，依赖检查、help、memory guide、init及config show通过。本次未重跑此前全套功能验收，也未升级本项目客户端或生产服务。
+
+三个附件保存在`experiments/20261106-basepack/dist/release-0.14.0/`，发布后逐一重新下载，与本地字节及GitHub摘要一致，校验清单的两项内容亦通过：
+
+| 附件 | 字节 | SHA256 |
+| --- | ---: | --- |
+| `basepack-0.14.0-py3-none-any.whl` | 138152 | `930537eab6f2af9fede04f885f55fbe121d081e092d87aac67a61f3bdcf0c481` |
+| `basepack-member-identity-v2-tools.zip` | 133156 | `abc377167b41c44f5bd0a772f09194abecff8687d14a746de24b564098d4d909` |
+| `SHA256SUMS-0.14.0.txt` | 205 | `79eff8288c662f02096860b5569f60c775cc0aee716866fab5b47e74b890083b` |
+
+迁移ZIP沿用上一版已公开附件，内部CRC及七项清单通过，面向旧0.12十一表schema/SurrealDB4原生导出的离线UUID迁移；0.13成员身份版本2升级本版本无需再做该身份迁移。未上传项目数据库、私有Git、凭据、模型或运行原证。GitHub连接器没有Release附件能力，本次使用本机GitHub CLI。
+
+发布准备的自动维护返回`acquired=false`，已有其它聊天持有项目owner，本次未派维护队列或操作其所有权。检索分支的freshness仍受Codex状态库访问限制，沿既有反馈接续；直接读过旧版发布授权，四项实际交付版本已登记event8。主agent负责发布和文档，检索与打包分支独立完成各自检查；总用量、费用和主上下文计量不可得。构建、普通安装、草稿/正式API及下载验证原证在`artifacts/runs/20261114-release-0.14.0/`。

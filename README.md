@@ -10,7 +10,7 @@ basePack gives agents project-local memory, shared compute coordination, and ind
 | file-structure | Organize project files by purpose and lifecycle | A host with skills |
 | engineering-judgment | Judge contracts, responsibilities, compatibility, and the work passed to users | A host with skills |
 
-The current source targets **0.14.0, in development**, for Windows and Python 3.13+. Completed versions use plain numeric versions; `.devN` is reserved for intermediate builds. The host's subscription-based agents understand material, build relations, and score results; basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability. The [current delivery progress](devDoc/tasks/20261114-next-maintenance/progress.md) records checks, installation and remaining limits.
+The current release is **[0.14.0](https://github.com/YS-Pan/basePack/releases/tag/v0.14.0)** for Windows and Python 3.13+. Completed versions use plain numeric versions; `.devN` is reserved for intermediate builds. The host's subscription-based agents understand material, build relations, and score results; basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability. The [current delivery progress](devDoc/tasks/20261114-next-maintenance/progress.md) records checks, installation and remaining limits.
 
 **basePack is under development. Real use also serves as testing; record problems so they can inform subsequent fixes.**
 
@@ -29,7 +29,7 @@ $python = (Resolve-Path '.venv/Scripts/python.exe').Path
 
 The Python package lives in `experiments/20261106-basepack`; include that directory when installing from the repository root. These commands install the lightweight client. Project memory connects to a shared model service whose dependencies belong in its service environment. General skills can be used independently. This virtual environment belongs to the current clone; after moving or deleting it, recreate the client and update project instructions.
 
-Development wheels are available from [GitHub Releases](https://github.com/YS-Pan/basePack/releases). To build a normal wheel from the current source, see the [route README](experiments/20261106-basepack/README.md#development-checks-and-builds). Existing memory projects need the explicit offline member-identity migration before switching to 0.13; follow the [upgrade steps](experiments/20261106-basepack/docs/setup-project.md#版本升级) and preserve the old client and recovery set.
+Release wheels are available from [GitHub Releases](https://github.com/YS-Pan/basePack/releases). To build a normal wheel from the current source, see the [route README](experiments/20261106-basepack/README.md#development-checks-and-builds). Existing memory projects need the explicit offline member-identity migration before switching to 0.13; follow the [upgrade steps](experiments/20261106-basepack/docs/setup-project.md#版本升级) and preserve the old client and recovery set.
 
 ## Enable project memory
 
