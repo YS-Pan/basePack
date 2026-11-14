@@ -10,6 +10,8 @@
 
 ## 已完成
 
+- 2026-11-14完成[Condor原生职责与代码量复核](research/condor-boundary-and-code.md)：两项未修问题未证明为Condor通病；当前额外PID确认与客户端时限属于明确产品合同，简化前需先确定证据/时效要求。jobs专属391代码行、站点样例27行，配套测试另计。仅作源码/历史/官方文档核对，未运行新作业或改变已定修复计划。
+
 - 按用户最新要求明确：agent负责工程修复、必要回归与安装检查；用户收集自己及其他使用者的收益、协作效果和分发部署反馈，agent未来据反馈分析修改。取消本轮agent执行P7收益对照和空白新机演练的前置要求，保留历史证据与未验边界。
 - 读取指定分发聊天全部3turn及其迁移主聊天、AIGC发布任务；在线核AIGC main为`5bb4580`、用量统计远端main为`48efc99`。只读核AIGC本机干净，用量统计领先1提交且3项原媒体修改保留，TTS本机无Git仓库。没有操作三个工具的源码、remote或发布。
 - 完成[漏项调查](research/memory-missed-distribution.md)：确认上一轮未执行新跨历史检索，目标聊天晚于既有采集截止，相关独立分发要求本来可召回；未证明发现器、图或向量算法有缺陷。
@@ -23,6 +25,10 @@
 本轮已正常补采目标聊天10条正文记录、gaps为空，并实际语义发布全文1–46行、4个member和1个节点。固定61源中24源成功发布处置（均initial），余37源为19 initial、18 existing-change；无已发布deferred refinement。两条反馈仍pending，不能把目标补入写成调用/覆盖产品机制已修复。
 
 归档迁移三文件首批因result.md准备版本变化被原子拒绝，无部分写入；作者重新prepare后完成修订稿，因主任务stop未再发布。批次与原错沿固定回执保留。业务结束已stop、取消协调者及全部后代，owner确认stopped且publications=[]后release成功，最终owner=null。固定截止后的计划、文档和聊天变化留后续维护，不追逐新增范围。
+
+随后Condor职责/代码盘点任务另开automatic：control为`condor-review-20261114-01a1d7dc.control`，固定回执`6f52b3c58ac543f8967d2d0c7b7436e8.json`，run为`82b2c3c54c364636b76d3a90b3f635b5`。机械5批复用95块；固定70源成功处置33（27 initial、6 existing-change），余37（21 initial、16 existing-change），两反馈仍pending，无已发布deferred refinement。图表批次因已有member身份冲突被原子拒绝后，重新prepare并用唯一ID成功发布；三个变更日志草稿在stop时未发布，不能计完成。所有自有后代已结束/中断，stop后publications=[]、release成功，最终owner=null。
+
+该任务完成11条历史知识的搜索/回源/评分rank并确认delivery（event=3），复算代码计量，核官方原生合同；新增3份文档的UTF-8、16个本地目标和差异检查通过。没有提交新作业、运行产品测试或修改部署/产品代码；原证沿`artifacts/runs/20261114-condor-review/`选留，固定截止后的材料留后续维护。
 
 ## 本次检查
 
