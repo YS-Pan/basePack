@@ -61,7 +61,7 @@ The wheel includes the program, configuration and entry templates, memory schema
 | Entry | Contents |
 | --- | --- |
 | [Route README](experiments/20261106-basepack/README.md) | Capabilities, development, builds, and tests |
-| [Maintenance experiment](experiments/20261111-basepack-maintenance/README.md) | Isolated trial and consolidation record for the maintenance changes |
+| [Maintenance trial history](devDoc/tasks/20261106-memory-system/maintenance-implementation-result.md) | Implementation, isolation checks, consolidation and retirement record |
 | [Project setup](experiments/20261106-basepack/docs/setup-project.md) | Configuration, new shells, upgrades, relocation, and skill discovery |
 | [Configuration maintenance](experiments/20261106-basepack/docs/project-config-maintenance.md) | Changes to host capacity, paths, models, services, and project state |
 | [Memory guide](experiments/20261106-basepack/docs/memory.md) | Initial knowledge, retrieval, small-batch maintenance, and backup |

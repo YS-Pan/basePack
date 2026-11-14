@@ -79,4 +79,4 @@ Release 仅上传上述 58,361 字节 wheel 和 99 字节 `SHA256SUMS.txt`，为
 
 先建立草稿并上传附件，两个附件重新下载后的 SHA256 均与本地一致，再正式发布；发布后 API 确认非草稿、prerelease、两个附件及其 digest，远端 tag 与上述提交相同。非秘密构建、安装、发布回执及验证脚本选留于本机 `artifacts/runs/20261111-release/`，项目记忆、数据库、配置、凭据、模型和运行原证未上传。
 
-发布说明明确保留升级备份、旧 text 模式迁移及设施准备要求；自动维护漏启动、长耗时和 SQL 413 仍为已知问题。新增[维护候选实验](../../../experiments/20261111-basepack-maintenance/README.md)只有入口，AGENTS 指令入口和透明 SQL 分包尚未实现，长耗时的具体方案留到本轮[维护计划](../20261106-memory-system/automatic-maintenance-plan.md)结束后讨论。完整空白新机部署及真实聊天附件覆盖仍有待验范围，本次发布不改变这些边界。
+发布说明明确保留升级备份、旧 text 模式迁移及设施准备要求；自动维护漏启动、长耗时和 SQL 413 仍为已知问题。当时新增的[维护候选实验](../20261106-memory-system/maintenance-implementation-result.md#候选路线历史与目录退役)只有入口，AGENTS 指令入口和透明 SQL 分包尚未实现，长耗时的具体方案留到本轮[维护计划](../20261106-memory-system/automatic-maintenance-plan.md)结束后讨论。完整空白新机部署及真实聊天附件覆盖仍有待验范围，本次发布不改变这些边界。
