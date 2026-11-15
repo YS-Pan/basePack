@@ -57,7 +57,7 @@
 
 2026-11-13 已完成 AIGC、TTS 与 Codex 用量统计的独立打包、系统 Python 3.13 安装、现有资源归集及已知调用方切换。基础代码随各包，模型首次准备先确认目录；AgentTools 和 basePack 保持可选。中英文检测/统计对照、语音 CPU/GPU 与长文恢复、用量增量及 GUI、HTTP 并存和调度回收均有实际证据；人工听审未做。详见 [迁移结果](../../archive/20261113-agenttools-migration/result.md) 与 [专项记录](../../archive/20261113-agenttools-migration/progress.md)。
 
-2026-11-15 用户反馈用量统计原 `.cmd` 的 cmd 未退出及报告位置变化，已形成[启动器整改计划](../20261115-codex-usage-launcher/plan.md)：恢复分离启动和项目内报告，保留已安装包及 AgentTools 状态。当前仅完成调查与计划，未修改外部工具。
+2026-11-15 用量统计需求已按用户新意见重写为[目录与运行行为整改计划](../20261115-codex-usage-launcher/plan.md)：开发目录分离旧运行产物，可复制启动器以自身目录保存报告／缓存／设置，CLI 提供三种默认方案、推荐报告随 cwd 而缓存按用户复用。此前写回原项目报告的建议退出；CLI 仍待选择，当前未修改外部工具或执行清理。
 
 已执行[实际使用整改计划](../20261112-usage-rectification/plan.md)，源码及本项目普通客户端为0.12.0.dev1，已交付检索入口、任务级brief、精确知识历史和纯访问状态；真实业务采用、安装与恢复见[验收结果](../20261112-usage-rectification/acceptance-result.md)。共享服务部署、外部项目修正及长期效果边界沿[整改进度](../20261112-usage-rectification/progress.md)接续。
 

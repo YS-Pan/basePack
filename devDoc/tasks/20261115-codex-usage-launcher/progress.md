@@ -1,28 +1,41 @@
-# Codex 用量统计启动器整改进度
+# Codex 用量统计目录与运行行为整改进度
 
-2026-11-15。**调查与计划已形成，整改未实施。** 用户已澄清主要针对原 `.cmd`，通用 GUI/report 目录规则保留。需求、证据、执行步骤与验收统一见 [plan.md](plan.md)。
+2026-11-15 修订。**当前为计划阶段，外部项目尚未整理或修改。** 用户新方向及 CLI 三个候选统一见 [plan.md](plan.md)。CLI 推荐 A，等待用户选择；此前“原项目启动器只把报告写回开发目录”的建议已退出。
 
-## 本次使用反馈与核查
+## 当前已定与待定
 
-- 观察版本：本地源码 main `edda407`；系统 Python 3.13 的 `codex-usage-plot` 0.2.0。源码／安装副本的 paths、gui、__main__、charts、query、query_cli、environment 七模块 SHA256 一致。
-- 复现条件：用户在 `D:/project/trifles/20260829 codex usage` 双击 `启动用量统计.cmd`。用户观察到 GUI 正常出现而 cmd 留着，报告写入 AgentTools。主任务未再次打开 GUI 或统计；已通过启动器、Tk 主循环及本机保存配置确认两项行为的实现依据。
-- 原因：迁移后同步调用 GUI；报告路径保存为 `D:/AgentTools/state/codex-usage/reports`。旧备份明确使用 pythonw／Popen 分离启动，GUI 报告位于原项目 `codex_usage_report/`。
-- 推荐处置：仅在原启动器内覆盖报告环境变量并分离启动，同步使用说明和定点回归；不迁回设置／缓存、不重装包。状态为待实施、待实际 Windows 验收。
+已定：原项目作为开发目录；版本化可复制启动器维护源放在 scripts；用户放在 AgentTools 的运行副本按自身位置保存 reports、cache 和 GUI 设置；系统 Python 仍运行安装包；原始 .codex 日志不动。CLI 默认尚未选择，不把推荐当作用户已选，也未改全局路径配置。
 
-本轮只读外部项目与安装副本，未改其源码、配置、媒体、缓存、系统安装或远端。外部 `git status` 返回 `fatal: this operation must be run in a work tree`，因此未确认工作树状态；本地远程跟踪引用也不作为当前远端事实。
+本轮实际完成只读目录／Git 跟踪／媒体字节盘点及官方惯例查询，并据此重写计划和接续入口。使用同一实现核查者，主任务负责默认行为比较与整合；沿用 agent-team、file-structure、engineering-judgment、writing-for-agents。模型按项目配置派发；团队用量与费用未知。
 
-实现核查者复核计划，未发现须扩大范围的问题；已从无关 TEMP 目录实际执行系统安装包的 `gui --help`，退出 0，在创建 Tk 窗口前结束。现有 `worker_python()` 会为统计子进程选择 pythonw 同目录的 console Python，子进程已有 `CREATE_NO_WINDOW`。这支持轻量预检及启动方案，不代替待实施的真实窗口验收。
+## 只读发现与处置范围
 
-## 记忆与组织
+- 原源码根存在约 1.42 GB 的旧缓存及 invalid 备份、约 224 MB 的 .task-tmp 和约 207 MB 的真实报告；可再生成缓存／临时物列清理候选，未执行删除。
+- 原报告目录有四个 Git 跟踪媒体。HEAD 与 index 一致；工作区两 PNG 与 MP4 较提交版本有变化。规划以 HEAD 原 blob 迁至 docs/assets，当前完整报告另留运行区，不把受保护 PNG 更新或已有 MP4 改动混入提交。
+- scripts 当前仅有旧预览脚本 pyc；requirements.txt 仅转接 .[test]，CI 仍在使用；五份现有测试使用 .task-tmp。保留有效依赖／文档／测试分工，避免为改名增加无用迁移。
+- 用户复制的 D:/AgentTools/state/codex-usage/启动用量统计.cmd 已实际存在，与原同步启动脚本一致。本轮只读该文件，尚未设置相对脚本根的两个环境变量。
+- CLI 惯例按 coverage.py（报告目录）、uv（用户缓存）、pytest（项目缓存）和 PyPA（布局）官方说明比较，来源链接在计划；推荐为设计推论，不把参考项目当作本项目既定要求。
 
-主任务完成一次 memory brief，保留 mandatory；历史检索和当前实现核查分别委托，主任务整合计划。自动维护尝试返回 `acquired=false`，已有持有者 `codex-01a1da5e-runtime-implementation`；本轮未取得维护所有权，未派维护协调者，也未停止或释放他人任务。
+原项目早前 git status 返回 work tree 错误；本轮用 ls-tree、ls-files --stage 及二进制 blob 哈希确认媒体跟踪与变化，仍不声称原工作树整体干净。未 fetch 或判断当前远端发布状态。
 
-历史检索实际完成搜索、回源、评分与 rank，5 项／3081 字符全部接收，并已按 `retrieval-872a80859f6b4aaba9781e323ab6bfc5` 确认 delivery。主迁移及实施对话各读到可见最新 10 turns、`hasMore=false`；后续 GitHub 同步对话读最新 10 turns、`hasMore=true`，未继续读更早页。三个分线程 freshness 均因 Codex App Server 无法打开 `state_5.sqlite`（SQLite code 14）失败；直接读对话及迁移原证补足本次依据，不声称新鲜度检查通过或已覆盖更晚发布。
+## 前轮调查与历史依据
 
-原对话定位：主迁移 `01a1d2db-9ca7-7891-b59e-c948688b69ab`（追加用量工具、独立安装和保留原 project）；实施 `01a1d2ea-8f4f-7e92-b715-d731120f36e4`；后续同步 `01a1d7dc-69f2-7791-b709-a04cf43aa63e`。补读范围为迁移 plan/progress/result、用量启动器与 environment 备份、usage-result／usage-machine-result、路径收据及 11 月 14 日收尾计划的相关段落。未扩查其他工具推理或全库业务资料。
+观察版本为本地 main edda407、系统 Python 3.13 安装的 codex-usage-plot 0.2.0。前轮对 paths、gui、__main__、charts、query、query_cli、environment 七模块核得源码与安装副本 SHA256 一致；未把这一观察外推为之后源码修改会自动更新安装。
 
-本轮文档按 UTF-8 读取，新增／改动的本地链接与锚点检查通过，相关 Git 差异无空白错误；未运行产品测试或真实统计。分支为一名历史检索者、一名实现核查者，后者定点复核计划；模型按本项目日常／检索配置派发，用量与费用未知。
+原反馈的实现根因已核：迁移后 .cmd 同步运行 GUI，报告目录配置为 AgentTools reports；旧启动器经 environment --launch 用 pythonw／Popen 分离启动。实际从无关 TEMP 目录运行系统安装包 gui --help 退出 0，未创建 Tk 窗口。当前方案继续沿用这些实现证据。
+
+前轮历史检索完成搜索、回源、评分与 rank，5 项／3081 字符全部接收并以 retrieval-872a80859f6b4aaba9781e323ab6bfc5 确认 delivery。主迁移对话 01a1d2db-9ca7-7891-b59e-c948688b69ab 及实施对话 01a1d2ea-8f4f-7e92-b715-d731120f36e4 各读最新 10 turns、hasMore=false；后续同步对话 01a1d7dc-69f2-7791-b709-a04cf43aa63e 读最新 10 turns、hasMore=true，未继续读更早页。freshness 的 state_5.sqlite 访问失败保留为未核；已直接读对话和迁移原证补足本次依据。没有扩查其他工具推理或全库业务资料。
+
+原计划提交为 1d63cb3；本轮直接改写现行计划，原文通过 Git 追溯，不维持两个相互竞争的执行入口。
+
+## 自动维护与检查
+
+前轮启动维护时由其他任务持有，返回 acquired=false，未停止或释放他人任务。本轮刷新完整项目注册清单并重新启动，取得自有 run bdb9fb30c5a24c5d88f015ee14416519 后，在 Codex App Server 访问 state_5.sqlite 时失败（SQLite code 14、arg0 目录访问被拒）。未得到语义派工回执、未派维护协调者；已独立 stop，核 publications=[] 后 release 成功。未把此轮维护记为完成。
+
+本轮仅做相关 Markdown 的 UTF-8、本地链接／锚点与 Git 差异检查；未运行产品回归、GUI 更新、真实日志统计或目录清理。执行检查结果随提交记录；实际整改及新版安装验收仍待后续实施。
+
+实现核查者已定点复核新版计划，补清 A／B 对应的具体配置键迁移、demo／CI 默认路径，以及独立 query 不继承 cmd 临时环境的边界。修订后检查通过；本轮只提交五份计划及接续文档。
 
 ## 下一步
 
-按 [计划](plan.md#实施顺序)在用量统计原项目执行，核工作树后修改启动器和相关说明，完成分离启动、路径隔离及合成更新检查，再补实际结果。当前不属于已修复或已发布状态。
+用户选择 CLI 方案后，按[实施顺序](plan.md#实施顺序与验收)整合开发目录整理、可复制启动器与统一 CLI 默认，再用合成数据和真实 Windows 入口验收。正式记录实际删除／移动清单及未完范围，不能以计划提交代替功能修复。
