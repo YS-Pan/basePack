@@ -30,6 +30,8 @@ def _receipt(memory_dir, project_id):
     receipts = sorted((memory_dir / 'maintenance').glob('codex-*.json'),
                       key=lambda path: path.stat().st_mtime_ns, reverse=True)
     for path in receipts:
+        if not re.fullmatch(r'codex-[0-9a-f]{32}\.json', path.name):
+            continue
         data = json.loads(path.read_text(encoding='utf-8'))
         if data['binding']['project_id'] == project_id:
             return path, data

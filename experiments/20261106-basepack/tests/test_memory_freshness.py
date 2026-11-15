@@ -1,8 +1,11 @@
 import json
+import os
 from types import SimpleNamespace
 
+import pytest
+
 from basepack.memory.codex import collect_codex
-from basepack.memory.freshness import inspect_codex
+from basepack.memory.freshness import _receipt, inspect_codex
 from basepack.memory.prompts import prepare_retrieval, render_retrieval_prompt
 from basepack.project.config import load_project_config
 from basepack.project.init import init_project
@@ -38,6 +41,36 @@ class Server:
         return {'data': data[start:start + 1], 'nextCursor': str(start + 1) if start + 1 < len(data) else None}
 
 
+@pytest.mark.parametrize('content', ['', json.dumps({'status': 'ok', 'output': 'command summary'})])
+def test_receipt_ignores_newer_custom_codex_output(tmp_path, content):
+    maintenance = tmp_path / 'maintenance'
+    maintenance.mkdir()
+    receipt = maintenance / ('codex-' + 'a' * 32 + '.json')
+    data = {'binding': {'project_id': 'project'}, 'capture': {'threads': []}}
+    receipt.write_text(json.dumps(data), encoding='utf-8')
+    output = maintenance / 'codex-usage-plan-revised-20261115-01a1dd96.json'
+    output.write_text(content, encoding='utf-8')
+    os.utime(receipt, (1700000000, 1700000000))
+    os.utime(output, (1700000001, 1700000001))
+
+    assert _receipt(tmp_path, 'project') == (receipt, data)
+
+
+def test_receipt_preserves_corrupt_canonical_json_error(tmp_path):
+    maintenance = tmp_path / 'maintenance'
+    maintenance.mkdir()
+    previous = maintenance / ('codex-' + 'a' * 32 + '.json')
+    previous.write_text(json.dumps({'binding': {'project_id': 'project'}, 'capture': {'threads': []}}),
+                        encoding='utf-8')
+    corrupt = maintenance / ('codex-' + 'b' * 32 + '.json')
+    corrupt.write_text('', encoding='utf-8')
+    os.utime(previous, (1700000000, 1700000000))
+    os.utime(corrupt, (1700000001, 1700000001))
+
+    with pytest.raises(json.JSONDecodeError):
+        _receipt(tmp_path, 'project')
+
+
 def test_distribution_freshness_evidence_flow(tmp_path, monkeypatch):
     machine = tmp_path / 'machine.toml'
     machine.write_text('schema_version=1\n', encoding='utf-8')
@@ -49,7 +82,7 @@ def test_distribution_freshness_evidence_flow(tmp_path, monkeypatch):
     server = Server(config.root)
     output = config.memory_dir / 'codex'
     capture = collect_codex('project', [OLD], output, client=server)
-    receipt = config.memory_dir / 'maintenance' / 'codex-test.json'
+    receipt = config.memory_dir / 'maintenance' / ('codex-' + 'a' * 32 + '.json')
     receipt.parent.mkdir(parents=True)
     receipt.write_text(json.dumps({'binding': {'project_id': 'project'}, 'capture': capture}), encoding='utf-8')
     preflight = receipt.parent / ('a' * 32 + '.json')
