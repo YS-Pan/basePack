@@ -4,4 +4,4 @@
 
 显式维护已完成固定217/217来源（109 initial、108 existing_change），76个成功批次、4条原待决关系已处理；另4个关联来源用于必要共读/依据接续。作者均结束，已stop，确认无在途/未明发布后release，最终owner=null。JSON回执选择反馈已随实际修复及部署验证结案；受限shell的SQLite权限反馈仍pending，正常用户入口成功不冒充其已修复。原采集缺口和截点外新材料保留。详见[result.md](result.md)。
 
-从796416d隔离构建的最终wheel已校验、普通安装和冒烟通过；稳定客户端59文件与wheel一致，依赖检查及实际freshness成功。共享embedding沿此前0.15部署继续运行，无需为客户端回执修复重启。接下来正常推送main，创建/核验Release草稿和3个附件，再公开0.15.0、重下校验并记录实际结果；此刻尚未公开发行。
+最终wheel从796416d隔离构建，包装、普通安装及稳定客户端59文件验证通过，依赖检查及实际freshness成功。共享embedding沿此前0.15部署继续运行。本地21项提交已正常快进推送；2026-11-15北京时间16:49:24公开[0.15.0](https://github.com/YS-Pan/basePack/releases/tag/v0.15.0)，非prerelease并设Latest，标签为70be61b。草稿与公开后3附件均下载校验通过，标签/说明/附件及工程tree一致；main随后补本发行回执和README版本。本任务保留在tasks，不自动归档。

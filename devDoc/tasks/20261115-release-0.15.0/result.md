@@ -1,6 +1,6 @@
 # 0.15.0规则修订、维护与发行结果
 
-2026-11-15。规则修订、显式维护、最终包构建及本机客户端验证完成；GitHub公开发行尚待下节记录。
+2026-11-15。规则修订、显式维护、最终包构建及本机客户端验证完成；[GitHub 0.15.0](https://github.com/YS-Pan/basePack/releases/tag/v0.15.0)已公开并设为Latest。
 
 ## 规则与实际修复
 
@@ -32,4 +32,6 @@ JSON解析反馈`a27788a17c0041218d59a2f5e66c0e0c`已fixed：最终普通安装�
 
 ## GitHub发行
 
-待正常推送main、核Release草稿及3附件后公开0.15.0并设Latest，再重下附件验证；实际标签提交、时间与URL在成功后补记。[英文发行说明](release-notes.md)已准备。公开范围不含项目记忆、数据库、配置、凭据、模型及本机运行原证。本任务按新约定保留在tasks，不自动归档。
+本地21项提交正常快进推送至[YS-Pan/basePack](https://github.com/YS-Pan/basePack)。[v0.15.0](https://github.com/YS-Pan/basePack/releases/tag/v0.15.0)于北京时间2026-11-15 **16:49:24**公开，非草稿、非prerelease并设Latest；Release ID为445921314，标签指向`70be61b997977ad40f9e338e81d37bea21df986f`。该提交包含规则、freshness修复和维护结果，实验工程tree与构建源796416d完全相同；main随后只补发行记录和根README链接，不改发行包。
+
+草稿阶段已核目标提交、[英文说明](release-notes.md)、3附件大小和GitHub digest，并下载逐字节比对；公开后再次重下，全部SHA256及字节仍相同，远端标签指向上述提交、Latest API返回本次Release。选留证据为本机`artifacts/runs/20261115-release-0.15.0/github-draft.json`及`github-published.json`。公开范围不含项目记忆、数据库、配置、凭据、模型及本机运行原证。本任务按新约定保留在tasks，不自动归档。
