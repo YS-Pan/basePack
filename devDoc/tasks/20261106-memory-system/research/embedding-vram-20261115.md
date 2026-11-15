@@ -1,5 +1,7 @@
 # Embedding 上下文长度与显存标定
 
+后续已实测现有框架显式使用cuDNN后跑通10k×4，见[高效后端结果](efficient-attention-20261115.md)。本文18–19／60–65 GiB只针对保持math路径的外推，不代表换后端后的需求或本卡的固有限制。
+
 2026-11-15。针对2k提高至约10k的显存问题，在独立HTCondor作业内复用本机Qwen3-VL-Embedding-2B固定revision、FP16、Sentence Transformers6.2.0和PyTorch2.10.0+cu128。共享0.13.0.dev1服务保持运行，生产配置仍为2048、纯文本batch4、9216 MiB预算；本次没有提高生产上限。
 
 ## 实测与估计
