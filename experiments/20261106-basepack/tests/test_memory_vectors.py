@@ -175,7 +175,9 @@ def test_real_file_and_section_token_overflow_preserves_previous_publication(rea
     memory.apply(batch)
     before = memory._execute("SELECT * FROM member ORDER BY id;")[0]
     batch = batch_for(memory, text, previous=batch)
-    long_summary = "维护条件必须保留。" * 500
+    # The current 32768-token model limit includes template/instruction tokens.
+    # This repeated one-token pattern exceeds it before those tokens are added.
+    long_summary = " a" * 33000
     batch["members"][0]["text"] = long_summary
     batch["members"][1]["text"] = long_summary
     with pytest.raises(HTTPError) as failure:
@@ -183,6 +185,7 @@ def test_real_file_and_section_token_overflow_preserves_previous_publication(rea
     error = failure.value
     assert error.code == 422
     notes = '\n'.join(error.__notes__)
+    assert 'supported_context_tokens=32768' in notes
     assert 'Request input indices exceeding the limit (0-based)' in notes
     assert 'request token counts' in notes
     assert 'Candidate encoding failed for request inputs' in notes

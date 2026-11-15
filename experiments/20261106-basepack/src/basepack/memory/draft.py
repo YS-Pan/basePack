@@ -1,6 +1,8 @@
 """Freeze scoped author drafts into one immutable publication batch."""
 
 from copy import deepcopy
+import json
+from pathlib import Path
 from uuid import uuid4
 
 
@@ -81,6 +83,17 @@ def freeze(drafts):
                 raise ValueError('Conflicting draft contexts')
             merged['context'] = draft['context']
     return merged
+
+
+def freeze_file(drafts, output):
+    """Validate and exclusively save one frozen batch before it can be applied."""
+    batch = freeze(drafts)
+    validate_batch(batch)
+    path = Path(output).resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('x', encoding='utf-8') as stream:
+        json.dump(batch, stream, ensure_ascii=False, indent=2)
+    return batch
 
 
 def validate_batch(batch):

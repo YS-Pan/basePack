@@ -8,7 +8,7 @@ def register_commands(subparsers):
     memory = subparsers.add_parser("memory", help="Project-local multilevel memory")
     commands = memory.add_subparsers(dest="memory_action", required=True)
     actions = {name: commands.add_parser(name) for name in
-               ("init", "guide", "sources", "prepare", "freeze", "apply", "stop", "owner", "release", "recover-owner", "embed", "search", "read", "knowledge", "history", "neighbors", "brief", "changes", "maintain", "prompt", "pending-dispatch", "retrieve", "retrieval-dispatch", "retrieval-prompt", "freshness", "rank", "delivery", "access-hints", "feedback-report", "feedback-list", "feedback-resolve")}
+               ("init", "guide", "sources", "prepare", "freeze", "publish", "apply", "stop", "owner", "release", "recover-owner", "embed", "search", "read", "knowledge", "history", "neighbors", "brief", "changes", "maintain", "prompt", "pending-dispatch", "retrieve", "retrieval-dispatch", "retrieval-prompt", "freshness", "rank", "delivery", "access-hints", "feedback-report", "feedback-list", "feedback-resolve")}
     actions["feedback-report"].add_argument("--kind", choices=["knowledge", "retrieval"], required=True)
     actions["feedback-report"].add_argument("--issue", required=True)
     actions["feedback-report"].add_argument("--target", help="Member, node or semantic edge ID")
@@ -25,6 +25,12 @@ def register_commands(subparsers):
     actions["prepare"].add_argument("--paths", nargs="+", required=True,
                                     help="Project-relative files; enumerate directories first")
     actions["freeze"].add_argument("--drafts", nargs="+", required=True, help="Reader-scoped UTF-8 JSON drafts")
+    publication = actions["publish"].add_mutually_exclusive_group(required=True)
+    publication.add_argument("--completed", help="Ordered JSON list of completed {path, file_sha256, assignment} drafts")
+    publication.add_argument("--frozen", help="Resume this exact frozen UTF-8 JSON batch")
+    actions["publish"].add_argument("--control", required=True, help="Current owner's control file")
+    actions["publish"].add_argument("--result", required=True, help="Local detailed database-receipt projection")
+    actions["publish"].add_argument("--timeout", type=float, default=600, help="Candidate embedding timeout")
     actions["apply"].add_argument("--batch", required=True, help="Frozen UTF-8 JSON batch")
     actions["apply"].add_argument("--control", required=True, help="Current owner control file")
     actions["apply"].add_argument("--timeout", type=float, default=600, help="Candidate embedding timeout")
@@ -103,7 +109,8 @@ def register_commands(subparsers):
         if name in ("prompt", "pending-dispatch", "retrieval-dispatch", "retrieval-prompt"):
             command.set_defaults(output=None)
         else:
-            command.add_argument("--output", help="Write JSON here and return its location")
+            command.add_argument("--output", help=("New frozen batch path (requires --completed)" if name == "publish"
+                                                  else "Write JSON here and return its location"))
 
 
 def dispatch(args, config):
@@ -123,15 +130,11 @@ def dispatch(args, config):
             return claim, 0
         layout = maintenance_layout(config, mode=args.mode, available_subagents=args.available_subagents)
     if action == "freeze":
-        from .draft import freeze, validate_batch
+        from .draft import freeze_file
         if not args.output:
             raise ValueError('memory freeze requires --output for the frozen batch')
-        batch = freeze([load_json_file(path) for path in args.drafts])
-        validate_batch(batch)
         path = Path(args.output).resolve()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open('x', encoding='utf-8') as stream:
-            json.dump(batch, stream, ensure_ascii=False, indent=2)
+        batch = freeze_file([load_json_file(path) for path in args.drafts], path)
         return {"output": str(path), "batch_id": batch['batch_id']}, 0
     if action == "guide":
         result = {"skill": str(Path(__file__).with_name("SKILL.md"))}
@@ -177,7 +180,12 @@ def dispatch(args, config):
     else:
         from .store import Memory
         memory = Memory(config)
-        if action == "feedback-report":
+        if action == "publish":
+            from .publish import publish
+            return publish(memory, completed=load_json_file(args.completed) if args.completed else None,
+                           output=args.output, frozen=args.frozen, control=args.control,
+                           result=args.result, timeout=args.timeout), 0
+        elif action == "feedback-report":
             from .feedback import report
             result = report(memory, kind=args.kind, issue=args.issue, target=args.target,
                             observed_revision=args.observed_revision, query=args.query,

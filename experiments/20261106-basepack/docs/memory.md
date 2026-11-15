@@ -24,9 +24,8 @@ function memory {
 memory maintain --mode manual --holder '<本thread身份>' --control '<memory.data_dir>/maintenance/<全新标识>.control'
 # 仅 acquired=true 时继续；已有 owner 时报告持有者。
 memory prepare --paths '说明.md' '决定.md' --output '<project-root>/tmp/<run>/reading.json'
-# 阅读 prepare 输出，每个 reader 写出独立 draft。
-memory freeze --drafts '<draft.json>' --output '<新batch.json>'
-memory apply --batch '<新batch.json>' --control '<同一control>'
+# 阅读 prepare 输出，作者显式完成本次 assignment，publisher 保存有序完成稿引用。
+memory publish --completed '<completed.json>' --output '<新batch.json>' --control '<同一control>' --result '<result.json>'
 memory stop --control '<同一control>'
 memory release --control '<同一control>'
 memory changes --scope '资料目录'
@@ -37,6 +36,12 @@ memory changes --scope '资料目录'
 prepare 时包括本批所用依据与关系两端的材料；它提供新旧编号原文、已有与关联成员、节点、关系及 expected 知识版本，图片返回可打开的原图路径。关联记录的来源原文仍需 read 或扩充 prepare 范围核实。将材料交给订阅 agent，在同次阅读中选择最终块边界并生成摘要、节点和图边；结构备读单元只用于定位。批次 JSON 合同与操作流程在 `memory guide` 返回的已安装 skill 中，源码维护源为 [SKILL.md](../src/basepack/memory/SKILL.md)。
 
 新成员省略 ID，freeze 按各 draft 的成员位置分配 UUID 并解析引用；更新只使用 prepare 返回的 UUID 和 expected。跨 reader 保留 draft 作用域，重复更新报错。冻结 batch 及其映射必须保留，重试复用同一文件，已提交的相同批次返回原回执。旧写入协议与未迁移库明确拒绝；升级存量项目先停写并完成离线迁移。详细位置引用见[批次合同](../src/basepack/memory/SKILL.md#direct-batch-interface)。
+
+`publish` 将核稿、freeze/validate、独占保存 frozen 和原 apply 顺序组合；CLI 与 Python 共用 `basepack.memory.publish` helper。`completed.json` 是有序 JSON 数组，每项为 `{"path":"<draft.json>","file_sha256":"<文件字节SHA256>","assignment":"<具体交付引用>"}`；相对路径按调用进程 cwd 解析。数组顺序即 draft 作用域顺序。一个完成稿可直接发布，多稿合组或拆组由 publisher 判断；各次发布各自原子。作者须针对该 assignment 显式交付，publisher 根据已有自有句柄声明完成；文件出现或整个聊天结束都不能代替它。
+
+Python 可直接传列表：`from basepack.memory import publish; publish(memory, completed=references, output="new-frozen.json", control=control, result="result.json")`。已有 `prepare/read/neighbors`、prompt 渲染和直接 `freeze/apply` 仍可自由调用；已知步骤可在一次宿主 exec 中用普通 Python 顺序或条件组合，需要判断时返回 agent。格式、覆盖、证据和语义分块修订交回原作者，跨 scope 判断共读解决。
+
+固定稿接续用 `memory publish --frozen '<原batch.json>' --control '<同一control>' --result '<result.json>'`，Python 对应 `frozen=`，保留原 batch_id 与 UUID。来源或作者稿改变时才经当前 prepare/必要阅读产生新 path/hash 并重新 freeze。数据库 batch receipt 是发布权威；本地 result 仅为详细投影，写失败后也接续同一 frozen，不能为补回执生成新 batch。短返回给各类写入和 invalidated 数量，详细 result 保存原 apply 结果（包括 invalidated IDs）、batch_id、frozen 路径与文件 SHA256；接续时 completed 为 null。`file_sha256`/`frozen_file_sha256` 是文件字节校验，DB `batch_hash` 是 apply 规范化内容身份。未知提交沿原 marker/owner 合同核定，保留 fixed frozen，不自动重投或 release。
 
 apply 核对来源版本，以及本批改写、退役、更正目标、实际依据、父引用和关系端点的 expected 版本，再原子写入；无关 expected 不阻塞，缺 expected 仅允许本批新建记录。chunk 按范围取原词；摘要、依据、更正和旧快照持久保存。旧草稿冲突重新 prepare、阅读后提交。作者完成必要理解、生成批次并由程序成功发布即完成普通批次，不追加独立语义复核、例行回读/检索抽查。失败或结果未明保持未决。
 

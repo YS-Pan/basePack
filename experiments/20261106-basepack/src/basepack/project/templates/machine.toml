@@ -5,13 +5,12 @@ endpoint = 'http://127.0.0.1:8765'
 service_name = 'BasepackEmbedding'
 model_root = 'models/ORG/MODEL/REVISION'
 device = 'auto'
-max_length = 2048
 batch_size = 4
 max_pixels = 1048576
 queue_timeout = 600
 cpu_threads = 2
-# CUDA only: replace 0 with a measured positive budget in MiB before starting.
-gpu_memory_mib = 0
+# CUDA soft target in MiB; adjust to the machine and measured workload. 0 disables cache trimming.
+gpu_memory_mib = 9216
 
 [htcondor]
 bin_dir = 'C:/condor/bin'

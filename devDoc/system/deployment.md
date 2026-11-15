@@ -1,6 +1,6 @@
 # 项目配置与部署合同
 
-更新：2026年11月14日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向0.14.0；本轮安装及检查见[交付进度](../tasks/20261114-next-maintenance/progress.md)，0.13身份切换见[上批交付](../tasks/20261114-delivery-closeout/result.md)。本文维护部署边界；操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入，修改配置时按[维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)同步受影响状态。
+更新：2026年11月15日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向0.15.0；本轮范围见[运行与维护计划](../tasks/20261115-runtime-and-maintenance/plan.md)，此前0.14安装见[交付进度](../tasks/20261114-next-maintenance/progress.md)，0.13身份切换见[上批交付](../tasks/20261114-delivery-closeout/result.md)。本文维护部署边界；操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入，修改配置时按[维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)同步受影响状态。
 
 ## 位置与责任
 
@@ -10,12 +10,12 @@
 | 项目配置、详细 instructions、项目知识和产物 | 属于对应项目，集中于其 .basepack/；业务原件沿业务布局 |
 | 模型及 model.lock.json | 共享设施按组织/模型/revision 保存，多项目共用权重 |
 | 机器配置 | 一份 schema 1 TOML，保存显式模型路径、服务地址与资源设施位置 |
-| embedding 服务环境 | 独立共享 Python 3.13 环境，使用兼容 wheel 与锁定依赖，运行时不依赖源码或 tmp；0.6 客户端可沿用 0.5 服务 |
+| embedding 服务环境 | 独立共享 Python 3.13 环境，使用兼容 wheel 与锁定依赖，运行时不依赖源码或 tmp；新服务行为须部署对应包并重启后生效 |
 | SurrealDB 程序与项目库 | 官方发行 exe 可共用；每项目独立进程、端口与项目内物理目录，多聊天共用该项目进程 |
 | 运行托管与日志 | 共享模型沿用 Shawl/SCM；项目库可由普通用户手动启动，也可选管理员 SCM；日志分别保存 |
 | 普通作业容量与策略 | HTCondor 独立安装并唯一维护 |
 
-本机共享服务沿R9使用`C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe`与`D:/AgentTools/state/basepack/embedding/logs/`；SurrealDB4.0.0 exe为`D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。本项目独立稳定客户端环境仍为`D:/AgentTools/envs/basepack-client-0.10/`，其中包已原位升级0.14.0，目录名不表示包版本；本项目库已迁至`.basepack/memory/store-0.13`并由原serve.ps1监听18080，旧store只作恢复。共享embedding服务同步升级0.13，原模型/identity/依赖版本和Shawl定义保持，仅补必要websocket-client。其它项目共用的`D:/AgentTools/envs/basepack-client/`仍为0.9.1，未代迁其数据库。公共代码通过配置定位，不写死这些本机位置。
+本机共享服务沿R9使用`C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe`与`D:/AgentTools/state/basepack/embedding/logs/`；SurrealDB4.0.0 exe为`D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。2026-11-15本轮已将本项目稳定客户端`D:/AgentTools/envs/basepack-client-0.10/`及共享embedding服务普通安装升级至0.15.0；真实HTTP、旧索引查询与安装内容已核，见[交付结果](../tasks/20261115-runtime-and-maintenance/result.md)，目录名不表示包版本。本项目库为`.basepack/memory/store-0.13`并由原serve.ps1监听18080，旧store只作恢复。原模型/identity/依赖版本和Shawl定义沿用。其它项目共用的`D:/AgentTools/envs/basepack-client/`仍为0.9.1，未代迁其数据库。公共代码通过配置定位，不写死这些本机位置。
 
 根 file-structure、agent-team、engineering-judgment 独立维护，resources skill 归 active 实验。memory skill 与英文 coordinator/reader 提示词随包安装，分别通过无需配置的 `memory guide` 和显式配置的 `memory prompt` 使用；提示词渲染不要求数据库、密码文件或模型在线。独立技能选择完整目录复制到项目 `.agents/skills/`，或联接已有项目原件；同名冲突保留并报告，正确入口复用。`init` 与 core doctor 不安装或验收它们；忽略的本机联接在新检出后重建，核宿主实际发现。开发环境、构建缓存和夹具在根 tmp，交付及回滚 wheel 在实验 dist，选留原证在根 artifacts/runs；寿命见 [文档约定](../documentation.md)。
 
@@ -54,6 +54,7 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 | memory.data_dir、jobs.jobs_dir | 相对项目根，受管理数据必须在该项目 .basepack 内 |
 | 机器配置中的相对设施路径 | 相对机器配置文件 |
 | embedding.endpoint | 显式共享 HTTP 地址，本机为 loopback 8765 |
+| embedding.gpu_memory_mib | 可按机器调整的软目标；模板9216 MiB，0关闭按目标释放空闲缓存，不设置分配器硬上限或作为CUDA启动正预算门槛 |
 | memory.endpoint/namespace/database | HTTP(S) 显式回环 IP（127/8 或 ::1），拒绝域名/通配/远端及额外 URL 成分；逻辑库不代替物理隔离 |
 | memory.username/password_file | 用户名及唯一 UTF-8 密码文件；路径相对项目根或绝对，省略时为 memory_dir/password.txt |
 | memory.project_id/source_scope | 随项目保留的 UUID；source_scope 在 Git 项目中增加显式包含项，在非 Git 项目中声明新文件发现范围 |
@@ -62,7 +63,7 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 
 `memory guide/rank` 在项目配置解析前分派；stop/owner/release/recover-owner读配置定位状态但不读凭据。prompt、pending-dispatch和retrieval-dispatch/retrieval-prompt仅读各自输入。机器配置不再维护无消费者的 `[shared].state_dir`；模型日志由 SCM/Shawl 服务定义中的显式路径管理，jobs 材料仍归项目 jobs_dir。
 
-机器 embedding 节沿用 R9 endpoint、service_name、queue_timeout 及模型/预算设置。客户端以 username 和自动读取的 password_file 建立 Basic Authorization；config show 返回 memory_password_file 绝对路径而不读取或显示 secret。password_env 与手工 shell 桥退出。instructions 保留固定 Python、绝对配置和 brief 调用；guide/rank不读配置或凭据；owner/stop/release/recover-owner需配置但不读凭据或连库。project_id 随移动或恢复保留，误连另一身份的库会失败。config show 和 doctor 只作诊断，不能替代真实功能验收。
+机器 embedding 节沿用 endpoint、service_name、queue_timeout 与模型设置；模型适配层单处维护32768-token上限，移除旧机器 `max_length`。客户端以 username 和自动读取的 password_file 建立 Basic Authorization；config show 返回 memory_password_file 绝对路径而不读取或显示 secret。password_env 与手工 shell 桥退出。instructions 保留固定 Python、绝对配置和 brief 调用；guide/rank不读配置或凭据；owner/stop/release/recover-owner需配置但不读凭据或连库。project_id 随移动或恢复保留，误连另一身份的库会失败。config show 和 doctor 只作诊断，不能替代真实功能验收。
 
 ## 环境与服务
 
@@ -77,6 +78,8 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 搬迁先停止该项目库并确认进程退出，再移动完整项目、调整启动 cwd/日志/endpoint，保留 UUID 后复核。在线备份使用原生 export；恢复集合含 export、配置、原凭据文件、业务原件、受管聊天导出、codex-attachments 原件与定位回执、必要 assets。已接受语义与更正必须恢复，向量可以从保留表示重建。长期备份位置和保留周期由业务项目确定，Git 忽略和本机目录不代替备份。
 
 ## 升级与回退
+
+0.15.0 新增同源 `memory publish` Python helper／薄CLI，顺序组合完成稿hash核对、freeze/validate、固定稿保存和原apply；原子工具、scope／版本／owner合同及数据库receipt权威保持。客户端升级后刷新托管入口和提示词，固定稿接续保持原batch_id与UUID；本地结果投影失败不新建batch。共享服务须另部署并重启，才启用CUDA显式cuDNN、实际32768-token上限、无文本字节硬限和柔性显存目标；纯文本batch4、含图batch1，超限422且不截断，合法输入仍可能OOM。请求结束后仅在reserved超正目标且有空闲缓存时释放。运行设置不改变向量身份，未变旧输入继续复用，实际分块／输入改变才重新编码；本版不迁库或全量重算。约99%落在目标内是经验目标，未作统计验收。升级保留原wheel／配置及已有恢复链，移除旧 `max_length`，核 `/info` 后端／上限／软目标及实际图文、旧索引查询；操作见[管理员流程](../../experiments/20261106-basepack/docs/administrator.md#升级与回滚)。
 
 0.14.0 将根 `private/` 独立 Git 的已跟踪及未忽略资料默认纳入同一项目，按来源、固定版本依据与端点写入 `private` 布尔标记；显式 scope 仍仅控制本轮新文件发现。沿用项目配置 schema 2、成员身份版本 2、UUID、数据库和向量输入；源码变更不要求共享 embedding 服务同步升级。普通安装后刷新 memory 托管入口，存量补标在结束旧维护并保存恢复集合后按可确认版本作元数据升级，不改知识身份或向量。无标记的旧记录保留未核含义，完整恢复备份须包含数据库及必要原件/图片等文件。独立私有 Git 不复用公共 remote，公开分享副本另行处理；本版没有自动净化导出命令。
 
@@ -98,7 +101,7 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 
 0.8.0 将维护入口收敛为 `memory maintain` 的确定性预检与余下语义交接，默认读取 source_scope，采集可归属聊天后按来源接续。CLI search 与 Python `Memory.vector_search`、`Memory.hybrid_search` 统一 `{matches, vector_coverage}`，两项 Python 方法删除 `include_coverage`，调用方读取 matches；brief 删除 `changes/change_count/vector_pending/vector_pending_count`。删除无消费者的 MachineConfig.state_dir 和旧 MemberContent/read_member 原件接口，快照回源保持。独立 skills 仍从配套源码取得，未改 wheel 发行范围。
 
-轻客户端要求 Python >=3.13，CPU/CUDA 模型依赖由各自 extra 选择。共享 embedding 的协议和语义身份未变，现有 0.5.0 CUDA 服务可继续运行；CPU 服务按自动设备选择启动，保持相同模型与 FP16。Condor 继续维护准入和排队，capacity 只作观测。更老项目缺少检索模式或 `[ai]` 时按[项目接入](../../experiments/20261106-basepack/docs/setup-project.md#版本升级)补齐。
+轻客户端要求 Python >=3.13，CPU/CUDA 模型依赖由各自 extra 选择。共享 embedding 的协议和语义身份未变，旧服务可继续提供其原有能力；新后端、上限和软目标需对应服务包部署后生效。CPU 服务按自动设备选择启动，保持相同模型与 FP16。Condor 继续维护准入和排队，capacity 只作观测。更老项目缺少检索模式或 `[ai]` 时按[项目接入](../../experiments/20261106-basepack/docs/setup-project.md#版本升级)补齐。
 
 升级保留新旧 wheel、配置和知识备份，核安装来源并在源码外验证受影响流程。底座或知识 schema 变化须验证原生恢复；回退客户端保留项目数据，旧资源版不提供记忆能力。只有服务实现或资源协议确需改变时，才按管理员流程排空、停止并切换相应服务。
 

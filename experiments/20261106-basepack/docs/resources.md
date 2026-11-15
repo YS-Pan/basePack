@@ -16,7 +16,9 @@ python -m basepack embedding --machine-config '<machine-config>' status
 
 多条输入可重复 `--text`，或用 `--inputs inputs.json` 传 UTF-8 JSON 数组，元素为字符串或 `{"text":"...","image":"<absolute-local-image>"}`。建库批量输入与单条查询共用一份模型。
 
-每请求 1–8 项，文本每项至多 64 KiB。实际含模板 token 上限由机器 max_length 固定，超限在模型 forward 前报错，原文和图片均不静默截断。每项最多一张静态图，原文件至多 32 MiB、4000 万源像素；预处理按 max_pixels 缩放。机器模板为 2048 token、max_pixels 1048576、纯文本 batch 4，含图请求 batch 固定为 1；管理员须按目标硬件验证这些负载。模型为 Qwen3-VL-Embedding-2B、FP16，输出 2048 维 L2 归一化向量；浮点范数有舍入误差。
+每请求 1–8 项。模型支持上限为每项 32768 token，按实际预处理后的 attention_mask 计数，含模板、指令和图片 token；超限在模型 forward 前返回 HTTP 422，给出原请求索引和实际计数，输入保持不截断。文本不另设字节上限。每项最多一张静态图，原文件至多 32 MiB、4000 万源像素；预处理按 max_pixels 缩放。机器模板为 max_pixels 1048576、纯文本 batch 4，含图请求 batch 固定为 1。合法长度仍可能因硬件和批次发生 OOM；调用者据原错决定分批、缩短或稍后调用。
+
+CUDA 显式选择 cuDNN attention，不支持的输入或运行环境保留原错；CPU 沿 PyTorch 原有 SDPA 路径。机器 `gpu_memory_mib` 是可调整的软运行目标，模板中的 9216 MiB 是示例，不设置分配器硬上限。请求结束后仅在 reserved 超过正软目标且有空闲缓存时释放该缓存；0 关闭此项清理。`/info` 的 model 报告后端、32768-token 上限和软目标语义。模型为 Qwen3-VL-Embedding-2B、FP16，输出 2048 维 L2 归一化向量；浮点范数有舍入误差。运行后端、上限和软目标不改变 embedding_identity；同一旧输入可复用原向量，重新分块或改变输入的条目重新编码。
 
 已知输入限额错误返回 HTTP 422，正文给出 token 数和从 0 开始的请求输入索引；客户端保留原 HTTP 错误和至多 4096 字节的响应正文。记忆候选编码另列出该请求的成员 key、来源路径和行范围。按这些定位缩短摘要或在语义边界拆分原文块，重新准备受影响材料后再提交；程序不截断原文、不自动重投。整个候选批编码完成后才发布知识和向量。旧共享服务可能仍把此类错误作为通用 HTTP 500 返回，须据对应服务日志查因；新错误呈现随服务包升级生效，客户端不会自行升级或重启共享服务。
 

@@ -30,6 +30,8 @@ read 以 member ID 和可选的依据版本、位置回读保留的原文或原�
 
 成员使用程序生成的 UUID。`freeze` 为各 reader 独立 draft 中的新成员分配身份，解析草稿位置作用域与跨草稿引用，将一对一映射保留在冻结批次；更新使用 prepare 返回的 UUID 与 expected。apply 拒绝旧协议、重复更新及未迁移库，已提交的相同冻结批次返回事务回执。项目元数据的 member_identity_version 门禁要求先完成离线迁移，不在线解析旧 ID。缺少文字成员起止行时，apply 在写入前报出成员、批次位置及字段；不存在的 read 目标明确报错。输入方式与最小批次见用户流程及随包 skill。
 
+[publish.py](../../../experiments/20261106-basepack/src/basepack/memory/publish.py)提供稳定 Python 组合 helper，`memory publish` CLI 调同一实现。有序完成稿引用为 path/file_sha256/assignment；publisher 根据具体 assignment 的显式交付和自有宿主句柄声明完成，程序不从文件或聊天结束推断它。helper 核文件 SHA256，复用 draft.py 的 freeze/validate/独占保存，再调用原 Memory.apply；没有另一套发布事务或作者状态库。短结果报告写入/invalidated 数量，本地详细 result 是原 DB batch receipt 的投影。首次从完成稿生成新 frozen；显式 `--frozen` 接续原 batch_id/UUID，包括本地结果写失败后的恢复。文件字节 SHA256 和 apply 的规范化 batch_hash 分开；改稿才经当前 prepare/阅读产生新 path/hash 与 freeze。未知提交继续原 marker/owner 合同，不自动重试或 release。其余原子工具仍可由 agent 用普通 Python 自由组合，语义修订归原作者，宿主继续负责实际派工和事件等待。
+
 brief、search 和 read 只读取已发布状态及其依据版本，不扫描原件或触发维护。brief 直接交付 mandatory、现有文件/章节概况索引和已知缺口，不执行搜索或连接 embedding；task 只是标签。stale mandatory 仍交付并标待核，known_unsynced 独立比较已登记来源与该表示/直接依据的接受版本；未发现的原件变化保持未知，false 不证明现行。changes 由维护显式调用，发现来源变化不改已发布记录，避免旧检查覆盖新接受态。
 
 向量绑定实际输入版本及 embedding_identity；仅支持 vector/hybrid，默认 vector。search 报告已发布范围内相同 identity 的兼容与待建数量，brief 明示未检查；缺少兼容向量时明确报错，真实空范围与空命中保持可辨。旧 text 配置须先改为 vector 或 hybrid，再 embed 补建索引；CPU/CUDA 的相同语义 identity 共用向量。apply 先准备候选向量，并在同一短事务发布内容和匹配向量；模型失败保留原错误并停止本批，不发布无匹配向量的内容。输入版本与 identity 未变化的向量可复用。

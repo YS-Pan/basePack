@@ -66,9 +66,9 @@
 | 数据库 endpoint、namespace/database、`data_dir` 迁移或恢复 | 先收尾活动维护及未明发布，再按 [项目 SurrealDB](administrator.md#项目-surrealdb) / [备份与恢复](memory.md#备份与恢复) 迁移。改配置不移动 store 或迁库，也不绕过旧 owner。同项目保留 UUID；新项目独立目录/端口/身份。核 launcher 配置路径/cwd及旧路径服务定义，跨调用核 `/ready`、目标 UUID 和原知识依据 |
 | `username`/`password_file` 恢复、迁址或账户轮换 | 客户端与 launcher 使用同一凭据文件。已有库缺文件先恢复原凭据；改写文件不轮换数据库已存账户。确需轮换时按 [数据库管理](administrator.md#项目-surrealdb) 同步账户和文件，只记录路径与结果，用新调用核认证及原知识读取 |
 | 重启系统、修改 launcher、运行账户或托管方式 | 配置正确不代表进程已运行；手动进程按本项目入口重开，同一 store 只启动一次。启动调用结束后另一次调用核 `/ready`，PID 不代替就绪；见 [数据库管理](administrator.md#项目-surrealdb) |
-| embedding endpoint、service_name、model_root、环境或 device 改变 | 同步客户端目标与实际服务启动设置；运行服务不会自动采用新启动参数，需要时按 [升级与回滚](administrator.md#升级与回滚) 处理。核 status、identity、实际 device/dtype及必要的一次编码；仅改客户端包不当然重启共享服务 |
-| 模型锁、前处理或相关库改变 | 按实际 `embedding_identity` 和编码输入版本决定补建兼容向量。相同模型在 CPU/CUDA 间切换或仅搬路径不当然改身份；`max_pixels` 等语义设置和身份见 [共享服务与身份](administrator.md#共享服务与身份)。`max_length` 是超限拒绝限制，不自动截断或当然要求全量重建；补建见 [首建与维护](memory.md#首建与维护) |
-| GPU、常驻负载、模型或 CUDA 承诺负载改变 | 有影响时重核峰值并协调 embedding 额度和 Condor 普通池；分配器预算不是全卡硬隔离，CPU 路径不套 CUDA 预算。按实际影响选择编码/资源检查；见 [容量与策略](administrator.md#condor-容量与策略) |
+| embedding endpoint、service_name、model_root、环境或 device 改变 | 同步客户端目标与实际服务启动设置；运行服务不会自动采用新包或启动参数，需要时按 [升级与回滚](administrator.md#升级与回滚) 处理。核 status、identity、实际 device/dtype、attention_backend、supported_context_tokens及gpu_memory_semantics，再做必要的一次编码；仅改客户端包不当然重启共享服务 |
+| 模型锁、前处理或相关库改变 | 按实际 `embedding_identity` 和编码输入版本决定补建兼容向量。相同模型在 CPU/CUDA 间切换或仅搬路径不当然改身份；`max_pixels` 等语义设置和身份见 [共享服务与身份](administrator.md#共享服务与身份)。0.15移除旧机器 `max_length`，适配层固定32768实际token上限且不截断；CUDA后端、该上限及软目标不改变身份，未变旧输入继续复用，实际分块／输入改变才重新编码；见 [首建与维护](memory.md#首建与维护) |
+| GPU、常驻负载、模型或 CUDA 负载改变 | 有影响时重核峰值并协调 embedding 软目标和 Condor 普通池。`gpu_memory_mib` 模板9216 MiB是可调整目标，不设分配器硬闸，0关闭按目标清理空闲缓存；纯文本初始batch4、含图batch1，合法输入仍可能OOM并保留原错。分别记录allocated／reserved／进程口径，约99%目标不是已验证保证；CPU不套CUDA目标，Condor作业申报合同保持。见 [容量与策略](administrator.md#condor-容量与策略) |
 | HTCondor `bin_dir`/`config_file`、安装或资源池策略改变 | 客户端路径、`CONDOR_CONFIG` 和实际站点配置保持一致；实时容量/GPU规则由 Condor 维护。核 status/queue及必要的小作业，涉及 GPU 才核该路径；见 [Condor 容量与策略](administrator.md#condor-容量与策略) |
 | `jobs.jobs_dir`、项目保存位置或作业执行环境改变 | 新配置不移动历史材料/回执或运行任务的 cwd。核解析后的作业路径和受影响任务输出，沿现有活动/历史状态处理；旧 PID 或目录名不构成清理证据；见 [普通重任务](resources.md#普通重任务) |
 
@@ -77,6 +77,8 @@
 ## 按变化边界准备恢复集合
 
 先记录客户端版本、wheel、配置及当前 owner/发布状态。结束自有维护并确认发布结果后升级；安装与数据兼容验收结束后，才另开语义维护。积压不是升级失败，也不要求每次重新理解全部资料。
+
+0.15的 `memory publish` 与原freeze/apply共用发布合同，固定稿接续保留原batch_id和UUID；数据库receipt为权威，本地result写失败时保留同一frozen及owner/control，按[发布流程](memory.md#最小闭环示例)核定，不为补投影新建batch。此客户端升级不迁库或要求全量重算；cuDNN／32768／软目标须在对应共享服务部署后核实。
 
 | 本次改变 | 需要保留的恢复材料 | 最小实际确认 |
 | --- | --- | --- |

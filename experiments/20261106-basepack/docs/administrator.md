@@ -181,11 +181,13 @@ model_root/
 
 成功时生成 `model.lock.json` 和完整 `model/`。保留已投用的锁，推理从本地加载。模型清单变化会改变 embedding_identity，须按新身份补建向量；锁格式和生成规则由 [准备脚本](../examples/prepare_embedding_model.py) 维护。
 
-从包内机器模板创建配置，将 model_root 指向该目录，选择 CPU 线程和支持负载。使用 CUDA 时，管理员在开放共享前将 `gpu_memory_mib` 改为正 MiB 预算，并配置普通 GPU 池：
+从包内机器模板创建配置，将 model_root 指向该目录，选择 CPU 线程和支持负载。CUDA 显式使用 cuDNN attention，CPU 沿原有 SDPA 路径且无需 GPU 预算。模型上限固定为实际预处理后 32768 token，退役机器 `max_length`；升级配置时移除该旧项。`gpu_memory_mib` 是可按机器调整的软运行目标，模板 9216 MiB 为示例，0 关闭按目标清理缓存；它不设置 PyTorch 分配器硬上限，也不作为 CUDA 启动的正预算门槛。管理员在开放共享前标定背景负载，并配置普通 GPU 池：
 
-1. 首次标定期间先不开放 Condor GPU 作业。记录物理显存 T、桌面及其它常驻程序的峰值，再扣留安全余量，给 embedding 一个能容纳模型和测试负载的正预算 E；E 小于 T。CPU 线程、max_length、max_pixels 和 batch_size 一起确定支持负载。
-2. 按 [共享服务与身份](#共享服务与身份) 启动服务。在另一终端用 `nvidia-smi --query-gpu=timestamp,memory.used,memory.total --format=csv -lms 250` 采样，按承诺负载编码文本批次和图片，记录峰值和服务日志；OOM 时调整预算或负载。
-3. 根据加载及编码全过程峰值确定背景总预留 B，含 embedding、其它程序、非 PyTorch CUDA 开销及余量。普通 GPU 池 G = T − B，只有 G 为正且能容纳目标作业时才开放；再测 embedding 与声明峰值的实际 GPU 作业并存。E 只控制 PyTorch 分配器，不能代替外部全卡峰值。WDDM 下 CUDA free 不代表全卡空闲。
+1. 首次标定期间先不开放 Condor GPU 作业。记录物理显存 T、桌面及其它常驻程序的峰值和安全余量，为 embedding 选择日常软目标 E。CPU 线程、max_pixels 和 batch_size 一起确定代表负载；纯文本初始 batch 4，含图 batch 1。
+2. 按 [共享服务与身份](#共享服务与身份) 启动服务。在另一终端用 `nvidia-smi --query-gpu=timestamp,memory.used,memory.total --format=csv -lms 250` 采样，编码代表文本批次、长输入和图片，分别记录 PyTorch allocated/reserved/peak、外部进程／全卡口径及服务日志。少数长输入或大批次可超目标并发生 OOM，由调用者按原错调整；不保证全部合法 32768-token 输入都成功，也不自动降批或重试。
+3. 根据加载及日常编码峰值确定背景总预留 B，含 embedding、其它程序、非 PyTorch CUDA 开销及余量。普通 GPU 池 G = T − B，只有 G 为正且能容纳目标作业时才开放；再测 embedding 与声明峰值的实际 GPU 作业并存。软目标 E 不提供隔离，突发占用可超过预留。若资源失败成为常态，调整默认批次或日常预留。WDDM 下 CUDA free 不代表全卡空闲。
+
+请求结束后，reserved 超过正软目标且存在未使用缓存时才调用 PyTorch 释放空闲缓存，并记录 allocated、释放前后 reserved 与目标；仍在用的张量保持。通常不逐请求清缓存。约 99% 的日常使用落在目标内是初始经验目标，后续按真实使用调整。
 
 这项共享预算由管理员维护。普通用户只运行所选后端的一次编码冒烟，兼容回归和峰值研究由开发者按对应任务执行。
 
@@ -255,7 +257,7 @@ basePack 和原生用户都提交官方 `request_gpus = 1`、`gpus_minimum_memor
 
 改变 CPU、slot 定义、GPU 名额或资源总量时，暂停新提交、排空作业并平稳重启 startd，再核实际发布容量；reconfig 不会重建已有 slot。只改变提交规则时按影响重载 schedd。本站配置机制及历史实测见 [R6 结果](../../../devDoc/archive/20261107-resource-coordination/native-condor.md) 和 [R7 结果](../../../devDoc/archive/20261107-resource-coordination/standard-submit-result.md)。
 
-embedding 分配器额度由机器 `[embedding].gpu_memory_mib` 维护，独立于 Condor。模型或推理设置改变且可能影响峰值时，重新测量背景用量再调整普通池。PyTorch allocated/reserved/peak 是本进程指标；WDDM 下 CUDA free 不代表全卡其它进程占用，全卡峰值须使用外部 nvidia-smi 时间采样。动态 free 不参与准入。
+embedding 软目标由机器 `[embedding].gpu_memory_mib` 维护，独立于 Condor 的作业申报和配额合同。模型或推理设置改变且可能影响峰值时，重新测量背景用量再调整普通池。PyTorch allocated/reserved/peak 是本进程指标；WDDM 下 CUDA free 不代表全卡其它进程占用，全卡峰值须使用外部 nvidia-smi 时间采样。动态 free 不参与准入。
 
 ## 共享服务与身份
 
@@ -298,7 +300,7 @@ $machineConfig = '<absolute-machine-config>'
 & $python -m basepack --config '<absolute-project-config>' embed --text '每周导出数据库快照' --output '<absolute-project>/.basepack/vector-smoke.json'
 ```
 
-新服务 status 报告实际 device 和 dtype；CPU 路径为 `cpu`，CUDA 路径为 `cuda:0`，两者 dtype 均为 `float16`。兼容旧服务沿用其设备配置。成功时命令返回 count 为 1 与 embedding_identity，输出 JSON 含一条 2048 维向量。失败按原始连接、模型或 CUDA 错误处理；客户端等待超时后服务端推理仍可能运行，先查日志再决定下一步。
+新服务 status 的 model 报告实际 device、dtype、attention_backend、supported_context_tokens、gpu_memory_mib 和 gpu_memory_semantics=soft_target；CPU 后端为 `sdpa_default`，CUDA 为 `CUDNN_ATTENTION`，两者 dtype 均为 `float16`。成功时命令返回 count 为 1 与 embedding_identity，输出 JSON 含一条 2048 维向量。后端、长度上限和软目标不改变向量身份；同一模型、预处理和旧输入保留向量复用合同，实际输入改变后重新编码。失败按原始连接、模型或 CUDA 错误处理；客户端等待超时后服务端推理仍可能运行，先查日志再决定下一步。
 
 Shawl `add` 创建服务，`run` 由服务管理器调用。服务保持 Manual 启动，管理员停止后保持停止。LitServe 重建死亡的推理 worker，失败请求保留原错；主进程或 Shawl 故障时管理员查日志后用 `Start-Service` 恢复。
 

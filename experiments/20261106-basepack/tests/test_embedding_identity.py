@@ -21,8 +21,8 @@ def options(tmp_path):
         "model": "Qwen/Qwen3-VL-Embedding-2B", "hf_revision": "fixture",
         "files": [{"path": "weights.safetensors", "bytes": 10, "sha256": "fixture"}],
     }), encoding="utf-8")
-    return {"model_root": str(model), "device": "cuda:0", "max_length": 2048,
-            "batch_size": 4, "max_pixels": 1048576, "idle_seconds": 30,
+    return {"model_root": str(model), "device": "cuda:0",
+            "batch_size": 4, "max_pixels": 1048576,
             "cpu_threads": 2, "gpu_memory_mib": 9216}
 
 
@@ -30,8 +30,9 @@ def test_runtime_settings_and_model_location_preserve_embedding_identity(options
     expected = identity.embedding_identity(options)
     moved = tmp_path / "移动后 model"
     shutil.copytree(options["model_root"], moved)
-    changed = options | {"model_root": str(moved), "device": "cpu", "max_length": 1024,
-                         "batch_size": 1, "idle_seconds": 10, "cpu_threads": 1,
+    changed = options | {"model_root": str(moved), "device": "cpu", "attention_backend": "CUDNN_ATTENTION",
+                         "supported_context_tokens": 32768,
+                         "batch_size": 1, "cpu_threads": 1,
                          "gpu_memory_mib": 8000}
     assert identity.embedding_identity(changed) == expected
 

@@ -7,7 +7,9 @@ from fastapi import HTTPException
 from litserve import LitAPI, LitServer
 
 from .identity import DTYPE, embedding_identity
-from .qwen3_vl import EmbeddingInputError, Qwen3VLEmbedder, resolve_device
+from .qwen3_vl import (
+    SUPPORTED_CONTEXT_TOKENS, EmbeddingInputError, Qwen3VLEmbedder, attention_backend, resolve_device,
+)
 
 
 class EmbeddingAPI(LitAPI):
@@ -39,6 +41,9 @@ def serve(machine):
         devices=[device.index if device.index is not None else 0] if device.type == "cuda" else 1,
         workers_per_device=1, timeout=configured["queue_timeout"], restart_workers=True,
         model_metadata={"embedding_identity": embedding_identity(options), "device": str(device), "dtype": DTYPE,
+                        "attention_backend": attention_backend(device),
+                        "supported_context_tokens": SUPPORTED_CONTEXT_TOKENS,
+                        "gpu_memory_mib": configured.get("gpu_memory_mib", 0), "gpu_memory_semantics": "soft_target",
                         "basepack": version("basepack"), "litserve": version("litserve"),
                         "sentence_transformers": version("sentence-transformers")},
     )

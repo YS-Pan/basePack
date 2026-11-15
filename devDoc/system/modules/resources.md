@@ -6,15 +6,15 @@
 
 ## 共享 embedding
 
-[embedding/qwen3_vl.py](../../../experiments/20261106-basepack/src/basepack/embedding/qwen3_vl.py) 通过 Sentence Transformers 6.2.0 加载本地 Qwen3-VL-Embedding-2B，复用其图文预处理、last-token pooling、归一化和请求内批处理。必要的薄适配负责输入限制、CUDA 分配器预算，以及在 Transformer forward 前按实际 attention_mask 拒绝超长输入；截断被显式关闭，图片原件经验证后交给库处理。
+[embedding/qwen3_vl.py](../../../experiments/20261106-basepack/src/basepack/embedding/qwen3_vl.py) 通过 Sentence Transformers 6.2.0 加载本地 Qwen3-VL-Embedding-2B，复用其图文预处理、last-token pooling、归一化和请求内批处理。薄适配单处声明 `SUPPORTED_CONTEXT_TOKENS=32768`，在 Transformer forward 前按实际 attention_mask 拒绝超长输入，计数包含模板、指令和图片 token；截断显式关闭，退役机器 max_length 和文本 64 KiB 限制。图片原件经验证后交给库处理，原文件／像素、静态图和请求项数合同保持。
 
-`resolve_device(auto)` 根据 Torch 的可用性优先选 CUDA，否则 CPU；显式设备保持用户选择。CPU 不访问 CUDA 或 nvidia-smi，CUDA 才要求正显存预算并设置分配器上限。LitServe 按已选设备使用 cpu/devices=1 或 cuda/设备索引；`/info` 的 model 提供 device 和 dtype，旧服务无需新增字段即可继续兼容。
+`resolve_device(auto)` 根据 Torch 的可用性优先选 CUDA，否则 CPU；显式设备保持用户选择。CUDA encode 显式限定 `sdpa_kernel(CUDNN_ATTENTION)`，不支持时保留原错；CPU 沿原 SDPA 路径，不访问 CUDA 或 nvidia-smi。`gpu_memory_mib` 改为软目标，不设置分配器上限或正硬预算启动门槛；纯文本保持配置 batch 4、含图 batch 1。请求结束后仅在 reserved 超过正软目标且有未使用缓存时释放空闲缓存，日志分别记录 allocated、释放前后 reserved 和目标；0 关闭此清理。合法输入可超目标或 OOM，保留原错，不动态降批或重投。LitServe 按已选设备使用 cpu/devices=1 或 cuda/设备索引；`/info` 的 model 提供 device、dtype、attention_backend、supported_context_tokens、gpu_memory_mib 和 soft_target 语义。
 
 [identity.py](../../../experiments/20261106-basepack/src/basepack/embedding/identity.py) 维护 `embedding_identity`：模型 revision/文件清单、Sentence Transformers 版本、FP16、指令、图像缩放和 pooling/归一化合同共同决定语义。服务地址、模型存放路径、队列期限、请求批次、线程和预算不改变此标识。0.5.0 引入新的身份，0.6.1 保持兼容。[记忆向量模块](../../../experiments/20261106-basepack/src/basepack/memory/vectors.py) 已按身份与输入版本判断复用、过滤不兼容向量，并通过 `memory embed` 重建。
 
 0.7.0 沿用该身份算法，CPU/CUDA 同模型与精度直接复用索引；正常浮点差异和近同分换序按语义等价处理。CPU/CUDA 依赖分别由 `embedding-cpu`、`embedding-cuda` extra 选择；跨设备实际证据在[本轮整改](../../archive/20261110-rectification/progress.md)维护。
 
-首次准备使用 [短脚本](../../../experiments/20261106-basepack/examples/prepare_embedding_model.py) 调用官方 hf 下载并验证固定 revision，再从实际文件生成 model.lock.json；模型保存为 model_root/model/，清单记录模型名、revision 及文件相对路径、字节数和 SHA256。该步骤只在准备时运行。已有服务继续保留原锁；重建清单可能改变身份，调用项目据实际身份重建向量。机器模板显存预算 0 是待标定占位，首次启动前按机器测量填写正预算并协调 Condor 普通池。
+首次准备使用 [短脚本](../../../experiments/20261106-basepack/examples/prepare_embedding_model.py) 调用官方 hf 下载并验证固定 revision，再从实际文件生成 model.lock.json；模型保存为 model_root/model/，清单记录模型名、revision 及文件相对路径、字节数和 SHA256。该步骤只在准备时运行。已有服务继续保留原锁；重建清单可能改变身份，调用项目据实际身份重建向量。机器模板 9216 MiB 为可调整软目标示例；管理员按实测背景负载协调 Condor 普通池。后端、上限和软目标不改 identity/input_revision，同一旧输入继续复用原向量，实际分块或输入改变的项重新编码；数值兼容依据见[cuDNN对照](../../tasks/20261106-memory-system/research/efficient-attention-20261115.md)。
 
 [service.py](../../../experiments/20261106-basepack/src/basepack/embedding/service.py) 只适配 LitAPI：setup 加载一份常驻模型，predict 调用编码器。LitServe 0.2.19 提供 HTTP、队列、健康检查和 worker 管理；单设备、单推理 worker、单 API 接入线程，跨请求批次为 1。请求内批次由模型库处理。`restart_workers=True` 负责重建失败 worker，失败请求不自动重投。
 

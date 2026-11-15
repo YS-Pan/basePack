@@ -1,6 +1,6 @@
 # cuDNN、E与ongoing最终计划
 
-2026-11-15。用户已选择E，本文整合已定的cuDNN、模型32k、柔性9 GiB和ongoing到期归档，是本任务唯一实施计划。本轮只维护文档，尚未实施代码、配置、服务或新机制。历史候选及案例比较保留在[研究报告](research/d-flexibility-20261115.md)，不构成本轮额外实施项。
+2026-11-15。用户已选择E，本文整合已定的cuDNN、模型32k、柔性9 GiB和ongoing到期归档，是本任务唯一实施计划。用户随后授权实施；本计划范围已落地，实际验证、安装和余项见[result.md](result.md)及[progress.md](progress.md)。历史候选及案例比较保留在[研究报告](research/d-flexibility-20261115.md)，不构成本轮额外实施项。
 
 ## 已定范围与完成边界
 
@@ -11,7 +11,7 @@
 | 协调者E | 稳定发布组合helper及同源薄CLI；其余由agent用现有原子工具／普通Python自由组合 | 保留版本、scope、原子发布和宿主生命周期，只合并确定性往返 |
 | ongoing | 项目局部持续整改索引；条目默认7天，发现到期即整目录归档 | 到期不等于完成；不自动续期，无定时任务 |
 
-工具面向能判断和调整操作的AI agent。偶发资源失败直接保留原错，由调用者决定分批、修稿或稍后调用；不为极端情况增加调度层或隐式重试。当前生产仍为math／2048／分配器硬限，新publish能力和ongoing均未启用，现行产品文档在实施时随实际行为同步。
+工具面向能判断和调整操作的AI agent。偶发资源失败直接保留原错，由调用者决定分批、修稿或稍后调用；不为极端情况增加调度层或隐式重试。实施前生产为math／2048／分配器硬限；实施后本项目客户端与共享服务均为0.15.0，publish和ongoing已启用，实际状态见结果。
 
 ## 一、embedding与柔性资源目标
 
@@ -23,7 +23,7 @@
 6. 突发请求结束后，若留下超过软目标的未使用缓存，按需用PyTorch释放空闲缓存，使突发占用回落；不逐请求无条件清缓存，也不释放仍在用的张量。沿现有日志／实验回执分别记录可得的allocated、reserved和进程口径，不建设百分位监控系统，也不混算这些指标。
 7. 现有`/info`同步呈现所选后端、模型上限和软目标语义。上述运行设置不另造向量身份；沿现有identity／input_revision复用未变输入的旧向量。必要数值对照仍保留，身份相同本身不是兼容证明；仅实际分块／输入改变的条目重新编码。
 
-已有cuDNN证据覆盖10k单条／batch4、混长短批、图片／图文和小型检索排序，32k尚未实测。实施时做代表性batch4、实际32768-token单项、超一token拒绝、超过64 KiB但token合法的文本、混长padding及图片／图文检查；保持CPU既有行为。确认kernel并区分显存口径，极限样例超过9 GiB本身不判失败，也不为证明99%扩大试验。
+制定计划时的cuDNN证据覆盖10k单条／batch4、混长短批、图片／图文和小型检索排序，32k尚未实测；本轮已补实际32768-token及拒绝边界，见结果。实施时做代表性batch4、实际32768-token单项、超一token拒绝、超过64 KiB但token合法的文本、混长padding及图片／图文检查；保持CPU既有行为。确认kernel并区分显存口径，极限样例超过9 GiB本身不判失败，也不为证明99%扩大试验。
 
 ## 二、E：稳定发布能力，agent自由编排
 
@@ -59,9 +59,9 @@ devDoc/tasks/ongoing/
   YYYYMMDD-short-topic/plan.md        时间元数据、缘由、客观命中、范围、验证及结束条件
 ```
 
-每主题只维护一份短计划。主题头是时间字段的维护源，使用带时区的ISO 8601 `created_at`与`expires_at`；默认实际创建后7天（168小时），可明确指定其他有限期限。时间从条目实际创建起算，不从本规划日期起算；本轮不提前创建条目。
+每主题只维护一份短计划。主题头是时间字段的维护源，使用带时区的ISO 8601 `created_at`与`expires_at`；默认实际创建后7天（168小时），可明确指定其他有限期限。时间从条目实际创建起算，不从本规划日期起算；计划阶段不提前创建条目；实施时已按实际创建时间起算。
 
-未来AGENTS增加一条短指针：
+AGENTS采用一条短指针：
 
 > 修改代码、配置或开发文档时，本任务读一次持续整改索引，发现到期项先归档，再按已确定的工作范围选择有效主题；遇到具体命中时，按主题边界顺手修复或记录。
 
@@ -86,15 +86,15 @@ devDoc/tasks/ongoing/
 4. **ongoing文档机制：** 创建短索引和有期限主题，更新AGENTS与documentation的归属／到期规则。检查有效／到期两个示例、整目录归档路径和引用即可，不搭测试框架或另开agent实验。
 5. **逐项交付：** 每个完整改动按既有main提交约定，结果记录实际检查与余项；相关system／产品说明只随已实现行为更新。部署不自动触发一次全项目维护，收益沿后续真实使用观察，不预报token比例。
 
-模型上限、柔性目标、E职责、ongoing时限均已确定；剩余是具体实现与有限负载验证，不是待用户再选方案。当前未实施，不修改项目纲领、不迁移数据库、不全量重算旧向量，也不把计划完成记为功能交付。
+模型上限、柔性目标、E职责、ongoing时限均已确定；剩余是具体实现与有限负载验证，不是待用户再选方案。实施未修改项目纲领，未迁移数据库或全量重算旧向量；功能交付以结果中的实际检查为据。
 
 ## 一致性维护与依据
 
 本轮已清除“待选E”、未选B/C/D/F的实施接口及完整cycle流程；区分assignment完成与整个聊天结束、真实修稿新freeze与相同frozen接续；明确退役会先挡住合法32k的64 KiB限制、处理正硬预算旧准入措辞，并统一过期不等于完成、规划日期不等于条目创建时间。
 
-沿上轮已完成的跨历史检索与实时聊天回读，本轮只定点核计划、现行源码及相关入口，没有追加历史审计或产品执行。已做文档UTF-8、链接／锚点、示例和差异检查。当前源码／产品说明中的旧运行值是尚未实施的现状，实施时按上列步骤同步，不提前改写为已交付。
+沿上轮已完成的跨历史检索与实时聊天回读，计划阶段只定点核计划、现行源码及相关入口，并做文档检查；随后按用户授权实施，实际源码、部署和功能验证独立记录于结果，没有追加历史审计。
 
-- [cuDNN与向量兼容证据](../20261106-memory-system/research/efficient-attention-20261115.md)：已测范围和未验32k；[模型卡](https://huggingface.co/Qwen/Qwen3-VL-Embedding-2B#model-overview)的官方32k。
+- [cuDNN与向量兼容证据](../20261106-memory-system/research/efficient-attention-20261115.md)：早期已测范围（当时未验32k）；[模型卡](https://huggingface.co/Qwen/Qwen3-VL-Embedding-2B#model-overview)的官方32k。
 - [协调者token调查](../20261106-memory-system/research/coordinator-token-overhead-20261115.md)与[真实维护案例分析](research/d-flexibility-20261115.md)：E的取舍和必要的临场判断；研究稿中的其它候选仅为历史比较。
 - [编码器](../../../experiments/20261106-basepack/src/basepack/embedding/qwen3_vl.py)、[身份](../../../experiments/20261106-basepack/src/basepack/embedding/identity.py)、[CLI](../../../experiments/20261106-basepack/src/basepack/memory/cli.py)、[发布](../../../experiments/20261106-basepack/src/basepack/memory/store.py)与[owner](../../../experiments/20261106-basepack/src/basepack/memory/owner.py)是实施时的对应维护源。
 - [文档约定](../../documentation.md)、[file-structure](../../../skills/file-structure/SKILL.md)及用户点名旧项目的toDo合同支持ongoing归属和期限设计；本计划不继承旧项目业务状态或全量加载要求。
