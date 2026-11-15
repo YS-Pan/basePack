@@ -10,7 +10,7 @@ basePack gives agents project-local memory, shared compute coordination, and ind
 | file-structure | Organize project files by purpose and lifecycle | A host with skills |
 | engineering-judgment | Judge contracts, responsibilities, compatibility, and the work passed to users | A host with skills |
 
-The latest published release is **[0.14.0](https://github.com/YS-Pan/basePack/releases/tag/v0.14.0)** for Windows and Python 3.13+. Current source targets **0.15.0**; its [runtime plan](devDoc/tasks/20261115-runtime-and-maintenance/plan.md) and [deployment contract](devDoc/system/deployment.md) distinguish implemented behavior from installed services. Completed versions use plain numeric versions; `.devN` is reserved for intermediate builds. The host's subscription-based agents understand material, build relations, and score results; basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability.
+The latest published release is **[0.14.0](https://github.com/YS-Pan/basePack/releases/tag/v0.14.0)** for Windows and Python 3.13+. Current source targets **0.15.0**; its [runtime plan](devDoc/archive/20261115-runtime-and-maintenance/plan.md) and [deployment contract](devDoc/system/deployment.md) distinguish implemented behavior from installed services. Completed versions use plain numeric versions; `.devN` is reserved for intermediate builds. The host's subscription-based agents understand material, build relations, and score results; basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability.
 
 **basePack is under development. Real use also serves as testing; record problems so they can inform subsequent fixes.**
 

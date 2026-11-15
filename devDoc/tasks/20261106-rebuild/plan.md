@@ -1,6 +1,6 @@
 # basePack 重建总览
 
-2026 年 11 月 14 日更新。本目录维护跨工具取舍、公共历史、skill 工作及联合发布条件；当前阶段从 [总进度](progress.md) 及各任务进度读取。当前唯一 active 路线为 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，资源 R9 已交付 0.5.0，记忆 P0–P5 接续该工程；现行实现与部署合同维护在根 system。当前工程收尾和验证责任按[收尾计划](../20261114-delivery-closeout/plan.md)执行。
+2026 年 11 月 14 日更新。本目录维护跨工具取舍、公共历史、skill 工作及联合发布条件；当前阶段从 [总进度](progress.md) 及各任务进度读取。当前唯一 active 路线为 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，资源 R9 已交付 0.5.0，记忆 P0–P5 接续该工程；现行实现与部署合同维护在根 system。当前工程收尾和验证责任按[收尾计划](../../archive/20261114-delivery-closeout/plan.md)执行。
 
 战略以 [项目纲领](../../project-charter.md) 为准；公共调查见 [调研索引](research/sources.md) 与 [近期历史](legacy-history.md)，本目录状态见 [总进度](progress.md)。旧项目只取思想、事故样例和经核实的薄接口，不迁入其数据库、任务状态或业务授权。
 
@@ -49,9 +49,9 @@
 
 ## P8 联合交付与轻量发布
 
-首次上传已完成，当时的步骤与验收保留在 [GitHub 首次发布历史计划](github-publish-plan.md)，实际阶段从 [总进度](progress.md) 读取；后续工程交付与验证责任以[收尾计划](../20261114-delivery-closeout/plan.md)为准。
+首次上传已完成，当时的步骤与验收保留在 [GitHub 首次发布历史计划](github-publish-plan.md)，实际阶段从 [总进度](progress.md) 读取；后续工程交付与验证责任以[收尾计划](../../archive/20261114-delivery-closeout/plan.md)为准。
 
-2026-11-14起，分发部署与新机验证由用户收集其他使用者及自身实际项目反馈，agent不在作者机模拟新机验收；当前回归和源码外安装只证明相应工程行为。该边界不阻塞已完成工程的开发版交付，公开说明按实际证据披露范围，详见[收尾计划](../20261114-delivery-closeout/plan.md)。
+2026-11-14起，分发部署与新机验证由用户收集其他使用者及自身实际项目反馈，agent不在作者机模拟新机验收；当前回归和源码外安装只证明相应工程行为。该边界不阻塞已完成工程的开发版交付，公开说明按实际证据披露范围，详见[收尾计划](../../archive/20261114-delivery-closeout/plan.md)。
 
 联合场景：业务主 agent 提出资料问题 → 检索团队返回证据 → 项目有变更时增量维护 → embedding 等重任务经过资源协调 → 新结果保持项目局部。短文件读取和每次 agent 派工不进入重任务队列。
 

@@ -94,7 +94,7 @@ AGENTS采用一条短指针：
 
 沿上轮已完成的跨历史检索与实时聊天回读，计划阶段只定点核计划、现行源码及相关入口，并做文档检查；随后按用户授权实施，实际源码、部署和功能验证独立记录于结果，没有追加历史审计。
 
-- [cuDNN与向量兼容证据](../20261106-memory-system/research/efficient-attention-20261115.md)：早期已测范围（当时未验32k）；[模型卡](https://huggingface.co/Qwen/Qwen3-VL-Embedding-2B#model-overview)的官方32k。
-- [协调者token调查](../20261106-memory-system/research/coordinator-token-overhead-20261115.md)与[真实维护案例分析](research/d-flexibility-20261115.md)：E的取舍和必要的临场判断；研究稿中的其它候选仅为历史比较。
+- [cuDNN与向量兼容证据](../../tasks/20261106-memory-system/research/efficient-attention-20261115.md)：早期已测范围（当时未验32k）；[模型卡](https://huggingface.co/Qwen/Qwen3-VL-Embedding-2B#model-overview)的官方32k。
+- [协调者token调查](../../tasks/20261106-memory-system/research/coordinator-token-overhead-20261115.md)与[真实维护案例分析](research/d-flexibility-20261115.md)：E的取舍和必要的临场判断；研究稿中的其它候选仅为历史比较。
 - [编码器](../../../experiments/20261106-basepack/src/basepack/embedding/qwen3_vl.py)、[身份](../../../experiments/20261106-basepack/src/basepack/embedding/identity.py)、[CLI](../../../experiments/20261106-basepack/src/basepack/memory/cli.py)、[发布](../../../experiments/20261106-basepack/src/basepack/memory/store.py)与[owner](../../../experiments/20261106-basepack/src/basepack/memory/owner.py)是实施时的对应维护源。
 - [文档约定](../../documentation.md)、[file-structure](../../../skills/file-structure/SKILL.md)及用户点名旧项目的toDo合同支持ongoing归属和期限设计；本计划不继承旧项目业务状态或全量加载要求。

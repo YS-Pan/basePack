@@ -1,6 +1,6 @@
 # 移除独立当前理解层的建设计划
 
-2026-11-12（北京时间）。用户认为当前理解在高速迭代项目中性价比低、倾向去掉。评估后从[维护接续](../../tasks/20261106-memory-system/task-duration-and-worker-naming-plan.md#六后续知识维护与检索闭环)及[整改 D/I](../../tasks/20261112-usage-rectification/plan.md#d知识演变与历史追溯)移除跨源主题短文／投影、主题身份、自动同步／刷新及专用缓存，撤回 C 作为长期默认主体的推荐；[退出评估](../../tasks/20261112-usage-rectification/research/current-understanding-options-20261112.md#退出本轮建设的评估)保留理由及原选项历史。
+2026-11-12（北京时间）。用户认为当前理解在高速迭代项目中性价比低、倾向去掉。评估后从[维护接续](../../tasks/20261106-memory-system/task-duration-and-worker-naming-plan.md#六后续知识维护与检索闭环)及[整改 D/I](../../archive/20261112-usage-rectification/plan.md#d知识演变与历史追溯)移除跨源主题短文／投影、主题身份、自动同步／刷新及专用缓存，撤回 C 作为长期默认主体的推荐；[退出评估](../../archive/20261112-usage-rectification/research/current-understanding-options-20261112.md#退出本轮建设的评估)保留理由及原选项历史。
 
 保留现有多层摘要、mandatory、原证、统一图的条件与演变、纯访问调权及已有 tier1 综合评分。检索 worker 在同一委托内整合回答，无需先刷新全局理解；明确新目标／授权仍及时定点更正。核心未知前提发现继续由必保留信息、现有概况线索、多层检索及关系发现承担；重复问题可能重复整合，未量化 token 净收益，也不承诺始终最新。
 

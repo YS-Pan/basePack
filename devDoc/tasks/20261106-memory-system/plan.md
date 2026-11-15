@@ -2,11 +2,11 @@
 
 2026 年 11 月 9 日按已提交纲领 `2f55a56` 更新，现已获用户授权执行；2026 年 11 月 11 日同步现行查询与发布合同。本文是记忆专项实施源；日常接续读本计划与 [进度](progress.md)，跨工具取舍/联合发布再读重建总览。实际接入证据见 [P0 结果](p0-result.md)，项目数据关系与阶段依赖见 [方案框图](diagrams.md)。
 
-2026-11-14责任接续：用户明确收益、质量/成本及新机分发部署验证由其实际项目和其他使用者反馈提供，agent未来据反馈分析修改。本文P4/P5、devDoc自用及机械盘/成本相关的未完成效果验证，均按[收尾计划](../20261114-delivery-closeout/plan.md)接续，不再安排agent在本机新做对照或部署模拟，也不作为本轮工程交付前置；已有实测、未知和产品目标保留。agent仍负责具体缺陷的必要回归与安装功能检查。
+2026-11-14责任接续：用户明确收益、质量/成本及新机分发部署验证由其实际项目和其他使用者反馈提供，agent未来据反馈分析修改。本文P4/P5、devDoc自用及机械盘/成本相关的未完成效果验证，均按[收尾计划](../../archive/20261114-delivery-closeout/plan.md)接续，不再安排agent在本机新做对照或部署模拟，也不作为本轮工程交付前置；已有实测、未知和产品目标保留。agent仍负责具体缺陷的必要回归与安装功能检查。
 
 ## 目标与范围
 
-2026-11-14 已随0.14.0实施根 `private/` 默认入同库及 `private` 布尔标记，沿固定版本依据传播，未建设公开导出平台。范围与验收在[本批计划](../20261114-next-maintenance/plan.md#同一项目记忆默认纳入与轻量标记)维护，源码/普通安装及有限元数据补标见[交付结果](../20261114-next-maintenance/result.md)；旧副本缺标不代表可公开。
+2026-11-14 已随0.14.0实施根 `private/` 默认入同库及 `private` 布尔标记，沿固定版本依据传播，未建设公开导出平台。范围与验收在[本批计划](../../archive/20261114-next-maintenance/plan.md#同一项目记忆默认纳入与轻量标记)维护，源码/普通安装及有限元数据补标见[交付结果](../../archive/20261114-next-maintenance/result.md)；旧副本缺标不代表可公开。
 
 记忆工具既要回答已知缺口，也要在 agent 未主动检索时交付相关线索，使其发现尚未意识到的前提；初建、检索和维护都要低成本。项目知识、来源、状态和数据库留在各自项目，通用工具、模型与机器资源可以显式共用。机械盘可用性属于交付要求。
 
@@ -24,7 +24,7 @@
 | 配置、安装与数据位置 | [部署合同](../../system/deployment.md)；复用 ProjectConfig/init，不另建安装、配置或服务发现骨架 |
 | 基座接入与历史依据 | [SurrealDB 接入依据](research/backend-review.md)；P0 验公开接口与数据合同，历史比较不再作为首期待办 |
 | 多层次表示的证据与取舍 | [专项调研](research/multilevel-retrieval.md)；区分位置层级、摘要索引与语义图，检索策略和成本按本项目样例验证 |
-| 知识历史、访问状态与检索接续 | [D/I实现](../20261112-usage-rectification/history-access-result.md)及[验收结果](../20261112-usage-rectification/acceptance-result.md)；0.12.0.dev1已实现精确知识历史、事件访问权重及tier1同次参考访问线索，本项目已普通安装；存量历史缺口、服务部署及长期效果沿结果接续。独立当前理解层已退出，现有摘要／mandatory保留；后续入口见[维护接续](task-duration-and-worker-naming-plan.md#六后续知识维护与检索闭环) |
+| 知识历史、访问状态与检索接续 | [D/I实现](../../archive/20261112-usage-rectification/history-access-result.md)及[验收结果](../../archive/20261112-usage-rectification/acceptance-result.md)；0.12.0.dev1已实现精确知识历史、事件访问权重及tier1同次参考访问线索，本项目已普通安装；存量历史缺口、服务部署及长期效果沿结果接续。独立当前理解层已退出，现有摘要／mandatory保留；后续入口见[维护接续](task-duration-and-worker-naming-plan.md#六后续知识维护与检索闭环) |
 | 旧项目思想、事故与证据边界 | [调研索引](../20261106-rebuild/research/sources.md)、[近期历史](../20261106-rebuild/legacy-history.md)、[多层代码核查](research/legacy-multilevel.md)；借鉴精确回源与未变片段复用，不把旧结构加工链或语义 note 当作三层方案已实现 |
 | 共性取舍、分发与协作 | [重建总览](../20261106-rebuild/plan.md)、[agent-team](../../../skills/agent-team/SKILL.md)、[file-structure](../../../skills/file-structure/SKILL.md)；本任务使用它们，不承接独立团队研发验收 |
 

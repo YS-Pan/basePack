@@ -8,7 +8,7 @@
 
 [retrieval_dispatch](../../../../experiments/20261106-basepack/src/basepack/memory/prompts.py) 每次接收一个 request、返回一个 assignment；`slot=0` 为默认，容量不足时才改由主 agent 执行。它不分析业务问题并自动扩成多个 worker，容量上限也不意味着自动用满。检查时，源码与普通安装的 prompts.py、retrieval.md 分别哈希相同。因此常见的单 worker 既有明确默认的影响，也有主 agent 把业务问题合成一份委托的组织选择；不是全任务只能并发一名检索 worker。
 
-历史讨论中，用户要求 brief 不包含检索、有检索需求时交检索 worker；把项目概况与任务检索合并到同一 worker，是助手为避免重复派发提出的建议，并非用户规定全业务只许一人，见[制定 basePack 使用整改计划](codex://threads/01a1ce4e-982e-7e21-9255-bc1449fe3ced)。后续[任务入口整改](../../20261112-usage-rectification/plan.md#b按任务启动按业务问题委托)要求跨历史发现实际交付原证和排名，减少重复启动、半成品交付与主 agent 接手；这不是检索人数最优的性能结论。
+历史讨论中，用户要求 brief 不包含检索、有检索需求时交检索 worker；把项目概况与任务检索合并到同一 worker，是助手为避免重复派发提出的建议，并非用户规定全业务只许一人，见[制定 basePack 使用整改计划](codex://threads/01a1ce4e-982e-7e21-9255-bc1449fe3ced)。后续[任务入口整改](../../../archive/20261112-usage-rectification/plan.md#b按任务启动按业务问题委托)要求跨历史发现实际交付原证和排名，减少重复启动、半成品交付与主 agent 接手；这不是检索人数最优的性能结论。
 
 ## 近期聊天
 
@@ -25,7 +25,7 @@
 | [查找 AgentTools 迁移原文](codex://threads/01a1d2db-9ca7-7891-b59e-c948688b69ab) | 初轮 1 个检索找原话，主 agent 同时核当前部署。数据库不可达时只作原文件证据交付，未声称完整 rank 成功；再加部署 worker 会重复主 agent 的分支。 |
 | [执行 basePack 使用整改计划](codex://threads/01a1d01b-4a39-7bd2-bef8-ccd4f267c192) | 实际有 search_0/1 两个独立检索，分别核阵列项目的目标/授权演变与旧成果承接，执行重叠 5 分 18 秒。二者各自完成 rank 和宿主交付；直接反驳全任务限一人的解释。 |
 
-进度漏项当时的客户端为 0.12.0.dev1，已有[独立调查](../../20261114-delivery-closeout/research/memory-missed-distribution.md)记录调用遗漏、采集截止与后续发布核查问题；本次不把它重复解释为并发缺陷。file-structure 窄问使用 0.14.0，其调用收敛问题已记录；私密规划初轮的具体版本未单独核实，不把两个案例当作同版本产品缺陷。本次未修改调用合同。
+进度漏项当时的客户端为 0.12.0.dev1，已有[独立调查](../../../archive/20261114-delivery-closeout/research/memory-missed-distribution.md)记录调用遗漏、采集截止与后续发布核查问题；本次不把它重复解释为并发缺陷。file-structure 窄问使用 0.14.0，其调用收敛问题已记录；私密规划初轮的具体版本未单独核实，不把两个案例当作同版本产品缺陷。本次未修改调用合同。
 
 ## 组织建议与证据限度
 

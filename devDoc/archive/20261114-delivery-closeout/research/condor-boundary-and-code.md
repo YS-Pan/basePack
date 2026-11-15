@@ -62,4 +62,4 @@
 
 原生结构化事件读取是候选，但引入绑定/版本和部署负担必须小于实际收益。391行不是必须保留的结论，也不是全部可删的结论。没有重跑作业、验证新机或证明跨平台普适性；本次只读源码计量、历史检索及官方文档核实。
 
-历史依据：[首轮资源结果](../../../archive/20261107-resource-coordination/result.md#预算修复与边界)、[R6](../../../archive/20261107-resource-coordination/native-condor.md)、[R7](../../../archive/20261107-resource-coordination/standard-submit-result.md)、[职责整改结果](../../../archive/20261110-rectification/jobs-result.md)、[迁移问题记录](../../../archive/20261113-agenttools-migration/progress.md#使用中发现的条件与未决问题)。计量及检索原证在项目根`artifacts/runs/20261114-condor-review/`；后台自动维护结果与收尾沿[进度](../progress.md)。
+历史依据：[首轮资源结果](../../20261107-resource-coordination/result.md#预算修复与边界)、[R6](../../20261107-resource-coordination/native-condor.md)、[R7](../../20261107-resource-coordination/standard-submit-result.md)、[职责整改结果](../../20261110-rectification/jobs-result.md)、[迁移问题记录](../../20261113-agenttools-migration/progress.md#使用中发现的条件与未决问题)。计量及检索原证在项目根`artifacts/runs/20261114-condor-review/`；后台自动维护结果与收尾沿[进度](../progress.md)。

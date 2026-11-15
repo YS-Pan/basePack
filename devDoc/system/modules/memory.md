@@ -1,6 +1,6 @@
 # 项目记忆实现
 
-源码面向0.14.0，实现SurrealDB多层文字、原图向量与统一知识图、知识版本历史、单owner维护及纯访问状态。本轮私有来源发现、标记与实际安装/补标状态见[本轮进度](../../tasks/20261114-next-maintenance/progress.md)，此前入口、历史和访问实现见[使用整改进度](../../tasks/20261112-usage-rectification/progress.md)，固定派工沿[既有结果](../../tasks/20261106-memory-system/dispatch-implementation-result.md)。首建和维护由宿主订阅agent阅读生成，程序提交成功即完成普通批次，默认无额外审计。完整历史沿[记忆专项进度](../../tasks/20261106-memory-system/progress.md)，用户流程见[记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
+源码面向0.14.0，实现SurrealDB多层文字、原图向量与统一知识图、知识版本历史、单owner维护及纯访问状态。本轮私有来源发现、标记与实际安装/补标状态见[本轮进度](../../archive/20261114-next-maintenance/progress.md)，此前入口、历史和访问实现见[使用整改进度](../../archive/20261112-usage-rectification/progress.md)，固定派工沿[既有结果](../../tasks/20261106-memory-system/dispatch-implementation-result.md)。首建和维护由宿主订阅agent阅读生成，程序提交成功即完成普通批次，默认无额外审计。完整历史沿[记忆专项进度](../../tasks/20261106-memory-system/progress.md)，用户流程见[记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
 
 ## 职责与数据
 

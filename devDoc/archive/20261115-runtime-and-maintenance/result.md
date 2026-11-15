@@ -7,7 +7,7 @@
 - **Embedding：** CUDA显式cuDNN attention；适配层统一按预处理后的实际attention_mask限制32768 token，包含模板、指令和图像token。超限在所属推理批forward前返回422，不截断，并保留原请求索引与计数。移除机器max_length、64 KiB文本限制、分配器硬限和正硬预算启动门槛。纯文本batch4、含图batch1保持。
 - **柔性显存：** 本机gpu_memory_mib仍为9216 MiB（9 GiB），作为运行目标。请求后仅在未用缓存超过目标时尝试释放，不逐请求清空；OOM和底层错误继续交调用agent处理。普通Condor作业的资源申报合同保持。
 - **E：** 新增`basepack.memory.publish`与同源`memory publish`，从有序完成稿引用核文件hash、freeze／validate、独占保存frozen并调用原apply，一次返回紧凑结果并保存详细数据库回执投影。原prepare／read／neighbors／freeze／apply仍直接可用，agent可用普通Python自由组合。固定稿接续保持batch ID／UUID；真实修稿重新prepare／阅读／freeze。
-- **Ongoing：** [索引](../ongoing/README.md)、两个主题、AGENTS短指针和文档约定已建立。created_at为`2026-11-15T12:59:18+08:00`，expires_at为`2026-11-22T12:59:18+08:00`。到期即失效，下次正常读索引时整目录归档，保留时间、原因和未完范围；普通编辑不续期。
+- **Ongoing：** [索引](../../tasks/ongoing/README.md)、两个主题、AGENTS短指针和文档约定已建立。created_at为`2026-11-15T12:59:18+08:00`，expires_at为`2026-11-22T12:59:18+08:00`。到期即失效，下次正常读索引时整目录归档，保留时间、原因和未完范围；普通编辑不续期。
 
 ## 实际验证
 

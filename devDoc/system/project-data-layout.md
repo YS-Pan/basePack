@@ -1,6 +1,6 @@
 # 项目本机数据目录约定
 
-2026-11-14。供配置、生成入口、维护过程及清理本机 `.basepack` 时使用。既有通用约定见[文档维护](../documentation.md)，实现和安装边界见[部署合同](deployment.md)，本轮私有区与恢复状态见[进度](../tasks/20261114-next-maintenance/progress.md)。
+2026-11-14。供配置、生成入口、维护过程及清理本机 `.basepack` 时使用。既有通用约定见[文档维护](../documentation.md)，实现和安装边界见[部署合同](deployment.md)，本轮私有区与恢复状态见[进度](../archive/20261114-next-maintenance/progress.md)。
 
 0.10.0.dev1已落实维护工作包进入根tmp，持久owner/控制/收据仍在项目memory目录；历史保留例外见下文。以下为职责示意，memory.data_dir、jobs_dir及password_file按实际配置解析，不预建可选目录，也不为统一名字迁库。
 

@@ -1,6 +1,6 @@
 # 调研遗忘、知识替代与当前表示
 
-2026-11-12（北京时间）。按用户要求联网核对 Graphiti/Zep、Mem0 当前算法与平台 Dream、Letta MemFS、LangMem 以及 LongMemEval、MemConflict、Generative Agents 的原论文和固定源码，形成[联网调研及方案重评](../../tasks/20261112-usage-rectification/research/forgetting-options-20261112.md)。
+2026-11-12（北京时间）。按用户要求联网核对 Graphiti/Zep、Mem0 当前算法与平台 Dream、Letta MemFS、LangMem 以及 LongMemEval、MemConflict、Generative Agents 的原论文和固定源码，形成[联网调研及方案重评](../../archive/20261112-usage-rectification/research/forgetting-options-20261112.md)。
 
 新建议以原证、带条件／替代关系的知识和持续整理的当前表示为中心，将现行／历史作为查询视图；旧 D 增加重评入口，未把建议视为用户已经选定。明确默认搜索不必排失效、时间降权不等于语义替代、Git／记忆 history 不保证完整业务原证等边界。未安装外部产品、跑效果评测、修改产品、项目纲领或外部项目。
 

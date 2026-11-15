@@ -29,4 +29,4 @@
 
 ## 私有开发上下文扩展（0.14.0已交付）
 
-2026-11-14 用户选定根 `private/` 独立 Git，公共引用可选且功能自足，B仅用于迁移期。已新增[私有上下文模式](../../../skills/file-structure/references/private-context.md)，同步公共单树、材料生命周期、项目入口和记忆边界，实际检查见[0.14结果](../20261114-next-maintenance/result.md)。完整决定及完成依据保留在[计划第2项](../20261114-next-maintenance/plan.md#2-私有开发上下文与文件结构-skill)；本项目限定清点没有确认需搬入的机密原件，不宣称已审计全部历史。
+2026-11-14 用户选定根 `private/` 独立 Git，公共引用可选且功能自足，B仅用于迁移期。已新增[私有上下文模式](../../../skills/file-structure/references/private-context.md)，同步公共单树、材料生命周期、项目入口和记忆边界，实际检查见[0.14结果](../../archive/20261114-next-maintenance/result.md)。完整决定及完成依据保留在[计划第2项](../../archive/20261114-next-maintenance/plan.md#2-私有开发上下文与文件结构-skill)；本项目限定清点没有确认需搬入的机密原件，不宣称已审计全部历史。

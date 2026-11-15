@@ -1,16 +1,18 @@
 # 重建总进度
 
+2026-11-15 工程状态接续：已按用户授权完成0.15.0的cuDNN／32768-token／柔性9 GiB、发布组合E和项目局部ongoing，本项目稳定客户端与共享服务均已升级，见[交付结果](../../archive/20261115-runtime-and-maintenance/result.md)。本目录继续承接跨工具总跟踪；下段“只维护计划／未实施”为实施前历史状态。已完成的独立任务按各自交付结案归档，后续具体需求另按所属任务推进。
+
 更新：2026 年 11 月 15 日（北京时间）。
 
 ## 当前阶段
 
-2026-11-15 用户已选E，已整合[cuDNN、E与ongoing最终计划](../20261115-runtime-and-maintenance/plan.md)：CUDA cuDNN／模型32768 token，文本长度统一token判定并退役64 KiB限制；9 GiB为柔性目标，纯文本初始batch4、图batch1；E仅新增稳定发布helper及同源薄CLI，保留原子工具自由组合，完整cycle及B／C／F新接口退出本轮；ongoing默认实际创建后7天，发现到期整目录归档、不自动续期。已清除待选状态、交稿完成／整聊天结束及固定稿接续／真实改稿重冻等歧义，研究稿标历史比较。本轮只维护计划及入口，源码、prompt、AGENTS、机器配置和共享服务未实施改变，生产仍有原硬限；[案例分析](../20261115-runtime-and-maintenance/research/d-flexibility-20261115.md)及其普通维护收尾保留。
+2026-11-15 用户已选E，已整合[cuDNN、E与ongoing最终计划](../../archive/20261115-runtime-and-maintenance/plan.md)：CUDA cuDNN／模型32768 token，文本长度统一token判定并退役64 KiB限制；9 GiB为柔性目标，纯文本初始batch4、图batch1；E仅新增稳定发布helper及同源薄CLI，保留原子工具自由组合，完整cycle及B／C／F新接口退出本轮；ongoing默认实际创建后7天，发现到期整目录归档、不自动续期。已清除待选状态、交稿完成／整聊天结束及固定稿接续／真实改稿重冻等歧义，研究稿标历史比较。本轮只维护计划及入口，源码、prompt、AGENTS、机器配置和共享服务未实施改变，生产仍有原硬限；[案例分析](../../archive/20261115-runtime-and-maintenance/research/d-flexibility-20261115.md)及其普通维护收尾保留。
 
-2026-11-14 已按用户授权交付[0.14.0私有上下文与记忆标记](../20261114-next-maintenance/result.md)：独立 `private/` Git、默认入同库、固定版本布尔标记、skill/文档与本项目稳定客户端均已落地。源码634项经环境修正后覆盖通过，普通wheel真实流程及恢复库十表对照通过；完整恢复资料保留，旧副本未核范围如实记录。随后按明确授权推送源码并发布[常规版v0.14.0](https://github.com/YS-Pan/basePack/releases/tag/v0.14.0)，三个附件下载哈希通过；公开记忆分享工具仍未建设，本批收尾见[进度](../20261114-next-maintenance/progress.md)。
+2026-11-14 已按用户授权交付[0.14.0私有上下文与记忆标记](../../archive/20261114-next-maintenance/result.md)：独立 `private/` Git、默认入同库、固定版本布尔标记、skill/文档与本项目稳定客户端均已落地。源码634项经环境修正后覆盖通过，普通wheel真实流程及恢复库十表对照通过；完整恢复资料保留，旧副本未核范围如实记录。随后按明确授权推送源码并发布[常规版v0.14.0](https://github.com/YS-Pan/basePack/releases/tag/v0.14.0)，三个附件下载哈希通过；公开记忆分享工具仍未建设，本批收尾见[进度](../../archive/20261114-next-maintenance/progress.md)。
 
-2026-11-14已执行[既定交付收尾计划](../20261114-delivery-closeout/plan.md)，结果见[0.13交付](../20261114-delivery-closeout/result.md)：记忆调用/脚本覆盖、UUID冻结协议和本项目全量迁移/同步切换、Condor原生职责收敛及共享服务422诊断部署均已完成。源码618项全套通过，普通wheel最短流程、原证/历史/图/交付恢复、真实CPU作业和共享图文/错误定位均有实际依据。随后按用户明确授权推送源码并发布[v0.13.0.dev1开发版](https://github.com/YS-Pan/basePack/releases/tag/v0.13.0.dev1)，三个附件下载哈希通过。用户负责收益、协作效果及新机分发部署反馈，agent未来据证据分析修改；三工具及外部阵列正式库沿其所属项目接续。
+2026-11-14已执行[既定交付收尾计划](../../archive/20261114-delivery-closeout/plan.md)，结果见[0.13交付](../../archive/20261114-delivery-closeout/result.md)：记忆调用/脚本覆盖、UUID冻结协议和本项目全量迁移/同步切换、Condor原生职责收敛及共享服务422诊断部署均已完成。源码618项全套通过，普通wheel最短流程、原证/历史/图/交付恢复、真实CPU作业和共享图文/错误定位均有实际依据。随后按用户明确授权推送源码并发布[v0.13.0.dev1开发版](https://github.com/YS-Pan/basePack/releases/tag/v0.13.0.dev1)，三个附件下载哈希通过。用户负责收益、协作效果及新机分发部署反馈，agent未来据证据分析修改；三工具及外部阵列正式库沿其所属项目接续。
 
-2026-11-12 已执行[使用整改计划](../20261112-usage-rectification/plan.md)：源码与本项目普通客户端升级至0.12.0.dev1，交付任务级直接brief、默认检索请求、精确知识历史与纯访问状态，以及超限输入诊断源码。623项全套通过，原生恢复/反馈跳过项随后8项单独通过；真实阵列副本检索及历史版本/交付恢复通过。外部项目与共享服务未升级，数据原件未清理；质量/成本、服务部署及积压边界沿[整改进度](../20261112-usage-rectification/progress.md)接续，不把模拟或安装等同语义现行性。
+2026-11-12 已执行[使用整改计划](../../archive/20261112-usage-rectification/plan.md)：源码与本项目普通客户端升级至0.12.0.dev1，交付任务级直接brief、默认检索请求、精确知识历史与纯访问状态，以及超限输入诊断源码。623项全套通过，原生恢复/反馈跳过项随后8项单独通过；真实阵列副本检索及历史版本/交付恢复通过。外部项目与共享服务未升级，数据原件未清理；质量/成本、服务部署及积压边界沿[整改进度](../../archive/20261112-usage-rectification/progress.md)接续，不把模拟或安装等同语义现行性。
 
 已按用户要求于 2026-11-11 19:01（北京时间）公开发布 [0.9.1 开发版](https://github.com/YS-Pan/basePack/releases/tag/v0.9.1)，附普通 wheel 与 SHA256 校验和；重建包等价检查、隔离普通安装及附件下载校验通过，详见[发布结果](github-publish-result.md#091-开发版)。发布包含现行 0.9.1 功能与维护调查文档，不将候选实验或待实施方案标为已修复。
 
@@ -48,18 +50,18 @@
 ## 阻碍与待核
 
 - array reconstruct 原遗漏的两项 skill 发现入口已按本轮计划补齐，官方 `skills/list` 返回两项 `scope=repo`、`errors=[]`，外部 main 提交 `931634e`。完整目录、引用、冲突与发现核验已纳入产品接入说明；init/core doctor 的职责仍不等同于技能安装与发现验收，见[调查接续](research/array-skill-discovery.md)与[文档结果](../../archive/20261110-onboarding-simplification/documentation-result.md)。
-- 文件结构建议已有独立 skill；真实大项目迁移、未来布局及记忆读取效果由用户实际项目反馈接续，agent据具体问题修改；当前责任见[收尾计划](../20261114-delivery-closeout/plan.md)。
+- 文件结构建议已有独立 skill；真实大项目迁移、未来布局及记忆读取效果由用户实际项目反馈接续，agent据具体问题修改；当前责任见[收尾计划](../../archive/20261114-delivery-closeout/plan.md)。
 - 分层协作已有指令层初版，[P7](plan.md#p7-分层-agent-组织) 的能力与质量效果按用户真实反馈接续，不再要求agent在本机跑正式对照；可得用量与耗时仍分别记录。
 
 ## 下一步
 
-0.14工程、本项目升级及用户后续授权的GitHub发行已完成，[本批结果](../20261114-next-maintenance/result.md)保留恢复、未知历史副本与分享边界；后续需求再沿相关任务接续。三工具独立分发沿[原收尾计划](../20261114-delivery-closeout/plan.md#四三工具沿既有独立分发方向接续)在各自项目接续；其中的已核状态带有观察日期，不能用迁移任务的历史“未推送”推断外部项目当前状态。
+0.14工程、本项目升级及用户后续授权的GitHub发行已完成，[本批结果](../../archive/20261114-next-maintenance/result.md)保留恢复、未知历史副本与分享边界；后续需求再沿相关任务接续。三工具独立分发沿[原收尾计划](../../archive/20261114-delivery-closeout/plan.md#四三工具沿既有独立分发方向接续)在各自项目接续；其中的已核状态带有观察日期，不能用迁移任务的历史“未推送”推断外部项目当前状态。
 
 2026-11-13 已完成 AIGC、TTS 与 Codex 用量统计的独立打包、系统 Python 3.13 安装、现有资源归集及已知调用方切换。基础代码随各包，模型首次准备先确认目录；AgentTools 和 basePack 保持可选。中英文检测/统计对照、语音 CPU/GPU 与长文恢复、用量增量及 GUI、HTTP 并存和调度回收均有实际证据；人工听审未做。详见 [迁移结果](../../archive/20261113-agenttools-migration/result.md) 与 [专项记录](../../archive/20261113-agenttools-migration/progress.md)。
 
-2026-11-15 用量统计需求已按用户新意见重写为[目录与运行行为整改计划](../20261115-codex-usage-launcher/plan.md)：开发目录分离旧运行产物，可复制启动器以自身目录保存报告／缓存／设置，CLI 提供三种默认方案、推荐报告随 cwd 而缓存按用户复用。此前写回原项目报告的建议退出；CLI 仍待选择，当前未修改外部工具或执行清理。
+2026-11-15 用量统计[跨项目执行计划](../20261115-codex-usage-launcher/plan.md)已按用户选择确定：启动器源留项目根、运行数据随脚本位置；CLI A 的报告随 cwd、缓存默认平台用户目录。当前 740.7 MB 缓存的隔离去冗余原型缩小 43.4%、快照数据等价，性能还存在未解写入长尾，正式优化与目录清理将在所属项目执行；本轮未修改外部工具。
 
-已执行[实际使用整改计划](../20261112-usage-rectification/plan.md)，源码及本项目普通客户端为0.12.0.dev1，已交付检索入口、任务级brief、精确知识历史和纯访问状态；真实业务采用、安装与恢复见[验收结果](../20261112-usage-rectification/acceptance-result.md)。共享服务部署、外部项目修正及长期效果边界沿[整改进度](../20261112-usage-rectification/progress.md)接续。
+已执行[实际使用整改计划](../../archive/20261112-usage-rectification/plan.md)，源码及本项目普通客户端为0.12.0.dev1，已交付检索入口、任务级brief、精确知识历史和纯访问状态；真实业务采用、安装与恢复见[验收结果](../../archive/20261112-usage-rectification/acceptance-result.md)。共享服务部署、外部项目修正及长期效果边界沿[整改进度](../../archive/20261112-usage-rectification/progress.md)接续。
 
 已执行[接入、记忆维护与运行简化计划](../../archive/20261110-onboarding-simplification/plan.md)，0.8.0交付脚本增量维护、Codex聊天来源、接口清理、技能发现和英文README；随后按用户选择完成0.8.1保留认证与自动读取凭据。普通wheel369项通过、无跳过，共用客户端及三个项目入口已实际升级，七表逐字段、原凭据及数据库进程保持。新shell直接调用不再手工加载密码；实际覆盖与回退材料见[专项进度](../../archive/20261110-onboarding-simplification/progress.md)和[正式升级结果](../../archive/20261110-onboarding-simplification/credential-installation-result.md)。0.8.0免认证仅保留历史隔离证据，远端推送/发布未执行。
 

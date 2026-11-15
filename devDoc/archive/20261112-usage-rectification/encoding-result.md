@@ -40,6 +40,6 @@ G/BP-T22 当前版已经在 `Memory.prepare` 访问数据库前拒绝目录，�
 
 ## 证据与余项
 
-本机原证在根 [encoding 选留目录](../../../artifacts/runs/20261112-usage-rectification/encoding/)（Git忽略）：`service-evidence.md/json`、`input-reconstruction.md`、`frozen-input-{sources,candidates,strings,tokenizer-check}.json`、实际脚本、原服务日志选段及原版本代码。该目录另选留原 batch 与 trace；SHA256 分别为 `51916ea0264ea396fc3f98a52193f67f9f35b2d15318a974be1900157d7a9aa6`、`1782fd0c08c624b356d8c7c00152e270a78c3becb4ebdca3feea59a488dc4bfb`。临时测试、日志和 launcher 在根 `tmp/20261112-usage-rectification/encoding/`。
+本机原证在根 [encoding 选留目录](../../../artifacts/runs/20261112-usage-rectification/encoding)（Git忽略）：`service-evidence.md/json`、`input-reconstruction.md`、`frozen-input-{sources,candidates,strings,tokenizer-check}.json`、实际脚本、原服务日志选段及原版本代码。该目录另选留原 batch 与 trace；SHA256 分别为 `51916ea0264ea396fc3f98a52193f67f9f35b2d15318a974be1900157d7a9aa6`、`1782fd0c08c624b356d8c7c00152e270a78c3becb4ebdca3feea59a488dc4bfb`。临时测试、日志和 launcher 在根 `tmp/20261112-usage-rectification/encoding/`。
 
 当前共享服务仍是0.5.0，保持原安装和限额；HTTP422与原请求索引只有管理员后续按普通升级流程安装服务包后才生效，本轮交付源码与隔离检查。原阵列冻结 batch 仍含超限块，需要其作者按 token 诊断拆分16个几何块，重新prepare/接受后再发布；本轮未修改或重提该外部批次，不能宣称原业务批次已成功入库。输入超限原因及呈现缺口已有复现和修复证据，原请求身份与瞬时缓存实录的缺口保留。

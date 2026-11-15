@@ -11,7 +11,7 @@
 - [BP-T01–T28 问题记录](<D:/project/20261109 array reconstruct/devDoc/archive/20261110-migration/basepack-test-findings.md>)，重点 BP-T27/BP-T28。
 - [0.11 升级结果](<D:/project/20261109 array reconstruct/devDoc/archive/20261112-basepack-011-upgrade/result.md>)、[0.10 升级结果](<D:/project/20261109 array reconstruct/devDoc/archive/20261112-basepack-upgrade/result.md>)、[当前接入说明](<D:/project/20261109 array reconstruct/devDoc/system/basepack.md>)。
 
-必要原证选留到根 [artifacts/runs/20261112-usage-rectification/](../../../../artifacts/runs/20261112-usage-rectification/)（Git 忽略）：外部问题/升级文档快照、反馈与旧 mandatory brief、编码失败 trace 和冻结 batch、维护收尾状态，以及本轮 read_thread 选取的命令/输出与文件 hash 清单。文件名及原位置见其中 `manifest.json`；这是本机复核材料，跨机器仍可据本文的聊天、版本和源码定位接续。
+必要原证选留到根 [artifacts/runs/20261112-usage-rectification/](../../../../artifacts/runs/20261112-usage-rectification)（Git 忽略）：外部问题/升级文档快照、反馈与旧 mandatory brief、编码失败 trace 和冻结 batch、维护收尾状态，以及本轮 read_thread 选取的命令/输出与文件 hash 清单。文件名及原位置见其中 `manifest.json`；这是本机复核材料，跨机器仍可据本文的聊天、版本和源码定位接续。
 
 ## 核心发现
 
@@ -66,7 +66,7 @@ BP-T27 记录了前几轮只 brief、文件阅读和普通代码核查，没有�
 ## 已有能力、历史问题与优先级反证
 
 - BP-T22 的 0.6.2 目录输入错误是事实，当前版是否仍有同症状需定点核对；不以历史标签直接判现版缺陷。
-- BP-T26 的 HTTP413 已有原生 WebSocket 事务分消息，以及本仓旧超限批次成功记录，见[维护改造结果](../../20261106-memory-system/maintenance-implementation-result.md)。不重复设计手工分批。
+- BP-T26 的 HTTP413 已有原生 WebSocket 事务分消息，以及本仓旧超限批次成功记录，见[维护改造结果](../../../tasks/20261106-memory-system/maintenance-implementation-result.md)。不重复设计手工分批。
 - 密码文件自动读取和新 shell 访问已经交付；不再添加密码环境桥。init/core doctor 的静态范围、Git 索引权限、旧聊天读取上限等依其实际所有者处理。
 - 0.11 升级前后八表字段和 90 项旧 basis 保持、实际原子发布及 owner 释放是有效反证；不证明语义内容现行，也不证明所有积压完成。
 - BP-T27 初始反馈文件是 pending，0.11 收尾投影已为 resolved；没有完整处置响应，不能把 resolved 当产品修复验收。BP-T28 与新增检索反馈在各自最新留存状态仍 pending，未查询当前外部库。
