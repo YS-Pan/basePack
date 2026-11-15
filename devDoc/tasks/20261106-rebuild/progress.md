@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-2026-11-15 已按用户“先讨论、制定计划、不实施”保存并修订[cuDNN、协调者流程与持续整改讨论稿](../20261115-runtime-and-maintenance/plan.md)：CUDA cuDNN／模型32k方向、9 GiB柔性目标、允许偶发超标／OOM、不为极端负载全局强制batch1；ongoing默认7天、发现到期整目录归档且不自动续期。随后[实时维护案例分析](../20261115-runtime-and-maintenance/research/d-flexibility-20261115.md)确认现稿D的可绕行设计能承载实际流程，但无法根治源变化／语义修稿／权限问题，完整cycle额外省往返无实证；新增推荐E（发布helper＋原子工具自由编排）与可选F（定点判断材料）。方案均未选择实施，源码、prompt、AGENTS、机器配置和共享服务未改变，生产仍有原硬限。只做读取和文档检查，未运行D或量化改造收益；并行普通维护收尾沿分析报告。
+2026-11-15 用户已选E，已整合[cuDNN、E与ongoing最终计划](../20261115-runtime-and-maintenance/plan.md)：CUDA cuDNN／模型32768 token，文本长度统一token判定并退役64 KiB限制；9 GiB为柔性目标，纯文本初始batch4、图batch1；E仅新增稳定发布helper及同源薄CLI，保留原子工具自由组合，完整cycle及B／C／F新接口退出本轮；ongoing默认实际创建后7天，发现到期整目录归档、不自动续期。已清除待选状态、交稿完成／整聊天结束及固定稿接续／真实改稿重冻等歧义，研究稿标历史比较。本轮只维护计划及入口，源码、prompt、AGENTS、机器配置和共享服务未实施改变，生产仍有原硬限；[案例分析](../20261115-runtime-and-maintenance/research/d-flexibility-20261115.md)及其普通维护收尾保留。
 
 2026-11-14 已按用户授权交付[0.14.0私有上下文与记忆标记](../20261114-next-maintenance/result.md)：独立 `private/` Git、默认入同库、固定版本布尔标记、skill/文档与本项目稳定客户端均已落地。源码634项经环境修正后覆盖通过，普通wheel真实流程及恢复库十表对照通过；完整恢复资料保留，旧副本未核范围如实记录。随后按明确授权推送源码并发布[常规版v0.14.0](https://github.com/YS-Pan/basePack/releases/tag/v0.14.0)，三个附件下载哈希通过；公开记忆分享工具仍未建设，本批收尾见[进度](../20261114-next-maintenance/progress.md)。
 
