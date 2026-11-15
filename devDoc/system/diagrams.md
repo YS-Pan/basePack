@@ -218,7 +218,7 @@ flowchart TB
   entry -->|目标与取舍| charter["R/devDoc/project-charter.md<br/>用户目标；修改正文须同意"]
   entry -->|了解已交付实现| system["R/devDoc/system/<br/>概览、架构、部署、模块、框图"]
   entry -->|继续开发| tasks["R/devDoc/tasks/<br/>计划、调查、进度与结果"]
-  tasks -->|任务结束后整体归档| archive["R/devDoc/archive/<br/>历史条件和证据"]
+  tasks -->|普通任务按用户明确要求归档| archive["R/devDoc/archive/<br/>历史条件和证据"]
   entry -->|产品与执行入口| route["E/README.md → E/docs/<br/>用户与管理员流程"]
   entry -->|结构建议 / 组织分工| general["R/skills/<br/>file-structure、agent-team、engineering-judgment"]
   route -->|资源操作指引| resources["E/skills/resources/"]
@@ -232,4 +232,4 @@ flowchart TB
   system -->|按次记录已发生变化| changes["R/devDoc/change_log/<br/>major / minor"]
 ```
 
-skill 是宿主读取的指令与参考；memory skill 随 wheel 安装，根通用 skill 与 resources skill 沿发现联接读取，各自保留唯一维护源。系统事实随实际实现更新，计划只在 tasks，结束材料进 archive；图和叙述冲突时应回查源码、配置与验收条件。依据：[文档约定](../documentation.md)、[结构说明](architecture.md)、[环境与发现入口](environment.md)。
+skill 是宿主读取的指令与参考；memory skill 随 wheel 安装，根通用 skill 与 resources skill 沿发现联接读取，各自保留唯一维护源。系统事实随实际实现更新，计划在 tasks 维护；普通任务归档沿[文档约定](../documentation.md#更新与归档)，ongoing 到期另循[持续整改期限](../documentation.md#持续整改)。图和叙述冲突时应回查源码、配置与验收条件。依据：[结构说明](architecture.md)、[环境与发现入口](environment.md)。
