@@ -28,7 +28,7 @@ Condor首次宿主Get-Acl模块自动加载失败且命令返回0、owner为空�
 
 ## 安装、数据与恢复
 
-最终wheel为`experiments/20261106-basepack/dist/basepack-0.16.0-py3-none-any.whl`，SHA256为`ee3bd3a30cdbb26992cb813206b3d0fc424f2de69822522fa10eadbd2cf68eb8`。客户端从`D:/AgentTools/envs/basepack-client-0.10/Lib/site-packages/`导入；原目录名沿用。依赖未变，锁文件仅本包版本变化；共享embedding服务保持0.15.0，不重启或改模型／identity。
+实施阶段本机安装wheel为`experiments/20261106-basepack/dist/basepack-0.16.0-py3-none-any.whl`，SHA256为`ee3bd3a30cdbb26992cb813206b3d0fc424f2de69822522fa10eadbd2cf68eb8`；后续正式发行构建与最终客户端对齐见下节。客户端从`D:/AgentTools/envs/basepack-client-0.10/Lib/site-packages/`导入；原目录名沿用。依赖未变，锁文件仅本包版本变化；共享embedding服务保持0.15.0，不重启或改模型／identity。
 
 升级前确认owner为空并保留一次原生export（430,996,586 bytes）、旧0.15 wheel、原配置／入口及凭据，位置为`.basepack/memory/backups/rectification-0.16.0-20261116/`。这只是客户端升级恢复覆盖集，完整项目恢复仍依赖原件、assets和既有恢复链，不重复复制大导出到artifacts或Git。
 
@@ -42,4 +42,16 @@ Condor首次宿主Get-Acl模块自动加载失败且命令返回0、owner为空�
 
 外部镜像迁移、R2项目薄入口、AEDT／GUI／许可证实际执行条件及科研项目权限问题均在本轮外，后续按具体项目选择。Terra减少60–80%、Luna持平至增加10%仍为规划情景；此次短样例没有同材料基线，未实测用量节省，长期质量、遗漏和全队用量沿真实使用反馈维护。
 
-选留原证在`artifacts/runs/20261116-real-use-rectification/`：manifest固定96份文件、约0.55MB，含宿主handoff／原稿／发布回执／精确回读、Condor原证、测试原错与定点复核、两个wheel及安装前后不变量。原JSON绝对执行路径按目录README的前缀映射复核；分支报告的待root验收是当时状态，最终口径以本文为准。临时venv、缓存、大源副本和密码不选留，均不进入公开发行包。
+选留原证在`artifacts/runs/20261116-real-use-rectification/`：manifest固定文件字节数与hash，含宿主handoff／原稿／发布回执／精确回读、Condor原证、测试原错与定点复核、对应wheel及安装前后不变量。原JSON绝对执行路径按目录README的前缀映射复核；分支报告的待root验收是当时状态，最终口径以本文为准。临时venv、缓存、大源副本和密码不选留，均不进入公开发行包。
+
+## 正式发行构建
+
+用户追加发行要求后，从提交`49fcc0f86b75612f16a3337746f6aa1bc913bb31`隔离Git源码构建；60个包文件匹配该提交，68个wheel条目的RECORD、metadata、依赖、README、入口与许可证核对通过。干净环境普通安装、pip check及9项入口冒烟通过；未重复运行已通过的功能集。此wheel与上一实施wheel的包文件仅CRLF／LF差异，没有功能源码变化；本项目稳定客户端已对齐正式发行wheel。
+
+| 附件 | 字节 | SHA256 |
+| --- | ---: | --- |
+| `basepack-0.16.0-py3-none-any.whl` | 150224 | `689174dad2a44e9fc5e079918d8ce296988fc3ca75fdebd82de061cda1409042` |
+| `basepack-member-identity-v2-tools.zip` | 133156 | `abc377167b41c44f5bd0a772f09194abecff8687d14a746de24b564098d4d909` |
+| `SHA256SUMS-0.16.0.txt` | 203 | `a64e70e2f77ea8201b40ee73099a0f73794db59391fca84e48db552678aa0fb4` |
+
+附件在`experiments/20261106-basepack/dist/release-0.16.0/`；迁移ZIP沿既有发行原字节。构建与安装原证选留于同一artifacts目录的`release/`。发行标签须与上述实验工程tree相同，远端实际发布与下载核对后再更新[进度](progress.md)。
