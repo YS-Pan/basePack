@@ -1,5 +1,7 @@
 # 记忆系统进度
 
+2026-11-16 已综合通信实证和token估算修订[现行整改计划](../20261115-real-use-rectification/plan.md)：P0整源快照、P1维护入口／接受范围、P2有界作者协作、P3合法干净接续分别交付；阶段保持同一维护生命周期，不能以阶段完成代表全回执完成。估算不是费用或验收降幅。仅维护文档，未实施产品或改动记忆库。
+
 2026-11-16 [协调者通信调查](../20261115-real-use-rectification/research/coordinator-communication-20261116.md)核实0.15.0长轮的主要问题是长期上下文承接大量细交接：1668次响应平均输入24.6万，E和紧凑final已经实际执行；全树list重复自有final并带入其他业务分支正文，交稿后改文件引发一次真实hash返工。中间MESSAGE正文两端加密，未证明其内容重复。已细化待选C1／C2，不新增调度平台、不改产品或外部库；本任务自动维护在语义派工前遇已知SQLite访问失败，自有owner已stop／release。
 
 2026-11-16 新项目只读复盘发现0.15.0真实大文本来源发布受阻：8.44／3.90／8.94MB三个清单JSON的完整source.text进入单条SQL，超过客户端2,162,688字节wire限制，失败在begin_publication前；小frozen／细分chunk不能消除，仍pending。后续维护355批／580不同源有回执，新结果页及execution未进固定候选，部分入口接受版落后最终磁盘；无旧摘要实际误导的正证。见[复盘及整改细化](../20261115-real-use-rectification/research/robotic-arm-review-20261116.md)。本轮只记问题，未改产品或外部库；本项目自动维护再次因SQLite权限失败，已stop／release。
