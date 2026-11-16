@@ -1,6 +1,6 @@
 # 0.16真实使用整改结果
 
-2026-11-16（北京时间）。用户授权执行整改，并明确本轮仅接入basePack本项目；后续追加GitHub push及Release。P0—P4实现与本项目普通安装已完成，P5完成有界R1验证，P6外部项目不在本轮范围。发布状态沿[进度](progress.md)更新。
+2026-11-16（北京时间）。用户授权执行整改，并明确本轮仅接入basePack本项目；后续追加GitHub push及Release。P0—P4实现与本项目普通安装已完成，P5完成有界R1验证，P6外部项目不在本轮范围。[GitHub 0.16.0](https://github.com/YS-Pan/basePack/releases/tag/v0.16.0)已公开并设Latest，状态与后续边界沿[进度](progress.md)维护。
 
 ## 实际交付
 
@@ -54,4 +54,8 @@ Condor首次宿主Get-Acl模块自动加载失败且命令返回0、owner为空�
 | `basepack-member-identity-v2-tools.zip` | 133156 | `abc377167b41c44f5bd0a772f09194abecff8687d14a746de24b564098d4d909` |
 | `SHA256SUMS-0.16.0.txt` | 203 | `a64e70e2f77ea8201b40ee73099a0f73794db59391fca84e48db552678aa0fb4` |
 
-附件在`experiments/20261106-basepack/dist/release-0.16.0/`；迁移ZIP沿既有发行原字节。构建与安装原证选留于同一artifacts目录的`release/`。发行标签须与上述实验工程tree相同，远端实际发布与下载核对后再更新[进度](progress.md)。
+附件在`experiments/20261106-basepack/dist/release-0.16.0/`；迁移ZIP沿既有发行原字节。构建与安装原证选留于同一artifacts目录的`release/`。最终客户端60包文件匹配正式附件，pip check、缺字段原错及UUID／11表／mandatory／配置不变量复核通过，owner=null。
+
+11项本地提交与标签正常快进推送；[v0.16.0](https://github.com/YS-Pan/basePack/releases/tag/v0.16.0)于北京时间2026-11-16 **17:51:59**公开，非草稿、非prerelease并设Latest，Release ID为446849102。标签指向`88756a7d3860b4ec0fa9692e8f7098a6910a6f20`；实验工程tree `fdd868c025e554db2aa57aaf2880f036a3955a05`与构建源49fcc0f相同，main后续仅补发行记录。
+
+草稿及公开后分别下载三个附件，全部大小、GitHub digest、SHA256与本地字节相同；发行说明与文件一致，远端标签和Latest API确认本次发行。结构化原证为`release/github-draft-verification.json`、`github-published-verification.json`及对应API响应。公开范围不含项目知识、原件、配置、凭据、模型或本机运行原证；根README已指向本版。

@@ -1,6 +1,8 @@
 # 整改计划进度
 
-当前状态（2026-11-16）：P0—P4实现、普通wheel及本项目0.16.0安装已完成；P5真实Condor作业14469.0验证账户／线程／工件并收尾。P6用户明确“本轮仅basePack本项目”，外部接入不在范围。真实宿主两阶段fresh派工沿同receipt／owner／control完成发布与父stop，最终owner=null；安装前后11表、三条mandatory、UUID及配置保持。实际检查、原错、有限兼容和未测收益见[结果](result.md)。用户追加GitHub push和Release，正在完成提交／发布；共享服务保持0.15.0。
+当前状态（2026-11-16）：本轮整改、安装与发行已完成。P0—P4实现、普通wheel及本项目0.16.0安装已完成；P5真实Condor作业14469.0验证账户／线程／工件并收尾。P6用户明确“本轮仅basePack本项目”，外部接入不在范围。真实宿主两阶段fresh派工沿同receipt／owner／control完成发布与父stop，最终owner=null；安装前后11表、三条mandatory、UUID及配置保持。实际检查、原错、有限兼容和未测收益见[结果](result.md)。[v0.16.0](https://github.com/YS-Pan/basePack/releases/tag/v0.16.0)已公开并设Latest，main与标签正常推送；共享服务保持0.15.0。
+
+发行源码提交49fcc0f，标签88756a7的实验工程tree与其相同；正式wheel、未变迁移ZIP及SHA256SUMS均在草稿与公开后下载逐字节核对通过，GitHub摘要／Latest／远端标签已核。最终客户端60包文件与正式附件一致，pip check通过，数据库／mandatory／配置不变量再次核同。UTF-8／语法、437个本地链接、54个围栏及Git差异检查通过；未为发行重复全套功能测试或启动全项目维护。最后仅补发行记录，代码与附件保持。
 
 本轮brief已取得，默认自动维护在语义派工前遇已知SQLite14访问失败；自有run a533dfd8048e400bb16ad9fa8c07e00a已stop、确认publications为空并release，无维护worker。M2文件维护和C2由隔离宿主实际验证，不宣称聊天freshness、正式新文档摄入或权限根因已修复。选留原证位于artifacts/runs/20261116-real-use-rectification/。
 
