@@ -99,12 +99,15 @@ if ($LASTEXITCODE -ne 0) { throw "Cannot load project config ($LASTEXITCODE)" }
 $settings = $json | ConvertFrom-Json
 $endpoint = [Uri]$settings.memory.endpoint
 $bind = '{0}:{1}' -f $endpoint.Host, $endpoint.Port
+$origin = $endpoint.GetLeftPart([UriPartial]::Authority)
 Set-Location -LiteralPath $settings.memory_dir
 $env:SURREAL_USER = $settings.memory.username
 $env:SURREAL_PASS = [IO.File]::ReadAllText($settings.memory_password_file)
-& $surreal start --bind $bind --allow-origin 'http://127.0.0.1' 'surrealkv://store'
+& $surreal start --bind $bind --allow-origin $origin 'surrealkv://store'
 exit $LASTEXITCODE
 ```
+
+示例的允许来源沿同一endpoint生成，包含协议、主机及实际端口，与客户端WebSocket握手一致。Origin是原生HTTP／WebSocket来源配置，认证仍由数据库账户承担；机器维护者管理实际部署策略。
 
 首次新库启动建立该账户；已有库使用库内已保存的账户。改写密码文件或 launcher 的环境值不会轮换已有账户，错误密码直接认证失败。配置限定 endpoint 为 HTTP(S) 显式回环 IP（127/8 或 ::1）；不使用域名、通配或远端地址。
 
