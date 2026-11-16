@@ -198,6 +198,31 @@ def test_project_and_machine_schema_are_checked_separately(tmp_path):
         load_project_config(path)
 
 
+@pytest.mark.parametrize('scope', ['"secret"', '["../outside"]', '["/absolute"]',
+                                  '["C:/absolute"]', '["data/*"]', '[""]', '[1]'])
+def test_private_scope_rejects_nonproject_paths_at_config_boundary(tmp_path, scope):
+    machine = tmp_path / 'machine.toml'
+    machine.write_text('schema_version=1\n', encoding='utf-8')
+    path = init_project(tmp_path / 'project', machine, max_concurrent_subagents=12, concurrency_source='fixture')
+    content = path.read_text(encoding='utf-8').replace('private_scope = []', f'private_scope={scope}')
+    path.write_text(content, encoding='utf-8')
+    with pytest.raises(ValueError, match='memory.private_scope'):
+        load_project_config(path)
+
+
+def test_private_scope_normalizes_paths_without_changing_discovery(tmp_path):
+    from basepack.memory.privacy import privacy_rules
+
+    machine = tmp_path / 'machine.toml'
+    machine.write_text('schema_version=1\n', encoding='utf-8')
+    path = init_project(tmp_path / 'project', machine, max_concurrent_subagents=12, concurrency_source='fixture')
+    content = path.read_text(encoding='utf-8').replace('private_scope = []', 'private_scope=["./Research/", "research", "data/../confidential.md"]')
+    path.write_text(content, encoding='utf-8')
+    config = load_project_config(path)
+    assert privacy_rules(config) == {'version': 1, 'private_scope': ['confidential.md', 'research']}
+    assert config.raw['memory']['source_scope'] == []
+
+
 @pytest.fixture
 def ai_config(tmp_path):
     machine = tmp_path / "machine.toml"

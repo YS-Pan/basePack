@@ -45,7 +45,7 @@ def publish(memory, *, completed=None, output=None, frozen=None, control, result
             drafts.append(json.loads(material.decode('utf-8')))
             references.append({'path': str(draft_path), 'file_sha256': file_sha256,
                                'assignment': reference['assignment']})
-        batch = freeze_file(drafts, path)
+        batch = freeze_file(drafts, path, config=memory.config)
         material = path.read_bytes()
     else:
         material = path.read_bytes()

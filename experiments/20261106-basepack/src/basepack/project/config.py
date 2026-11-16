@@ -130,7 +130,11 @@ def load_project_config(path: str | Path) -> ProjectConfig:
                 or not loopback):
             raise ValueError("memory.endpoint must be an HTTP(S) URL with an explicit loopback IP address")
         endpoint.port  # Validate the optional port at the configuration boundary.
-    return ProjectConfig(path, python, root, raw, load_machine_config(machine_path))
+    config = ProjectConfig(path, python, root, raw, load_machine_config(machine_path))
+    if "memory" in raw:
+        from basepack.memory.privacy import privacy_rules
+        privacy_rules(config)
+    return config
 
 
 def installation() -> dict:

@@ -105,7 +105,7 @@ def test_shipped_detail_links_resolve_skill_headings():
     from basepack.memory import __file__ as memory_module
 
     skill = Path(memory_module).with_name("SKILL.md").read_text(encoding="utf-8")
-    anchors = {heading.lower().replace(" ", "-") for heading in re.findall(r"^## (.+)$", skill, re.M)}
+    anchors = {heading.lower().replace(" ", "-") for heading in re.findall(r"^#{1,6} (.+)$", skill, re.M)}
     for name in ("memory-enabled.md", "memory-disabled.md", "tools.md"):
         for anchor in re.findall(r"\$skill#([\w-]+)", template(name)):
             assert anchor in anchors

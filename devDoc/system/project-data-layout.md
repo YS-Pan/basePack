@@ -1,6 +1,6 @@
 # 项目本机数据目录约定
 
-2026-11-14。供配置、生成入口、维护过程及清理本机 `.basepack` 时使用。既有通用约定见[文档维护](../documentation.md)，实现和安装边界见[部署合同](deployment.md)，本轮私有区与恢复状态见[进度](../archive/20261114-next-maintenance/progress.md)。
+2026-11-16。供配置、生成入口、维护过程及清理本机 `.basepack` 时使用。既有通用约定见[文档维护](../documentation.md)，实现和安装边界见[部署合同](deployment.md)，本轮阶段引用边界见[整改进度](../tasks/20261115-real-use-rectification/progress.md)，此前私有区与恢复状态见[进度](../archive/20261114-next-maintenance/progress.md)。
 
 0.10.0.dev1已落实维护工作包进入根tmp，持久owner/控制/收据仍在项目memory目录；历史保留例外见下文。以下为职责示意，memory.data_dir、jobs_dir及password_file按实际配置解析，不预建可选目录，也不为统一名字迁库。
 
@@ -24,13 +24,15 @@
       logs/                   运行日志
       maintenance/            维护必要控制、收据及来源身份
         owner.lock            owner状态读写的短时互斥
-        owner.json            项目唯一持有者、control、运行及发布状态
+        owner.json            唯一持有者、control、运行/发布及当前stage引用
     jobs/                     作业运行与项目记录，按资源合同管理
-  tmp/<任务或运行标识>/       可重建的reading、batch、探针与一次性验证
+  tmp/<任务或运行标识>/       reading、draft/result、stage/handoff等工作包及探针
   artifacts/runs/<运行标识>/  选定的长期原证和清理/迁移清单
 ```
 
 配置和已有实际路径优先，不为统一名字移动数据库、改凭据或改旧依据位置。现有 runtime.json 等外部定位文件若确实在用则保留，不作为客户端必备生成物。maintenance 保存仍在使用的控制/回执及恢复所需出处；控制可早于回执存在，stop/apply 仍使用时不能放到会自动清除的位置。owner.json保存全生命周期所有权，owner.lock保护其短时读写；同任务control另仲裁stop与发布准入，三者职责不同。
+
+0.16的`owner.json.stage`保存当前阶段的固定`path/file_sha256/index`引用，stage再固定原receipt、handoff及前阶段引用；handoff保留已完成/剩余范围、实际结束句柄和draft/result引用。它们仍使用现有维护工作包位置，不增加新的目录体系。活跃或恢复仍依赖时，stage、handoff、交付draft、publication result及其引用文件均不可清除或原地改稿；结束后核引用链选留必要原证，再清理可重建内容。阶段生成不代表整轮维护结束，具体交接沿[记忆模块](modules/memory.md)及[阶段合同](../../experiments/20261106-basepack/src/basepack/memory/SKILL.md#stage-continuation)。
 
 `private/`采用独立的本机Git，未配置远端；内部按实际材料创建目录。首批限定清点未确认需迁移的机密原件，详细范围见本轮进度。公开开发说明沿`devDoc/`维护，私有来源引用按文档约定标为可选，安装、构建、测试与产品运行保持自足。私有资料默认进入同一项目记忆并带来源/依据标记，合同见[记忆模块](modules/memory.md)；受管快照、聊天、维护阅读包及选留原证仍沿现有忽略位置保管，不为统一私有字节位置迁库或搬包。
 
@@ -44,8 +46,9 @@ tmp/artifacts 的职责约定不自动意味着其中内容可以删除：source
 | --- | --- |
 | store、assets、聊天/附件原件、配置与原凭据 | 生产状态，保留引用及历史回读；不以“缓存”名义删除 |
 | private原件、附件及独立Git历史 | 按实际保留目的管理；清理ignored内容时保留私有仓库和恢复所需材料 |
-| 活跃控制、收据、采集身份 | 在使用或恢复仍需时保留；结束后核引用，不凭时间或停止标记整批删除 |
-| reading/batch、临时导出、试验/覆盖率验证 | 新工作包生成在根tmp/basepack-maintenance；历史保留例外另列。任务结束前选留独有原证，并核它们是否也是受管来源 |
+| 活跃控制、收据、采集身份及当前stage引用 | 在使用或恢复仍需时保留；结束后核引用，不凭时间或停止标记整批删除 |
+| stage/handoff、固定draft/result及关联batch | 沿既有维护工作包保存固定引用；活跃或恢复依赖尚在时保留原文件/hash，结束后按引用链选留，不据tmp位置直接删除 |
+| reading、临时导出、试验/覆盖率验证 | 新工作包生成在根tmp/basepack-maintenance；历史保留例外另列。任务结束前选留独有原证，并核它们是否也是受管来源 |
 | 备份 | 由项目明确恢复目标、输出位置与保留规则；完整恢复同时覆盖原生export、配置/凭据、原件、必要assets、受管聊天/附件及private仓库和其忽略但仍需保留的材料。原生export不包含全部文件，同盘Git历史不代替独立备份 |
 | 日志与 jobs | 按实际运行路径和所属合同判断，不能将运行中状态当临时文件清空 |
 

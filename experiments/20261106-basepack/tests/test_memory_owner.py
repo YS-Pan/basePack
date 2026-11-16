@@ -130,7 +130,7 @@ os._exit(7)
     owner.recover(tmp_path, record["run_id"], owner_ended=True, publication_resolved=True)
 
 
-def test_preflight_failure_retains_owner(tmp_path):
+def test_preflight_failure_releases_undispatched_owner(tmp_path):
     from types import SimpleNamespace
     from basepack.memory.cli import dispatch
 
@@ -139,8 +139,23 @@ def test_preflight_failure_retains_owner(tmp_path):
                            mode="manual", available_subagents=None)
     with pytest.raises((AttributeError, KeyError)):
         dispatch(args, config)
-    assert owner.status(tmp_path)["holder"] == "thread"
-    assert not owner.acquire(tmp_path, "project", "other", tmp_path / "other")["acquired"]
+    assert owner.status(tmp_path) is None
+    assert (tmp_path / "control").read_bytes() == b"S"
+    assert owner.acquire(tmp_path, "project", "other", tmp_path / "other")["acquired"]
+
+
+def test_failed_startup_keeps_uncertain_publication_and_other_owner(tmp_path):
+    control = tmp_path / "control"
+    claimed = owner.acquire(tmp_path, "project", "thread", control)["owner"]
+    publication = owner.begin_publication(tmp_path, control)
+    assert not owner.release_failed_startup(tmp_path, control, claimed["run_id"])["released"]
+    assert owner.status(tmp_path)["publications"] == [publication]
+    assert not owner.status(tmp_path)["stopped"]
+    with pytest.raises(PermissionError):
+        owner.release_failed_startup(tmp_path, tmp_path / "other", claimed["run_id"])
+    with pytest.raises(PermissionError):
+        owner.release_failed_startup(tmp_path, control, "wrong-run")
+    assert owner.status(tmp_path)["publications"] == [publication]
 
 
 def test_stop_cli_loads_config_without_credentials_or_database(tmp_path):

@@ -1,11 +1,35 @@
 """Derive a lightweight marker from retained, version-pinned provenance."""
 
 import posixpath
+from hashlib import sha256
+import json
+import re
 
 
-def source_private(path: str) -> bool:
+def privacy_rules(config=None) -> dict:
+    """Freeze the one-way project path policy, independently of discovery."""
+    scope = [] if config is None else config.raw["memory"].get("private_scope", [])
+    if not isinstance(scope, list) or any(not isinstance(path, str) for path in scope):
+        raise ValueError("memory.private_scope must be a list of project-relative paths")
+    normalized = []
+    for path in scope:
+        value = posixpath.normpath(path.replace("\\", "/")).casefold()
+        if (not path.strip() or value.startswith("/") or re.match(r"^[a-z]:", value)
+                or value == ".." or value.startswith("../") or any(char in value for char in "*?[]")):
+            raise ValueError(f"memory.private_scope must contain project-relative paths without globs: {path}")
+        normalized.append(value)
+    return {"version": 1, "private_scope": sorted(set(normalized))}
+
+
+def rules_revision(rules: dict) -> str:
+    return sha256(json.dumps(rules, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
+def source_private(path: str, private_scope=()) -> bool:
     """Classify a normalized project-relative path, never its text content."""
-    return posixpath.normpath(path.replace("\\", "/")).split("/", 1)[0].casefold() == "private"
+    path = posixpath.normpath(path.replace("\\", "/")).casefold()
+    return (path.split("/", 1)[0] == "private" or any(
+        prefix == "." or path == prefix or path.startswith(prefix + "/") for prefix in private_scope))
 
 
 def derive_private(record: dict, *, source_version, knowledge_version) -> bool | None:

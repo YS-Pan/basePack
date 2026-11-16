@@ -48,6 +48,9 @@ username = 'root'
 # Additional files/directories; also the discovery scope for projects without Git.
 # private/ needs no entry here; explicit --scope overrides new-file discovery.
 source_scope = []
+# Extra project-relative private files/directories; '.' classifies the whole project.
+# This classifies selected sources without expanding discovery; private/ is always private.
+private_scope = []
 
 [memory.codex]
 # Host project binding; the collector reports missing metadata as a coverage gap.

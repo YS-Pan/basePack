@@ -142,6 +142,51 @@ def release(memory_dir, control):
         return owner
 
 
+def release_failed_startup(memory_dir, control, run_id):
+    """Clean up this process's un-dispatched run, retaining uncertain publications."""
+    lock, state = _paths(memory_dir)
+    with _locked(lock, timeout=5):
+        owner = _owned(state, control)
+        if owner["run_id"] != run_id:
+            raise PermissionError("Startup cleanup is not for the current maintenance run")
+        if owner["publications"]:
+            return {"released": False, "owner": _public(owner)}
+        stop(control)
+        owner["stopped"] = True
+        _write(state, None)
+        return {"released": True, "owner": _public(owner)}
+
+
+def save_stage(memory_dir, control, stage, output):
+    """Advance the sole current stage after the host confirms the old group ended."""
+    from hashlib import sha256
+
+    lock, state = _paths(memory_dir)
+    with _locked(lock, timeout=5):
+        owner = _owned(state, control)
+        if owner["run_id"] != stage["owner_run_id"]:
+            raise PermissionError("Stage receipt does not belong to the current maintenance run")
+        if owner["stopped"]:
+            from .maintenance import MaintenanceStopped
+            raise MaintenanceStopped("Maintenance stopped before stage handoff")
+        begin_commit(control)
+        if owner["publications"]:
+            raise RuntimeError("Publication is in flight or its result is uncertain; resolve the original batch before handoff")
+        if owner.get("stage") != stage["previous_stage"]:
+            raise ValueError("Previous stage is not the current owner stage")
+        path = Path(output).resolve()
+        material = json.dumps(stage, ensure_ascii=False, indent=2).encode("utf-8")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("xb") as file:
+            file.write(material)
+            file.flush()
+            os.fsync(file.fileno())
+        reference = {"path": str(path), "file_sha256": sha256(material).hexdigest(), "index": stage["index"]}
+        owner["stage"] = reference
+        _write(state, owner)
+        return reference
+
+
 def recover(memory_dir, run_id, *, owner_ended, publication_resolved):
     """Explicitly recover an abandoned run after independent verification."""
     if not owner_ended or not publication_resolved:

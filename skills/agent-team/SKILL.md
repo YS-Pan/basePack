@@ -38,10 +38,10 @@ Let the recipient search, read broadly, and fill relevant gaps within scope. Ass
 ## Coordinate and execute
 
 1. **Own a layered branch.** Assign its coordinator continuing responsibility for routine delegation, follow-up, dependencies, normal fixes, verification, and integration through branch completion, including arranging the next work. The coordinator delegates further within its authority; the main agent exchanges goals, results, and issues requiring key decisions, and may inspect sources or intervene. Keep one dispatcher for that branch. When ownership changes, explicitly hand over active tasks and handles, dependencies, outputs, and open issues.
-2. **Split reading, then connect evidence.** Partition by question or materials and track coverage and unread areas. Bring relevant passages into one agent's context for claims that depend on relationships across partitions; arrange targeted follow-up reading where evidence is missing.
+2. **Split reading, then connect evidence.** Assign semantically related, nonoverlapping finite source groups. Each author owns the group's reading, interpretation, relationships, and ordinary repairs through a complete delivery; size groups by their connections and manageable scope. Track coverage and unread areas. Bring relevant passages into one agent's context for claims that depend on relationships across groups; arrange targeted follow-up reading where evidence is missing.
 3. **Assign output ownership.** Give shared files or artifacts one integration owner. Parallelize edits with independent ownership; run dependent checks when their inputs are ready. Arrange overlapping investigation or independent review for a stated purpose.
 4. **Finish bounded work.** Workers read, execute, and perform necessary checks, then return when their completion criteria are met. Resolve gaps within authority; escalate facts, impact, and the decision needed when goals, key tradeoffs, or permissions must change.
-5. **Collect results through events.** Continue independent work while children run. When results are needed, use the host's agent wait or completion notifications. Report usable results, significant changes, or issues requiring parent intervention.
+5. **Collect results through events.** Continue independent work while children run. Observe owned handles or your branch only; use host completion events or bounded waits, continuing the wait after an unchanged timeout. Read necessary slices of instructions and receipts. Intermediate messages carry errors, dependencies, or changes needing early action; return usable results at the agreed boundary.
 
 Add specialist review when uncertainty, material risk, or task requirements justify it. Batch related results and keep checks proportionate to the problem.
 
@@ -55,9 +55,11 @@ Counterevidence, conflicts, and unfinished scope:
 Evidence and artifact locations; actual changes and checks:
 ```
 
-Keep decision-critical premises in this return. Downstream agents read original artifacts directly; pass their locations rather than repeatedly rewriting full reports through each coordinator.
+Keep decision-critical premises in this return. Downstream agents read original artifacts directly; pass their locations rather than repeatedly rewriting full reports through each coordinator. For snapshot handoffs, deliver once with the assignment and fixed artifact references, including hashes when required; preserve those snapshots and use a new file/hash for revisions. Recognize a later automatic final for the same delivered references as the same completion; a revised reference is a new delivery.
 
 At the decision or stage that consumes a result, reconcile its conditions, counterevidence, and gaps: integrate it, request a targeted follow-up, or explain why it is set aside. Derive completion claims from actual artifacts and checks. The main agent owns key decisions and the overall deliverable.
+
+For long branches, hand off at a completed source-group or stage boundary: save results, open scope, dependencies, and actual handle authority, finish the old group's in-flight work, then create the next coordinator with clean history and a new identity. When the host cannot transfer reader handles, complete the old group and create new readers. A summary in the same context is a continuation, not clean history. Keep the original parent lifecycle and stop authority; the main agent receives stage results and key decisions while the coordinator owns routine dispatch.
 
 When work needs continuation across turns or interruptions, record the goal, established findings, active tasks and handles, open issues, and next steps in existing project progress materials. Before task closure, retain needed conclusions and selected evidence in their stable project locations and update references; temporary handoffs may then be cleared.
 

@@ -1,6 +1,8 @@
 # 整改计划进度
 
-当前状态（2026-11-16）：用户已授权执行，P0／P4存储分类、P1／P3维护阶段、P2协作指令并行实施，主任务统一检查提交和安装；P5正在做有界账户／工件验证，P6外部项目范围已征询、尚待答复。P0管理员示例已改为从同一endpoint生成Origin，三组URI（含端口、IPv6、默认端口）解析通过，实际发布验证待本轮安装闭环。本轮brief已取得，自动维护在语义派工前遇已知SQLite14访问失败；自有run a533dfd8048e400bb16ad9fa8c07e00a已stop、确认publications为空并release，无维护worker。
+当前状态（2026-11-16）：P0—P4实现、普通wheel及本项目0.16.0安装已完成；P5真实Condor作业14469.0验证账户／线程／工件并收尾。P6用户明确“本轮仅basePack本项目”，外部接入不在范围。真实宿主两阶段fresh派工沿同receipt／owner／control完成发布与父stop，最终owner=null；安装前后11表、三条mandatory、UUID及配置保持。实际检查、原错、有限兼容和未测收益见[结果](result.md)。用户追加GitHub push和Release，正在完成提交／发布；共享服务保持0.15.0。
+
+本轮brief已取得，默认自动维护在语义派工前遇已知SQLite14访问失败；自有run a533dfd8048e400bb16ad9fa8c07e00a已stop、确认publications为空并release，无维护worker。M2文件维护和C2由隔离宿主实际验证，不宣称聊天freshness、正式新文档摄入或权限根因已修复。选留原证位于artifacts/runs/20261116-real-use-rectification/。
 
 计划整合记录（实施前，2026-11-16）：大源snapshot纳入P0，当前成果优先组及接受截点纳入P1，C1／C2独立为P2／P3；S1／S2按布局，R1复用已验终态、外部接入另列P6。Origin为自有文档勘误。两路只读一致性、UTF-8、链接／锚点和4张图结构检查通过；当时未实施产品。
 

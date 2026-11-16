@@ -1,0 +1,100 @@
+"""Fixed handoff packages for serial host coordinators in one maintenance run."""
+
+from copy import deepcopy
+from hashlib import sha256
+import json
+from pathlib import Path
+
+
+def fixed_reference(path):
+    path = Path(path).resolve()
+    return {"path": str(path), "file_sha256": sha256(path.read_bytes()).hexdigest()}
+
+
+def _read_reference(reference):
+    path = Path(reference["path"])
+    material = path.read_bytes()
+    if sha256(material).hexdigest() != reference["file_sha256"]:
+        raise ValueError(f"Stage reference file SHA256 mismatch: {path}")
+    return json.loads(material.decode("utf-8"))
+
+
+def receipt_scope(material):
+    return {"paths": [item["path"] for item in material["semantic"]],
+            "relations": [item["id"] for item in material["pending_relations"]],
+            "feedback": [item["id"] for item in material.get("feedback", [])]}
+
+
+def stage_layout(layout, index, run_id):
+    layout = deepcopy(layout)
+    prefix = f"bp_mem_{run_id[:8]}_s{index}_"
+    for team in layout["teams"]:
+        team["task_name"] = f"{prefix}coord_{team['team']}"
+        team["parent_task_name"] = f"{prefix}coord_0" if team["team"] else None
+        team["reader_task_names"] = [f"{prefix}read_{team['team']}{reader}"
+                                     for reader in range(len(team["reader_task_names"]))]
+    return layout
+
+
+def load_stage(receipt, control, stage_path, *, file_sha256=None):
+    """Read a saved package without opening ownership, credentials, or the database."""
+    stage = (_read_reference({"path": str(Path(stage_path).resolve()), "file_sha256": file_sha256})
+             if file_sha256 else json.loads(Path(stage_path).read_text(encoding="utf-8")))
+    if stage["receipt"]["path"] != str(Path(receipt).resolve()) or stage["control"] != str(Path(control).resolve()):
+        raise ValueError("Stage receipt/control does not match this assignment")
+    material = _read_reference(stage["receipt"])
+    _read_reference(stage["handoff"])
+    if material["owner_run_id"] != stage["owner_run_id"]:
+        raise ValueError("Stage owner does not match the fixed receipt")
+    return stage
+
+
+def prepare_stage(config, receipt, control, handoff, output, *, workers_ended, previous_stage=None):
+    """Validate a host-confirmed boundary and save one new stage; never spawn agents."""
+    from .owner import save_stage
+    from .prompts import pending_workers, prompt_dispatch
+
+    if not workers_ended:
+        raise ValueError("Confirm that the previous coordinator and its workers ended")
+    receipt_ref, handoff_ref = fixed_reference(receipt), fixed_reference(handoff)
+    material, boundary = _read_reference(receipt_ref), _read_reference(handoff_ref)
+    previous_ref = None
+    if previous_stage is not None:
+        previous = load_stage(receipt, control, previous_stage)
+        previous_ref = {**fixed_reference(previous_stage), "index": previous["index"]}
+        scope, layout, index = previous["remaining"], previous["layout"], previous["index"] + 1
+    else:
+        scope, layout, index = receipt_scope(material), material["layout"], 1
+    # Every original candidate is either finished by this group or carried forward.
+    for kind in ("paths", "relations", "feedback"):
+        completed, remaining = boundary["completed"][kind], boundary["remaining"][kind]
+        if (len(set(completed)) != len(completed) or len(set(remaining)) != len(remaining)
+                or set(completed) & set(remaining) or set(completed) | set(remaining) != set(scope[kind])):
+            raise ValueError(f"Handoff completed/remaining {kind} must exactly partition the previous scope")
+    workers = boundary["workers"]
+    names = [worker["task_name"] for worker in workers]
+    pending_workers(layout, 0, names)  # Reuse the saved-layout identity boundary.
+    if not layout["teams"] or layout["teams"][0]["task_name"] not in names:
+        raise ValueError("Handoff must identify the ended publisher coordinator")
+    if len(set(names)) != len(names) or any(worker["status"] != "ended" or not worker["handle"] for worker in workers):
+        raise ValueError("Handoff workers must have unique task names and ended host handles")
+    for reference in boundary["completed_drafts"]:
+        if not reference["assignment"].strip():
+            raise ValueError("Completed draft must identify its assignment")
+        _read_reference(reference)
+    for reference in boundary["publication_results"]:
+        _read_reference(reference)
+    if not any(boundary["remaining"].values()):
+        raise ValueError("No remaining work requires a new stage; finish the original run")
+    stage = {"index": index, "receipt": receipt_ref, "control": str(Path(control).resolve()),
+             "owner_run_id": material["owner_run_id"], "previous_stage": previous_ref,
+             "handoff": handoff_ref, "completed": boundary["completed"], "remaining": boundary["remaining"],
+             "layout": stage_layout(layout, index, material["owner_run_id"]), "workers_ended": True,
+             "errors": boundary["errors"], "jobs": boundary["jobs"],
+             "completion": "Previous bounded group ended; the maintenance run remains open."}
+    reference = save_stage(config.memory_dir, control, stage, output)
+    return {"stage": reference, "receipt": receipt_ref["path"], "control": stage["control"],
+            "owner_run_id": stage["owner_run_id"], "remaining": stage["remaining"],
+            "worker": prompt_dispatch(config, receipt, control, layout=stage["layout"],
+                                      stage=reference["path"], stage_sha256=reference["file_sha256"]),
+            "completion": stage["completion"]}

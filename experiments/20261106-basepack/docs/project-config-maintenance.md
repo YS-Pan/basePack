@@ -1,6 +1,6 @@
 # 项目配置维护要点
 
-安装、升级、换宿主/profile、迁移项目或修改 basePack 配置时，按本文核对受影响的项目与功能。普通业务直接使用现有入口；每次维护仍按既有流程刷新 Codex 注册根，不增加每对话全量检查或自动审计。首次操作从 [项目接入](setup-project.md) 开始，字段默认值以 [项目模板](../src/basepack/project/templates/project.toml) 和 [机器模板](../src/basepack/project/templates/machine.toml) 为准。
+安装、升级、换宿主/profile、迁移项目或修改 basePack 配置时，按本文核对受影响的项目与功能。普通业务直接使用现有入口；请求新聊天采集时按既有流程刷新 Codex 注册根，不增加每对话全量检查或自动审计。首次操作从 [项目接入](setup-project.md) 开始，字段默认值以 [项目模板](../src/basepack/project/templates/project.toml) 和 [机器模板](../src/basepack/project/templates/machine.toml) 为准。
 
 ## 先分清读取机制
 
@@ -52,9 +52,11 @@
 
 | 变更触发 | 来源、同步动作与最小确认 |
 | --- | --- |
-| Codex 项目重绑、注册/删除/移动其它项目或 worktree 变化 | 更新 `[memory.codex]`；每次维护前取得完整当前注册根，传 `--codex-registry` 覆盖本轮采集绑定，这不写回 TOML。核 projectId、清单完整性和 gaps，旧 `registry_complete=true` 不证明今天完整。宿主 projectId 与 basePack UUID 是两种身份；见 [聊天接入](setup-project.md#codex-项目聊天接入) |
+| Codex 项目重绑、注册/删除/移动其它项目或 worktree 变化 | 更新 `[memory.codex]`；请求新采集时取得完整当前注册根，传 `--codex-registry` 覆盖本轮采集绑定，这不写回 TOML。核 projectId、清单完整性和 gaps，旧 `registry_complete=true` 不证明今天完整。宿主 projectId 与 basePack UUID 是两种身份；见 [聊天接入](setup-project.md#codex-项目聊天接入) |
+| 本轮明确不请求新聊天采集 | maintain 加 `--skip-codex-collection`，回执 `codex.status=not_requested`；保留已登记聊天、历史快照及依赖，默认采集失败仍失败。核实际维护范围与聊天缺口；见 [维护入口](memory.md#自动维护与手动维护) |
 | 新增非 Git 原件、显式包含项、目录布局或 ignore 规则变化 | 按实际额外来源同步 `memory.source_scope` 与 Git 忽略规则，核 discovery boundaries/gaps。Git 内普通新文件及根 private 独立 Git 的已跟踪/未忽略新文件默认发现，后者无需逐项配置 source_scope；显式 `--scope` 不追加 private 范围。缩小 scope 不清除已登记来源、历史 pending 或已接受知识；见 [来源发现](memory.md#自动维护与手动维护) |
-| 新建/迁移 private 独立仓库或补齐旧记录标记 | 核公共忽略、私有 Git 自身忽略及发现范围，保持外层项目 UUID/数据库；来源缺失沿既有合同。按已确认映射和固定版本依据作限定范围元数据补标，保留身份、版本与未变向量，记明未覆盖/未知记录；见 [私有资料](memory.md#私有资料与分享边界) |
+| 私有分类范围变化或业务正文需原位私有 | 更新 `[memory].private_scope`；默认 `[]`，根 private 固定私有，`['.']` 为全项目。分类不改变 discovery，freeze 固定规则，规则变化或分类改变沿版本合同重新处理；不以补标覆写历史。核受影响原件及固定依据，复用输入未变的兼容向量；见 [私有资料](memory.md#私有资料与分享边界) |
+| 新建/迁移 private 独立仓库或补齐旧记录标记 | 核公共忽略、私有 Git 自身忽略及发现范围，保持外层项目 UUID/数据库；来源缺失沿既有合同。旧来源迁移或补标按已确认映射限定范围，保留历史与恢复材料，记明未覆盖/未知记录；不随升级自动执行 |
 | 检索模式变化或旧检索配置升级 | 新调用读取 `memory.search_mode`；vector/hybrid 均需要兼容向量，切模式本身不当然重建索引。按一次实际查询核模式与覆盖；支持值、literal 和旧模式升级见 [启动与检索](memory.md#启动与检索) |
 
 ## 数据、凭据与服务变化
@@ -78,13 +80,15 @@
 
 先记录客户端版本、wheel、配置及当前 owner/发布状态。结束自有维护并确认发布结果后升级；安装与数据兼容验收结束后，才另开语义维护。积压不是升级失败，也不要求每次重新理解全部资料。
 
-0.15的 `memory publish` 与原freeze/apply共用发布合同，固定稿接续保留原batch_id和UUID；数据库receipt为权威，本地result写失败时保留同一frozen及owner/control，按[发布流程](memory.md#最小闭环示例)核定，不为补投影新建batch。此客户端升级不迁库或要求全量重算；cuDNN／32768／软目标须在对应共享服务部署后核实。
+0.16 仅升级客户端、提示词及生成入口，沿用原配置 schema、项目 UUID、凭据与数据库，不默认迁库、迁移来源或全库语义审计。本版不改变共享 embedding 身份或依赖锁，不要求重启共享服务；保留新旧 wheel、配置、原凭据及对应可恢复数据。实际安装和生成入口刷新按 [版本升级](setup-project.md#升级到-016) 核实，独立 skills 副本另行同步。
+
+`memory publish` 继续与 freeze/apply 共用发布合同，固定稿接续保留 batch_id 和 UUID；数据库 receipt 为权威，本地 result 写失败时保留同一 frozen 及 owner/control。0.15 frozen 缺失私有规则字段的接续条件、纯 Python freeze 的项目配置要求见 [发布流程](memory.md#首建与维护)，不为补投影新建 batch。长维护的固定 stage 引用、干净上下文与父 stop 沿 [阶段接续](memory.md#同一轮的阶段接续)，阶段入口不重开 owner。
 
 | 本次改变 | 需要保留的恢复材料 | 最小实际确认 |
 | --- | --- | --- |
 | 仅客户端代码、提示词或生成入口 | 新旧 wheel、原配置/凭据及入口块外业务正文；沿用已有可用的数据恢复链 | 在源码外核安装路径与版本，执行受影响操作；刷新托管块并核业务正文 |
 | schema、知识版本或访问状态 | 上项加升级前原生数据库 export，保留项目 UUID、知识历史、关系、交付去重身份及访问状态 | 在隔离库 import；验证旧知识/原证、精确版本回读及同 delivery_id 重试，再核新功能 |
-| private 字段及已确认旧记录的元数据补标 | 升级前 export、限定来源映射及公私原件/附件恢复集合 | 核当前和历史副本的确认范围；身份、知识/输入版本及未变向量保持原值，无法确认的旧记录不声明公开 |
+| private_scope 规则变化、已确认旧记录补标或来源迁移 | 升级前 export、原私有规则／配置、限定来源映射及公私原件/附件恢复集合 | 核正文未变而分类改变的新来源版本及历史回读；freeze 后规则变化须冲突。旧 frozen 按明确条件接续，输入未变向量复用，未知记录不声明公开 |
 | 共享模型或服务、数据库底座 | 对应环境/启动配置、原可用 wheel 与数据恢复集合；模型锁及语义身份按实际变化保存 | 按管理员流程切换受影响设施，核真实调用；只有向量身份或输入改变才重建相应索引 |
 
 恢复集合必须能取得其引用的公私原件、受管聊天/附件、图片 assets 及必要选留证据，也覆盖 private 独立 Git 和其忽略但仍需保留的材料；原生数据库 export 不包含全部文件，完整备份仍含公私内容。升级不要求逐份重复制所有研究 artifacts。已有备份可作为不可变基底：记录其绝对位置、hash 清单及本次新增/变更覆盖层，核引用文件仍可取得，写清恢复次序。原件只存在于活动项目、无可用备份时，路径清单不能代替备份；先把缺少的内容纳入恢复集合。相同 hash 的已有内容可复用，不能把 Git 忽略或同一磁盘的存在当作长期备份；公开分享另按 [分享边界](memory.md#私有资料与分享边界) 准备。

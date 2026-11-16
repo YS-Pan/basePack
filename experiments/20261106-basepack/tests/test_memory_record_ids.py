@@ -159,3 +159,13 @@ def test_missing_text_ranges_identify_member_and_batch_position_without_writes(m
 def test_missing_read_id_reports_the_target(memory):
     with pytest.raises(ValueError, match="Member not found: member:missing-order"):
         memory.read("member:missing-order")
+
+
+@pytest.mark.parametrize('field,item,missing', [
+    ('nodes', {'kind': 'entity', 'text': 'missing identity'}, 'id'),
+    ('edges', {'in': 'node:a', 'out': 'node:b', 'kind': 'supports'}, 'id'),
+    ('edges', {'id': 'relation', 'kind': 'supports'}, 'in, out'),
+])
+def test_freeze_locates_missing_node_or_relation_fields(field, item, missing):
+    with pytest.raises(ValueError, match=rf'drafts\[0\]\.{field}\[0\] missing required fields: {missing}'):
+        freeze([{'sources': [], field: [item]}])

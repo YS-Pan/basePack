@@ -8,7 +8,7 @@ def register_commands(subparsers):
     memory = subparsers.add_parser("memory", help="Project-local multilevel memory")
     commands = memory.add_subparsers(dest="memory_action", required=True)
     actions = {name: commands.add_parser(name) for name in
-               ("init", "guide", "sources", "prepare", "freeze", "publish", "apply", "stop", "owner", "release", "recover-owner", "embed", "search", "read", "knowledge", "history", "neighbors", "brief", "changes", "maintain", "prompt", "pending-dispatch", "retrieve", "retrieval-dispatch", "retrieval-prompt", "freshness", "rank", "delivery", "access-hints", "feedback-report", "feedback-list", "feedback-resolve")}
+               ("init", "guide", "sources", "prepare", "freeze", "publish", "apply", "stop", "owner", "release", "recover-owner", "embed", "search", "read", "knowledge", "history", "neighbors", "brief", "changes", "maintain", "stage", "prompt", "pending-dispatch", "retrieve", "retrieval-dispatch", "retrieval-prompt", "freshness", "rank", "delivery", "access-hints", "feedback-report", "feedback-list", "feedback-resolve")}
     actions["feedback-report"].add_argument("--kind", choices=["knowledge", "retrieval"], required=True)
     actions["feedback-report"].add_argument("--issue", required=True)
     actions["feedback-report"].add_argument("--target", help="Member, node or semantic edge ID")
@@ -68,6 +68,8 @@ def register_commands(subparsers):
     actions["changes"].add_argument("--deep", action="store_true")
     actions["maintain"].add_argument("--scope", nargs="+", help="Override new-file discovery; registered sources and pending relations remain included")
     actions["maintain"].add_argument("--codex-registry", help="Host project binding and complete registered roots as UTF-8 JSON")
+    actions["maintain"].add_argument("--skip-codex-collection", action="store_true",
+                                    help="Do not request new chat collection; retained and registered sources remain included")
     actions["maintain"].add_argument("--control", required=True, help="Fresh, never-used task control file")
     actions["maintain"].add_argument("--holder", required=True, help="Host thread identity")
     actions["maintain"].add_argument("--mode", choices=["automatic", "manual"], default="manual",
@@ -75,6 +77,12 @@ def register_commands(subparsers):
     actions["maintain"].add_argument("--available-subagents", type=int,
                                     help="Host raw free subagent seats, excluding the main agent and before business reserve")
     actions["maintain"].add_argument("--timeout", type=float, default=600, help="Candidate embedding timeout")
+    actions["stage"].add_argument("--receipt", required=True, help="Original fixed maintenance receipt")
+    actions["stage"].add_argument("--control", required=True, help="The original maintenance control file")
+    actions["stage"].add_argument("--handoff", required=True, help="Fixed JSON boundary with completed/remaining work and saved references")
+    actions["stage"].add_argument("--previous-stage", help="Current stage package; omit only for the first handoff")
+    actions["stage"].add_argument("--workers-ended", action="store_true", required=True,
+                                 help="Host confirms the previous coordinator and its workers have ended")
     actions["prompt"].add_argument("--receipt", required=True, help="Maintenance receipt to render as worker context")
     actions["prompt"].add_argument("--control", required=True, help="The same task control file used by maintain and apply")
     actions["prompt"].add_argument("--role", choices=["coordinator", "reader"], default="coordinator")
@@ -83,10 +91,15 @@ def register_commands(subparsers):
     actions["prompt"].add_argument("--paths", nargs="+", help="Bounded project-relative sources for a reader or nonpublishing coordinator")
     actions["prompt"].add_argument("--team", type=int, default=0, help="Fixed team from this receipt's saved layout")
     actions["prompt"].add_argument("--reader", type=int, default=0, help="Fixed reader slot within the team")
+    actions["prompt"].add_argument("--stage", help="Saved stage package for this original receipt/control")
+    actions["prompt"].add_argument("--stage-sha256", help="Expected stage package hash from the saved reference")
     actions["pending-dispatch"].add_argument("--receipt", required=True)
     actions["pending-dispatch"].add_argument("--available-subagents", required=True, type=int,
                                            help="New host raw free seats; already-started workers are already deducted")
     actions["pending-dispatch"].add_argument("--started-task-names", nargs="*", default=[])
+    actions["pending-dispatch"].add_argument("--stage", help="Saved stage package instead of the initial layout")
+    actions["pending-dispatch"].add_argument("--stage-sha256", help="Expected stage package hash from the saved reference")
+    actions["pending-dispatch"].add_argument("--control", help="Original control; required with --stage")
     for name in ("retrieval-dispatch", "retrieval-prompt"):
         actions[name].add_argument("--request", required=True, help="UTF-8 JSON with question, scope and content_budget")
         actions[name].add_argument("--slot", type=int, default=0, help="Parent-owned retrieval slot")
@@ -118,8 +131,7 @@ def dispatch(args, config):
 
     action = args.memory_action
     if action == "maintain":
-        from .owner import acquire
-        from .prompts import maintenance_layout
+        from .owner import acquire, release_failed_startup
         claim = acquire(config.memory_dir, config.raw["memory"]["project_id"], args.holder, args.control)
         if not claim["acquired"]:
             if args.output:
@@ -128,13 +140,22 @@ def dispatch(args, config):
                 path.write_text(json.dumps(claim, ensure_ascii=False, indent=2), encoding="utf-8")
                 return {"output": str(path)}, 0
             return claim, 0
-        layout = maintenance_layout(config, mode=args.mode, available_subagents=args.available_subagents)
+        try:
+            result = _maintain(config, args, claim)
+            return _output(result, args.output), 0
+        except Exception as error:
+            try:
+                release_failed_startup(config.memory_dir, args.control, claim["owner"]["run_id"])
+            except Exception as cleanup_error:
+                raise ExceptionGroup("Maintenance startup and ownership cleanup failed",
+                                     [error, cleanup_error]) from error
+            raise
     if action == "freeze":
         from .draft import freeze_file
         if not args.output:
             raise ValueError('memory freeze requires --output for the frozen batch')
         path = Path(args.output).resolve()
-        batch = freeze_file([load_json_file(path) for path in args.drafts], path)
+        batch = freeze_file([load_json_file(path) for path in args.drafts], path, config=config)
         return {"output": str(path), "batch_id": batch['batch_id']}, 0
     if action == "guide":
         result = {"skill": str(Path(__file__).with_name("SKILL.md"))}
@@ -158,11 +179,23 @@ def dispatch(args, config):
         from .prompts import render_prompt
         result = render_prompt(config, args.receipt, args.control,
                                role=args.role, tier=args.tier, paths=args.paths,
-                               team=args.team, reader=args.reader)
+                               team=args.team, reader=args.reader, stage=args.stage, stage_sha256=args.stage_sha256)
+    elif action == "stage":
+        from .stages import prepare_stage
+        if not args.output:
+            raise ValueError("memory stage requires --output for the new fixed stage package")
+        return prepare_stage(config, args.receipt, args.control, args.handoff, args.output,
+                             workers_ended=args.workers_ended, previous_stage=args.previous_stage), 0
     elif action == "pending-dispatch":
         from .prompts import pending_workers
         material = json.loads(Path(args.receipt).read_text(encoding="utf-8"))
-        result = {"workers": pending_workers(material["layout"], args.available_subagents,
+        layout = material["layout"]
+        if args.stage:
+            from .stages import load_stage
+            if not args.control:
+                raise ValueError("pending-dispatch --stage requires the original --control")
+            layout = load_stage(args.receipt, args.control, args.stage, file_sha256=args.stage_sha256)["layout"]
+        result = {"workers": pending_workers(layout, args.available_subagents,
                                              started_task_names=args.started_task_names)}
     elif action in ("retrieval-dispatch", "retrieval-prompt"):
         from .prompts import retrieval_dispatch, render_retrieval_prompt
@@ -237,45 +270,57 @@ def dispatch(args, config):
             result = memory.brief(task=args.task, limit=args.limit)
         elif action == "changes":
             result = memory.changes(args.scope, deep=args.deep)
-        elif action == "maintain":
-            from .discovery import discover_sources, retained_codex_paths
-            from .maintenance import check
-            from .prompts import prompt_dispatch
-            control = claim["owner"]["control"]
-            check(control)
-            discovery = discover_sources(config, args.scope)
-            codex = _collect_codex(config, args.codex_registry, control=control)
-            retained = retained_codex_paths(config, codex["project_id"])
-            scope = list(dict.fromkeys([*discovery["paths"], *codex.pop("paths", []), *retained["paths"]]))
-            codex["retained_sources"] = len(retained["paths"])
-            codex["retained_gaps"] = retained["gaps"]
-            result = memory.maintain(scope, control=control, timeout=args.timeout)
-            result["codex"] = codex
-            result["control"] = control
-            result["owner"] = claim["owner"]
-            result["acquired"] = True
-            result["discovery"] = {"mode": discovery["mode"], "sources": len(scope),
-                                   "gaps": discovery["gaps"]}
-            result["layout"] = layout
-            receipt = Path(result["receipt"])
-            material = json.loads(receipt.read_text(encoding="utf-8"))
-            material["layout"] = layout
-            material["codex"] = {"project_id": codex["project_id"],
-                                 "capture_dir": str(config.memory_dir / "codex"),
-                                 "attachment_dir": str(config.memory_dir / "codex-attachments")}
-            if "receipt" in codex:
-                material["codex"]["receipt"] = codex["receipt"]
-            receipt.write_text(json.dumps(material, ensure_ascii=False, indent=2), encoding="utf-8")
-            if result["needs_semantic"] and layout["teams"]:
-                result["worker"] = prompt_dispatch(config, result["receipt"], control, layout=layout)
-            elif result["needs_semantic"]:
-                result["dispatch_blocked"] = "No subagent capacity; semantic work remains pending."
-    if args.output:
-        path = Path(args.output).resolve()
+    return _output(result, args.output), 0
+
+
+def _output(result, output):
+    if output:
+        path = Path(output).resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-        return {"output": str(path)}, 0
-    return result, 0
+        return {"output": str(path)}
+    return result
+
+
+def _maintain(config, args, claim):
+    """Finish startup before the host can receive and dispatch any worker."""
+    from .discovery import discover_sources, retained_codex_paths
+    from .maintenance import check
+    from .prompts import maintenance_layout, prompt_dispatch
+    from .store import Memory
+
+    control = claim["owner"]["control"]
+    layout = maintenance_layout(config, mode=args.mode, available_subagents=args.available_subagents)
+    check(control)
+    discovery = discover_sources(config, args.scope)
+    if args.skip_codex_collection:
+        binding = (json.loads(Path(args.codex_registry).read_text(encoding="utf-8")) if args.codex_registry
+                   else config.raw["memory"].get("codex", {}))
+        codex = {"status": "not_requested", "project_id": binding.get("project_id"), "paths": [],
+                 "gap": "New chat collection was not requested; chat freshness is unverified."}
+    else:
+        codex = _collect_codex(config, args.codex_registry, control=control)
+    retained = retained_codex_paths(config, codex["project_id"])
+    scope = list(dict.fromkeys([*discovery["paths"], *codex.pop("paths", []), *retained["paths"]]))
+    codex["retained_sources"] = len(retained["paths"])
+    codex["retained_gaps"] = retained["gaps"]
+    result = Memory(config).maintain(scope, control=control, timeout=args.timeout)
+    result.update(codex=codex, control=control, owner=claim["owner"], acquired=True, layout=layout,
+                  discovery={"mode": discovery["mode"], "sources": len(scope), "gaps": discovery["gaps"]})
+    receipt = Path(result["receipt"])
+    material = json.loads(receipt.read_text(encoding="utf-8"))
+    material["layout"] = layout
+    material["owner_run_id"] = claim["owner"]["run_id"]
+    material["codex"] = {**codex,
+                         "capture_dir": str(config.memory_dir / "codex"),
+                         "attachment_dir": str(config.memory_dir / "codex-attachments")}
+    material["discovery"] = result["discovery"]
+    receipt.write_text(json.dumps(material, ensure_ascii=False, indent=2), encoding="utf-8")
+    if result["needs_semantic"] and layout["teams"]:
+        result["worker"] = prompt_dispatch(config, result["receipt"], control, layout=layout)
+    elif result["needs_semantic"]:
+        result["dispatch_blocked"] = "No subagent capacity; semantic work remains pending."
+    return result
 
 
 def _collect_codex(config, registry_path, *, control=None):

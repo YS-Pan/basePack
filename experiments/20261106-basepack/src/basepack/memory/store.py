@@ -16,10 +16,11 @@ from uuid import uuid4
 from basepack.project.config import ProjectConfig
 from .content import SourceContent, _project_path, detect_changes, numbered_text, read_source, reading_units
 from .images import IMAGE_SUFFIXES, ImageSource, read_image, retain_image
-from .privacy import derive_private, source_private
+from .privacy import derive_private, privacy_rules, rules_revision, source_private
 
 
 _CANDIDATE_OMIT = "embedding,basis,raw_revision"
+_MESSAGE_LIMIT = 2112 * 1024
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,37 @@ def _digest(text: str) -> str:
 
 def _input_revision(title: str, text: str) -> str:
     return _digest(title + "\n" + text)
+
+
+def _query_wire_size(sql: str) -> int:
+    """Measure the actual escaped query envelope, reserving the RPC identity."""
+    return len(json.dumps({"id": 999999, "method": "query", "txn": "0" * 36,
+                           "params": [sql]}, ensure_ascii=False).encode("utf-8"))
+
+
+def _snapshot_sql(version: _Record, snapshot: dict) -> list[str]:
+    """Keep one complete stored original while transporting bounded SQL pieces."""
+    statement = f"UPSERT {_sql(version)} CONTENT {_sql(snapshot)} RETURN NONE;"
+    if _query_wire_size(statement) <= _MESSAGE_LIMIT or snapshot["kind"] != "text":
+        return [statement]
+    text = snapshot["text"]
+    statements = [f"UPSERT {_sql(version)} CONTENT {_sql({**snapshot, 'text': ''})} RETURN NONE;"]
+    offset = 0
+    while offset < len(text):
+        def append(end):
+            return f"UPDATE {_sql(version)} SET text += {_sql(text[offset:end])} RETURN NONE;"
+        low, high = offset + 1, len(text)
+        while low <= high:
+            end = (low + high) // 2
+            if _query_wire_size(append(end)) <= _MESSAGE_LIMIT:
+                low = end + 1
+            else:
+                high = end - 1
+        if high < offset + 1:
+            raise ValueError(f"Source snapshot statement exceeds the {_MESSAGE_LIMIT}-byte WebSocket message limit")
+        statements.append(append(high))
+        offset = high
+    return statements
 
 
 def _original(source: SourceContent, start: int, end: int) -> str:
@@ -132,7 +164,7 @@ class Memory:
         """Send complete SQL statements in bounded messages in one native transaction."""
         from websocket import create_connection
 
-        limit = 2112 * 1024
+        limit = _MESSAGE_LIMIT
         marker = _Record("meta", "publication_" + uuid4().hex)
         project_check = (f"IF meta:project.project_id != {_sql(self.connection['project_id'])} "
                          "{ THROW 'Memory database belongs to another project or is not initialized'; };\n"
@@ -141,21 +173,18 @@ class Memory:
         statements = [project_check, *statements[1:-1],
                       f"CREATE {_sql(marker)} SET committed=true RETURN NONE;"]
         # Measure the actual JSON wire message, including escaped SQL and transaction id.
-        def payload(sql):
-            return json.dumps({"id": 999999, "method": "query", "txn": "0" * 36,
-                               "params": [sql]}, ensure_ascii=False).encode("utf-8")
         groups, group = [], []
         for statement in statements:
             candidate = "\n".join([*group, statement])
-            if len(payload(candidate)) > limit:
+            if _query_wire_size(candidate) > limit:
                 if not group:
-                    raise ValueError(f"One SQL statement exceeds the {limit}-byte WebSocket message limit; "
-                                     "reduce the source or increase the supported message capacity")
+                    raise ValueError(f"One SQL statement exceeds the {limit}-byte WebSocket message limit "
+                                     f"({_query_wire_size(statement)} encoded bytes)")
                 groups.append("\n".join(group))
                 group = [statement]
-                if len(payload(statement)) > limit:
-                    raise ValueError(f"One SQL statement exceeds the {limit}-byte WebSocket message limit; "
-                                     "reduce the source or increase the supported message capacity")
+                if _query_wire_size(statement) > limit:
+                    raise ValueError(f"One SQL statement exceeds the {limit}-byte WebSocket message limit "
+                                     f"({_query_wire_size(statement)} encoded bytes)")
             else:
                 group.append(statement)
         if group:
@@ -286,6 +315,8 @@ class Memory:
                 raise ValueError(f"prepare --paths accepts files, not directories: {path}. "
                                  "Enumerate and select files first (PowerShell: Get-ChildItem -File); "
                                  "pass their project-relative paths to --paths.")
+        rules = privacy_rules(self.config)
+        rules_hash = rules_revision(rules)
         known = {source["path"]: source for source in self._rows("source")}
         members = self._rows("member")
         prepared = []
@@ -300,12 +331,27 @@ class Memory:
                 item["private"] = known[item["path"]].get("private", source_private(item["path"]))
             else:
                 item = {"path": source.path, "revision": source.revision, "size": source.size,
-                        "private": source_private(source.path),
+                        "private": source_private(source.path, rules['private_scope']),
                         "mtime_ns": source.mtime_ns}
                 if isinstance(source, ImageSource):
                     item.update({"kind": "image", "image_path": str(self.config.root / source.path)})
                 else:
+                    preview = {"source": _Record("source", "0" * 32), "revision": source.revision,
+                               "path": source.path, "kind": "text", "text": source.text,
+                               "private": item['private'], "privacy_rules_revision": rules_hash}
+                    version = _Record("source_version", "0" * 64)
+                    sql = f"UPSERT {_sql(version)} CONTENT {_sql(preview)} RETURN NONE;"
+                    try:
+                        pieces = _snapshot_sql(version, preview)
+                    except ValueError as error:
+                        error.add_note(f"Source {source.path}: {source.size} original bytes; "
+                                       f"{_query_wire_size(sql)} encoded snapshot bytes")
+                        raise
                     item.update({"kind": "text", "numbered_text": numbered_text(source),
+                                 "snapshot_transport": {"original_bytes": source.size,
+                                                        "encoded_snapshot_bytes": _query_wire_size(sql),
+                                                        "statement_count": len(pieces),
+                                                        "message_limit_bytes": _MESSAGE_LIMIT},
                                  "reading_units": [{"kind": unit.kind, "start_line": unit.start_line, "end_line": unit.end_line}
                                                    for unit in reading_units(source)]})
             item["members"] = [row for row in members if row["path"] == item["path"]]
@@ -344,7 +390,8 @@ class Memory:
         neighborhood_members = [member for member in members if member["id"] in related - selected]
         expected = {row["id"]: row["knowledge_revision"] for row in
                     [member for item in prepared for member in item["members"]] + neighborhood_members + nodes + edges}
-        return {"sources": prepared, "neighborhood": {"members": neighborhood_members, "edges": edges,
+        return {"sources": prepared, "privacy_rules": rules, "privacy_rules_revision": rules_hash,
+                "neighborhood": {"members": neighborhood_members, "edges": edges,
                 "nodes": nodes}, "expected": expected,
                 "instruction": "Read originals together. Choose semantic boundaries, summaries, and evidenced relations in one batch; reading_units are structural hints only."}
 
@@ -458,6 +505,19 @@ class Memory:
             if prior['batch_hash'] != batch_hash:
                 raise ValueError('Frozen batch ID already used with different content')
             return prior['result']
+        rules = privacy_rules(self.config)
+        rules_hash = rules_revision(rules)
+        legacy_rules = 'privacy_rules' not in batch and 'privacy_rules_revision' not in batch
+        if legacy_rules and rules['private_scope']:
+            raise ValueError('Legacy frozen batch uses root-private classification; private_scope rules changed; '
+                             'freeze again with the project configuration')
+        if not legacy_rules and (batch.get('privacy_rules') != rules or batch.get('privacy_rules_revision') != rules_hash):
+            raise ValueError('Private classification rules changed or were not frozen for this project; '
+                             'freeze again with the project configuration')
+        for source in batch['sources']:
+            if (not legacy_rules and not source.get('deleted')
+                    and source.get('private') != source_private(source['path'], rules['private_scope'])):
+                raise ValueError(f"Frozen private classification mismatch for {source['path']}; freeze again")
         for field in ("dispositions", "deferred_refinement"):
             if field in batch:
                 raise ValueError(f"{field} must be inside the relevant sources[] entry, not at batch root")
@@ -537,14 +597,16 @@ class Memory:
             current[source.path] = source
             previous = by_id[expected["id"]] if "id" in expected else by_path.get(source.path)
             record = _record(previous["id"]) if previous else _Record("source", uuid4().hex)
-            version = _Record("source_version", _digest(_sql([record, source.revision, source.path])))
+            marker = source_private(source.path) if legacy_rules else expected['private']
+            version = _Record("source_version", _digest(_sql([record, source.revision, source.path,
+                                                              marker, rules_hash])))
             sources[source.path], versions[source.path] = record, version
             if previous:
                 statements.append(f"IF {_sql(record)}.version != {_sql(_record(previous['version']))} {{ THROW 'Concurrent source version changed'; }};")
             snapshot = {"source": record, "revision": source.revision, "path": source.path,
-                        "private": source_private(source.path)}
-            if previous and _record(previous["version"]) == version:
-                old_snapshot = self._execute(f"SELECT * FROM ONLY {_sql(version)};")[0]
+                        "private": marker, "privacy_rules_revision": rules_hash}
+            if previous and previous['revision'] == source.revision and previous['path'] == source.path:
+                old_snapshot = self._execute(f"SELECT * FROM ONLY {_sql(_record(previous['version']))};")[0]
                 snapshot.update({key: old_snapshot[key] for key in ("dispositions", "deferred_refinement")
                                  if key in old_snapshot})
             snapshot.update({key: expected[key] for key in ("dispositions", "deferred_refinement")
@@ -555,9 +617,20 @@ class Memory:
                 snapshot.update({"kind": kind, "asset": assets[source.path]})
             else:
                 snapshot.update({"kind": kind, "text": source.text})
-            statements.append(f"UPSERT {_sql(version)} CONTENT {_sql(snapshot)};")
+            try:
+                source_statements = _snapshot_sql(version, snapshot)
+                for statement in source_statements:
+                    if _query_wire_size(statement) > _MESSAGE_LIMIT:
+                        raise ValueError(f"One SQL statement exceeds the {_MESSAGE_LIMIT}-byte WebSocket message limit "
+                                         f"({_query_wire_size(statement)} encoded bytes)")
+            except ValueError as error:
+                error.add_note(f"Source {source.path}: {source.size} original bytes; "
+                               f"{_query_wire_size(f'UPSERT {_sql(version)} CONTENT {_sql(snapshot)} RETURN NONE;')} "
+                               "encoded snapshot bytes")
+                raise
+            statements.extend(source_statements)
             snapshots[version] = snapshot
-            statements.append(f"UPSERT {_sql(record)} CONTENT {_sql({'path':source.path, 'kind':kind, 'revision':source.revision, 'size':source.size, 'mtime_ns':source.mtime_ns, 'version':version, 'deleted':False, 'private':snapshot['private']})};")
+            statements.append(f"UPSERT {_sql(record)} CONTENT {_sql({'path':source.path, 'kind':kind, 'revision':source.revision, 'size':source.size, 'mtime_ns':source.mtime_ns, 'version':version, 'deleted':False, 'private':snapshot['private'], 'privacy_rules_revision':rules_hash})};")
         existing = {_record(item["id"]).key: item for item in before_members}
         affected = self._affected(current, before_members)
         for item in batch.get("members", []):
@@ -762,6 +835,10 @@ class Memory:
         statements.append(f"CREATE {_sql(receipt)} CONTENT {_sql({'batch_hash': batch_hash, 'result': result})};")
         statements.append("COMMIT;")
         # Encoding may take time; never publish a candidate from a changed original.
+        from basepack.project.config import load_project_config
+        current_config = load_project_config(self.config.path) if self.config.path.is_file() else self.config
+        if privacy_rules(current_config) != rules:
+            raise ValueError('Private classification rules changed during publication; freeze again')
         for expected in batch["sources"]:
             if expected.get("deleted"):
                 previous = by_id[expected["id"]] if "id" in expected else by_path[expected["path"]]
@@ -944,7 +1021,7 @@ class Memory:
 
     def sources(self) -> list[dict]:
         """List source metadata for explicit inventory or deep-maintenance sampling."""
-        return self._execute("SELECT id,path,revision,size,mtime_ns,deleted,kind,private FROM source ORDER BY path;")[0]
+        return self._execute("SELECT id,path,revision,size,mtime_ns,deleted,kind,private,privacy_rules_revision FROM source ORDER BY path;")[0]
 
     def changes(self, scope: list[str], *, deep: bool = False) -> list[dict]:
         return self._check_changes(self.sources(), scope, deep=deep)
@@ -960,7 +1037,23 @@ class Memory:
 
     def _check_changes(self, known: list[dict], scope: list[str], *, deep: bool) -> list[dict]:
         changes = detect_changes(self.config.root, [source for source in known if not source.get("deleted")], scope, deep=deep)
-        return [asdict(change) for change in changes]
+        changes = {change.path: asdict(change) for change in changes}
+        rules = privacy_rules(self.config)
+        selected = [_project_path(self.config.root.resolve(), path) for path in scope]
+        for source in known:
+            path = _project_path(self.config.root.resolve(), source['path'])
+            if (source.get('deleted') or not path.is_file() or
+                    not any(path == prefix or path.is_relative_to(prefix) for prefix in selected)):
+                continue
+            previous = source.get('private', source_private(source['path']))
+            if previous != source_private(source['path'], rules['private_scope']):
+                if source['path'] not in changes:
+                    current = self._load_source(source['path'], source.get('kind'))
+                    changes[source['path']] = {'path': current.path, 'kind': 'modified',
+                                               'revision': current.revision, 'size': current.size,
+                                               'mtime_ns': current.mtime_ns}
+                changes[source['path']]['privacy_changed'] = True
+        return [changes[path] for path in sorted(changes)]
 
     def embed_members(self, ids: list[str] | None = None, *, timeout: float = 600) -> dict:
         from .vectors import embed_members

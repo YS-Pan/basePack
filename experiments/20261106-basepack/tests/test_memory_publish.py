@@ -48,8 +48,8 @@ def publication_paths(memory, tmp_path):
 
 
 def test_completed_drafts_keep_order_scopes_and_receipt_details(tmp_path):
-    completed = [completed_file(tmp_path, {'sources': [], 'members': [{'kind': 'chunk'}]}, name='a.json'),
-                 completed_file(tmp_path, {'sources': [], 'members': [{'kind': 'chunk'}],
+    completed = [completed_file(tmp_path, {'sources': [], 'members': [{'kind': 'chunk', 'start_line': 1, 'end_line': 1}]}, name='a.json'),
+                 completed_file(tmp_path, {'sources': [], 'members': [{'kind': 'chunk', 'start_line': 1, 'end_line': 1}],
                      'edges': [{'id': 'edge', 'in': {'draft': 0, 'member': 0}, 'out': {'member': 0},
                                 'evidence': [{'draft': 0, 'member': 0}, {'member': 0}]}]}, name='b.json')]
     files = paths(tmp_path)
@@ -61,7 +61,7 @@ def test_completed_drafts_keep_order_scopes_and_receipt_details(tmp_path):
         calls.append((batch, kwargs))
         return applied
 
-    summary = publish(SimpleNamespace(apply=apply), completed=completed, **files, timeout=42)
+    summary = publish(SimpleNamespace(apply=apply, config=None), completed=completed, **files, timeout=42)
     batch, kwargs = calls[0]
     a, b = [member['id'] for member in batch['members']]
     assert a != b and batch['edges'][0]['in'] == a and batch['edges'][0]['out'] == b
@@ -74,7 +74,7 @@ def test_completed_drafts_keep_order_scopes_and_receipt_details(tmp_path):
     assert receipt['completed'] == completed and receipt['apply'] == applied
     assert receipt['frozen_file_sha256'] == sha256(files['output'].read_bytes()).hexdigest()
     with pytest.raises(FileExistsError):
-        publish(SimpleNamespace(apply=apply), completed=completed, **files)
+        publish(SimpleNamespace(apply=apply, config=None), completed=completed, **files)
     assert len(calls) == 1
 
 
@@ -90,10 +90,10 @@ def test_hash_mismatch_keeps_affected_position_and_publishes_nothing(tmp_path):
 
 def test_existing_scope_validation_runs_before_save_or_apply(tmp_path):
     completed = [completed_file(tmp_path, {'sources': [], 'members': [
-        {'kind': 'chunk', 'evidence': [{'draft': 1, 'member': 0}]}]})]
+        {'kind': 'chunk', 'start_line': 1, 'end_line': 1, 'evidence': [{'draft': 1, 'member': 0}]}]})]
     files = paths(tmp_path)
     with pytest.raises(ValueError, match='Draft index out of range'):
-        publish(SimpleNamespace(apply=lambda *a, **kw: pytest.fail('applied invalid draft')),
+        publish(SimpleNamespace(config=None, apply=lambda *a, **kw: pytest.fail('applied invalid draft')),
                 completed=completed, **files)
     assert not files['output'].exists()
 
@@ -103,13 +103,13 @@ def test_powershell_uppercase_file_hash_is_accepted_and_normalized(tmp_path):
     reference['file_sha256'] = reference['file_sha256'].upper()
     files = paths(tmp_path)
     applied = {'sources': 0, 'members': 0, 'nodes': 0, 'edges': 0, 'invalidated': []}
-    publish(SimpleNamespace(apply=lambda *a, **kw: applied), completed=[reference], **files)
+    publish(SimpleNamespace(config=None, apply=lambda *a, **kw: applied), completed=[reference], **files)
     saved = json.loads(files['result'].read_text(encoding='utf-8'))
     assert saved['completed'][0]['file_sha256'] == reference['file_sha256'].lower()
 
 
 def test_original_apply_error_leaves_fixed_batch_for_explicit_resume(tmp_path):
-    completed = [completed_file(tmp_path, {'sources': [], 'members': [{'kind': 'chunk'}]})]
+    completed = [completed_file(tmp_path, {'sources': [], 'members': [{'kind': 'chunk', 'start_line': 1, 'end_line': 1}]})]
     original = RuntimeError('publication result unknown: preserve marker and owner')
 
     def fail(*a, **kw):
@@ -117,7 +117,7 @@ def test_original_apply_error_leaves_fixed_batch_for_explicit_resume(tmp_path):
 
     files = paths(tmp_path)
     with pytest.raises(RuntimeError) as raised:
-        publish(SimpleNamespace(apply=fail), completed=completed, **files)
+        publish(SimpleNamespace(config=None, apply=fail), completed=completed, **files)
     assert raised.value is original and files['output'].exists() and not files['result'].exists()
 
 

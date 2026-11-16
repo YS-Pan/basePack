@@ -385,7 +385,7 @@ def test_maintain_discovers_git_project_and_emits_complete_worker_command(tmp_pa
     assert receipt in result["worker"]["render_command"]
     assert calls[0][1] == {"control": str(control), "timeout": 600}
     material = json.loads(Path(receipt).read_text(encoding="utf-8"))
-    assert material["codex"] == {"project_id": result["codex"]["project_id"],
+    assert material["codex"] == {**result["codex"],
                                   "capture_dir": str(config.memory_dir / "codex"),
                                   "attachment_dir": str(config.memory_dir / "codex-attachments")}
     assert material["layout"] == result["layout"]
@@ -413,7 +413,7 @@ def test_maintain_receipt_keeps_current_and_retained_codex_provenance(tmp_path, 
     result, status = dispatch(_memory_args("maintain", "--holder", "thread", "--control", str(config.memory_dir / "maintenance" / "task.control"), "--scope", "no-new-discovery"), config)
     assert status == 0
     material = json.loads(receipt.read_text(encoding="utf-8"))
-    assert material["codex"] == {"project_id": "owned", "receipt": str(capture_receipt),
+    assert material["codex"] == {**result["codex"],
                                   "capture_dir": str(config.memory_dir / "codex"),
                                   "attachment_dir": str(config.memory_dir / "codex-attachments")}
     from basepack.memory.prompts import render_prompt
@@ -485,3 +485,79 @@ def test_codex_registry_is_used_for_maintenance_scope(tmp_path, monkeypatch):
     assert seen == [{"gaps": []}]
     assert Path(result["receipt"]).is_file()
     assert "other project private text" not in Path(result["receipt"]).read_text(encoding="utf-8")
+
+
+def test_skip_collection_retains_existing_capture_and_explicit_registry(tmp_path, monkeypatch):
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    config = load_project_config(init_project(tmp_path / "project", machine,
+                                             max_concurrent_subagents=4, concurrency_source="test"))
+    _provision_password(config)
+    (config.root / "current.md").write_text("Current project file", encoding="utf-8")
+    registry = tmp_path / "registry.json"
+    registry.write_text(json.dumps({"project_id": "explicit-project"}), encoding="utf-8")
+    capture = config.memory_dir / "codex" / "old.txt"
+    capture.parent.mkdir()
+    capture.write_bytes(json.dumps({"project_id": "explicit-project", "thread_id": "old", "byte_length": 3,
+                                    "managed_attachment": "codex-attachments/old.png"}).encode() + b"\nold\n")
+    attachment = config.memory_dir / "codex-attachments" / "old.png"
+    attachment.parent.mkdir()
+    attachment.write_bytes(b"retained")
+    receipt = config.memory_dir / "maintenance" / "receipt.json"
+    receipt.parent.mkdir()
+    receipt.write_text('{"semantic": [], "pending_relations": []}', encoding="utf-8")
+    scopes = []
+    monkeypatch.setattr("basepack.memory.cli._collect_codex", lambda *a, **k: pytest.fail("collector was called"))
+    monkeypatch.setattr("basepack.memory.store.Memory.maintain", lambda self, scope, **k:
+                        scopes.append(scope) or {"needs_semantic": True, "receipt": str(receipt)})
+    result, _ = dispatch(_memory_args("maintain", "--holder", "thread", "--control", str(tmp_path / "control"),
+                                     "--skip-codex-collection", "--codex-registry", str(registry),
+                                     "--scope", "current.md"), config)
+    assert set(scopes[0]) == {"current.md", ".basepack/memory/codex/old.txt", ".basepack/memory/codex-attachments/old.png"}
+    assert result["codex"]["status"] == "not_requested"
+    assert result["codex"]["retained_sources"] == 2
+    assert result["worker"]["task_name"] == "bp_mem_coord_0"
+    material = json.loads(receipt.read_text(encoding="utf-8"))
+    assert material["codex"]["status"] == "not_requested"
+    assert material["owner_run_id"] == result["owner"]["run_id"]
+
+
+def test_default_collector_failure_is_original_error_and_releases_startup(tmp_path, monkeypatch):
+    from basepack.memory import owner
+
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    config = load_project_config(init_project(tmp_path / "project", machine,
+                                             max_concurrent_subagents=4, concurrency_source="test"))
+    error = RuntimeError("collector SQLite error 14")
+    def failed(*args, **kwargs):
+        raise error
+    monkeypatch.setattr("basepack.memory.cli._collect_codex", failed)
+    control = tmp_path / "control"
+    args = _memory_args("maintain", "--holder", "thread", "--control", str(control), "--scope", "missing")
+    with pytest.raises(RuntimeError) as failure:
+        dispatch(args, config)
+    assert failure.value is error
+    assert owner.status(config.memory_dir) is None
+    assert control.read_bytes() == b"S"
+
+
+def test_startup_cleanup_failure_keeps_both_errors(tmp_path, monkeypatch):
+    from basepack.memory import owner
+
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    config = load_project_config(init_project(tmp_path / "project", machine,
+                                             max_concurrent_subagents=4, concurrency_source="test"))
+    original, cleanup = RuntimeError("collector failed"), OSError("owner state is unavailable")
+    def fail_original(*args, **kwargs):
+        raise original
+    def fail_cleanup(*args, **kwargs):
+        raise cleanup
+    monkeypatch.setattr("basepack.memory.cli._collect_codex", fail_original)
+    monkeypatch.setattr(owner, "release_failed_startup", fail_cleanup)
+    with pytest.raises(ExceptionGroup) as failure:
+        dispatch(_memory_args("maintain", "--holder", "thread", "--control", str(tmp_path / "control"),
+                              "--scope", "missing"), config)
+    assert failure.value.exceptions == (original, cleanup)
+    assert owner.status(config.memory_dir)["holder"] == "thread"

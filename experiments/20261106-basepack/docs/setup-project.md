@@ -113,6 +113,8 @@ bp --config $config config ai --tier tier2
 
 在 `memory init` 前核项目配置的 `[memory]`，选定本项目独立的 `data_dir`、显式回环 IP 的 `endpoint`，保留 init 生成的 `project_id`。endpoint 仅支持 HTTP(S) 的 127/8 或 `::1`，不使用 localhost、域名、通配或远端地址。新项目默认 `search_mode = 'vector'`，也可选 `hybrid`；search 使用项目检索模式并需要共享编码服务，`search --mode` 只覆盖本次查询。brief 直接读取已发布 mandatory、已有文件／章节摘要和已知缺口，不做任务搜索或 embedding。
 
+`private_scope` 默认空列表，根 private 始终私有；已有业务文件需要原位保存时，可在 `[memory]` 声明额外私有路径，分类不会扩大来源发现。匹配、版本与公开边界见 [私有资料](memory.md#私有资料与分享边界)。
+
 默认端口 18080 被占用时修改新项目 endpoint。两个项目可共用程序和共享模型服务，分别使用：
 
 | 项目 | memory.data_dir 的实际位置 | memory.endpoint | memory.project_id |
@@ -136,7 +138,7 @@ brief、search、read 只读上次已发布知识及其依据快照。主任务�
 
 Codex 宿主按项目归属默认接入可取得的聊天，不要求逐 thread 配置。宿主从当前聊天与完整项目清单取得项目 ID、其它已注册项目根，在 `init` 时自动传 `--codex-project-id`、可重复的 `--codex-other-project-root` 和 `--codex-registry-complete`；已有项目由宿主更新配置的 `[memory.codex]`。这是宿主元数据接法，Codex 项目 ID 与 basePack 的 `memory.project_id` UUID 各自保留。
 
-首次启用或旧项目升级时，instructions 指引 Codex 宿主补齐绑定；每次维护预检刷新完整注册根。`memory maintain --holder <本thread身份> --control <全新稳定路径> --codex-registry <UTF-8-JSON>` 可传本轮 `{project_id, other_project_roots, registry_complete:true}`，覆盖本轮采集绑定。注册清单工作文件放根 tmp，采集原件与定位回执保留在实际 memory 目录。非 Codex 宿主或绑定不可取时继续文件记忆，明确聊天覆盖缺口。
+首次启用或旧项目升级时，instructions 指引 Codex 宿主补齐绑定；请求本轮新聊天采集时刷新完整注册根。`memory maintain --holder <本thread身份> --control <全新稳定路径> --codex-registry <UTF-8-JSON>` 可传本轮 `{project_id, other_project_roots, registry_complete:true}`，覆盖本轮采集绑定。注册清单工作文件放根 tmp，采集原件与定位回执保留在实际 memory 目录。需要明确跳过本轮新采集时加 `--skip-codex-collection`，保留已登记聊天、历史与依赖；选择、状态和缺口说明见 [维护入口](memory.md#自动维护与手动维护)。
 
 维护入口通过受支持的 App Server 列出 active 与 archived 聊天并分页读取正文。明确的项目 ID 优先；线程未带项目 ID 时，用项目根、Git worktree/common-dir 与宿主其它注册项目根排除冲突。不能确认的条目留在 unresolved/gaps；标题与关键词不判定归属。受管 UTF-8 导出保存在项目 `memory.data_dir/codex/`，由同一维护入口加入发现范围；无需把每个 thread 填入 `source_scope`，也不递归扫描数据库、控制文件和维护回执。
 
@@ -154,7 +156,17 @@ Codex 宿主按项目归属默认接入可取得的聊天，不要求逐 thread 
 
 ## 版本升级
 
-0.13.0.dev1统一使用程序分配的member UUID与冻结批次协议。**已有记忆库先停写并离线迁移，通过后同时切换库和客户端**；不要先覆盖现用环境再连接旧库，`memory init`也不自动迁移。先在隔离环境检查新wheel，保留原生export、旧wheel、配置/凭据、原文/图片和身份回执；用该版配套的离线恢复工具冻结一对一映射，转换成员引用、历史、图端点、交付/访问派生键并在独立物理副本完整比对。知识版本、原文与向量输入不变时保留，迁移不重新接受知识或计访问。工具与映射只作离线恢复材料，正常包无旧ID解析或双协议；尚未取得工具或迁移未通过时继续保留旧环境。具体交付和工具位置见[本次交付记录](../../../devDoc/archive/20261114-delivery-closeout/result.md)。
+### 升级到 0.16
+
+本版更新轻量客户端、记忆角色提示词和生成入口，提供整源分段传输、原位私有范围、跳过新聊天采集及阶段接续。先结束自有维护并确认发布结果，保留新旧 wheel、项目／机器配置、原凭据和对应 [恢复集合](memory.md#备份与恢复)，再从目标解释器安装并运行 `memory init` 刷新托管块；核块外路径及复制安装的独立 skills。配置 schema、项目 UUID 和原数据库继续使用，不默认迁库、迁移来源或启动全库语义审计。
+
+本版不改变共享 embedding 的语义身份或依赖锁，无需为此次客户端升级重启或重装共享服务；兼容且输入未变的向量继续复用。核实际客户端版本／安装路径、生成入口和本次受影响操作，不能用安装成功代替宿主实际派工。长维护按 [阶段接续](memory.md#同一轮的阶段接续) 使用同一 owner/control/receipt，真实新上下文和父 stop 仍须宿主实现。
+
+原位私有规则以项目 `[memory].private_scope` 为准；纯 Python freeze 须显式传项目配置。0.15 冻结稿的接续条件与规则冲突处理见 [发布合同](memory.md#首建与维护)，保留原 frozen、batch_id 与 UUID，不手工修改冻结规则字段。
+
+### 更早版本的迁移与接口变化
+
+0.13.0.dev1统一使用程序分配的member UUID与冻结批次协议。**从更早的旧ID协议升级时，先停写并离线迁移，通过后同时切换库和客户端**；不要先覆盖现用环境再连接旧库，`memory init`也不自动迁移。先在隔离环境检查新wheel，保留原生export、旧wheel、配置/凭据、原文/图片和身份回执；用该版配套的离线恢复工具冻结一对一映射，转换成员引用、历史、图端点、交付/访问派生键并在独立物理副本完整比对。知识版本、原文与向量输入不变时保留，迁移不重新接受知识或计访问。工具与映射只作离线恢复材料，正常包无旧ID解析或双协议；尚未取得工具或迁移未通过时继续保留旧环境。具体交付和工具位置见[本次交付记录](../../../devDoc/archive/20261114-delivery-closeout/result.md)。
 
 切换前结清或明确作废持有旧ID的批次、维护回执和未确认交付；保留其恢复原件，后续重新prepare生成UUID引用。新建草稿省略永久ID，用局部数组位置引用，`memory freeze --drafts ... --output ...`分配并冻结UUID；更新复用prepare返回的UUID与expected，失败核实和重试沿用同一冻结文件。切换后执行`memory init`刷新生成入口，核旧知识/原证、历史与交付去重，并完成一次新建/更新流程。项目UUID、原凭据、配置schema 2和向量identity保留，外部项目各自安排迁移。
 

@@ -106,6 +106,7 @@ def maintain(memory, scope, *, control=None, timeout=600):
     candidates = {}
     mechanical_dependency_pending = set()
     completed_empty = set()
+    refreshed_privacy = set()
     change_by_path = {row['path']: row for row in changes}
     for path, change in change_by_path.items():
         if control:
@@ -124,7 +125,7 @@ def maintain(memory, scope, *, control=None, timeout=600):
             continue
         if change['kind'] == 'added':
             continue
-        if current.revision == previous['revision']:
+        if current.revision == previous['revision'] and not change.get('privacy_changed'):
             candidates[path] = {'source': source, 'members': [], 'reused': []}
             continue
         if isinstance(current, ImageSource) or not active:
@@ -228,7 +229,8 @@ def maintain(memory, scope, *, control=None, timeout=600):
         from .draft import freeze
         receipts.append(memory.apply(freeze([{'sources': [candidates[path]['source'] for path in sorted(group)],
                                       'expected': {row['id']: row['knowledge_revision'] for row in members},
-                                      'members': accepted}]), control=control, timeout=timeout))
+                                      'members': accepted}], config=memory.config), control=control, timeout=timeout))
+        refreshed_privacy.update(group)
         reused_chunks.extend(member for path in sorted(group) for member in candidates[path]['reused'])
         known = memory._rows('source')
         by_path = {row['path']: row for row in known if not row.get('deleted')}
@@ -238,6 +240,8 @@ def maintain(memory, scope, *, control=None, timeout=600):
     for change in changes:
         if change['kind'] in {'added', 'deleted'} and change['path'] not in completed_empty:
             semantic[change['path']] = {'path': change['path'], 'reason': change['kind'], 'members': [], 'versions': []}
+        elif change.get('privacy_changed') and change['path'] not in refreshed_privacy:
+            semantic[change['path']] = {'path': change['path'], 'reason': 'privacy_changed', 'members': [], 'versions': []}
     current_sources = {}
 
     def current_source(path, kind):
@@ -415,6 +419,9 @@ def maintain(memory, scope, *, control=None, timeout=600):
     semantic = {path: item for path, item in semantic.items()
                 if item.get('reason') or item['members'] or item.get('uncovered_ranges')}
     for item in semantic.values():
+        original = current_source(item['path'], by_path.get(item['path'], {}).get('kind'))
+        item['current_revision'] = original.revision if original is not None else None
+        item['accepted_source_version'] = by_path.get(item['path'], {}).get('version')
         item['category'] = ('existing_change' if any(row['path'] == item['path'] for row in members)
                             or item.get('reason') == 'deleted' else 'initial')
         ids = {member['id'] for member in item['members']}
@@ -430,7 +437,11 @@ def maintain(memory, scope, *, control=None, timeout=600):
     pending_feedback = feedback.pending(memory)
     material = {'changes': changes, 'mechanical': receipts, 'reused_chunks': reused_chunks,
                 'semantic': list(semantic.values()),
-                'pending_relations': pending_relations, 'feedback': pending_feedback}
+                'pending_relations': pending_relations, 'feedback': pending_feedback,
+                'acceptance_scope': {'kind': 'fixed_candidate_set', 'priority_owner': 'host_agent',
+                                     'current_revision': 'discovery_observation',
+                                     'candidate_versions': 'prepare_current_and_report_accepted_revision',
+                                     'new_candidates': 'outside_this_receipt'}}
     destination = memory.config.memory_dir / 'maintenance'
     destination.mkdir(parents=True, exist_ok=True)
     receipt = destination / f'{uuid4().hex}.json'

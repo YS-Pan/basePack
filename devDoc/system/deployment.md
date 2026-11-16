@@ -1,6 +1,6 @@
 # 项目配置与部署合同
 
-更新：2026年11月15日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向0.15.0；本轮范围见[运行与维护计划](../archive/20261115-runtime-and-maintenance/plan.md)，此前0.14安装见[交付进度](../archive/20261114-next-maintenance/progress.md)，0.13身份切换见[上批交付](../archive/20261114-delivery-closeout/result.md)。本文维护部署边界；操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入，修改配置时按[维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)同步受影响状态。
+更新：2026年11月16日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向0.16.0；本轮范围与实际验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)，此前0.14安装见[交付进度](../archive/20261114-next-maintenance/progress.md)，0.13身份切换见[上批交付](../archive/20261114-delivery-closeout/result.md)。本文维护部署边界；操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入，修改配置时按[维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)同步受影响状态。
 
 ## 位置与责任
 
@@ -15,7 +15,7 @@
 | 运行托管与日志 | 共享模型沿用 Shawl/SCM；项目库可由普通用户手动启动，也可选管理员 SCM；日志分别保存 |
 | 普通作业容量与策略 | HTCondor 独立安装并唯一维护 |
 
-本机共享服务沿R9使用`C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe`与`D:/AgentTools/state/basepack/embedding/logs/`；SurrealDB4.0.0 exe为`D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。2026-11-15本轮已将本项目稳定客户端`D:/AgentTools/envs/basepack-client-0.10/`及共享embedding服务普通安装升级至0.15.0；真实HTTP、旧索引查询与安装内容已核，见[交付结果](../archive/20261115-runtime-and-maintenance/result.md)，目录名不表示包版本。本项目库为`.basepack/memory/store-0.13`并由原serve.ps1监听18080，旧store只作恢复。原模型/identity/依赖版本和Shawl定义沿用。其它项目共用的`D:/AgentTools/envs/basepack-client/`仍为0.9.1，未代迁其数据库。公共代码通过配置定位，不写死这些本机位置。
+本机共享服务沿R9使用`C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe`与`D:/AgentTools/state/basepack/embedding/logs/`；SurrealDB4.0.0 exe为`D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。2026-11-16本项目稳定客户端`D:/AgentTools/envs/basepack-client-0.10/`已普通安装0.16.0，目录名不表示包版本；共享embedding服务仍为已验收的0.15.0，未重启或更换模型。客户端升级与保全核对见[整改结果](../tasks/20261115-real-use-rectification/result.md)，此前服务实际HTTP、旧索引查询见[交付结果](../archive/20261115-runtime-and-maintenance/result.md)。本项目库为`.basepack/memory/store-0.13`并由原serve.ps1监听18080，旧store只作恢复。原模型/identity/依赖版本和Shawl定义沿用。其它项目共用的`D:/AgentTools/envs/basepack-client/`仍为0.9.1，未代迁其数据库。公共代码通过配置定位，不写死这些本机位置。
 
 根 file-structure、agent-team、engineering-judgment 独立维护，resources skill 归 active 实验。memory skill 与英文 coordinator/reader 提示词随包安装，分别通过无需配置的 `memory guide` 和显式配置的 `memory prompt` 使用；提示词渲染不要求数据库、密码文件或模型在线。独立技能选择完整目录复制到项目 `.agents/skills/`，或联接已有项目原件；同名冲突保留并报告，正确入口复用。`init` 与 core doctor 不安装或验收它们；忽略的本机联接在新检出后重建，核宿主实际发现。开发环境、构建缓存和夹具在根 tmp，交付及回滚 wheel 在实验 dist，选留原证在根 artifacts/runs；寿命见 [文档约定](../documentation.md)。
 
@@ -58,6 +58,7 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 | memory.endpoint/namespace/database | HTTP(S) 显式回环 IP（127/8 或 ::1），拒绝域名/通配/远端及额外 URL 成分；逻辑库不代替物理隔离 |
 | memory.username/password_file | 用户名及唯一 UTF-8 密码文件；路径相对项目根或绝对，省略时为 memory_dir/password.txt |
 | memory.project_id/source_scope | 随项目保留的 UUID；source_scope 在 Git 项目中增加显式包含项，在非 Git 项目中声明新文件发现范围 |
+| memory.private_scope | 额外私有项目相对文件／目录，默认空；`.`为全项目。根private始终私有，分类不增加摄入；规则变化进入来源版本并使未提交旧稿明确冲突 |
 | memory.codex.project_id/other_project_roots/registry_complete | Codex 宿主项目绑定和完整注册根证据，独立于 basePack UUID；未取得时明确聊天缺口 |
 | memory.search_mode | CLI 未显式传 --mode 时采用的 hybrid/vector；新项目默认 vector |
 
@@ -78,6 +79,8 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 搬迁先停止该项目库并确认进程退出，再移动完整项目、调整启动 cwd/日志/endpoint，保留 UUID 后复核。在线备份使用原生 export；恢复集合含 export、配置、原凭据文件、业务原件、受管聊天导出、codex-attachments 原件与定位回执、必要 assets。已接受语义与更正必须恢复，向量可以从保留表示重建。长期备份位置和保留周期由业务项目确定，Git 忽略和本机目录不代替备份。
 
 ## 升级与回退
+
+0.16.0增加大源快照分消息、显式跳过新聊天采集、有界协作与同轮干净阶段、原位私有范围。客户端升级前结束自有维护并保留旧wheel／配置／凭据／原生export及既有完整恢复链；普通安装后`memory init`保留UUID、配置及托管块外业务内容。无需迁库、重算未变向量或升级共享服务。已提交receipt先恢复；0.15固定稿仅在两规则字段同时缺失且当前额外私有范围为空时沿已知根private合同接续，非空新规则明确冲突。阶段文件、handoff、原receipt、固定稿及结果需一起保留，owner.json.stage是唯一当前阶段指针；宿主负责实际旧组结束和fresh spawn。恢复材料边界与实测见[本轮结果](../tasks/20261115-real-use-rectification/result.md)。
 
 0.15.0 新增同源 `memory publish` Python helper／薄CLI，顺序组合完成稿hash核对、freeze/validate、固定稿保存和原apply；原子工具、scope／版本／owner合同及数据库receipt权威保持。客户端升级后刷新托管入口和提示词，固定稿接续保持原batch_id与UUID；本地结果投影失败不新建batch。共享服务须另部署并重启，才启用CUDA显式cuDNN、实际32768-token上限、无文本字节硬限和柔性显存目标；纯文本batch4、含图batch1，超限422且不截断，合法输入仍可能OOM。请求结束后仅在reserved超正目标且有空闲缓存时释放。运行设置不改变向量身份，未变旧输入继续复用，实际分块／输入改变才重新编码；本版不迁库或全量重算。约99%落在目标内是经验目标，未作统计验收。升级保留原wheel／配置及已有恢复链，移除旧 `max_length`，核 `/info` 后端／上限／软目标及实际图文、旧索引查询；操作见[管理员流程](../../experiments/20261106-basepack/docs/administrator.md#升级与回滚)。
 

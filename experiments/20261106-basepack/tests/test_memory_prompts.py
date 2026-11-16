@@ -75,8 +75,8 @@ def test_render_reads_only_receipt_and_templates(prompt_project, tmp_path, monke
     assert "1 semantic sources, 2 pending relations and 0 reports" in coordinator["prompt"]
     assert "secret-body" not in coordinator["prompt"]
     assert "sole publisher" in coordinator["prompt"]
-    assert "both relation endpoints" in coordinator["prompt"]
-    assert "until every candidate" in coordinator["prompt"]
+    assert "Source-group delivery" in coordinator["prompt"]
+    assert "until the active scope is handled" in coordinator["prompt"]
     reader_ai = prompt_project.resolve_ai(tier="tier1")
     assert reader_ai["model"] in coordinator["prompt"]
     assert reader_ai["reasoning_effort"] in coordinator["prompt"]

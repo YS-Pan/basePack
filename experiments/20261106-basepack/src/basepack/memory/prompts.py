@@ -65,7 +65,7 @@ def memory_command(config, *args):
 
 
 def prompt_dispatch(config, receipt, control, *, role="coordinator", tier=None, paths=None,
-                    layout=None, team=0, reader=0):
+                    layout=None, team=0, reader=0, stage=None, stage_sha256=None):
     """Describe a future render without reading the receipt or loading a template."""
     ai_key = {"coordinator": "coordinator_ai", "reader": "reader_ai"}[role]
     team = _nonnegative(team, "team")
@@ -88,9 +88,14 @@ def prompt_dispatch(config, receipt, control, *, role="coordinator", tier=None, 
         args.extend(["--reader", reader])
     if tier:
         args.extend(["--tier", tier])
+    if stage:
+        args.extend(["--stage", str(Path(stage).resolve())])
+    if stage_sha256:
+        args.extend(["--stage-sha256", stage_sha256])
     if paths:
         args.extend(["--paths", *paths])
     return {"role": role, "task_name": task_name, "team": team,
+            "fork_turns": "none",
             "reader": reader if role == "reader" else None,
             "parent_task_name": assigned["task_name"] if role == "reader" else assigned["parent_task_name"],
             "publisher": role == "coordinator" and assigned["publisher"],
@@ -141,7 +146,8 @@ def _reader_hints(material, paths):
     for item in semantic:
         if item["path"] not in selected:
             continue
-        sources.append({key: item[key] for key in ("path", "reason", "category") if key in item})
+        sources.append({key: item[key] for key in
+                        ("path", "reason", "category", "current_revision", "accepted_source_version") if key in item})
         sources[-1]["members"] = [{key: member[key] for key in
                                    ("id", "kind", "reasons", "source_version", "start_line", "end_line")
                                    if key in member} for member in item["members"]]
@@ -164,21 +170,33 @@ def _reader_hints(material, paths):
 
 
 def render_prompt(config, receipt, control, *, role="coordinator", tier=None, paths=None,
-                  team=0, reader=0):
+                  team=0, reader=0, stage=None, stage_sha256=None):
     """Render one brief from a saved receipt; no store, locks, or writes are used."""
     receipt_path = Path(receipt).resolve()
     material = json.loads(receipt_path.read_text(encoding="utf-8"))
     layout = material["layout"]
+    stage_context = None
+    if stage:
+        from .stages import load_stage
+        stage_context = load_stage(receipt, control, stage, file_sha256=stage_sha256)
+        layout = stage_context["layout"]
     dispatch = prompt_dispatch(config, receipt, control, role=role, tier=tier, paths=paths,
-                               layout=layout, team=team, reader=reader)
+                               layout=layout, team=team, reader=reader, stage=stage, stage_sha256=stage_sha256)
+    if stage_context:
+        stage_context = {key: stage_context[key] for key in
+                         ("index", "receipt", "control", "owner_run_id", "previous_stage", "handoff", "remaining", "completion")}
+        if not dispatch["publisher"]:
+            stage_context.pop("remaining")
+            stage_context["assigned_paths"] = paths
     assigned = layout["teams"][team]
     template_role = "reading-coordinator" if role == "coordinator" and not dispatch["publisher"] else role
     template = Template((Path(__file__).with_name("prompts") / f"{template_role}.md").read_text(encoding="utf-8"))
     readers = [prompt_dispatch(config, receipt, control, role="reader", layout=layout,
-                               team=team, reader=index, paths=["<project-relative-source>"])
+                               team=team, reader=index, paths=["<project-relative-source>"],
+                               stage=stage, stage_sha256=stage_sha256)
                for index in range(len(assigned["reader_task_names"]))] if role == "coordinator" else []
     coordinators = [prompt_dispatch(config, receipt, control, layout=layout, team=item["team"],
-                                    paths=["<project-relative-source>"])
+                                    paths=["<project-relative-source>"], stage=stage, stage_sha256=stage_sha256)
                     for item in layout["teams"][1:]] if dispatch["publisher"] else []
     work = config.root / "tmp" / "basepack-maintenance" / receipt_path.stem / uuid4().hex
     reading, batch = work / "reading.json", work / "batch.json"
@@ -202,6 +220,7 @@ def render_prompt(config, receipt, control, *, role="coordinator", tier=None, pa
         "coordinator_workers": json.dumps(coordinators, ensure_ascii=False),
         "reader_count": str(len(readers)),
         "layout": json.dumps({key: value for key, value in layout.items() if key != "teams"}, ensure_ascii=False),
+        "stage_context": json.dumps(stage_context, ensure_ascii=False) if stage_context else "Initial stage; original receipt scope.",
         "work": str(work),
         "batch": str(batch),
         "prepare_command": memory_command(config, "prepare", "--paths", *(paths or []),
@@ -214,7 +233,7 @@ def render_prompt(config, receipt, control, *, role="coordinator", tier=None, pa
         "effort": dispatch["reasoning_effort"],
         "tier": dispatch["tier"],
     }
-    return {"prompt": template.substitute(values), **dispatch}
+    return {"prompt": template.substitute(values), "stage_context": stage_context, **dispatch}
 
 
 def retrieval_dispatch(config, request_path, slot=0, available_subagents=None, tier=None):

@@ -45,6 +45,47 @@ def test_pending_feedback_alone_dispatches_semantic_work(memory):
     assert [item['id'] for item in receipt['feedback']] == [report['id']]
 
 
+def test_classification_only_registered_text_refreshes_without_encoding(memory, monkeypatch):
+    from test_memory_store import DeterministicEmbeddingClient
+
+    (memory.config.root / 'guide.md').write_bytes(b'Existing registered source.\n')
+    prepared = memory.prepare(['guide.md'])
+    batch = freeze([{'sources': [{'path': 'guide.md', 'revision': prepared['sources'][0]['revision']}],
+                     'members': [{'kind': 'chunk', 'path': 'guide.md', 'title': 'Existing',
+                                  'start_line': 1, 'end_line': 1}]}], config=memory.config)
+    memory.apply(batch)
+    identity = batch['members'][0]['id']
+    before = memory.read(identity)['original']
+    vector = memory._execute(f'SELECT * FROM ONLY {_sql(_record(identity))};')[0]['embedding']
+    memory.connection['private_scope'] = ['guide.md']
+    monkeypatch.setattr(DeterministicEmbeddingClient, 'embed',
+                        lambda *args, **kwargs: pytest.fail('classification-only maintenance re-encoded content'))
+    result = memory.maintain([])  # Registered originals stay included with no new discovery.
+    assert result['mechanical_batches'] == 1 and not result['needs_semantic']
+    after = memory.read(identity)['original']
+    assert after['revision'] == before['revision'] and after['source_version'] != before['source_version']
+    assert after['private'] is True and memory.knowledge(identity)['private'] is True
+    assert memory._execute(f'SELECT * FROM ONLY {_sql(_record(identity))};')[0]['embedding'] == vector
+    assert memory.read(identity, source_version=before['source_version'], start_line=1, end_line=1)['original'] == before
+
+
+def test_classification_only_image_remains_explicit_semantic_work(memory):
+    (memory.config.root / 'image.png').write_bytes(b'unchanged pixels')
+    prepared = memory.prepare(['image.png'])
+    batch = freeze([{'sources': [{'path': 'image.png', 'revision': prepared['sources'][0]['revision']}],
+                     'members': [{'kind': 'image', 'path': 'image.png', 'title': 'Image',
+                                  'text': 'Original image', 'locator': {'page': 1}}]}], config=memory.config)
+    memory.apply(batch)
+    memory.connection['private_scope'] = ['image.png']
+    result = memory.maintain([])
+    material = json.loads(open(result['receipt'], encoding='utf-8').read())
+    assert result['needs_semantic'] and result['mechanical_batches'] == 0
+    assert material['semantic'][0]['path'] == 'image.png'
+    assert material['semantic'][0]['reason'] == 'privacy_changed'
+    assert material['semantic'][0]['current_revision'] == prepared['sources'][0]['revision']
+    assert material['acceptance_scope']['kind'] == 'fixed_candidate_set'
+
+
 def test_reviewed_ranges_persist_only_for_the_read_source_version(memory):
     path = memory.config.root / 'reviewed.md'
     path.write_bytes(b'read\nunread\n')

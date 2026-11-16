@@ -1,5 +1,7 @@
 # 记忆系统进度
 
+2026-11-16 [0.16整改已实现并安装本项目](../20261115-real-use-rectification/result.md)：同事务大源分消息、M2跳新采集／启动清理、C1固定交稿及有界协作、C2同receipt／owner／control实际干净接续、S2分类与规则版本均已验证。真实两阶段精确回读／查询与父stop成立，正式库11表／mandatory／UUID／配置不变，最终owner=null；SQLite14默认采集问题、聊天freshness及token收益不计作已解决。外部项目不在本轮接入范围；GitHub发布沿所属进度。
+
 2026-11-16 已综合通信实证和token估算修订[现行整改计划](../20261115-real-use-rectification/plan.md)：P0整源快照、P1维护入口／接受范围、P2有界作者协作、P3合法干净接续分别交付；阶段保持同一维护生命周期，不能以阶段完成代表全回执完成。估算不是费用或验收降幅。仅维护文档，未实施产品或改动记忆库。
 
 2026-11-16 [协调者通信调查](../20261115-real-use-rectification/research/coordinator-communication-20261116.md)核实0.15.0长轮的主要问题是长期上下文承接大量细交接：1668次响应平均输入24.6万，E和紧凑final已经实际执行；全树list重复自有final并带入其他业务分支正文，交稿后改文件引发一次真实hash返工。中间MESSAGE正文两端加密，未证明其内容重复。已细化待选C1／C2，不新增调度平台、不改产品或外部库；本任务自动维护在语义派工前遇已知SQLite访问失败，自有owner已stop／release。

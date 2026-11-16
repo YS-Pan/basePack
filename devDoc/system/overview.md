@@ -1,6 +1,6 @@
 # 系统实现概览
 
-唯一active路线是[20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向0.15.0；本轮运行与发布能力见[计划](../archive/20261115-runtime-and-maintenance/plan.md)，实际安装状态见[部署合同](deployment.md)。此前私有开发上下文与同库标记见[交付进度](../archive/20261114-next-maintenance/progress.md)，统一身份与资源收敛见[上批交付](../archive/20261114-delivery-closeout/progress.md)，知识历史与访问状态见[使用整改进度](../archive/20261112-usage-rectification/progress.md)。代码、依赖锁、测试、产品文档、示例和随包skill位于实验工程；根devDoc维护现行实现和活动工作。实测和历史边界见[环境记录](environment.md)，共享资源基线见[R9结果](../archive/20261107-resource-coordination/r9-result.md)。
+唯一active路线是[20261106-basepack](../../experiments/20261106-basepack/README.md)，源码及本项目客户端为0.16.0；本轮能力与验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)，实际安装状态见[部署合同](deployment.md)。此前私有开发上下文与同库标记见[交付进度](../archive/20261114-next-maintenance/progress.md)，统一身份与资源收敛见[上批交付](../archive/20261114-delivery-closeout/progress.md)，知识历史与访问状态见[使用整改进度](../archive/20261112-usage-rectification/progress.md)。代码、依赖锁、测试、产品文档、示例和随包skill位于实验工程；根devDoc维护现行实现和活动工作。实测和历史边界见[环境记录](environment.md)，共享资源基线见[R9结果](../archive/20261107-resource-coordination/r9-result.md)。
 
 本仓库提供三项可独立使用的 skill：[engineering-judgment](../../skills/engineering-judgment/SKILL.md) 用于设计、错误处理、兼容和使用流程的工程取舍，保留独立形态，通过长期使用反馈维护；[file-structure](../../skills/file-structure/SKILL.md) 推荐或整理开发文档、实验工程及私有开发上下文布局；[agent-team](../../skills/agent-team/SKILL.md) 为每项任务选择组织，按完整交付过程判断独立完成、简单协作或清晰分层，并使用宿主已有的订阅 subagent 能力。安装时选择完整目录放入目标 `.agents/skills/`，或把已有项目原件联接到该发现目录，核对相对引用与宿主实际列表；`init` 与 core doctor 不覆盖这项验收。完整步骤见 [项目接入](../../experiments/20261106-basepack/docs/setup-project.md#独立-skills-安装与发现)。组织选择与协作已有指令层实现，复杂广读的质量与总成本对照仍见 [专项记录](../tasks/20261106-rebuild/research/agent-team.md)。
 
@@ -8,13 +8,13 @@
 
 [项目记忆](modules/memory.md) 使用唯一 SurrealDB 基座。一个 member 同时表示文件、实际章节、智能原文块或图片，也是默认检索表示及图节点；另有实体/决定/条件节点和带依据的原生语义边。宿主订阅 agent 同读完成分块、摘要、识图与关系，程序核源与逐记录知识版本后原子接受。多层全文、图文向量、严格回源、语义展开、人工更正及原生恢复共用这份持久知识。
 
-根`private/`是公共Git忽略的独立本机仓库，机密原件和人工分析按内容归入；公共开发说明继续自足。默认来源发现自动加入其内层Git清单，私有资料进入原项目记忆，`private`标记沿固定版本依据和关系端点传播并随检索/回读交付。存量补标保留知识身份与未变向量，无法确认的旧记录留未知。受管记忆与工作包沿现有忽略目录保留，完整恢复仍需数据库导出和相应文件；标记及原生导出不构成公开分享副本。详见[记忆模块](modules/memory.md)与[本机目录](project-data-layout.md)。
+根`private/`是公共Git忽略的独立本机仓库，机密原件和人工分析按内容归入；公共开发说明继续自足。默认来源发现自动加入其内层Git清单；`memory.private_scope`可额外声明原位私有文件／目录，分类不扩大来源发现或控制Git发行。freeze固定归一规则及分类，新source_version纳入分类与规则版本，apply在编码前及提交前核规则，历史依据保持原分类。私有资料进入原项目记忆，`private`标记沿固定版本依据和关系端点传播并随检索/回读交付。存量补标保留知识身份与未变向量，无法确认的旧记录留未知。受管记忆与工作包沿现有忽略目录保留，完整恢复仍需数据库导出和相应文件；标记及原生导出不构成公开分享副本。详见[记忆模块](modules/memory.md)与[本机目录](project-data-layout.md)。
 
 member新建由freeze分配UUID并解析草稿局部位置引用，更新沿用prepare中的UUID与expected；冻结批次重试复用相同身份，apply只接受新协议。未迁移库明确拒绝，不自动转换或解析旧别名。存量按项目停写、备份、离线转换与验证后同步切换，原文/向量/知识版本及交付访问状态保留。
 
 `memory publish` CLI与Python helper共用完成稿hash核对、freeze/validate、固定稿保存和原apply这一条组合链；数据库batch receipt仍是权威，本地result为详细投影。固定稿接续保持原batch_id与UUID，真实修稿才生成新path/hash后重新freeze。其余准备和条件组合沿既有原子工具／普通Python，合组、拆组、共读与返工仍由agent判断，宿主负责实际派工及生命周期；见[发布合同](../../experiments/20261106-basepack/docs/memory.md#最小闭环示例)。
 
-memory init绑定原UUID并刷新AGENTS关键动作与本机详细入口，固定Python、显式配置和原凭据文件。主任务直觉预计约十分钟以内跳过整个自动维护，保留brief；长任务以全项目maintain取得单owner并行业务。容量快照由安装agent采集，脚本按模式及可得空闲额度固定本轮布局与名称：自动仅0队，手动满队，低并发coord亲读，仅coord_0发布。其它聊天继续业务，反馈加入下轮派工。普通批次作者生成并由程序提交即完成，默认不追加审计；显式审计另按授权。发布采用原生WebSocket事务透明分消息，保留依赖版本、原文和向量保护。结束stop、取消后代，确认发布结束才release；未知结果保留owner。详见[记忆模块](modules/memory.md)。
+memory init绑定原UUID并刷新AGENTS关键动作与本机详细入口，固定Python、显式配置和原凭据文件。主任务直觉预计约十分钟以内跳过整个自动维护，保留brief；长任务以全项目maintain取得单owner并行业务。容量快照由安装agent采集，脚本按模式及可得空闲额度固定本轮布局与名称：自动仅0队，手动满队，低并发coord亲读，仅coord_0发布。其它聊天继续业务，反馈加入下轮派工。普通批次作者生成并由程序提交即完成，默认不追加审计；显式审计另按授权。发布采用原生WebSocket事务透明分消息，大源snapshot按实际JSON wire大小分段追加，保留同一事务、完整原文和版本。维护可显式跳过新聊天采集，既有来源与依赖仍接续。长维护可由宿主在旧组结束后用`memory stage`固定交接，沿同receipt／owner／control实际派新上下文；有限来源组、固定交稿和自有分支观察由角色prompt约束。结束stop、取消后代，确认发布结束才release；未知结果保留owner。详见[记忆模块](modules/memory.md)。
 
 CLI检索默认读memory.search_mode，新项目为vector；hybrid/vector按相同语义身份查询，缺模型或兼容向量明确失败。CLI和Python返回`{matches, vector_coverage}`；采集、语义接受与向量覆盖分别报告，结果保留观察knowledge_revision供反馈。检索派工独立使用retrieval-dispatch/retrieval-prompt，名称bp_mem_search_s，零席位由主agent直接执行；不要求维护回执或owner。guide/rank不需配置；owner/stop/release/recover-owner不连库；prompt、pending-dispatch及检索渲染只读配置和各自输入。doctor默认core，模型及Condor显式选查。
 

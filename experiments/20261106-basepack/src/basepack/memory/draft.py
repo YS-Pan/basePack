@@ -6,13 +6,16 @@ from pathlib import Path
 from uuid import uuid4
 
 
-def freeze(drafts):
+def freeze(drafts, *, config=None):
     if not drafts:
         raise ValueError('At least one draft is required')
     from .store import _record
+    from .privacy import privacy_rules, rules_revision, source_private
 
+    rules = privacy_rules(config)
     merged = {'protocol': 2, 'batch_id': uuid4().hex, 'new_members': [], 'member_mapping': [],
-              'sources': [], 'expected': {}, 'members': []}
+              'sources': [], 'expected': {}, 'members': [],
+              'privacy_rules': rules, 'privacy_rules_revision': rules_revision(rules)}
     drafts = deepcopy(drafts)
     scopes = []
     for scope, draft in enumerate(drafts):
@@ -23,8 +26,19 @@ def freeze(drafts):
         unknown = draft.keys() - allowed
         if unknown:
             raise ValueError(f'Unknown draft fields: {sorted(unknown)}')
+        for field, required in (('nodes', ('id',)), ('edges', ('id', 'in', 'out'))):
+            for index, item in enumerate(draft.get(field, [])):
+                missing = [key for key in required if key not in item]
+                if missing:
+                    raise ValueError(f"drafts[{scope}].{field}[{index}] missing required fields: "
+                                     f"{', '.join(missing)}")
         ids = []
         for index, item in enumerate(draft.get('members', [])):
+            if item.get('kind') in {'file', 'section', 'chunk'}:
+                missing = [field for field in ('start_line', 'end_line') if field not in item]
+                if missing:
+                    raise ValueError(f"drafts[{scope}].members[{index}] ({item.get('id', 'new member')}) "
+                                     f"missing required fields: {', '.join(missing)}")
             if 'id' in item:
                 ids.append(item['id'])
             else:
@@ -64,6 +78,8 @@ def freeze(drafts):
                     for endpoint in ('in', 'out'):
                         item[endpoint] = ref(item[endpoint])
         for source in draft['sources']:
+            if not source.get('deleted'):
+                source['private'] = source_private(source['path'], rules['private_scope'])
             if 'path' in source and any(old.get('path') == source['path'] for old in merged['sources']):
                 raise ValueError(f"Duplicate source across drafts: {source.get('path')}")
             if 'id' in source and any('id' in old and _record(old['id'], 'source') == _record(source['id'], 'source')
@@ -85,9 +101,9 @@ def freeze(drafts):
     return merged
 
 
-def freeze_file(drafts, output):
+def freeze_file(drafts, output, *, config=None):
     """Validate and exclusively save one frozen batch before it can be applied."""
-    batch = freeze(drafts)
+    batch = freeze(drafts, config=config)
     validate_batch(batch)
     path = Path(output).resolve()
     path.parent.mkdir(parents=True, exist_ok=True)

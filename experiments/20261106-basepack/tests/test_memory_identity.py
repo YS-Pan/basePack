@@ -19,8 +19,10 @@ from test_memory_store import DeterministicEmbeddingClient, EMBEDDING_IDENTITY
 def test_scoped_drafts_allocate_distinct_ids_and_resolve_references():
     drafts = [
         {'sources': [{'path': 'a', 'revision': 'a'}], 'expected': {}, 'members': [
-            {'kind': 'chunk'}, {'kind': 'file', 'parent': {'member': 0}, 'evidence': [{'member': 0}]}]},
-        {'sources': [{'path': 'b', 'revision': 'b'}], 'expected': {}, 'members': [{'kind': 'chunk'}],
+            {'kind': 'chunk', 'start_line': 1, 'end_line': 1},
+            {'kind': 'file', 'start_line': 1, 'end_line': 1, 'parent': {'member': 0}, 'evidence': [{'member': 0}]}]},
+        {'sources': [{'path': 'b', 'revision': 'b'}], 'expected': {},
+         'members': [{'kind': 'chunk', 'start_line': 1, 'end_line': 1}],
          'edges': [{'id': 'link', 'in': {'draft': 0, 'member': 0}, 'out': {'member': 0},
                     'evidence': [{'draft': 0, 'member': 0}, {'member': 0}]}]},
     ]
@@ -39,7 +41,7 @@ def test_scoped_drafts_allocate_distinct_ids_and_resolve_references():
 def test_old_payload_and_duplicate_updates_are_rejected():
     with pytest.raises(ValueError, match='frozen protocol'):
         validate_batch({'sources': [], 'members': [{'id': 'old'}]})
-    draft = {'sources': [], 'expected': {}, 'members': [{'kind': 'chunk'}]}
+    draft = {'sources': [], 'expected': {}, 'members': [{'kind': 'chunk', 'start_line': 1, 'end_line': 1}]}
     frozen = freeze([draft])
     frozen['members'].append(deepcopy(frozen['members'][0]))
     with pytest.raises(ValueError, match='Duplicate'):
@@ -54,7 +56,7 @@ def test_freeze_command_persists_mapping_once(tmp_path):
 
     draft = tmp_path / 'draft.json'
     output = tmp_path / 'batch.json'
-    draft.write_text(json.dumps({'sources': [], 'members': [{'kind': 'chunk'}]}), encoding='utf-8')
+    draft.write_text(json.dumps({'sources': [], 'members': [{'kind': 'chunk', 'start_line': 1, 'end_line': 1}]}), encoding='utf-8')
     args = SimpleNamespace(memory_action='freeze', drafts=[str(draft)], output=str(output))
     result, status = dispatch(args, None)
     stored = json.loads(output.read_text(encoding='utf-8'))
