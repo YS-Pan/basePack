@@ -1,5 +1,7 @@
 # 记忆系统进度
 
+2026-11-17用户要求按长期普适/简洁/易维护选型，下一阶段已统一为[长期整改计划](../20261115-real-use-rectification/plan.md)与[目标架构](../20261115-real-use-rectification/target-architecture.md)，实施状态只在该任务[进度](../20261115-real-use-rectification/progress.md)维护。已完成计划与前后总体逻辑图，尚未实现N0—N5；当前客户端仍0.16，不把旧已交付批次重新排为待办。
+
 2026-11-16 [0.16整改已实现、安装本项目并公开发行](../20261115-real-use-rectification/result.md)：同事务大源分消息、M2跳新采集／启动清理、C1固定交稿及有界协作、C2同receipt／owner／control实际干净接续、S2分类与规则版本均已验证。真实两阶段精确回读／查询与父stop成立，正式库11表／mandatory／UUID／配置不变，最终owner=null；SQLite14默认采集问题、聊天freshness及token收益不计作已解决。外部项目不在本轮接入范围；GitHub main／标签已推送，Release公开附件与Latest已核。
 
 2026-11-16 已综合通信实证和token估算修订[现行整改计划](../20261115-real-use-rectification/plan.md)：P0整源快照、P1维护入口／接受范围、P2有界作者协作、P3合法干净接续分别交付；阶段保持同一维护生命周期，不能以阶段完成代表全回执完成。估算不是费用或验收降幅。仅维护文档，未实施产品或改动记忆库。

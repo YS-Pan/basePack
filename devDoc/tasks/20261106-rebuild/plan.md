@@ -1,5 +1,7 @@
 # basePack 重建总览
 
+2026-11-17记忆接续入口：当前下一阶段唯一技术路线与批次见[长期整改计划](../20261115-real-use-rectification/plan.md)，修改前后总体关系见其[目标架构](../20261115-real-use-rectification/target-architecture.md)和[当前系统图](../../system/diagrams.md)。本总览继续管理跨工具取舍；下文原阶段/收尾状态按其日期保留，不构成另一套待实施路线。
+
 2026 年 11 月 14 日更新。本目录维护跨工具取舍、公共历史、skill 工作及联合发布条件；当前阶段从 [总进度](progress.md) 及各任务进度读取。当前唯一 active 路线为 [20261106-basepack](../../../experiments/20261106-basepack/README.md)，资源 R9 已交付 0.5.0，记忆 P0–P5 接续该工程；现行实现与部署合同维护在根 system。当前工程收尾和验证责任按[收尾计划](../../archive/20261114-delivery-closeout/plan.md)执行。
 
 战略以 [项目纲领](../../project-charter.md) 为准；公共调查见 [调研索引](research/sources.md) 与 [近期历史](legacy-history.md)，本目录状态见 [总进度](progress.md)。旧项目只取思想、事故样例和经核实的薄接口，不迁入其数据库、任务状态或业务授权。

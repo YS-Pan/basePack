@@ -1,6 +1,6 @@
 # 系统结构与边界
 
-当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向 0.15.0 的公共入口、项目记忆与资源工具；当前维护与发行状态见[本轮进度](../tasks/20261115-release-0.15.0/progress.md)，已部署能力见[实施结果](../archive/20261115-runtime-and-maintenance/result.md)。配置和安装合同见 [部署说明](deployment.md)，记忆实际完成边界见 [专项进度](../tasks/20261106-memory-system/progress.md)，资源基线见 [R9 结果](../archive/20261107-resource-coordination/r9-result.md)。文件位置图见 [逻辑框图](diagrams.md)。
+当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码与本项目客户端为0.16.0，共享embedding服务保持0.15.0；已部署能力及公开发行见[整改结果](../tasks/20261115-real-use-rectification/result.md)，维护观察见[本项目实测](../tasks/20261115-real-use-rectification/maintenance-20261116-result.md)。配置和安装合同见[部署说明](deployment.md)，资源基线见[R9结果](../archive/20261107-resource-coordination/r9-result.md)。本页只述已实现行为，[当前图](diagrams.md)与[未来目标架构](../tasks/20261115-real-use-rectification/target-architecture.md)分开维护。
 
 ## 当前组成
 
