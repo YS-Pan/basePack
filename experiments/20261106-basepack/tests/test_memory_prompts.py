@@ -80,8 +80,8 @@ def test_render_reads_only_receipt_and_templates(prompt_project, tmp_path, monke
     reader_ai = prompt_project.resolve_ai(tier="tier1")
     assert reader_ai["model"] in coordinator["prompt"]
     assert reader_ai["reasoning_effort"] in coordinator["prompt"]
-    assert "actual host spawn parameters" in coordinator["prompt"]
-    assert "Execute the following command, parse its JSON output, and follow its prompt." in coordinator["prompt"]
+    assert "`spawn_arguments` object" in coordinator["prompt"]
+    assert "Run the following command and follow the `prompt` field in its JSON output:" in coordinator["prompt"]
     assert "do not launch an audit" in coordinator["prompt"].lower()
     assert "no-knowledge or duplicate disposition" in coordinator["prompt"]
     assert "<batch.json>" not in coordinator["prompt"]

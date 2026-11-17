@@ -10,6 +10,7 @@ from uuid import uuid4
 
 
 MAINTENANCE_RESERVE = {"automatic": 1, "manual": 0}
+MAINTENANCE_BOOTSTRAP = "Run the following command and follow the `prompt` field in its JSON output:"
 
 
 def _nonnegative(value, name):
@@ -95,13 +96,17 @@ def prompt_dispatch(config, receipt, control, *, role="coordinator", tier=None, 
         args.extend(["--stage-sha256", stage_sha256])
     if paths:
         args.extend(["--paths", *paths])
+    render_command = memory_command(config, *args)
+    spawn_arguments = {"task_name": task_name, "fork_turns": "none",
+                       "model": resolved["model"], "reasoning_effort": resolved["reasoning_effort"],
+                       "message": f"{MAINTENANCE_BOOTSTRAP}\n{render_command}"}
     return {"role": role, "task_name": task_name, "team": team,
             "fork_turns": "none",
             "reader": reader if role == "reader" else None,
             "parent_task_name": assigned["task_name"] if role == "reader" else assigned["parent_task_name"],
             "publisher": role == "coordinator" and assigned["publisher"],
             "reader_task_names": assigned["reader_task_names"] if role == "coordinator" else [],
-            **resolved, "render_command": memory_command(config, *args)}
+            **resolved, "render_command": render_command, "spawn_arguments": spawn_arguments}
 
 
 def pending_workers(layout, available_subagents, started_task_names=()):
