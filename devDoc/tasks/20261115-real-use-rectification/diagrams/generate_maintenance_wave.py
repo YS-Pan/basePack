@@ -1,4 +1,4 @@
-"""Compare the deployed 0.17.4 organization with the 0.18 wave target.
+"""Compare the 0.17.4 organization with the installed 0.18 wave organization.
 
 Only the maintenance organization changes. The rest of both system diagrams is
 rendered from shared objects and verified by exact XML comparison.
@@ -77,9 +77,9 @@ SLOTS = {
 
 VERSIONS = {
     "before": {
-        "title": "修改前 · 当前记忆系统",
-        "subtitle": "0.17.4 deployed · KL-NMF / Gaussian 已部署；维护按来源组接续",
-        "state": "现用组织：Terra 在执行期间接收作者结果、正常修稿并逐组接续；阶段边界交接。",
+        "title": "修改前 · 0.17.4 维护组织",
+        "subtitle": "0.17.4 历史基线 · KL-NMF / Gaussian 已部署；维护按来源组接续",
+        "state": "变更前组织：Terra 在执行期间接收作者结果、正常修稿并逐组接续；阶段边界交接。",
         "lines": {
             "terra-init": ["Terra 阶段协调者", "按来源组规划与选择作者", "同一 turn 持续组织维护"],
             "plan-registry": ["组级派工程序", "固定 prepare＋descriptor", "生成当前作者的任务 prompt"],
@@ -94,13 +94,13 @@ VERSIONS = {
         },
         "bounds": [
             "接续与修稿沿同一维护 receipt / owner / control；唯一发布与原子接受已经存在。",
-            "0.17.4 的实际阶段与作者模型核验已有小批证据；全项目剩余维护仍未完成。",
+            "0.17.4 的实际阶段与作者模型核验已有小批证据；本图保留变更前组织，不表示当前部署。",
         ],
     },
     "after": {
-        "title": "修改后 · 有限任务池目标",
-        "subtitle": "0.18 target · 实现中；本图不表示已安装、已验宿主闭环或完成维护",
-        "state": "目标组织：Terra 两 turn；固定 Luna 池自领任务；普通完成只留邮箱，最后正常者 followup 同一 Terra。",
+        "title": "修改后 · 有限任务池维护",
+        "subtitle": "0.18 系列 · 程序 / 纯文件宿主 / 首次真实发布已验；安装状态见部署合同，范围与余项见进度记录",
+        "state": "现行组织：Terra 两 turn；固定 Luna 池自领任务；普通完成只留邮箱，最后正常者 followup 同一 Terra。",
         "lines": {
             "terra-init": ["Terra 第一 turn", "一次规划有限独立任务", "启动固定池；init 回执即结束"],
             "plan-registry": ["预登记任务与固定 Luna", "目标・来源・写目标・输出", "脚本生成 prompt；保留恢复位"],
@@ -248,7 +248,7 @@ def build(version):
     p += ['</g>', '<g id="footer">',
           text(80, 2633, "实线：工作 / 交付　　虚线：数据 / 控制　　search・read・rank 本身不算交付", 20,
                fill="#697589", anchor="start"),
-          text(1890, 2633, "2026-11-17 · 0.17.4 → 0.18 组织对照", 19,
+          text(1890, 2633, "2026-11-18 · 0.17.4 → 0.18 组织对照", 19,
                fill="#7E8997", anchor="end"), '</g>', '</g></svg>']
     return "\n".join(p) + "\n"
 
@@ -275,14 +275,15 @@ def verify_pair(before, after):
         shared_canvases.append(ET.tostring(shared))
     assert shared_canvases[0] == shared_canvases[1], "Shared canvas changed outside organization/title"
     return {
-        "canvas": [W, H], "current": "0.17.4 deployed", "target": "0.18 implementation in progress",
+        "canvas": [W, H], "baseline": "0.17.4 historical organization",
+        "current": "0.18 series; installed version follows deployment contract; first real publication verified",
         "unchanged_nodes": [n["id"] for n in COMMON_NODES],
         "unchanged_edges": [e[0] for e in COMMON_EDGES],
         "shared_objects_exact_xml": common_ids,
         "organization_slots_same_geometry_and_role": list(SLOTS),
         "whole_shared_canvas_exact_xml": True,
         "check": "exact XML equality: all shared node text, geometry, colors, edge paths and labels",
-        "runtime_claim": "diagram QA only; target lifecycle not runtime acceptance",
+        "runtime_claim": "diagram QA only; installation follows deployment contract; maintenance scope follows progress record",
     }
 
 

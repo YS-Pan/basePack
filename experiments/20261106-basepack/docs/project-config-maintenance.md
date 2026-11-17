@@ -55,7 +55,7 @@
 | Codex 项目重绑、注册/删除/移动其它项目或 worktree 变化 | 更新 `[memory.codex]`；请求新采集时取得完整当前注册根，向 `memory collect` 传 `--codex-registry` 覆盖本轮采集绑定，这不写回 TOML。核 projectId、清单完整性和 gaps，旧 `registry_complete=true` 不证明今天完整。宿主 projectId 与 basePack UUID 是两种身份；见 [聊天接入](setup-project.md#codex-项目聊天接入) |
 | 采集新聊天或明确使用已有原件 | 独立 `memory collect --codex-registry <json> --output <receipt>`；绑定项目 maintain 显式选择 `--collection <receipt>` 或 `--retained`。加载回执核归属/hash，retained 不证明 freshness；采集和语义结果分开。见 [维护入口](memory.md#自动维护与手动维护) |
 | 新增非 Git 原件、显式包含项、目录布局或 ignore 规则变化 | 按实际额外来源同步 `memory.source_scope` 与 Git 忽略规则，核 discovery boundaries/gaps。Git 内普通新文件及根 private 独立 Git 的已跟踪/未忽略新文件默认发现，后者无需逐项配置 source_scope。显式 `--scope` 实际限制新增、已登记、缺失和 pending 来源，不追加 private；范围外余项保留，已接受知识不因此删除。见 [来源发现](memory.md#自动维护与手动维护) |
-| 私有分类范围变化或业务正文需原位私有 | 更新 `[memory].private_scope`；默认 `[]`，根 private 固定私有，`['.']` 为全项目。分类不改变 discovery，freeze 固定规则，规则变化或分类改变沿版本合同重新处理；不以补标覆写历史。核受影响原件及固定依据，复用输入未变的兼容向量；见 [私有资料](memory.md#私有资料与分享边界) |
+| 私有分类范围变化或业务正文需原位私有 | 更新 `[memory].private_scope`；默认 `[]`，根 private 固定私有，`['.']` 为全项目。分类不改变 discovery，freeze 固定规则，规则变化或分类改变沿版本合同重新处理；不以补标覆写历史。核受影响原件及固定依据，复用输入未变的兼容向量。私有转公开且旧unavailable_gaps非空时，须显式清理／重判，预检将该源交语义处理，独立安全源可继续机械处理；见[来源缺口处置](memory.md#证据不可得与细化延期)及[私有资料](memory.md#私有资料与分享边界) |
 | 新建/迁移 private 独立仓库或补齐旧记录标记 | 核公共忽略、私有 Git 自身忽略及发现范围，保持外层项目 UUID/数据库；来源缺失沿既有合同。旧来源迁移或补标按已确认映射限定范围，保留历史与恢复材料，记明未覆盖/未知记录；不随升级自动执行 |
 | 检索模式变化或旧检索配置升级 | 新调用读取 `memory.search_mode`；vector/hybrid 均需要兼容向量，切模式本身不当然重建索引。按一次实际查询核模式与覆盖；支持值、literal 和旧模式升级见 [启动与检索](memory.md#启动与检索) |
 

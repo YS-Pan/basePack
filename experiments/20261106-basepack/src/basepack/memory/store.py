@@ -391,7 +391,7 @@ class Memory:
                     old = SourceContent(item["path"], previous["revision"], previous["size"],
                                         previous["mtime_ns"], snapshot["text"])
                     item["previous"] = {"revision": old.revision, "numbered_text": numbered_text(old)}
-                item["previous"].update({key: snapshot[key] for key in ("dispositions", "deferred_refinement")
+                item["previous"].update({key: snapshot[key] for key in ("dispositions", "deferred_refinement", "unavailable_gaps")
                                          if key in snapshot})
                 item["previous"]["private"] = snapshot.get("private", source_private(snapshot.get("path", previous["path"])))
             prepared.append(item)
@@ -607,7 +607,7 @@ class Memory:
             if (not legacy_rules and not source.get('deleted')
                     and source.get('private') != source_private(source['path'], rules['private_scope'])):
                 raise ValueError(f"Frozen private classification mismatch for {source['path']}; freeze again")
-        for field in ("dispositions", "deferred_refinement"):
+        for field in ("dispositions", "deferred_refinement", "unavailable_gaps"):
             if field in batch:
                 raise ValueError(f"{field} must be inside the relevant sources[] entry, not at batch root")
         for index, item in enumerate(batch.get("members", [])):
@@ -697,9 +697,12 @@ class Memory:
                         "private": marker, "privacy_rules_revision": rules_hash}
             if previous and previous['revision'] == source.revision and previous['path'] == source.path:
                 old_snapshot = self._execute(f"SELECT * FROM ONLY {_sql(_record(previous['version']))};")[0]
-                snapshot.update({key: old_snapshot[key] for key in ("dispositions", "deferred_refinement")
+                if (old_snapshot.get('private') is not False and marker is False
+                        and old_snapshot.get('unavailable_gaps') and 'unavailable_gaps' not in expected):
+                    raise ValueError('Public source requires explicit review of private unavailable gaps')
+                snapshot.update({key: old_snapshot[key] for key in ("dispositions", "deferred_refinement", "unavailable_gaps")
                                  if key in old_snapshot})
-            snapshot.update({key: expected[key] for key in ("dispositions", "deferred_refinement")
+            snapshot.update({key: expected[key] for key in ("dispositions", "deferred_refinement", "unavailable_gaps")
                              if key in expected})
             kind = "image" if isinstance(source, ImageSource) else "text"
             if kind == "image":

@@ -56,11 +56,21 @@ batch = compile_proposals(drafts, config=memory.config)
 
 apply 核对来源版本，以及本批改写、退役、更正目标、实际依据、父引用和关系端点的 expected 版本，再原子写入；无关 expected 不阻塞，缺 expected 仅允许本批新建记录。chunk 按范围取原词；摘要、依据、更正和旧快照持久保存。旧草稿冲突重新 prepare、阅读后提交。作者完成必要理解、生成批次并由程序成功发布即完成普通批次，不追加独立语义复核、例行回读/检索抽查。失败或结果未明保持未决。
 
-粗层摘要使用实际已读的精选 chunks 支持，保留独有事实及已有 mandatory。已阅但无新增知识/重复可登记 `sources[].dispositions`；已读而暂不细化可登记 `deferred_refinement`，不冒充未读缺口已完成。有效同版处置避免每次重复首建，来源或必要依赖变化重新处理。字段、范围与失效规则见 [批次合同](../src/basepack/memory/SKILL.md#direct-batch-interface)。
+粗层摘要使用实际已读的精选chunks支持，保留独有事实及已有mandatory。已阅但无新增知识／重复可登记 `sources[].dispositions`；实际已读且有fresh粗层表示覆盖、只是暂不细化时才用 `deferred_refinement`。证据不可取得属于下节的unavailable，不能借细化延期表示该证据已读。字段与定位细则见[批次合同](../src/basepack/memory/SKILL.md#direct-batch-interface)。
 
 新内容由 apply 使用 [共享 embedding](resources.md) 编码；已有内容补建或重建索引时运行 `memory embed`，不另外加载模型。文件/章节使用已接受摘要，块使用原文，图片使用原始图片；兼容且输入未变的向量复用。超限保留原错误，交回原阅读 agent 调整分块或摘要，不能静默截断。模型不可用时停止本批发布或查询，并保留原错误。
 
 图片先由视觉 agent 实际打开，描述与 OCR 单独标明，程序按 hash 保留必要原字节快照。必要 PDF 页可由宿主读取/渲染为项目内图片，locator 记录原文件、版本、页与区域；原 PDF 变化时重新核相关页面，不声称自动解析所有 PDF。
+
+### 证据不可得与细化延期
+
+0.18.2源码新增来源级 `unavailable_gaps`；实际安装与验收以[部署合同](../../../devDoc/system/deployment.md)为准。作者逐项声明当前证据不可得，形状为 `sources:[{path,unavailable_gaps:[{member,knowledge_revision,gap,reason}]}]`。member必须是prepare中同路径／当前原件版本的fresh、非retired成员，本批不改写或退役它；knowledge_revision及gap须精确匹配该成员当前版本和原 `coverage_gaps` 文本，reason写清已核的不可得原因。
+
+这只抑制已匹配coverage_gaps的重复semantic派工；原缺口、可读未覆盖范围、member／知识版本／向量／J保持不变。stale、missing、changed、uncovered及feedback各自继续触发处理，不把“不可得已记录”当作证据已补齐或范围已读完。`deferred_refinement`仍仅表示实际已读粗层覆盖范围的细化延期，两者可独立记录。
+
+同raw／path省略该字段会保留既有记录；显式list替换整个列表，`[]`清空，新raw不继承。公开source只能保存来自已确认public成员版本的记录；private或分类未核成员不能派生到公开source。private→public时若既有非空记录，须显式清理或重判，该源进入语义处理；独立安全来源仍可机械处理。
+
+旧frozen缺少此字段时保持缺省，不手补空数组或改原稿字节，以免改变batch hash；需要新增／清空记录时，从当前prepare产生新提案并重新freeze。
 
 ## 自动维护与手动维护
 
@@ -267,6 +277,6 @@ try {
 
 恢复时先为新的物理目录/端口启动认证服务，保留原 project_id；从该目标配置读取用户名及同一密码文件，再以原生 `import` 替换上述 `export`。缺失凭据先恢复正确文件，不给已有库重新生成密码。恢复后核快照、图关系和检索。
 
-恢复集合包括 export、配置、原凭据、公私业务原件、private 独立 Git 及其忽略但仍需保留的附件、受管 Codex 导出、codex-attachments 原件与定位回执，以及 `memory.data_dir` 下的 assets 图片快照和数据库引用的 `behavior/<sha>.json` 模型文件。知识版本、关系、依据、private、更正、旧快照、已阅/延期处置、反馈、原始交付事实、访问投影及 delivery_id 去重随 export 恢复；旧备份不能补齐后来状态或缺失历史。新目录保留 project_id，使用独立目录/端口，再验证原文、精确版本、关系、检索、反馈、模型 hash 和交付重试。兼容向量随 export 恢复，或从接受表示与原图重新 embed；访问记账不要求重建向量。运行库使用原生 export；复制物理目录先停写、停止服务。长期备份按明确恢复需求决定目的地与保留周期，不默认叠加完整备份；完整恢复材料按私有边界保管。凭据不随源码发行；清理前核原件／旧依据引用及活跃控制／未明发布。
+恢复集合包括 export、配置、原凭据、公私业务原件、private 独立 Git 及其忽略但仍需保留的附件、受管 Codex 导出、codex-attachments 原件与定位回执，以及 `memory.data_dir` 下的 assets 图片快照和数据库引用的 `behavior/<sha>.json` 模型文件。知识版本、关系、依据、private、更正、旧快照、来源处置（含unavailable_gaps）、反馈、原始交付事实、访问投影及 delivery_id 去重随 export 恢复；旧备份不能补齐后来状态或缺失历史。新目录保留 project_id，使用独立目录/端口，再验证原文、精确版本、关系、检索、反馈、模型 hash 和交付重试。兼容向量随 export 恢复，或从接受表示与原图重新 embed；访问记账不要求重建向量。运行库使用原生 export；复制物理目录先停写、停止服务。长期备份按明确恢复需求决定目的地与保留周期，不默认叠加完整备份；完整恢复材料按私有边界保管。凭据不随源码发行；清理前核原件／旧依据引用及活跃控制／未明发布。
 
 `memory freshness [--codex-registry <json>] [--thread <id>]` 只读项目归属、分页、采集回执与原文比较，不取得 owner、不写原件、不生成向量或发布知识。按相关候选及用户点名聊天补读；跨项目引用使用宿主读取。回执时间不是全局截止，端点和 `updatedAt` 不是正文证明；报告未摄入、待语义快照、实际补读和未知。预检 pending 是历史快照，不代表当前语义状态。

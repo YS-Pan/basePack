@@ -118,3 +118,19 @@ wheel SHA49e9884a11f7be85c78d3a41f2c9945144497376ce423cf1ecc7d57dcc9c50a9已普�
 0.18.1只补4份SKILL/角色指引：确已读、fresh粗层覆盖且符合现合同的gap须以source-only deferred_refinement提案持久化，精确绑定成员/知识版本/gap；保留未知，未读或无合格粗层覆盖的内容继续remaining。同批改成员先经publisher接受，后波才可暂缓其新版本；不增加例行全文审计。补PowerShell多行Python写.py及真实错误/处理状态留痕，提交后新错另留引用，不改固定文件。后端、schema、Gaussian及真实交付规则不变。136项提示词检查通过；普通wheel cf8f36029941925d0fa22328810bf5c8d96196ebf18f08243c189d90cd2a7047与源码/site-packages恰为同69文件且字节一致，pip check通过。
 
 新鲜418a9020复验的实际预检仍为8 semantic且8条raw revision全不变，实证了重复入队；旧074c（0.17.2全项目）与b870（0.18.0小批）候选中这8条也已存在且current raw revision一致，不能把现象归为0.18队列新引入，但其对19:05原用量图的贡献未量化。新波85a00f63d6ec49bc9fd0ddb318364ed1仍为7任务/2Luna，原父确认首turn结束并核模型后seal/go；接下来以持久化结果、未知仍保留以及同材料是否再次入队验收，不只看发布成功。原其余新修订全项目维护、真实行为训练及完整恢复仍继续。
+
+## 不可得证据与细化暂缓的实用修正
+
+0.18.1同批执行揭示合同缺口：一名作者把未知上下文/截断结果归为细化暂缓，另一名实际读完两个资源聊天后指出，缺失原文和未确认结果不能声称已经读过。R9粗层还存在raw相同但source_version历史pin不同的合法情况，不能为方便绑定而重写provenance。原父据此停止85a波，实际coordinator只完成初始化、r0正常结束、r1中断，publications=[]且未发布；未发关系稿与20个固定引用保留，未伪造剩余任务完成。父终态证据在本机`tmp/20261117-implementation/wave-gap-repair-1/parent-terminal.json`，SHA256为`04f8260c50e86336d75a0493335f6593501623f58e748532e2e477f47897c563`；原owner暂以stopped状态保护恢复，准备新版后再正确释放。
+
+0.18.2因此增加独立source版本字段`unavailable_gaps=[{member,knowledge_revision,gap,reason}]`。作者逐条核实当前不可得条件，编译及原生提交均检查当前fresh、未退役、同path/raw的精确成员版本和现存gap，不替换为新版本；只消除同输入下匹配gap造成的重复维护，原缺口、正文、read/covered范围、历史pin、mandatory/private、向量与交付事实不变。同版本省略保留、显式list替换/[]清空，新raw不继承。其他维护理由不被遮蔽；外部证据恢复但版本未变时需feedback或明确重新判断。public来源不能保存private成员派生记录，private转public的非空继承会留语义复核，其余安全来源仍可机械处理。没有批量为44条缺口自动背书，没有新增遗忘/退役或审阅平台。
+
+隔离18193原生DB的23项新增行为回归通过（主22项199.52秒，strict fresh另10.12秒，真实旧fixture替换后的兼容项5.72秒）；既有prompt/proposal143项、reviewed/maintenance7项通过。另由普通site-packages0.18.1实际prepare→compile→freeze→native发布的两份旧稿，在新代码先接受不可得记录后原样重放成功：旧文件SHA、canonical batch hash和DB receipt hash不变，新记录未被抹除，成员及交付头不变。仅embedding模拟，不以新代码造的“旧稿”冒充跨版本。完整memory、新安装及真实同批复验仍待完成。
+
+0.18.2随后已默认sdist→wheel构建并普通安装，wheel SHA256 `a32196c33e320dcae9a5beed9ee1dc932e87f83ce46bcea204f7133cf93b60c5`，69文件集/字节三方一致、pip check通过。ba3e866e新鲜同8来源仍待处理，7任务/2reader初始化后尚未seal/go；独立最终审查发现legacy frozen可伪造item.private使私有gap写入实际公开快照。原父在任何claim/读取/发布前stop，两reader实际interrupted，coordinator仅init FINAL，publications=[]。父终态证据SHA256 `11874351d3140a91d8ec5c111f171ecf74b288d3d219b5185656daac8ca4b0a3`，位于本机wave-gap-repair-2/parent-terminal.json。已启动的完整memory在21%进度按主任务要求中断，保留原log且没有最终summary，不计成功或产品失败。
+
+0.18.3源码修正隐私准入的实际来源：reviewed按source.path和当前配置privacy_rules计算marker，不再信legacy batch自带private。modern既有冻结规则检查、旧batch的hash/receipt及幂等返回顺序保持。143项prompt/proposal通过，新增legacy伪marker原生回归、重打包和完整回归待续；无必要调整行为算法或迁移数据。
+
+新增2项legacy隐私回归首次都在fixture install_schema HTTP30秒timeout，测试体未执行，真实portable旧稿1项通过。独立核自有测试服务发现Surreal后台node registration反复Transaction write conflict及60秒timeout；health仍200，无残留pytest或已建立连接。只证明隔离服务异常，不证明根因或产品失败；保留全部原证后核身份停止旧48040/74424，不复用其store。全新attempt4/18194的86520/96416经下一次工具独立核PID/exe/cwd/参数/store/监听及health，再运行新增2例及旧portable，3 passed/23.86秒。未改产品超时或盲重试，正式库与共享设施未动。
+
+0.18.3已默认sdist→wheel普通构建安装，SHA256 `21ebcb39bb3cf1fd366431075a56951ab080d08997f6d48c173686a0b38a9cbf`；69文件集/字节source=wheel=site-packages、pip check通过。独立全memory在新attempt4串行运行；生产新鲜81cb6715同8来源预检取得自有owner，真实作者小批重新启动，后续全范围/真实行为训练/完整恢复继续。修复前两次停止波的原件及未发稿均保留，未伪造发布或task终态。

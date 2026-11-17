@@ -78,6 +78,7 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
     from .content import SourceContent, comparison_text, line_changes, locate_lines, mapped_line_range, original_text
     from . import feedback
     from .images import ImageSource
+    from .privacy import privacy_rules, source_private
     from .store import _record, _sql
 
     if control:
@@ -126,6 +127,7 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
     mechanical_dependency_pending = set()
     completed_empty = set()
     refreshed_privacy = set()
+    unavailable_privacy_review = set()
     change_by_path = {row['path']: row for row in changes}
     for path, change in change_by_path.items():
         if control:
@@ -134,6 +136,12 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
             continue
         previous = by_path.get(path)
         current = memory._load_source(path, previous.get('kind') if previous else None)
+        if (previous and change.get('privacy_changed') and previous['revision'] == current.revision
+                and not source_private(path, privacy_rules(memory.config)['private_scope'])
+                and snapshot(previous['version']).get('private') is not False
+                and snapshot(previous['version']).get('unavailable_gaps')):
+            unavailable_privacy_review.add(path)
+            continue
         source = {'path': path, 'revision': current.revision}
         if previous:
             source['id'] = previous['id']
@@ -264,6 +272,9 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
     for change in changes:
         if change['kind'] in {'added', 'deleted'} and change['path'] not in completed_empty:
             semantic[change['path']] = {'path': change['path'], 'reason': change['kind'], 'members': [], 'versions': []}
+        elif change['path'] in unavailable_privacy_review:
+            semantic[change['path']] = {'path': change['path'], 'reason': 'unavailable_gaps_privacy_review',
+                                        'members': [], 'versions': []}
         elif change.get('privacy_changed') and change['path'] not in refreshed_privacy:
             semantic[change['path']] = {'path': change['path'], 'reason': 'privacy_changed', 'members': [], 'versions': []}
     current_sources = {}
@@ -298,7 +309,7 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
         """Return current-version dispositions whose referenced knowledge remains valid."""
         source = by_path.get(path)
         if source is None or current is None or source['revision'] != current.revision:
-            return [], []
+            return [], [], []
         version = snapshot(source['version'])
         dispositions = []
         for item in version.get('dispositions', []):
@@ -315,7 +326,7 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
             deferred = [entry for entry in version.get('deferred_refinement', []) if any(
                 row['kind'] in {'file', 'section'} and row['start_line'] <= entry['start_line']
                 and entry['end_line'] <= row['end_line'] for row in coarse)]
-        return dispositions, deferred
+        return dispositions, deferred, version.get('unavailable_gaps', [])
 
     for row in members:
         if row['retired'] or row['path'] not in by_path:
@@ -327,10 +338,13 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
         if row['id'] in mechanical_dependency_pending:
             reasons.append('mechanical_dependency_pending')
         current = current_source(path, row['kind'])
-        _, deferred = reviewed(path, current)
-        deferred_gaps = {(gap['member'], gap['knowledge_revision'], gap['gap'])
+        _, deferred, unavailable = reviewed(path, current)
+        reviewed_gaps = {(gap['member'], gap['knowledge_revision'], gap['gap'])
                          for item in deferred for gap in item.get('gaps', [])}
-        if any((row['id'], row['knowledge_revision'], gap) not in deferred_gaps
+        if (row.get('stale') is False and row.get('retired') is False and current is not None
+                and row['source_revision'] == current.revision):
+            reviewed_gaps.update((gap['member'], gap['knowledge_revision'], gap['gap']) for gap in unavailable)
+        if any((row['id'], row['knowledge_revision'], gap) not in reviewed_gaps
                for gap in row.get('coverage_gaps', [])):
             reasons.append('coverage_gaps')
         if current is None:
@@ -389,7 +403,7 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
     for path in by_path:
         active = [row for row in members if row['path'] == path and not row['retired']]
         current = current_source(path, by_path[path].get('kind'))
-        dispositions, deferred = reviewed(path, current)
+        dispositions, deferred, _ = reviewed(path, current)
         if not active:
             if current is not None and not isinstance(current, ImageSource) and not current.text:
                 continue

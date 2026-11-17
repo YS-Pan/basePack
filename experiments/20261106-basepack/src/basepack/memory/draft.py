@@ -164,7 +164,7 @@ def compile_proposals(proposals, *, config=None):
         for position, decision in enumerate(proposal.get('sources', [])):
             if isinstance(decision, str):
                 decision = {'path': decision}
-            extra = decision.keys() - {'path', 'dispositions', 'deferred_refinement'}
+            extra = decision.keys() - {'path', 'dispositions', 'deferred_refinement', 'unavailable_gaps'}
             if extra:
                 raise ValueError(f'proposals[{index}].sources[{position}] has generated fields: {sorted(extra)}')
             path = decision['path']
@@ -180,7 +180,7 @@ def compile_proposals(proposals, *, config=None):
                     compiled['kind'] = 'image'
             if 'id' in source:
                 compiled['id'] = source['id']
-            for field in ('dispositions', 'deferred_refinement'):
+            for field in ('dispositions', 'deferred_refinement', 'unavailable_gaps'):
                 if field in decision:
                     compiled[field] = decision[field]
             for decision_item in compiled.get('dispositions', []):
@@ -189,6 +189,23 @@ def compile_proposals(proposals, *, config=None):
             for decision_item in compiled.get('deferred_refinement', []):
                 for ref in decision_item.get('gaps', []):
                     ref['knowledge_revision'] = known[_record(ref['member'])]
+            if 'unavailable_gaps' in compiled:
+                if not isinstance(compiled['unavailable_gaps'], list):
+                    raise ValueError('unavailable_gaps must be a list')
+                for ref in compiled['unavailable_gaps']:
+                    record = _record(ref['member'])
+                    row = records.get(record)
+                    if (record.table != 'member' or row is None or row.get('stale') is not False
+                            or row.get('retired') is not False
+                            or known.get(record) != ref['knowledge_revision']
+                            or row.get('knowledge_revision') != ref['knowledge_revision']
+                            or row.get('path') != path or row.get('source_revision') != source.get('revision')
+                            or ref['gap'] not in row.get('coverage_gaps', [])):
+                        raise ValueError('Unavailable gap must match a current prepared member and its coverage gap')
+                    if row.get('private') is not False and source.get('private') is not True:
+                        raise ValueError('Unavailable gap cannot expose a private member in a public source')
+                    if not isinstance(ref.get('reason'), str) or not ref['reason'].strip():
+                        raise ValueError('Unavailable gap requires a reason')
             selected.append(compiled)
         proposal['sources'] = selected
         # IDs supplied for writes or retirements must be observed in prepare.
@@ -254,6 +271,9 @@ def compile_proposals(proposals, *, config=None):
             ids = {_record(ref['member']) for ref in item.get('gaps', [])}
             needed.update(ids)
             walk_roots.update(ids)
+        ids = {_record(ref['member']) for ref in source.get('unavailable_gaps', [])}
+        needed.update(ids)
+        walk_roots.update(ids)
     evidence = {_record(value) for field in ('members', 'nodes', 'edges')
                 for item in batch.get(field, []) for value in item.get('evidence', [])}
     retired = {_record(value, table) for table, field in (('member', 'delete_members'),
@@ -437,3 +457,7 @@ def validate_batch(batch):
         for decision in source.get('deferred_refinement', []):
             for ref in decision.get('gaps', []):
                 member(ref['member'])
+        if 'unavailable_gaps' in source and not isinstance(source['unavailable_gaps'], list):
+            raise ValueError('unavailable_gaps must be a list')
+        for ref in source.get('unavailable_gaps', []):
+            member(ref['member'])

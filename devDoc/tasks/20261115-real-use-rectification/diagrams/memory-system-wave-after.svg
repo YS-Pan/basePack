@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="2040" height="2670" viewBox="0 0 2040 2670" role="img" aria-labelledby="title desc">
-<title id="title">修改后 · 有限任务池目标</title>
+<title id="title">修改后 · 有限任务池维护</title>
 <desc id="desc">完整记忆系统同源对照。蓝色为主agent，橙色为子agent，绿色为代码执行，灰色为来源与存储。Terra与Luna均为子agent，不以模型区分角色颜色。带Δ的节点为维护组织变化。</desc>
 <defs>
 <marker id="flow-arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#596676"/></marker>
@@ -9,8 +9,8 @@
 <g font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif">
 <rect width="2040" height="2670" fill="#FCFDFE"/>
 <g id="version-heading">
-<text x="80" y="76" text-anchor="start" font-size="43" font-weight="700" fill="#283342">修改后 · 有限任务池目标</text>
-<text x="80" y="117" text-anchor="start" font-size="22" font-weight="400" fill="#66758A">0.18 target · 实现中；本图不表示已安装、已验宿主闭环或完成维护</text>
+<text x="80" y="76" text-anchor="start" font-size="43" font-weight="700" fill="#283342">修改后 · 有限任务池维护</text>
+<text x="80" y="117" text-anchor="start" font-size="22" font-weight="400" fill="#66758A">0.18 系列 · 程序 / 纯文件宿主 / 首次真实发布已验；安装状态见部署合同，范围与余项见进度记录</text>
 </g>
 <g id="unchanged-overview">
 <text x="80" y="163" text-anchor="start" font-size="22" font-weight="400" fill="#56667B">共同合同：Gaussian 连续降权；低 weight 的材料仍保留可检索，不退出、不删除、不 GC。</text>
@@ -388,12 +388,12 @@
 </g>
 </g>
 <g id="version-boundaries">
-<text x="95" y="2085" text-anchor="start" font-size="21" font-weight="600" fill="#5C6676">目标组织：Terra 两 turn；固定 Luna 池自领任务；普通完成只留邮箱，最后正常者 followup 同一 Terra。</text>
+<text x="95" y="2085" text-anchor="start" font-size="21" font-weight="600" fill="#5C6676">现行组织：Terra 两 turn；固定 Luna 池自领任务；普通完成只留邮箱，最后正常者 followup 同一 Terra。</text>
 <text x="95" y="2118" text-anchor="start" font-size="20" font-weight="400" fill="#6B7584">init ≠ 执行终态 ≠ 知识接受 ≠ 维护完成；seal 不证明 Terra idle，始终预留 Terra 恢复位。</text>
 <text x="95" y="2147" text-anchor="start" font-size="20" font-weight="400" fill="#6B7584">通知非事务：pending / accepted 分记；异常、残留 claimed、stop、晚回调不伪成功，原错交原父恢复。</text>
 </g>
 <g id="footer">
 <text x="80" y="2633" text-anchor="start" font-size="20" font-weight="400" fill="#697589">实线：工作 / 交付　　虚线：数据 / 控制　　search・read・rank 本身不算交付</text>
-<text x="1890" y="2633" text-anchor="end" font-size="19" font-weight="400" fill="#7E8997">2026-11-17 · 0.17.4 → 0.18 组织对照</text>
+<text x="1890" y="2633" text-anchor="end" font-size="19" font-weight="400" fill="#7E8997">2026-11-18 · 0.17.4 → 0.18 组织对照</text>
 </g>
 </g></svg>

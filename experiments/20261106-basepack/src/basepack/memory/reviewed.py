@@ -1,13 +1,15 @@
 """Validate author-recorded source dispositions and refinement deferrals."""
 
 from .images import ImageSource
+from .privacy import privacy_rules, source_private
 
 
 def dependencies(memory, batch, before_members, targets, expected):
     """Return versioned dependencies for the source-level author decisions."""
     from .store import _record
 
-    if not any('dispositions' in source or 'deferred_refinement' in source
+    fields = ('dispositions', 'deferred_refinement', 'unavailable_gaps')
+    if not any(any(field in source for field in fields)
                for source in batch['sources']):
         return set()
     records = {_record(row['id']): row for row in before_members}
@@ -31,13 +33,26 @@ def dependencies(memory, batch, before_members, targets, expected):
         result.add(record)
 
     for item in batch['sources']:
-        if 'dispositions' not in item and 'deferred_refinement' not in item:
+        if not any(field in item for field in fields):
             continue
         if item.get('deleted'):
             raise ValueError('Deleted sources cannot record reading dispositions')
         source = memory._load_source(item['path'], item.get('kind'))
         if source.revision != item['revision']:
             raise ValueError(f'Source revision mismatch for {source.path}')
+        if 'unavailable_gaps' in item:
+            if not isinstance(item['unavailable_gaps'], list):
+                raise ValueError('unavailable_gaps must be a list')
+            for ref in item['unavailable_gaps']:
+                if not isinstance(ref.get('reason'), str) or not ref['reason'].strip():
+                    raise ValueError('Unavailable gap requires a reason')
+                reference(ref, source=source, gap=ref['gap'])
+                row = records[_record(ref['member'])]
+                if row.get('stale') is not False or row.get('retired') is not False:
+                    raise ValueError('Unavailable gap requires a fresh, non-retired member')
+                if (row.get('private') is not False
+                        and not source_private(source.path, privacy_rules(memory.config)['private_scope'])):
+                    raise ValueError('Unavailable gap cannot expose a private member in a public source')
         for field in ('dispositions', 'deferred_refinement'):
             for entry in item.get(field, []):
                 if not isinstance(entry.get('reason'), str) or not entry['reason'].strip():

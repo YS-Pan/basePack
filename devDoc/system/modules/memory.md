@@ -56,7 +56,11 @@ Terra第二turn按汇总固定引用、覆盖和异常编译／唯一发布，�
 
 [feedback.py](../../../experiments/20261106-basepack/src/basepack/memory/feedback.py)在新增feedback表持久保存观察版本、漏检查询和处理结果；报告可并发，无需维护owner，未决报告进入needs_semantic及固定回执。修复先据当前版本apply，再由owner解决报告；旧报告不覆盖新版，未决不假关闭，原生导出恢复保留。检索只做业务所需阅读，发现问题就报告；只有用户明确的审计意图启动手动审计。
 
-[reviewed.py](../../../experiments/20261106-basepack/src/basepack/memory/reviewed.py)把非空来源实际已读范围的无新增/重复处置及已读待细化保存在source_version，核相关表示版本。有效处置抑制未变首建，来源/依赖变化重新入队；部分范围不代表整源。粗层表示仍保留精选原文依据和mandatory，未读缺口不伪作已读。非空parent纳入共用版本和解析检查；依赖临时写guard防止快照隔离写偏斜，逻辑版本和未变历史不增加。
+[reviewed.py](../../../experiments/20261106-basepack/src/basepack/memory/reviewed.py)在source_version保存来源级处置：dispositions为实际已读的无新增／重复范围，deferred_refinement为实际已读且由fresh粗层表示覆盖的细化延期。0.18.2源码新增unavailable_gaps，作者逐项声明当前证据不可得，记录member／knowledge_revision／gap／reason；必须精确对应同路径／当前raw的fresh、非retired成员及其原coverage_gaps，本批不得同时改写该依赖。无法取证不等于已读，不用fine延期伪造覆盖。
+
+unavailable只抑制精确匹配coverage_gaps的重复semantic，原缺口与可读范围、member／KV／向量／J不变；stale、missing、changed、uncovered及feedback独立处理。同raw／path省略保留，显式列表替换、[]清空，新raw不继承。公开source不得保存private或分类未知成员派生记录；private→public的非空旧记录须显式清理／重判并进入semantic，独立安全源的机械处理继续。旧frozen absent字段不注入空数组，保留原hash与幂等身份。
+
+有效处置抑制未变首建，来源／必要依赖变化重新处理；部分范围不代表整源。粗层表示保留精选原文依据和mandatory。非空parent纳入共用版本和解析检查；依赖临时写guard防止快照隔离写偏斜，逻辑版本和未变历史不增加。字段及作者流程见[证据不可得与细化延期](../../../experiments/20261106-basepack/docs/memory.md#证据不可得与细化延期)。
 
 [selection.py](../../../experiments/20261106-basepack/src/basepack/memory/selection.py)按worker一次综合分数排序，去重考虑成员、依据版本、位置和实际内容；按文字预算交付内容与省略入口，不二次乘访问权重。[retrieval.py](../../../experiments/20261106-basepack/src/basepack/memory/retrieval.py)唯一维护请求、工作目录、稳定delivery_id及请求加slot的派工身份；prompts仅复用渲染入口。retrieval-dispatch/retrieval-prompt返回默认tier1及实际模型/推理强度，不绑定维护receipt/control/owner，零席位由主agent执行同一完整流程。新问题用新请求及干净历史，重试复用原请求；没有模型API、常驻agent或另一套槽位登记表。
 

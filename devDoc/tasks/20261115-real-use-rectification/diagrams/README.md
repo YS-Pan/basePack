@@ -1,13 +1,15 @@
 # 记忆系统修改前后逻辑图
 
-2026-11-17。两组图分别比较完整系统；它们是逻辑示意，不替代接口与数值合同。
+2026-11-18 更新当前组织图状态。两组图分别比较完整系统；它们是逻辑示意，不替代接口与数值合同。
 
-## 当前维护组织：0.17.4 → 0.18 目标
+## 维护组织变更：0.17.4 → 0.18 系列
 
 | 版本 | 范围 | 可编辑源 | 预览 | 矢量采用件 |
 | --- | --- | --- | --- | --- |
-| 修改前 | 0.17.4 已部署；Terra 按来源组接续 | [SVG](memory-system-wave-before.svg) | [PNG](memory-system-wave-before.png) | [PDF](memory-system-wave-before.pdf) |
-| 修改后 | 0.18 实现中；有限任务池与 Terra 两 turn | [SVG](memory-system-wave-after.svg) | [PNG](memory-system-wave-after.png) | [PDF](memory-system-wave-after.pdf) |
+| 修改前 | 0.17.4 历史基线；Terra 按来源组接续 | [SVG](memory-system-wave-before.svg) | [PNG](memory-system-wave-before.png) | [PDF](memory-system-wave-before.pdf) |
+| 修改后 | 0.18 系列；有限任务池与 Terra 两 turn，安装状态见部署合同 | [SVG](memory-system-wave-after.svg) | [PNG](memory-system-wave-after.png) | [PDF](memory-system-wave-after.pdf) |
+
+本图按 0.18 系列描述维护组织，实际安装版本以[部署合同](../../../system/deployment.md)为唯一源，后续不因 patch 号单独改图。程序、纯文件宿主闭环与首个真实发布已验；source-level `unavailable_gaps` 语义持久化修复的真实小批验收、全项目实际接受范围与余项沿[任务进度](../progress.md)核实。该字段沿已有覆盖/缺口交付，不改变本图整体流程。
 
 新图依据[有限任务池合同](../maintenance-waves.md)，保留下面的历史图。内容 embedding、KL-NMF、Gaussian H 投影、固定独立锚点、单次 LLM 综合评分与 rank、真实 delivery、原证/知识/assets、owner/stop/release 都在两张新图的共同部分；低权重不引入退出、删除或 GC。主 agent 用蓝色，Terra 和 Luna 等子 agent 用橙色，程序执行用绿色，来源与存储用灰色；颜色表示角色，不表示模型。
 
@@ -18,10 +20,10 @@
 ```powershell
 python devDoc/tasks/20261115-real-use-rectification/diagrams/generate_maintenance_wave.py `
   --render --inkscape '<本机 Inkscape 可执行文件>' `
-  --qa-report artifacts/runs/20261117-wave-diagrams/same-layout-final.json
+  --qa-report artifacts/runs/20261118-wave-diagrams-series/same-layout-final.json
 ```
 
-新 PNG 为 2040 × 2670；PDF 由同一 SVG 导出，单页 1530 × 2002.5 pt。两轮逐张 `view_image` 检查 PNG，修正提交循环与无活退队分支、反馈线交叉和底注裁切；最终两张 PDF 再用 Poppler 栅格化并逐张查看，未见缺字、穿框、裁切或拥挤。制图检查及原证保存在忽略目录 `artifacts/runs/20261117-wave-diagrams/`。目标图明确标为实现中，图稿验收不代替 0.18 运行、宿主生命周期或真实维护验收。
+新 PNG 为 2040 × 2670；PDF 由同一 SVG 导出，单页 1530 × 2002.5 pt。初稿两轮逐张 `view_image` 检查 PNG，修正提交循环与无活退队分支、反馈线交叉和底注裁切，原证在 `artifacts/runs/20261117-wave-diagrams/`。本次更新系列状态后重新导出并逐张检查两张 PNG，以及 Poppler 栅格化的两张 PDF；同源报告、颜色核对与视觉原证保存在忽略目录 `artifacts/runs/20261118-wave-diagrams-series/`。图稿检查证明图形一致性和可读性，运行证据与完整维护验收分别报告。
 
 ## 历史架构：0.16 → 0.17
 

@@ -1,6 +1,6 @@
 # 项目配置与部署合同
 
-更新：2026年11月18日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)。本页是实际安装版本、wheel与验收状态的唯一维护源：当前普通安装0.18.1[behavior]，同批真实材料复验进行中，不能据提示词修订宣布缺口已闭合或178范围已完成。正式18080/store-0.17、memory schema 3和共享embedding 0.15保持。业务处置与余项见[进度](../tasks/20261115-real-use-rectification/progress.md)，原证与执行过程见[实施记录](../tasks/20261115-real-use-rectification/execution.md)；0.16既有验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)。操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入，修改配置按[维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)同步。
+更新：2026年11月18日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)。本页是实际安装版本、wheel与验收状态的唯一维护源：当前普通安装0.18.3[behavior]，新增不可得记录与legacy隐私准入已过原生回归和真实旧稿兼容验证，完整回归与同批真实材料复验继续。不能据安装成功宣布缺口已闭合或178范围已完成。正式18080/store-0.17、memory schema 3和共享embedding 0.15保持。业务处置与余项见[进度](../tasks/20261115-real-use-rectification/progress.md)，原证与执行过程见[实施记录](../tasks/20261115-real-use-rectification/execution.md)；0.16既有验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)。操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入，修改配置按[维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)同步。
 
 ## 位置与责任
 
@@ -15,9 +15,9 @@
 | 运行托管与日志 | 共享模型沿用 Shawl/SCM；项目库可由普通用户手动启动，也可选管理员 SCM；日志分别保存 |
 | 普通作业容量与策略 | HTCondor 独立安装并唯一维护 |
 
-本机共享服务沿R9使用`C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe`与`D:/AgentTools/state/basepack/embedding/logs/`；SurrealDB4.0.0 exe为`D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。2026-11-18核对，本项目稳定Python `D:/AgentTools/envs/basepack-client-0.10/Scripts/python.exe`已普通安装0.18.1[behavior]，目录名不表示包版本；当前wheel SHA256为`cf8f36029941925d0fa22328810bf5c8d96196ebf18f08243c189d90cd2a7047`。69个源码／wheel／实际site-packages文件的文件集及字节一致，pip check与136项prompt检查通过。该补丁修订defer、PowerShell .py helper及真实错误留痕指引，backend、schema与行为算法未变；安装通过不代替真实作者复验。
+本机共享服务沿R9使用`C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe`与`D:/AgentTools/state/basepack/embedding/logs/`；SurrealDB4.0.0 exe为`D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。2026-11-18核对，本项目稳定Python `D:/AgentTools/envs/basepack-client-0.10/Scripts/python.exe`已普通安装0.18.3[behavior]，目录名不表示包版本；当前wheel SHA256为`21ebcb39bb3cf1fd366431075a56951ab080d08997f6d48c173686a0b38a9cbf`。69个源码／wheel／实际site-packages文件的文件集及字节一致，pip check通过。原23项新原生行为、143项已有prompt/proposal和7项定向检查通过；随后新增2项legacy伪标记/正常接受回归及真实旧portable重放，3项通过23.86秒。普通旧0.18.1实际生成并发布的两份frozen跨版本原样重放保hash/receipt和新记录；完整memory与真实样本继续。新字段仅source版本可选元数据，schema和行为算法不变。
 
-0.18.0真实小批已发布2来源／7成员，主任务逐项原文、版本、history及embedding metadata回读通过；另6无稿来源的37个gap没有持久化defer，连同已发布2来源的7个gap，现有metadata合计8来源、9成员、44个未匹配gap。依据代码和metadata推断它们会在后续重进semantic；尚未启动0.18.1新preflight，该结论不是实际重新入队观测。原wave已由父核通知恢复并close、固定closure已保存，原owner暂持有，准备同8来源复验；问题尚未证实修完，178范围未闭合。
+0.18.0真实小批已发布2来源／7成员，主任务逐项原文、版本、history及embedding metadata回读通过；8来源、9成员仍有44个未匹配gap。0.18.1新鲜同材料预检已实证8来源重进semantic；执行发现缺失原文和未知结果不能等同细化暂缓，该波由父stop且所有角色实际终态、无发布，固定稿/原错保留。0.18.2将不可得条件独立持久化，原coverage_gaps保持可见；同材料修复复验及随后全范围仍须完成，不能据旧170/178作者计数声明闭合。0.18.1旧wheel SHA256为`cf8f36029941925d0fa22328810bf5c8d96196ebf18f08243c189d90cd2a7047`，提示词修订和136项检查保留为过程证据。
 
 此前0.18.0 wheel SHA256为`9ec178d95bfde63550f1696431866efb22cd7c4f9c7d49d2ac7abe70ae19117d`，源码提交a710e335；当时69文件三方字节一致、pip check与wave create help通过。全memory程序检查649 passed、6 skipped（1483.62秒），最后定向259 passed（8.91秒）；跳过2项原生导出及4项未启用共享模型专项，不据此宣称GPU专项重跑。纯文件宿主probe在该版已closed，由父按宿主事实完成通知恢复、owner=null；这是该轮结束截点，不能代替后续真实维护。
 
