@@ -87,38 +87,32 @@ memory maintain --mode automatic --holder '<本thread身份>' --control '<memory
 
 语义派工前的启动失败，只清理本进程已取得且确认无派工、无在途或未明发布的自有 owner，再抛出原始错误。清理也失败时保留两类错误；状态未明保留 owner 和恢复入口，他人 owner 不受影响。
 
-`acquired=false` 时返回已有 owner 的 holder/run_id/执行状态，跳过自身维护并继续业务；显式维护请求需报告该阻塞。`acquired=true` 时返回机械计数、`needs_semantic`、`receipt`、`control`、固定的 `layout`、来源/采集边界及容量允许时的 `worker`。未决反馈也触发语义维护，原件未变或 pending 为零并不关闭它。`needs_semantic=false` 时不创建语义 agent；为 true 且存在 worker 时，宿主实际设置 `worker.task_name`、`worker.model` 和 `worker.reasoning_effort`，干净历史派协调者，只传：
+### 有限任务池与两段式 Terra
 
-```text
-Run the following command and follow the `prompt` field in its JSON output:
-<worker.render_command>
-```
+本节为已授权的0.18接入合同，尚未安装；当前0.17.4轮次沿原固定回执自然收口，不能把任务池协议套给旧worker。详细设计维护源为[有限任务池合同](../../../devDoc/tasks/20261115-real-use-rectification/maintenance-waves.md)；安装后以 `memory guide` 返回的随包流程和CLI生成的命令、prompt与身份执行。新入口为 `memory wave`：create不传wave-id并返回该标识，其余动作均显式传 `--control <同一control> --run-id <owner run_id> --wave-id <wave_id>`。各动作字段以 `memory wave <action> --help` 为准，reader直接执行生成prompt中的命令。
 
-子 agent 自己执行该命令并遵循返回的 `prompt`。`memory prompt --receipt <receipt> --control <control> --team 0` 渲染第 0 队协调者；reader 使用 `--team <t> --role reader --reader <r> --paths <项目文件...>`。其它队协调者也必须有有界 `--paths`，派前将返回命令中的来源占位符替换为实际分配文件。脚本统一给出名称、父子位置、模型、推理强度和发布权限；宿主原样设置，不临时设计人数或自由起名。角色与档位独立：协调者默认 tier2，reader 默认 tier1；显式 `--tier <tier>` 仍保留角色。渲染只读配置、模板与固定回执，不读密码、不连数据库或模型，也不改控制文件或状态；配置变化不重写已开始的一轮布局。
+1. `acquired=false` 时报告已有owner并继续业务；显式维护报告该阻塞。`acquired=true` 后保留原receipt/control和父任务stop权限。只有 `needs_semantic=true` 才按返回名称、模型和推理强度实际创建Terra；初始化成功仅表示准备了一波工作。
+2. Terra第一turn规划有限、可独立阅读写稿的语义任务，将每项的 `id/goal/paths/write_targets/outputs` 写入tasks JSON数组，用 `memory wave create --receipt <固定receipt> --control <control> --run-id <owner run_id> --tasks <tasks.json> --coordinator <实际非根Terra规范路径> --readers <N>` 建波；长组先发，工作量差异明显的任务分组。依赖前一波新发布知识的任务留下一波。N必须在1至min(任务数,固定reader上限)内，由规划者按工作量选择较小固定池，供多轮领取，不以容量满编为目标。程序预登记worker，保留Terra第二turn恢复名额；余量不再默认补无reader协调者。
+3. Terra按create返回的 `workers[].spawn_arguments` 实际启动Luna，逐名运行 `started --worker <name> --handle <实际handle>`，失败则 `worker-failed --worker <name> --error <原错>`；全部登记后运行 `initialized`，交固定初始化回执并结束当前turn。Luna首turn先通过宿主事件等待带wave标识的go。原父任务保留全部实际句柄，确认Terra已空闲且全部成员已启动或明确失败后才运行 `memory wave seal`，并向已启动Luna发送一次go。未封口不得领取或退队，也不得提前产生最后通知；不凭等待时间推测Terra已空闲。
+4. Luna循环 `claim`→`task-prompt --task-id <id>`→原文阅读／分块／摘要／关系及普通修稿→`submit --task-id <id> --drafts <固定稿路径...> --coverage <覆盖JSON> --errors <错误JSON>`，再领取下一项；worker动作同时传 `--worker <name>`，失败提交显式加 `--failed`。作者保持稿件及hash不变，修稿另交新引用。普通Luna无任务即原子更新活动状态并正常退队，不主动唤醒Terra。
+5. 最后正常退队者核全波任务状态，保存固定执行回执并取得唯一通知资格；运行 `notification-pending` 后实际followup同一非根Terra，传稳定wave标识、回执路径及摘要，再用 `notification-result --accepted --result <实际宿主结果JSON>`（失败则改用 `--failed`） 记录结果。普通早退的完成消息只留在空闲Terra邮箱。程序的待通知状态不等于宿主已受理followup；实际宿主结果另记，重复通知按稳定wave幂等处理。
+6. Terra第二turn用 `finish` 核固定引用和执行边界，按汇总覆盖与异常沿现有编译器唯一发布：`memory wave publish --completed <有序固定引用JSON> --frozen <稳定新frozen路径> --result <稳定结果路径>`。该调用固定publication intent，重入沿原frozen／结果接续，固定publication结果后即FINAL；正常成功不逐稿全文重读或加语义审计。followup受理后Terra可能先于通知ack完成，因此Terra不等ack、不做wave close，也不为此增加第三turn。原父任务观察Terra FINAL与最后Luna的通知ack／宿主终态后机械执行 `memory wave close`；pending结果未知时按宿主事实恢复，不重发通知。必要共读及普通修稿交相应作者，形成有限修复波。初始化、执行终态、发布接受及维护完成分别报告，任何一个回执都不代替其余结果。
 
-布局使用接入时保存的宿主上限 C（不含主 agent、含全部后代）。宿主已有实时可用额度 A 时传 `--available-subagents <A>`：A 已扣其它占用（含检索），尚未扣本轮业务预留；自动维护预留 1 席，手动维护预留 0 席。脚本计算 `M=max(0,min(C,A)-预留)`。无 A 时仅返回配置允许的组织上限，实时额度未核，实际创建仍受宿主准入约束；容量快照的刷新见 [配置维护要点](project-config-maintenance.md#修改并发上限或切换宿主profile)。
+已确认publisher终态、无提交且owner.publications为空时，原父任务可用 `memory wave publication-failed --error <原错> --publisher-ended --no-commit` 固定错误并终止旧intent，未发稿保留给有限修复波。未知提交仍保留原intent与owner，不能标失败或重发；先沿原固定frozen及数据库回执核结果。
 
-程序根据实际 `work_items` 与 M 保存弹性布局；容量是上限，少量工作只启用所需人数。自动模式仅第 0 队，手动模式可启用更多有界组；M=0 时不派 worker，未处理材料保持待办。零 reader 的协调者亲自 prepare、阅读、分块、摘要、建图、处置与发布。所有队共用一份 owner/control/receipt，第 0 队协调者是唯一 apply 发布者及反馈结案者；其它队在其子树内交稿，不独立开维护或发布。
+任务的 `paths` 仅列当前stage的remaining.paths内拟处置来源；无stage时限原receipt的semantic处置来源。可选 `read_paths` 只为额外共读，prepare可读两者，但draft.sources与member.path必须属于paths。图／feedback-only任务可用 `paths=[]`，必要时先检索；新发现来源留下一wave，不自动纳入本波接受。
 
-同阶段的批次接续使用已知自有句柄，名称本身不证明实例归属。容量准入失败时保留原错与未派项、停止新增派工；取得新额度后用 `memory pending-dispatch --receipt <receipt> --available-subagents <A> --started-task-names <已启动名称...>` 仅缩减未启动清单，保留已启动名称和权限。不开第二个 owner，不以未派工冒充完成。
-
-协调者按语义、共读端点、共享写目标和工作量分组；每个共享节点、关系及其它图写目标只有一个 owner，跨组依据交其共读。作者负责阅读、语义和正常修复，按固定引用统一发布；只观察自有分支，按事件／有界等待接收一次完成交付。同稿的自动 FINAL 沿已收引用识别，修稿使用新文件／hash。具体合同见 [来源组交付](../src/basepack/memory/SKILL.md#source-group-delivery)，普通成功不追加语义审计。
-
-回执固定候选身份／来源集合和采集观察，`current_revision` 是发现时观察，`accepted_source_version` 是此前接受身份；候选内每批 prepare 固定实际原件，可接受当时版本并报告 accepted revision／覆盖，冲突回原作者重 prepare。优先用户约定、当前阶段与稳定成果入口，再补历史。接受后再改不自动重开本阶段；新路径、回执外候选及后续未接受成果列原件入口与有限后续范围。旧回执成功不等于最终磁盘全 fresh，业务收尾不默认再开全库维护。
+回执固定来源候选及采集观察，prepare固定实际阅读版本；冲突由作者重新prepare并正常修稿。共享节点／关系各有一个写owner，程序不代替语义判断。已接受后新改的原件不自动重开旧任务，回执外来源和后续未接受成果保留原件入口与有限后续范围。普通成功不追加例行全文审计，也不以一波结束宣布全授权范围完成。
 
 ### 同一轮的阶段接续
 
-长维护可在主题／来源组完成、旧协调者及作者均已结束、发布终态明确后串行接续。原宿主保存固定交接包，再运行：
+0.17的stage交接只用于原协议轮次收口；0.18默认由上述有限wave接续，不再逐来源组恢复Terra续派。切换前固定旧轮接受／未发稿、剩余范围和发布终态，旧worker结束后由原父任务正确stop/release；新轮显式承接全部未完范围，不继承旧worker协议。两种方式的恢复材料均保留实际固定引用，不能因更换客户端重置发布身份。
 
-```powershell
-memory stage --receipt '<原receipt>' --control '<原control>' --handoff '<固定handoff.json>' --workers-ended --available-subagents <当前可用额度> --output '<新stage.json>'
-```
+### 停止与恢复
 
-下一次接续增加 `--previous-stage '<当前stage.json>'`。该入口只保存阶段身份与固定引用，不创建宿主 agent。宿主须按返回 worker 的名称、模型、推理强度及 `fork_turns="none"` 实际派新上下文；保留返回的 `stage.path`／`stage.file_sha256` 和原父任务的取消句柄。自动生成的 render 命令携带 hash；手工运行 `memory prompt` 或 `memory pending-dispatch` 时，使用同一 receipt/control，并同时传 `--stage <path> --stage-sha256 <hash>`。
+维护与发布沿用自有 control，独立采集不持有它。业务完成时，以本项目配置 `memory stop --control <control>`，取消协调者及后代；通过 `memory owner` 核发布状态，再 `memory release --control <同一control>`。这些命令独立于 brief，不需要数据库或密码。stop 不撤销已获准提交，release 要求已停止且无未完成/未明发布。control 是协作授权凭证，只给持有者及其 worker，不能复用或按清理习惯删除。失败保留原错与 owner，业务答复报告余项。异常遗留先独立核旧持有者/后代已结束及事务结果已解决，再显式 `memory recover-owner --run-id <id> --owner-ended --publication-resolved`；不按文件年龄抢占。此机制用于协作互斥，不隔离有文件系统访问权的对手。任务池领取、回调处理和发布还须核当前owner/control/wave及stop。停止后不得新取得回调资格；已在途宿主调用可能迟到唤醒Terra，第二turn须先核状态并拒绝发布，不能因唤醒重开维护。未启动／失败worker、残留claimed、全体异常消失和未受理通知都保留原错及owner，由原父任务据真实宿主终态恢复；不盲重试、超时抢回或只依赖最后正常退出路径。
 
-各阶段沿用同一 receipt、owner/control 和父 stop，始终一个 dispatcher／publisher；无句柄接管能力时先结束旧组再创建新 reader。压缩或同会话摘要不是干净接续。阶段完成仅结束本组，候选余项、未读范围、反馈与原回执 gaps 继续保留，不执行整轮 stop/release 或重新采集。schema 与宿主交接职责以 [阶段合同](../src/basepack/memory/SKILL.md#stage-continuation) 为准；入口成功不代替真实宿主接续验收。
-
-维护与发布沿用自有 control，独立采集不持有它。业务完成时，以本项目配置 `memory stop --control <control>`，取消协调者及后代；通过 `memory owner` 核发布状态，再 `memory release --control <同一control>`。这些命令独立于 brief，不需要数据库或密码。stop 不撤销已获准提交，release 要求已停止且无未完成/未明发布。control 是协作授权凭证，只给持有者及其 worker，不能复用或按清理习惯删除。失败保留原错与 owner，业务答复报告余项。异常遗留先独立核旧持有者/后代已结束及事务结果已解决，再显式 `memory recover-owner --run-id <id> --owner-ended --publication-resolved`；不按文件年龄抢占。此机制用于协作互斥，不隔离有文件系统访问权的对手。
+通知者已实际结束且宿主结果已核实时，原父任务可用 `memory wave notification-recover --accepted --evidence <实际宿主证据> --worker-ended --host-verified` 补记结果（失败则用 `--failed`）。该动作不发送或重试followup；仍为eligible、从未尝试的通知只能记failed。未核宿主事实时继续保留pending与owner。
 
 自动小批接续已有积压，任务相关性只影响优先级。显式维护按授权范围交付实际处置、阻塞和余项，不以剩余数量或优先小批自行结案。普通业务结束不承诺清空历史；连续短任务的积压留下一次长任务或显式维护。特殊任务可按授权调整范围，固定名称和本轮容量仍由脚本提供。
 

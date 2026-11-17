@@ -8,7 +8,9 @@ def register_commands(subparsers):
     memory = subparsers.add_parser("memory", help="Project-local multilevel memory")
     commands = memory.add_subparsers(dest="memory_action", required=True)
     actions = {name: commands.add_parser(name) for name in
-               ("init", "guide", "collect", "sources", "prepare", "freeze", "publish", "apply", "stop", "owner", "release", "recover-owner", "embed", "search", "read", "knowledge", "history", "neighbors", "brief", "changes", "maintain", "stage", "prompt", "pending-dispatch", "retrieve", "retrieval-start", "retrieval-receipt", "behavior-train", "behavior-compile", "behavior-candidates", "retrieval-dispatch", "retrieval-prompt", "freshness", "rank", "delivery", "access-hints", "feedback-report", "feedback-list", "feedback-resolve")}
+               ("init", "guide", "collect", "sources", "prepare", "freeze", "publish", "apply", "stop", "owner", "release", "recover-owner", "embed", "search", "read", "knowledge", "history", "neighbors", "brief", "changes", "maintain", "stage", "prompt", "retrieve", "retrieval-start", "retrieval-receipt", "behavior-train", "behavior-compile", "behavior-candidates", "retrieval-dispatch", "retrieval-prompt", "freshness", "rank", "delivery", "access-hints", "feedback-report", "feedback-list", "feedback-resolve")}
+    from .wave_cli import register as register_waves
+    register_waves(commands.add_parser("wave", help="Host-driven finite maintenance wave"))
     actions["feedback-report"].add_argument("--kind", choices=["knowledge", "retrieval"], required=True)
     actions["feedback-report"].add_argument("--issue", required=True)
     actions["feedback-report"].add_argument("--target", help="Member, node or semantic edge ID")
@@ -75,7 +77,7 @@ def register_commands(subparsers):
     actions["maintain"].add_argument("--control", required=True, help="Fresh, never-used task control file")
     actions["maintain"].add_argument("--holder", required=True, help="Host thread identity")
     actions["maintain"].add_argument("--mode", choices=["automatic", "manual"], default="manual",
-                                    help="Automatic reserves one business seat; direct maintenance defaults to manual")
+                                    help="Both modes reserve one coordinator recovery seat; direct maintenance defaults to manual")
     actions["maintain"].add_argument("--available-subagents", type=int,
                                     help="Host raw free subagent seats, excluding the main agent and before business reserve")
     actions["maintain"].add_argument("--timeout", type=float, default=600, help="Candidate embedding timeout")
@@ -89,21 +91,12 @@ def register_commands(subparsers):
                                  help="Host confirms the previous coordinator and its workers have ended")
     actions["prompt"].add_argument("--receipt", required=True, help="Maintenance receipt to render as worker context")
     actions["prompt"].add_argument("--control", required=True, help="The same task control file used by maintain and apply")
-    actions["prompt"].add_argument("--role", choices=["coordinator", "reader"], default="coordinator")
+    actions["prompt"].add_argument("--role", choices=["coordinator"], default="coordinator")
     actions["prompt"].add_argument("--tier", choices=["tier1", "tier2", "tier3", "tier4"],
                                help="Override the role's default AI tier")
-    actions["prompt"].add_argument("--paths", nargs="+", help="Bounded project-relative sources for a reader or nonpublishing coordinator")
     actions["prompt"].add_argument("--team", type=int, default=0, help="Fixed team from this receipt's saved layout")
-    actions["prompt"].add_argument("--reader", type=int, default=0, help="Fixed reader slot within the team")
     actions["prompt"].add_argument("--stage", help="Saved stage package for this original receipt/control")
     actions["prompt"].add_argument("--stage-sha256", help="Expected stage package hash from the saved reference")
-    actions["pending-dispatch"].add_argument("--receipt", required=True)
-    actions["pending-dispatch"].add_argument("--available-subagents", required=True, type=int,
-                                           help="New host raw free seats; already-started workers are already deducted")
-    actions["pending-dispatch"].add_argument("--started-task-names", nargs="*", default=[])
-    actions["pending-dispatch"].add_argument("--stage", help="Saved stage package instead of the initial layout")
-    actions["pending-dispatch"].add_argument("--stage-sha256", help="Expected stage package hash from the saved reference")
-    actions["pending-dispatch"].add_argument("--control", help="Original control; required with --stage")
     for name in ("retrieval-dispatch", "retrieval-prompt"):
         actions[name].add_argument("--request", required=True, help="UTF-8 JSON with question, scope and content_budget")
         actions[name].add_argument("--slot", type=int, default=0, help="Parent-owned retrieval slot")
@@ -133,7 +126,7 @@ def register_commands(subparsers):
     actions["rank"].add_argument("--input", required=True, help="Read candidates with agent scores")
     actions["rank"].add_argument("--budget", type=int, default=6000, help="Returned text character budget")
     for name, command in actions.items():
-        if name in ("prompt", "pending-dispatch", "retrieval-dispatch", "retrieval-prompt"):
+        if name in ("prompt", "retrieval-dispatch", "retrieval-prompt"):
             command.set_defaults(output=None)
         else:
             command.add_argument("--output", help=("New frozen batch path (requires --completed)" if name == "publish"
@@ -144,6 +137,9 @@ def dispatch(args, config):
     from .query import load_json_file
 
     action = args.memory_action
+    if action == "wave":
+        from .wave_cli import dispatch as dispatch_wave
+        return dispatch_wave(config, args), 0
     if action == "maintain":
         from .owner import acquire, release_failed_startup
         claim = acquire(config.memory_dir, config.raw["memory"]["project_id"], args.holder, args.control)
@@ -192,8 +188,8 @@ def dispatch(args, config):
     elif action == "prompt":
         from .prompts import render_prompt
         result = render_prompt(config, args.receipt, args.control,
-                               role=args.role, tier=args.tier, paths=args.paths,
-                               team=args.team, reader=args.reader, stage=args.stage, stage_sha256=args.stage_sha256)
+                               role=args.role, tier=args.tier, team=args.team,
+                               stage=args.stage, stage_sha256=args.stage_sha256)
     elif action == "stage":
         from .stages import prepare_stage
         if not args.output:
@@ -201,17 +197,6 @@ def dispatch(args, config):
         return prepare_stage(config, args.receipt, args.control, args.handoff, args.output,
                              workers_ended=args.workers_ended, previous_stage=args.previous_stage,
                              available_subagents=args.available_subagents), 0
-    elif action == "pending-dispatch":
-        from .prompts import pending_workers
-        material = json.loads(Path(args.receipt).read_text(encoding="utf-8"))
-        layout = material["layout"]
-        if args.stage:
-            from .stages import load_stage
-            if not args.control:
-                raise ValueError("pending-dispatch --stage requires the original --control")
-            layout = load_stage(args.receipt, args.control, args.stage, file_sha256=args.stage_sha256)["layout"]
-        result = {"workers": pending_workers(layout, args.available_subagents,
-                                             started_task_names=args.started_task_names)}
     elif action in ("retrieval-dispatch", "retrieval-prompt"):
         from .retrieval import retrieval_dispatch, render_retrieval_prompt
         render = retrieval_dispatch if action == "retrieval-dispatch" else render_retrieval_prompt
@@ -369,7 +354,7 @@ def _maintain(config, args, claim):
     if result["needs_semantic"] and layout["teams"]:
         result["worker"] = prompt_dispatch(config, result["receipt"], control, layout=layout)
     elif result["needs_semantic"]:
-        result["dispatch_blocked"] = "No subagent capacity; semantic work remains pending."
+        result["dispatch_blocked"] = "A coordinator, reader and reserved recovery seat are required; semantic work remains pending."
     return result
 
 

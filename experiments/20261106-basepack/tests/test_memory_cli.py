@@ -264,10 +264,10 @@ def test_rank_directory_input_reports_the_file_contract(tmp_path):
 
 
 @pytest.mark.parametrize("mode,available,counts,planned", [
-    ("automatic", 0, (8, 0, 0), 0), ("automatic", 4, (2, 0, 0), 2),
-    ("automatic", 12, (8, 0, 0), 5), ("manual", 12, (6, 0, 0), 6),
-    ("manual", 12, (0, 0, 0), 0), ("manual", 12, (0, 3, 0), 3),
-    ("manual", 12, (0, 0, 2), 2),
+    ("automatic", 0, (8, 0, 0), 0), ("automatic", 4, (2, 0, 0), 3),
+    ("automatic", 12, (8, 0, 0), 9), ("manual", 12, (6, 0, 0), 7),
+    ("manual", 12, (0, 0, 0), 0), ("manual", 12, (0, 3, 0), 4),
+    ("manual", 12, (0, 0, 2), 3),
 ])
 def test_maintain_saves_layout_for_actual_work_and_capacity(tmp_path, monkeypatch, mode, available,
                                                          counts, planned):
@@ -290,6 +290,9 @@ def test_maintain_saves_layout_for_actual_work_and_capacity(tmp_path, monkeypatc
     assert status == 0
     saved = json.loads(receipt.read_text(encoding="utf-8"))["layout"]
     assert saved == result["layout"]
+    assert saved["organization"] == "finite-wave-v1"
+    assert len(saved["teams"]) <= 1
+    assert saved["reserve"] == 1
     assert saved["capacity_status"] == "verified_available"
     assert saved["work_items"] == max(counts)
     assert saved["planned_subagents"] == planned
@@ -304,9 +307,8 @@ def test_maintain_saves_layout_for_actual_work_and_capacity(tmp_path, monkeypatc
 
 
 @pytest.mark.parametrize("available,executor", [(0, "main"), (1, "worker")])
-def test_independent_retrieval_cli_and_pending_layout_never_open_store(tmp_path, monkeypatch,
+def test_independent_retrieval_cli_and_removed_pending_dispatch_never_open_store(tmp_path, monkeypatch,
                                                                     available, executor):
-    from basepack.memory.prompts import maintenance_layout
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
     config = load_project_config(init_project(tmp_path / "project", machine,
@@ -326,16 +328,20 @@ def test_independent_retrieval_cli_and_pending_layout_never_open_store(tmp_path,
             assert result["task_name"] is None
         if action == "retrieval-prompt":
             assert result["prompt"]
-    receipt = tmp_path / "receipt.json"
-    layout = maintenance_layout(config, mode="manual", work_items=5)
-    receipt.write_text(json.dumps({"layout": layout}), encoding="utf-8")
-    pending, status = dispatch(_memory_args("pending-dispatch", "--receipt", str(receipt),
-                                           "--available-subagents", "2", "--started-task-names",
-                                           layout["teams"][0]["task_name"]), config)
-    assert status == 0
-    assert [w["task_name"] for w in pending["workers"]] == layout["teams"][0]["reader_task_names"][:2]
+    with pytest.raises(SystemExit):
+        _memory_args("pending-dispatch", "--receipt", str(tmp_path / "receipt.json"),
+                     "--available-subagents", "2")
     assert not config.memory_dir.exists()
     assert not config.memory_password_file.exists()
+
+
+def test_wave_create_requires_an_explicit_reader_pool_size():
+    options = ("wave", "create", "--receipt", "receipt.json", "--control", "control",
+               "--run-id", "run", "--tasks", "tasks.json", "--coordinator", "/root/coordinator")
+    with pytest.raises(SystemExit):
+        _memory_args(*options)
+    args = _memory_args(*options, "--readers", "1")
+    assert args.readers == 1 and args.wave_action == "create"
 
 
 def test_prompt_cli_never_constructs_memory_or_creates_state(tmp_path, monkeypatch):
@@ -346,7 +352,7 @@ def test_prompt_cli_never_constructs_memory_or_creates_state(tmp_path, monkeypat
     config = load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
     receipt = tmp_path / "receipt.json"
     from basepack.memory.prompts import maintenance_layout
-    receipt.write_text(json.dumps({"semantic": [], "pending_relations": [],
+    receipt.write_text(json.dumps({"owner_run_id": "test-run", "semantic": [], "pending_relations": [],
                                    "layout": maintenance_layout(config)}), encoding="utf-8")
     control = config.memory_dir / "new control" / "task.control"
     monkeypatch.setattr("basepack.memory.store.Memory",
@@ -440,8 +446,8 @@ def test_maintain_discovers_git_project_and_emits_complete_worker_command(tmp_pa
     material = json.loads(receipt.read_text(encoding="utf-8"))
     assert material["layout"] == result["layout"]
     assert worker["task_name"] == f"bp_mem_{result['owner']['run_id'][:8]}_coord_0"
-    assert material["layout"]["planned_subagents"] == 1
-    assert material["layout"]["unused_subagents"] == 11
+    assert material["layout"]["planned_subagents"] == 2
+    assert material["layout"]["unused_subagents"] == 9
 
 
 def test_maintain_consumes_verified_collection_and_hands_off_provenance(tmp_path, monkeypatch):
@@ -458,10 +464,13 @@ def test_maintain_consumes_verified_collection_and_hands_off_provenance(tmp_path
                                   "attachment_dir": str(config.memory_dir / "codex-attachments")}
     assert result["codex"]["status"] == "captured" and result["codex"]["receipt"] == str(collection)
     assert material["owner_run_id"] == result["owner"]["run_id"]
+    # Provenance stays in the coordinator plan; reader prompts now come from a claimed wave task.
     from basepack.memory.prompts import render_prompt
-    rendered = render_prompt(config, result["receipt"], result["control"], role="reader", paths=[captured])
-    hints = json.loads(rendered["prompt"].split("Bounded receipt hints: ", 1)[1].splitlines()[0])
-    assert hints["codex"] == material["codex"]
+    rendered = render_prompt(config, result["receipt"], result["control"])
+    assert f"Codex provenance inputs: {json.dumps(material['codex'], ensure_ascii=False)}" in rendered["prompt"]
+    with pytest.raises(SystemExit):
+        _memory_args("prompt", "--receipt", str(receipt), "--control", str(tmp_path / "control"),
+                     "--role", "reader", "--paths", captured)
 
 
 def test_maintain_retained_is_explicit_and_freshness_remains_unknown(tmp_path, monkeypatch):

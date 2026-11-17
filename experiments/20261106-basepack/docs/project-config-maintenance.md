@@ -35,7 +35,7 @@
 
 改宿主上限、切 profile/宿主及升级接入时重新取得 C。用户级变更同步其影响的已接入项目；项目/profile 级变更只同步相应项目。该命令只更新容量与来源，不连接数据库，不改 UUID、凭据或知识，也无需为核数字启动完整维护。
 
-本轮实际可用额度 A 与 C 分开：A 已扣业务、检索及其它占用，不含主 agent，尚未扣维护的额外业务预留。将宿主已有 A 传给派工脚本，由脚本计算。没有 A 时返回的是配置允许的组织上限，不能称为当前空闲席位。维护回执固定已开始的布局，新配置供下一轮使用；运行中缩减未启动派工见 [记忆维护](memory.md#自动维护与手动维护)。
+本轮实际可用额度 A 与 C 分开：A 已扣业务、检索及其它占用，不含主 agent。将宿主已有 A 传给派工脚本，由脚本按实际工作量安排；没有 A 时只能说明配置上限。0.18有限任务池还须保留Terra第二turn的恢复名额，固定Luna池及活动worker由程序预登记，不能从瞬时agent列表计算最后退队者。新调用读取新配置，已封口wave继续使用固定身份和回执；容量不足、启动失败及恢复沿[任务池生命周期](memory.md#有限任务池与两段式-terra)，不临时增加无reader的Terra。
 
 ### 模型、解释器或入口变化
 
@@ -82,7 +82,7 @@
 
 0.17 使用 memory schema 3，member identity 仍为 2；0.16 旧库须按 [版本升级](setup-project.md#升级到-017) 在隔离原生恢复副本上 migrate，再由 finalize 全字段验证并显式写入 marker 3，之后由新客户端 init 并同步切换客户端／库。普通 init 拒绝已绑定但无标记的旧库，不代替桥接或重置合法 J。保留 UUID、原件、知识版本、依据、图、mandatory/private 和未变向量；旧事件不补造锚点，新 J 从切换基点计，未知旧接受时点保留显式 cutover 观察起点。共享 embedding 身份及运行服务不随客户端更新。独立 skills 副本另行同步。
 
-`memory publish` 继续与 freeze/apply 共用发布合同；作者提案引用固定 prepare path/hash，由程序编译依赖及身份。固定稿接续保留 batch_id 和 UUID，数据库 receipt 为权威；本地 result 写失败保留同一 frozen 及 owner/control，不为补投影新建 batch。旧作者稿先结清或作废后重新 prepare；纯 Python 编译仍须传项目配置，见 [发布流程](memory.md#首建与维护)。长维护的固定 stage、当前可用额度、干净上下文与父 stop 沿 [阶段接续](memory.md#同一轮的阶段接续)，阶段入口不重开 owner。
+`memory publish` 继续与 freeze/apply 共用发布合同；作者提案引用固定 prepare path/hash，由程序编译依赖及身份。固定稿接续保留 batch_id 和 UUID，数据库 receipt 为权威；本地 result 写失败保留同一 frozen 及 owner/control，不为补投影新建 batch。旧作者稿先结清或作废后重新 prepare；纯 Python 编译仍须传项目配置，见 [发布流程](memory.md#首建与维护)。0.18有限任务池不改变memory schema或行为算法；接入新轮前先在自然边界结束旧worker，固定接受／未发稿与范围、确认发布终态，再由原父任务正确关闭旧轮。新波不继承旧worker协议。Terra二段固定发布结果即FINAL，原父任务在核Terra FINAL与最后Luna通知ack／宿主终态后机械关闭wave，不为等待ack增加Terra轮次。任务池、预登记worker、固定稿、执行回执及通知受理状态随原owner/control保留恢复，停止、claimed、全异常或未明通知不能自动释放；见[任务池生命周期](memory.md#有限任务池与两段式-terra)。
 
 | 本次改变 | 需要保留的恢复材料 | 最小实际确认 |
 | --- | --- | --- |

@@ -39,9 +39,9 @@ Codex 原件先独立运行 `memory collect --output <采集回执.json>`，请�
 <a id="dispatch"></a>
 ## 维护派工
 
-仅 `acquired=true` 且 `needs_semantic=true` 并返回 worker 时，按 `worker.task_name`/`worker.model`/`worker.reasoning_effort` 实际派协调者；只给英文启动句和 `worker.render_command`，由其运行并遵循 JSON `prompt`。按回执固定的 `layout` 派工，自动维护仅第 0 队；零 reader 时协调者亲自阅读，仅第 0 队协调者发布。名额不足保留原错与未派项。协调者负责有限来源组的派工、依赖与正常修复，主任务接收阶段结果；[固定交付与分支通信](<$skill#source-group-delivery>)按统一合同执行。[派工与批次详情](<$skill#maintain-sources>)。
+仅 `acquired=true` 且 `needs_semantic=true` 并返回 worker 时，按 `worker.spawn_arguments` 实际派唯一协调者；保留原父 stop、全部宿主句柄及一个协调者恢复名额。协调者规划有限独立任务并启动固定 reader 池，固定初始化回执后结束第一 turn。原父确认该 turn 实际结束、协调者 idle 后封口，向已启动 reader 逐一发送明确 go；reader 在首 turn 用宿主事件等待，不提前领取。容量不足保持待处理，不启动无 reader 协调者。[派工与固定波次](<$skill#maintain-sources>)。
 
-长维护在来源组完成、旧团队结束且发布终态明确后，用 `memory stage --receipt <原receipt> --control <原control> --handoff <固定交接.json> --workers-ended --available-subagents <当前可用额度> --output <新stage.json>` 建立接续描述；宿主仍须实际按返回参数及 `fork_turns="none"` 创建新身份并保留父 stop 句柄。下一组按剩余工作和容量定人数，阶段完成仅结束本组，余项留在同轮。[阶段交接、schema与恢复](<$skill#stage-continuation>)。
+reader 自主领取、阅读、写稿、提交并再领取；普通退出不唤醒协调者。最后正常退出者固定回执，先登记通知意图，再实际 followup 同一非根协调者并记录宿主受理结果。协调者第二 turn 核 owner/stop，按固定稿和唯一 publisher 合同发布后即结束，不等待通知确认；原父观察其 FINAL 与最后 reader 的通知结果/宿主终态后关闭波次。pending/未明通知、claimed 失败、在途发布由原父按实际宿主证据恢复，不盲重发或超时抢占。[波次、恢复与阶段边界](<$skill#maintain-sources>)。
 
 <a id="stop"></a>
 ## 维护收尾
@@ -51,7 +51,7 @@ Codex 原件先独立运行 `memory collect --output <采集回执.json>`，请�
 <a id="explicit-maintenance"></a>
 ## 显式维护
 
-用户明确要求维护时，使用 `memory maintain --mode manual` 并附来源选择，维护本身属于交付：按授权范围报告实际处置、阻塞和余项。已有 owner 时报告持有者，不能将跳过或少量优先批次当作完成。按脚本根据实际工作量和容量保存的布局启用人数；零 reader 由协调者亲读并发布。固定候选内先处理用户约定、当前阶段及稳定成果入口，再补历史；披露实际接受版本、后续未接受成果的原件入口与有限后续范围。业务收尾按父任务停止边界执行。[完成口径](<$skill#maintain-sources>)。
+用户明确要求维护时，使用 `memory maintain --mode manual` 并附来源选择，维护本身属于交付：按授权范围报告实际处置、阻塞和余项。已有 owner 时报告持有者，不能将跳过或少量优先批次当作完成。按工作量和容量启用固定 reader 池，并为协调者恢复保留席位；没有 reader 容量时保留余项。固定候选内先处理用户约定、当前阶段及稳定成果入口，再补历史；披露实际接受版本、后续未接受成果的原件入口与有限后续范围。业务收尾按父任务停止边界执行。[完成口径](<$skill#maintain-sources>)。
 
 <a id="feedback"></a>
 ## 使用反馈

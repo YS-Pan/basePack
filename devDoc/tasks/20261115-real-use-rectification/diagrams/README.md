@@ -1,6 +1,29 @@
 # 记忆系统修改前后逻辑图
 
-2026-11-17。两图比较完整系统；它们是逻辑示意，不替代接口与数值合同。
+2026-11-17。两组图分别比较完整系统；它们是逻辑示意，不替代接口与数值合同。
+
+## 当前维护组织：0.17.4 → 0.18 目标
+
+| 版本 | 范围 | 可编辑源 | 预览 | 矢量采用件 |
+| --- | --- | --- | --- | --- |
+| 修改前 | 0.17.4 已部署；Terra 按来源组接续 | [SVG](memory-system-wave-before.svg) | [PNG](memory-system-wave-before.png) | [PDF](memory-system-wave-before.pdf) |
+| 修改后 | 0.18 实现中；有限任务池与 Terra 两 turn | [SVG](memory-system-wave-after.svg) | [PNG](memory-system-wave-after.png) | [PDF](memory-system-wave-after.pdf) |
+
+新图依据[有限任务池合同](../maintenance-waves.md)，保留下面的历史图。内容 embedding、KL-NMF、Gaussian H 投影、固定独立锚点、单次 LLM 综合评分与 rank、真实 delivery、原证/知识/assets、owner/stop/release 都在两张新图的共同部分；低权重不引入退出、删除或 GC。主 agent 用蓝色，Terra 和 Luna 等子 agent 用橙色，程序执行用绿色，来源与存储用灰色；颜色表示角色，不表示模型。
+
+[新生成器](generate_maintenance_wave.py)复用历史图的图元与导出设施。22 个共同节点、29 条共同连线、4 个泳道、组织外框、检索 worker、图例和页脚逐项比较完整 XML，覆盖坐标、框、文字、颜色与路径；移除版本标题及组织变化组后，剩余整张 SVG 再作完整 XML 比较。10 个变化槽位保持相同位置、尺寸与角色颜色。变化集中在维护组织区：预登记与启动屏障、Luna 自领/提交循环、无活原子退队及唯一通知、同一 Terra 第二 turn 发布、原父观察两方终态后机械 close。旁注说明通知非事务、恢复名额和异常/stop/晚回调边界。
+
+从项目根生成新图及同源报告：
+
+```powershell
+python devDoc/tasks/20261115-real-use-rectification/diagrams/generate_maintenance_wave.py `
+  --render --inkscape '<本机 Inkscape 可执行文件>' `
+  --qa-report artifacts/runs/20261117-wave-diagrams/same-layout-final.json
+```
+
+新 PNG 为 2040 × 2670；PDF 由同一 SVG 导出，单页 1530 × 2002.5 pt。两轮逐张 `view_image` 检查 PNG，修正提交循环与无活退队分支、反馈线交叉和底注裁切；最终两张 PDF 再用 Poppler 栅格化并逐张查看，未见缺字、穿框、裁切或拥挤。制图检查及原证保存在忽略目录 `artifacts/runs/20261117-wave-diagrams/`。目标图明确标为实现中，图稿验收不代替 0.18 运行、宿主生命周期或真实维护验收。
+
+## 历史架构：0.16 → 0.17
 
 | 版本 | 范围 | 可编辑源 | 预览 | 矢量采用件 |
 | --- | --- | --- | --- | --- |

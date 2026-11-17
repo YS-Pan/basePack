@@ -1,0 +1,398 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2040" height="2670" viewBox="0 0 2040 2670" role="img" aria-labelledby="title desc">
+<title id="title">修改前 · 当前记忆系统</title>
+<desc id="desc">完整记忆系统同源对照。蓝色为主agent，橙色为子agent，绿色为代码执行，灰色为来源与存储。Terra与Luna均为子agent，不以模型区分角色颜色。带Δ的节点为维护组织变化。</desc>
+<defs>
+<marker id="flow-arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#596676"/></marker>
+<marker id="data-arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#99A5B4"/></marker>
+<marker id="control-arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#A0A7B3"/></marker>
+</defs>
+<g font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif">
+<rect width="2040" height="2670" fill="#FCFDFE"/>
+<g id="version-heading">
+<text x="80" y="76" text-anchor="start" font-size="43" font-weight="700" fill="#283342">修改前 · 当前记忆系统</text>
+<text x="80" y="117" text-anchor="start" font-size="22" font-weight="400" fill="#66758A">0.17.4 deployed · KL-NMF / Gaussian 已部署；维护按来源组接续</text>
+</g>
+<g id="unchanged-overview">
+<text x="80" y="163" text-anchor="start" font-size="22" font-weight="400" fill="#56667B">共同合同：Gaussian 连续降权；低 weight 的材料仍保留可检索，不退出、不删除、不 GC。</text>
+</g>
+<g id="legend">
+<rect x="1190" y="48" width="24" height="20" rx="4" fill="#E4EEFC" stroke="#5179AE" stroke-width="1.8"/>
+<text x="1224" y="66" text-anchor="start" font-size="20" font-weight="400" fill="#283342">主 agent</text>
+<rect x="1356" y="48" width="24" height="20" rx="4" fill="#FFF0D7" stroke="#B67E31" stroke-width="1.8"/>
+<text x="1390" y="66" text-anchor="start" font-size="20" font-weight="400" fill="#283342">子 agent</text>
+<rect x="1523" y="48" width="24" height="20" rx="4" fill="#E7F2E7" stroke="#688C6D" stroke-width="1.8"/>
+<text x="1557" y="66" text-anchor="start" font-size="20" font-weight="400" fill="#283342">代码执行</text>
+<rect x="1693" y="48" width="24" height="20" rx="4" fill="#F0F2F5" stroke="#8994A4" stroke-width="1.8"/>
+<text x="1727" y="66" text-anchor="start" font-size="20" font-weight="400" fill="#283342">来源 / 存储</text>
+<text x="1890" y="115" text-anchor="end" font-size="19" font-weight="400" fill="#7B725F">Δ 维护组织调整　｜　其余图元完整 XML 一致</text>
+</g>
+<g id="business-lane"><rect x="20" y="198" width="1980" height="535" rx="16" fill="#FFFFFF" stroke="#E1E6ED" stroke-width="1.5"/><text x="80" y="232" text-anchor="start" font-size="22" font-weight="650" fill="#45536B">01  主业务、检索与真实交付反馈</text></g>
+<g id="store-lane"><rect x="20" y="770" width="1980" height="198" rx="16" fill="#FFFFFF" stroke="#E1E6ED" stroke-width="1.5"/><text x="80" y="804" text-anchor="start" font-size="22" font-weight="650" fill="#45536B">02  项目知识与共享编码设施</text></g>
+<g id="maintenance-lane"><rect x="20" y="992" width="1980" height="1170" rx="16" fill="#FFFFFF" stroke="#E1E6ED" stroke-width="1.5"/><text x="80" y="1026" text-anchor="start" font-size="22" font-weight="650" fill="#45536B">03  后台维护：来源到接受版本</text></g>
+<g id="lifecycle-lane"><rect x="20" y="2190" width="1980" height="190" rx="16" fill="#FFFFFF" stroke="#E1E6ED" stroke-width="1.5"/><text x="80" y="2224" text-anchor="start" font-size="22" font-weight="650" fill="#45536B">04  维护控制与业务收尾</text></g>
+<g id="retrieval-worker">
+<rect x="800" y="307" width="740" height="163" rx="18" fill="#FFF9EE" stroke="#D7BD91" stroke-dasharray="6 5" stroke-width="1.5"/>
+<text x="1170" y="303" text-anchor="middle" font-size="19" font-weight="600" fill="#9A723E">检索 worker（子 agent）</text>
+</g>
+<g id="organization-frame">
+<rect x="65" y="1270" width="1840" height="790" rx="18" fill="#FFFCF7" stroke="#D7BD91" stroke-dasharray="7 6" stroke-width="1.6"/>
+<text x="95" y="1306" text-anchor="start" font-size="20" font-weight="600" fill="#8D6B3C">维护组织：角色颜色固定；Terra / Luna 均为主任务下属子 agent</text>
+</g>
+<g id="shared-edges">
+<g id="brief-to-main" data-edge-type="flow">
+<polyline points="410,390 450,390" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="main-to-search" data-edge-type="flow">
+<polyline points="780,390 820,390" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="base-to-score" data-edge-type="flow">
+<polyline points="1150,390 1190,390" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="score-to-rank" data-edge-type="flow">
+<polyline points="1520,390 1560,390" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="rank-to-main" data-edge-type="flow">
+<polyline points="1725,330 1725,255 615,255 615,330" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+<text x="1170" y="241" text-anchor="middle" font-size="19" font-weight="400" fill="#637083">预算内检索结果</text>
+</g>
+<g id="main-to-delivery" data-edge-type="flow">
+<polyline points="615,450 615,570" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+<text x="628" y="518" text-anchor="start" font-size="19" font-weight="400" fill="#637083">实际接收后</text>
+</g>
+<g id="confirm-to-events" data-edge-type="flow">
+<polyline points="780,630 820,630" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="events-to-model" data-edge-type="flow">
+<polyline points="1150,630 1190,630" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="model-to-hint" data-edge-type="flow">
+<polyline points="1520,630 1560,630" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="hint-to-score" data-edge-type="flow">
+<polyline points="1725,570 1725,520 1355,520 1355,450" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+<text x="1540" y="508" text-anchor="middle" font-size="19" font-weight="400" fill="#637083">候选与访问提示</text>
+</g>
+<g id="store-to-brief" data-edge-type="data">
+<polyline points="450,858 45,858 45,390 80,390" fill="none" stroke="#99A5B4" stroke-width="2.2" stroke-dasharray="7 6" marker-end="url(#data-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="store-to-base-search" data-edge-type="data">
+<polyline points="45,390 45,294 985,294 985,330" fill="none" stroke="#99A5B4" stroke-width="2.2" stroke-dasharray="7 6" marker-end="url(#data-arrow)" stroke-linejoin="round"/>
+<text x="245" y="281" text-anchor="middle" font-size="19" font-weight="400" fill="#637083">只读：已接受知识</text>
+</g>
+<g id="events-in-project-store" data-edge-type="data">
+<polyline points="985,690 985,800" fill="none" stroke="#99A5B4" stroke-width="2.2" stroke-dasharray="7 6" marker-end="url(#data-arrow)" stroke-linejoin="round"/>
+<text x="1000" y="756" text-anchor="start" font-size="19" font-weight="400" fill="#637083">同库</text>
+</g>
+<g id="embedding-to-store" data-edge-type="data">
+<polyline points="1560,858 1510,858" fill="none" stroke="#99A5B4" stroke-width="2.2" stroke-dasharray="7 6" marker-end="url(#data-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="base-anchors-to-delivery" data-edge-type="data">
+<polyline points="985,450 985,546 795,546 795,598 780,598" fill="none" stroke="#99A5B4" stroke-width="2.2" stroke-dasharray="7 6" marker-end="url(#data-arrow)" stroke-linejoin="round"/>
+<text x="997" y="493" text-anchor="start" font-size="19" font-weight="400" fill="#637083">保留原始锚点</text>
+</g>
+<g id="current-anchors-to-behavior-candidates" data-edge-type="data">
+<polyline points="985,546 1640,546 1640,570" fill="none" stroke="#99A5B4" stroke-width="2.2" stroke-dasharray="7 6" marker-end="url(#data-arrow)" stroke-linejoin="round"/>
+<text x="1415" y="541" text-anchor="middle" font-size="19" font-weight="400" fill="#637083">当前锚点 / 行为候选</text>
+</g>
+<g id="facts-to-gaussian-projection" data-edge-type="data">
+<polyline points="1070,690 1070,720 1725,720 1725,690" fill="none" stroke="#99A5B4" stroke-width="2.2" stroke-dasharray="7 6" marker-end="url(#data-arrow)" stroke-linejoin="round"/>
+<text x="1395" y="709" text-anchor="middle" font-size="19" font-weight="400" fill="#637083">逐事件更新 H/R 与基准</text>
+</g>
+<g id="sources-to-collection" data-edge-type="flow">
+<polyline points="410,1140 450,1140" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="collection-to-prepare" data-edge-type="flow">
+<polyline points="780,1140 820,1140" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="prepare-to-organization" data-edge-type="flow">
+<polyline points="985,1200 985,1240 245,1240 245,1340" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+<text x="430" y="1229" text-anchor="middle" font-size="19" font-weight="400" fill="#637083">固定读取包进入维护组织</text>
+</g>
+<g id="compile-to-publisher" data-edge-type="flow">
+<polyline points="1520,1140 1560,1140" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="publisher-to-store" data-edge-type="flow">
+<polyline points="1890,1140 1970,1140 1970,948 1465,948 1465,915" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+<text x="1735" y="936" text-anchor="middle" font-size="19" font-weight="400" fill="#637083">唯一发布・原子接受</text>
+</g>
+<g id="publication-to-compile" data-edge-type="flow">
+<polyline points="245,1760 245,1820 1940,1820 1940,1240 1355,1240 1355,1200" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+<text x="1720" y="1229" text-anchor="middle" font-size="19" font-weight="400" fill="#637083">固定稿 → 编译 → 发布</text>
+</g>
+<g id="publisher-receipt-to-terra" data-edge-type="data">
+<polyline points="1725,1200 1725,1215 1915,1215 1915,1848 210,1848 210,1760" fill="none" stroke="#99A5B4" stroke-width="2.2" stroke-dasharray="7 6" marker-end="url(#data-arrow)" stroke-linejoin="round"/>
+<text x="1660" y="1876" text-anchor="middle" font-size="19" font-weight="400" fill="#637083">固定 frozen / result 与接受回执返回同一发布者</text>
+</g>
+<g id="luna-to-source-writing" data-edge-type="flow">
+<polyline points="1725,1490 1725,1610" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+<text x="1740" y="1573" text-anchor="start" font-size="19" font-weight="400" fill="#637083">本任务</text>
+</g>
+<g id="writing-to-submit" data-edge-type="flow">
+<polyline points="1560,1685 1520,1685" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="owner-to-maintain" data-edge-type="control">
+<polyline points="245,2240 245,2170 45,2170 45,1280 145,1280 145,1340" fill="none" stroke="#A0A7B3" stroke-width="2.2" stroke-dasharray="7 6" marker-end="url(#control-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="owner-to-stop" data-edge-type="control">
+<polyline points="410,2300 450,2300" fill="none" stroke="#A0A7B3" stroke-width="2.2" stroke-dasharray="7 6" marker-end="url(#control-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="stop-to-release" data-edge-type="flow">
+<polyline points="1150,2300 1190,2300" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+</g>
+</g>
+<g id="organization-edges">
+<g id="terra-to-registry" data-edge-type="flow">
+<polyline points="410,1415 450,1415" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="registry-to-gate" data-edge-type="control">
+<polyline points="780,1415 820,1415" fill="none" stroke="#A0A7B3" stroke-width="2.2" stroke-dasharray="7 6" marker-end="url(#control-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="gate-to-luna" data-edge-type="flow">
+<polyline points="1150,1415 1190,1415" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="luna-to-claim" data-edge-type="flow">
+<polyline points="1520,1415 1560,1415" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="receipt-to-notifier" data-edge-type="flow">
+<polyline points="820,1685 780,1685" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="notification-to-terra" data-edge-type="flow">
+<polyline points="450,1685 410,1685" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="terra-to-root-close" data-edge-type="control">
+<polyline points="245,1848 245,1900" fill="none" stroke="#A0A7B3" stroke-width="2.2" stroke-dasharray="7 6" marker-end="url(#control-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="results-to-retirement" data-edge-type="flow">
+<polyline points="1190,1685 1150,1685" fill="none" stroke="#596676" stroke-width="2.2" marker-end="url(#flow-arrow)" stroke-linejoin="round"/>
+</g>
+<g id="coordinator-next-assignment" data-edge-type="control">
+<polyline points="615,1610 615,1545 1355,1545 1355,1490" fill="none" stroke="#A0A7B3" stroke-width="2.2" stroke-dasharray="7 6" marker-end="url(#control-arrow)" stroke-linejoin="round"/>
+<text x="950" y="1530" text-anchor="middle" font-size="19" font-weight="400" fill="#637083">逐组接续与正常修稿</text>
+</g>
+</g>
+<g id="shared-nodes">
+<g id="memory-brief" data-role="code">
+<rect x="80" y="330" width="330" height="120" rx="14" fill="#E7F2E7" stroke="#688C6D" stroke-width="2.3"/>
+<text x="245.0" y="363.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">memory brief</text>
+<text x="245.0" y="395.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">mandatory・概况与缺口</text>
+<text x="245.0" y="427.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">不按当前问题搜索</text>
+</g>
+<g id="business-main" data-role="main">
+<rect x="450" y="330" width="330" height="120" rx="14" fill="#E4EEFC" stroke="#5179AE" stroke-width="2.3"/>
+<text x="615.0" y="363.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">业务主 agent</text>
+<text x="615.0" y="395.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">理解任务并开展工作</text>
+<text x="615.0" y="427.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">按需委托检索 worker</text>
+</g>
+<g id="candidate-score" data-role="agent">
+<rect x="1190" y="330" width="330" height="120" rx="14" fill="#FFF0D7" stroke="#B67E31" stroke-width="2.3"/>
+<text x="1355.0" y="363.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">一次综合评分</text>
+<text x="1355.0" y="395.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">LLM 回源核验＋访问提示</text>
+<text x="1355.0" y="427.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">形成候选综合分</text>
+</g>
+<g id="rank-budget" data-role="code">
+<rect x="1560" y="330" width="330" height="120" rx="14" fill="#E7F2E7" stroke="#688C6D" stroke-width="2.3"/>
+<text x="1725.0" y="363.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">rank 程序</text>
+<text x="1725.0" y="395.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">排序・去重・字符预算</text>
+<text x="1725.0" y="427.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">按综合分返回实际结果</text>
+</g>
+<g id="delivery-events" data-role="data">
+<rect x="820" y="570" width="330" height="120" rx="14" fill="#F0F2F5" stroke="#8994A4" stroke-width="2.3"/>
+<text x="985.0" y="603.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">真实交付记录</text>
+<text x="985.0" y="635.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">精确版本集合＋delivery_id</text>
+<text x="985.0" y="667.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">J 记录首收；非空推进 C</text>
+</g>
+<g id="project-store" data-role="data">
+<rect x="450" y="800" width="1060" height="115" rx="14" fill="#F0F2F5" stroke="#8994A4" stroke-width="2.3"/>
+<text x="980.0" y="830.5" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">项目唯一 SurrealDB</text>
+<text x="980.0" y="862.5" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">原证・知识版本・语义图・交付事实</text>
+<text x="980.0" y="894.5" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">原件与 assets 沿项目保存</text>
+</g>
+<g id="shared-embedding" data-role="data">
+<rect x="1560" y="800" width="330" height="115" rx="14" fill="#F0F2F5" stroke="#8994A4" stroke-width="2.3"/>
+<text x="1725.0" y="830.5" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">共享图文 embedding</text>
+<text x="1725.0" y="862.5" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">内容向量编码与检索</text>
+<text x="1725.0" y="894.5" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">机器服务独立托管</text>
+</g>
+<g id="base-search" data-role="code">
+<rect x="820" y="330" width="330" height="120" rx="14" fill="#E7F2E7" stroke="#688C6D" stroke-width="2.3"/>
+<text x="985.0" y="363.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">baseSearch 基础检索</text>
+<text x="985.0" y="395.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">词法・内容向量・语义图</text>
+<text x="985.0" y="427.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">行为筛选前固定独立锚点</text>
+</g>
+<g id="delivery-confirm" data-role="code">
+<rect x="450" y="570" width="330" height="120" rx="14" fill="#E7F2E7" stroke="#688C6D" stroke-width="2.3"/>
+<text x="615.0" y="603.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">宿主确认实际交付</text>
+<text x="615.0" y="635.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">精确版本＋原始锚点</text>
+<text x="615.0" y="667.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">非空交付：命中版本 hits +1</text>
+</g>
+<g id="behavior-model" data-role="code">
+<rect x="1190" y="570" width="330" height="120" rx="14" fill="#E7F2E7" stroke="#688C6D" stroke-width="2.3"/>
+<text x="1355.0" y="603.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">批量共交付学习</text>
+<text x="1355.0" y="635.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">标准 KL-NMF → 行为 φ</text>
+<text x="1355.0" y="667.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">模型快照・同空间重放</text>
+</g>
+<g id="access-hint" data-role="code">
+<rect x="1560" y="570" width="330" height="120" rx="14" fill="#E7F2E7" stroke="#688C6D" stroke-width="2.3"/>
+<text x="1725.0" y="603.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">Gaussian 候选与访问</text>
+<text x="1725.0" y="635.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">H_j 质量累计＋版本基准</text>
+<text x="1725.0" y="667.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">unknown 区间交综合评分</text>
+</g>
+<g id="source-material" data-role="data">
+<rect x="80" y="1080" width="330" height="120" rx="14" fill="#F0F2F5" stroke="#8994A4" stroke-width="2.3"/>
+<text x="245.0" y="1113.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">项目来源</text>
+<text x="245.0" y="1145.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">文件・private・绑定聊天</text>
+<text x="245.0" y="1177.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">附件与可定位原证</text>
+</g>
+<g id="source-collection" data-role="code">
+<rect x="450" y="1080" width="330" height="120" rx="14" fill="#E7F2E7" stroke="#688C6D" stroke-width="2.3"/>
+<text x="615.0" y="1113.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">独立采集</text>
+<text x="615.0" y="1145.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">原件保全＋采集回执</text>
+<text x="615.0" y="1177.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">维护消费已有快照</text>
+</g>
+<g id="prepare-workset" data-role="code">
+<rect x="820" y="1080" width="330" height="120" rx="14" fill="#E7F2E7" stroke="#688C6D" stroke-width="2.3"/>
+<text x="985.0" y="1113.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">实际工作集与 prepare</text>
+<text x="985.0" y="1145.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">增量差异・覆盖清单</text>
+<text x="985.0" y="1177.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">定位解析与固定读取包</text>
+</g>
+<g id="compile-proposal" data-role="code">
+<rect x="1190" y="1080" width="330" height="120" rx="14" fill="#E7F2E7" stroke="#688C6D" stroke-width="2.3"/>
+<text x="1355.0" y="1113.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">程序编译固定稿</text>
+<text x="1355.0" y="1145.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">依赖・符号・规则合同</text>
+<text x="1355.0" y="1177.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">生成不可变 frozen</text>
+</g>
+<g id="unique-publisher" data-role="agent">
+<rect x="1560" y="1080" width="330" height="120" rx="14" fill="#FFF0D7" stroke="#B67E31" stroke-width="2.3"/>
+<text x="1725.0" y="1113.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">唯一发布者</text>
+<text x="1725.0" y="1145.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">调用 apply 原子接受</text>
+<text x="1725.0" y="1177.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">实际版本・覆盖与缺口回执</text>
+</g>
+<g id="semantic-writing" data-role="agent">
+<rect x="1560" y="1610" width="330" height="150" rx="14" fill="#FFF0D7" stroke="#B67E31" stroke-width="2.3"/>
+<text x="1725.0" y="1658.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">原文智能创作</text>
+<text x="1725.0" y="1690.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">分块・摘要・关系判断</text>
+<text x="1725.0" y="1722.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">固定 prepare＋普通修稿</text>
+</g>
+<g id="owner-control" data-role="code">
+<rect x="80" y="2240" width="330" height="120" rx="14" fill="#E7F2E7" stroke="#688C6D" stroke-width="2.3"/>
+<text x="245.0" y="2273.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">唯一 owner ＋ control</text>
+<text x="245.0" y="2305.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">维护所有权与实际句柄</text>
+<text x="245.0" y="2337.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">原父保留 stop 与恢复权限</text>
+</g>
+<g id="stop-owned-work" data-role="code">
+<rect x="450" y="2240" width="700" height="120" rx="14" fill="#E7F2E7" stroke="#688C6D" stroke-width="2.3"/>
+<text x="800.0" y="2273.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">业务结束：stop 自有 control</text>
+<text x="800.0" y="2305.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">取消自有协调者及后代</text>
+<text x="800.0" y="2337.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">保留获准发布的明确终态</text>
+</g>
+<g id="release-owner" data-role="code">
+<rect x="1190" y="2240" width="700" height="120" rx="14" fill="#E7F2E7" stroke="#688C6D" stroke-width="2.3"/>
+<text x="1540.0" y="2273.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">确认发布终态后 release</text>
+<text x="1540.0" y="2305.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">未明状态保留 owner 与待处理项</text>
+<text x="1540.0" y="2337.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">共享数据库继续运行</text>
+</g>
+<g id="host-guidance" data-role="data">
+<rect x="80" y="2460" width="830" height="120" rx="14" fill="#F0F2F5" stroke="#8994A4" stroke-width="2.3"/>
+<text x="495.0" y="2493.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">宿主 skills 与订阅 agent</text>
+<text x="495.0" y="2525.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">agent-team・工程判断・资料边界</text>
+<text x="495.0" y="2557.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">语义理解与创作由 agent 完成</text>
+</g>
+<g id="shared-condor" data-role="data">
+<rect x="1000" y="2460" width="890" height="120" rx="14" fill="#F0F2F5" stroke="#8994A4" stroke-width="2.3"/>
+<text x="1445.0" y="2493.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">共享 embedding 与 HTCondor 设施</text>
+<text x="1445.0" y="2525.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">内容向量 ≠ 纯行为 φ；按实际容量调用</text>
+<text x="1445.0" y="2557.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">模型与重任务资源独立托管</text>
+</g>
+</g>
+<g id="organization-nodes">
+<g id="terra-init" data-role="agent">
+<rect x="80" y="1340" width="330" height="150" rx="14" fill="#FFF0D7" stroke="#B67E31" stroke-width="2.3"/>
+<text x="245.0" y="1388.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">Terra 阶段协调者</text>
+<text x="245.0" y="1420.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">按来源组规划与选择作者</text>
+<text x="245.0" y="1452.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">同一 turn 持续组织维护</text>
+<circle cx="406" cy="1344" r="13" fill="#FFF8E4" stroke="#C6973F" stroke-width="1.8"/>
+<text x="406" y="1350" text-anchor="middle" font-size="17" font-weight="700" fill="#9B6C1E">Δ</text>
+</g>
+<g id="plan-registry" data-role="code">
+<rect x="450" y="1340" width="330" height="150" rx="14" fill="#E7F2E7" stroke="#688C6D" stroke-width="2.3"/>
+<text x="615.0" y="1388.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">组级派工程序</text>
+<text x="615.0" y="1420.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">固定 prepare＋descriptor</text>
+<text x="615.0" y="1452.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">生成当前作者的任务 prompt</text>
+<circle cx="776" cy="1344" r="13" fill="#FFF8E4" stroke="#C6973F" stroke-width="1.8"/>
+<text x="776" y="1350" text-anchor="middle" font-size="17" font-weight="700" fill="#9B6C1E">Δ</text>
+</g>
+<g id="root-start-gate" data-role="main">
+<rect x="820" y="1340" width="330" height="150" rx="14" fill="#E4EEFC" stroke="#5179AE" stroke-width="2.3"/>
+<text x="985.0" y="1388.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">原父任务持有句柄</text>
+<text x="985.0" y="1420.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">按实际容量启动本组</text>
+<text x="985.0" y="1452.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">接收阶段交接并保留所有权</text>
+<circle cx="1146" cy="1344" r="13" fill="#FFF8E4" stroke="#C6973F" stroke-width="1.8"/>
+<text x="1146" y="1350" text-anchor="middle" font-size="17" font-weight="700" fill="#9B6C1E">Δ</text>
+</g>
+<g id="luna-execution" data-role="agent">
+<rect x="1190" y="1340" width="330" height="150" rx="14" fill="#FFF0D7" stroke="#B67E31" stroke-width="2.3"/>
+<text x="1355.0" y="1388.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">Luna 执行指定来源组</text>
+<text x="1355.0" y="1420.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">按当前分配开展工作</text>
+<text x="1355.0" y="1452.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">完成后回报协调者</text>
+<circle cx="1516" cy="1344" r="13" fill="#FFF8E4" stroke="#C6973F" stroke-width="1.8"/>
+<text x="1516" y="1350" text-anchor="middle" font-size="17" font-weight="700" fill="#9B6C1E">Δ</text>
+</g>
+<g id="task-claim" data-role="code">
+<rect x="1560" y="1340" width="330" height="150" rx="14" fill="#E7F2E7" stroke="#688C6D" stroke-width="2.3"/>
+<text x="1725.0" y="1388.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">指定当前来源组</text>
+<text x="1725.0" y="1420.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">作者绑定当前准备包</text>
+<text x="1725.0" y="1452.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">后续来源由协调者再分配</text>
+<circle cx="1886" cy="1344" r="13" fill="#FFF8E4" stroke="#C6973F" stroke-width="1.8"/>
+<text x="1886" y="1350" text-anchor="middle" font-size="17" font-weight="700" fill="#9B6C1E">Δ</text>
+</g>
+<g id="draft-submit" data-role="code">
+<rect x="1190" y="1610" width="330" height="150" rx="14" fill="#E7F2E7" stroke="#688C6D" stroke-width="2.3"/>
+<text x="1355.0" y="1658.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">作者交付固定稿</text>
+<text x="1355.0" y="1690.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">path / hash＋覆盖与错误</text>
+<text x="1355.0" y="1722.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">固定引用交给协调者</text>
+<circle cx="1516" cy="1614" r="13" fill="#FFF8E4" stroke="#C6973F" stroke-width="1.8"/>
+<text x="1516" y="1620" text-anchor="middle" font-size="17" font-weight="700" fill="#9B6C1E">Δ</text>
+</g>
+<g id="retirement-receipt" data-role="code">
+<rect x="820" y="1610" width="330" height="150" rx="14" fill="#E7F2E7" stroke="#688C6D" stroke-width="2.3"/>
+<text x="985.0" y="1658.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">组级结果与回执</text>
+<text x="985.0" y="1690.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">协调者逐组接收结果</text>
+<text x="985.0" y="1722.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">依据实际句柄安排后续</text>
+<circle cx="1146" cy="1614" r="13" fill="#FFF8E4" stroke="#C6973F" stroke-width="1.8"/>
+<text x="1146" y="1620" text-anchor="middle" font-size="17" font-weight="700" fill="#9B6C1E">Δ</text>
+</g>
+<g id="coordinator-notification" data-role="agent">
+<rect x="450" y="1610" width="330" height="150" rx="14" fill="#FFF0D7" stroke="#B67E31" stroke-width="2.3"/>
+<text x="615.0" y="1658.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">Terra 继续组织</text>
+<text x="615.0" y="1690.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">等待作者与正常修稿</text>
+<text x="615.0" y="1722.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">汇总后续派下一来源组</text>
+<circle cx="776" cy="1614" r="13" fill="#FFF8E4" stroke="#C6973F" stroke-width="1.8"/>
+<text x="776" y="1620" text-anchor="middle" font-size="17" font-weight="700" fill="#9B6C1E">Δ</text>
+</g>
+<g id="terra-publication" data-role="agent">
+<rect x="80" y="1610" width="330" height="150" rx="14" fill="#FFF0D7" stroke="#B67E31" stroke-width="2.3"/>
+<text x="245.0" y="1658.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">Terra 汇总与发布</text>
+<text x="245.0" y="1690.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">固定完成稿交程序编译</text>
+<text x="245.0" y="1722.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">阶段边界才交 FINAL</text>
+<circle cx="406" cy="1614" r="13" fill="#FFF8E4" stroke="#C6973F" stroke-width="1.8"/>
+<text x="406" y="1620" text-anchor="middle" font-size="17" font-weight="700" fill="#9B6C1E">Δ</text>
+</g>
+<g id="root-wave-close" data-role="main">
+<rect x="80" y="1900" width="1810" height="130" rx="14" fill="#E4EEFC" stroke="#5179AE" stroke-width="2.3"/>
+<text x="985.0" y="1938.0" text-anchor="middle" font-size="24" font-weight="650" fill="#283342">原父核阶段终态</text>
+<text x="985.0" y="1970.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">保留实际接受、未发稿与剩余范围</text>
+<text x="985.0" y="2002.0" text-anchor="middle" font-size="21" font-weight="400" fill="#283342">转交下一干净阶段，或按维护收尾释放</text>
+<circle cx="1886" cy="1904" r="13" fill="#FFF8E4" stroke="#C6973F" stroke-width="1.8"/>
+<text x="1886" y="1910" text-anchor="middle" font-size="17" font-weight="700" fill="#9B6C1E">Δ</text>
+</g>
+</g>
+<g id="version-boundaries">
+<text x="95" y="2085" text-anchor="start" font-size="21" font-weight="600" fill="#5C6676">现用组织：Terra 在执行期间接收作者结果、正常修稿并逐组接续；阶段边界交接。</text>
+<text x="95" y="2118" text-anchor="start" font-size="20" font-weight="400" fill="#6B7584">接续与修稿沿同一维护 receipt / owner / control；唯一发布与原子接受已经存在。</text>
+<text x="95" y="2147" text-anchor="start" font-size="20" font-weight="400" fill="#6B7584">0.17.4 的实际阶段与作者模型核验已有小批证据；全项目剩余维护仍未完成。</text>
+</g>
+<g id="footer">
+<text x="80" y="2633" text-anchor="start" font-size="20" font-weight="400" fill="#697589">实线：工作 / 交付　　虚线：数据 / 控制　　search・read・rank 本身不算交付</text>
+<text x="1890" y="2633" text-anchor="end" font-size="19" font-weight="400" fill="#7E8997">2026-11-17 · 0.17.4 → 0.18 组织对照</text>
+</g>
+</g></svg>

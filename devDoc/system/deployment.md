@@ -1,6 +1,6 @@
 # 项目配置与部署合同
 
-更新：2026年11月17日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)，稳定客户端已普通安装0.17.4[behavior]，新store-0.17已推广至正式18080，根AGENTS/instructions/serve入口已刷新。首批100候选实际维护已完成，后续全项目维护尚未完成。共享embedding服务保持0.15.0。memory schema 3隔离验证及切换进度沿[实施记录](../tasks/20261115-real-use-rectification/execution.md)，正式推广不代表完整全项目维护已完成；0.16既有验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)。本文维护部署边界；操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入，修改配置时按[维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)同步受影响状态。
+更新：2026年11月17日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)，稳定客户端已普通安装0.17.4[behavior]，源码目标为0.18.0，有限wave尚未普通安装且新宿主闭环未跑；新store-0.17已推广至正式18080，根AGENTS/instructions/serve入口已刷新。首批100候选实际维护已完成，后续全项目维护尚未完成。共享embedding服务保持0.15.0。memory schema 3隔离验证及切换进度沿[实施记录](../tasks/20261115-real-use-rectification/execution.md)，正式推广不代表完整全项目维护已完成；0.16既有验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)。本文维护部署边界；操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入，修改配置时按[维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)同步受影响状态。
 
 ## 位置与责任
 
@@ -19,7 +19,7 @@
 
 本项目正式`.basepack/config.toml`现连接18080及`.basepack/memory/store-0.17`，launcher PID 48740、数据库PID 115116。旧`.basepack/memory/store-0.13`保留但不运行；旧18174及临时18176端口均已关闭。保留的`.basepack/staging-0.17.toml`仅将endpoint改到18080，data_dir仍为本项目`.basepack/memory`，不再表示独立暂存服务。普通memory init已刷新受管根入口，块外业务正文按迁移结果保留。切换前后、init后及配置指针修改后均为J=compiled J=2、C=26、模型`3c69a1307fa077bfb0860ff26277bb78daec95c92afa2aa699fc673d3e64791f`且owner=null；没有合成交付或重训。独立只读验收通过brief、8250/8250兼容内容向量、文本/图片回读、history与实际图边neighbors。首批100候选实际维护已完成，完整全项目维护及其最终恢复点尚待完成。其它项目共用的`D:/AgentTools/envs/basepack-client/`及其数据库未代迁；公共代码通过配置定位，不写死这些本机位置。
 
-根 file-structure、agent-team、engineering-judgment 独立维护，resources skill 归 active 实验。memory skill 与英文 coordinator/reader 提示词随包安装，分别通过无需配置的 `memory guide` 和显式配置的 `memory prompt` 使用；提示词渲染不要求数据库、密码文件或模型在线。独立技能选择完整目录复制到项目 `.agents/skills/`，或联接已有项目原件；同名冲突保留并报告，正确入口复用。`init` 与 core doctor 不安装或验收它们；忽略的本机联接在新检出后重建，核宿主实际发现。开发环境、构建缓存和夹具在根 tmp，交付及回滚 wheel 在实验 dist，选留原证在根 artifacts/runs；寿命见 [文档约定](../documentation.md)。
+根 file-structure、agent-team、engineering-judgment 独立维护，resources skill 归 active 实验。memory skill 与英文角色提示词随包安装；`memory guide`无需配置，显式配置的`memory prompt`只渲染唯一协调者，`memory wave worker-prompt/task-prompt`按本地wave／固定任务渲染Luna指令。这些只读渲染入口不要求数据库、密码文件或模型在线。独立技能选择完整目录复制到项目 `.agents/skills/`，或联接已有项目原件；同名冲突保留并报告，正确入口复用。`init` 与 core doctor 不安装或验收它们；忽略的本机联接在新检出后重建，核宿主实际发现。开发环境、构建缓存和夹具在根 tmp，交付及回滚 wheel 在实验 dist，选留原证在根 artifacts/runs；寿命见 [文档约定](../documentation.md)。
 
 ## 业务项目实例
 
@@ -65,7 +65,7 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 | memory.codex.project_id/other_project_roots/registry_complete | Codex 宿主项目绑定和完整注册根证据，独立于 basePack UUID；未取得时明确聊天缺口 |
 | memory.search_mode | CLI 未显式传 --mode 时采用的 hybrid/vector；新项目默认 vector |
 
-`memory guide/rank` 在项目配置解析前分派；stop/owner/release/recover-owner读配置定位状态但不读凭据。prompt、pending-dispatch和retrieval-dispatch/retrieval-prompt仅读各自输入。机器配置不再维护无消费者的 `[shared].state_dir`；模型日志由 SCM/Shawl 服务定义中的显式路径管理，jobs 材料仍归项目 jobs_dir。
+`memory guide/rank` 在项目配置解析前分派；stop/owner/release/recover-owner读配置定位状态但不读凭据。memory prompt渲染唯一协调者；memory wave worker-prompt/task-prompt只读本地wave与固定任务，retrieval-dispatch/retrieval-prompt仅读配置和请求，均不连库或模型。机器配置不再维护无消费者的 `[shared].state_dir`；模型日志由 SCM/Shawl 服务定义中的显式路径管理，jobs 材料仍归项目 jobs_dir。
 
 机器 embedding 节沿用 endpoint、service_name、queue_timeout 与模型设置；模型适配层单处维护32768-token上限，移除旧机器 `max_length`。客户端以 username 和自动读取的 password_file 建立 Basic Authorization；config show 返回 memory_password_file 绝对路径而不读取或显示 secret。password_env 与手工 shell 桥退出。instructions 保留固定 Python、绝对配置和 brief 调用；guide/rank不读配置或凭据；owner/stop/release/recover-owner需配置但不读凭据或连库。project_id 随移动或恢复保留，误连另一身份的库会失败。config show 和 doctor 只作诊断，不能替代真实功能验收。
 
@@ -82,6 +82,8 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 搬迁先停止该项目库并确认进程退出，再移动完整项目、调整启动cwd/日志/endpoint，保留UUID后复核。在线备份用原生export；恢复集合含export、配置、原凭据文件、业务原件、受管聊天导出、附件原件/定位回执和必要assets。0.17还须保留memory_dir/behavior/<sha256>.json与其引用的数据库事实/模型元数据；模型工件按hash核字节，缺失或损坏明确失败。已接受语义、更正、真实交付及原始锚点必须恢复，行为投影可重放，内容向量可从保留表示重建。数值模型和原生导出仍属项目限制分发资料，不因无正文而自动可公开。备份位置和保留周期由项目确定，Git忽略和本机目录不代替备份。
 
 ## 升级与回退
+
+0.18.0源码将维护组织改为有限本地wave和两段Terra，当前普通安装仍是0.17.4；新普通安装、实际go等待／最后Luna恢复同Terra的宿主闭环尚待验证。该调整不改变memory schema 3、行为算法、项目UUID、知识版本或向量。接入前先在自然边界固定旧轮接受／未发稿及余项，结束旧worker并核发布终态，由原父正确关闭旧轮；新包不把旧receipt自动解释为新组织。安装后刷新托管入口并保留Terra恢复名额，按[产品接入](../../experiments/20261106-basepack/docs/setup-project.md#升级到-018有限任务池尚未安装)核实际宿主操作；不能以CLI单元成功代替宿主生命周期。活动`maintenance/wave.json`、固定初始化／执行回执、通知宿主证据、publication intent及未发稿与原owner/control一起保留恢复，未明状态不释放。
 
 0.17.0新增严格memory_schema_version=3标记，保持项目配置schema 2、机器schema 1和member identity 2。新库memory init写入3，已绑定且缺失或不符标记的库由新版init及普通读写明确拒绝，须先完成离线桥。独立collect与显式collection/retained替代maintain内采集及skip-codex-collection；scope实际限制来源工作集，作者提案引用固定prepare并由程序编译，检索使用请求专属身份及严格交付context。新J从切换基点开始，首次空/非空确认均推进，非空机会C另计；新版init只在不存在时创建事实头，不重置已有J。读API不隐式写行为投影。客户端升级不要求更新共享embedding服务或重算未变向量。
 

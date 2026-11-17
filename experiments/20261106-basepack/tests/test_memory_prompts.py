@@ -1,5 +1,4 @@
 import json
-from copy import deepcopy
 import os
 from pathlib import Path
 import shlex
@@ -7,8 +6,10 @@ import subprocess
 
 import pytest
 
-from basepack.memory.prompts import (maintenance_layout, memory_command, pending_workers,
+from basepack.memory.prompts import (maintenance_layout, memory_command,
                                      prompt_dispatch, render_prompt)
+from basepack.memory import owner, waves
+from basepack.memory.wave_cli import task_prompt, worker_prompt
 from basepack.memory.retrieval import retrieval_dispatch, render_retrieval_prompt
 from basepack.project.config import load_project_config
 from basepack.project.init import init_project
@@ -24,8 +25,26 @@ def prompt_project(tmp_path):
 
 
 def write_receipt(config, receipt, material, *, layout=None):
+    material.setdefault("owner_run_id", "prompt-test-run")
+    material.setdefault("workset", {"included": [item["path"] for item in material["semantic"]]})
     material["layout"] = maintenance_layout(config) if layout is None else layout
     receipt.write_text(json.dumps(material), encoding="utf-8")
+
+
+def render_claimed_task(config, receipt, control, paths):
+    """Reach reader rendering through a registered, sealed and claimed local wave."""
+    run = owner.acquire(config.memory_dir, config.raw["memory"]["project_id"], "test-parent", control)["owner"]["run_id"]
+    material = json.loads(receipt.read_text(encoding="utf-8"))
+    material["owner_run_id"] = run
+    receipt.write_text(json.dumps(material), encoding="utf-8")
+    task = {"id": "reading", "goal": "Read the bounded originals", "paths": paths,
+            "write_targets": ["test-node"], "outputs": ["draft", "coverage"]}
+    wave = waves.create(config.memory_dir, control, run, receipt, [task], ["reader"], coordinator="/root/coordinator")["wave_id"]
+    waves.started(config.memory_dir, control, run, wave, "reader", "host-reader")
+    waves.initialization_receipt(config.memory_dir, control, run, wave)
+    waves.seal(config.memory_dir, control, run, wave)
+    waves.claim(config.memory_dir, control, run, wave, "reader")
+    return task_prompt(config, control, run, wave, "reader", "reading")
 
 
 def test_dispatch_is_lazy_and_resolves_role_independently(prompt_project, tmp_path):
@@ -38,10 +57,12 @@ def test_dispatch_is_lazy_and_resolves_role_independently(prompt_project, tmp_pa
     assert "--receipt" in result["render_command"]
     assert str(receipt) in result["render_command"]
     assert not receipt.exists() and not control.parent.exists()
-    override = prompt_dispatch(prompt_project, receipt, control, role="reader", tier="tier4", paths=["one.md"])
-    assert override["role"] == "reader" and override["tier"] == "tier4"
-    assert "--paths" in override["render_command"] and "one.md" in override["render_command"]
-    with pytest.raises(KeyError):
+    override = prompt_dispatch(prompt_project, receipt, control, tier="tier4")
+    assert override["role"] == "coordinator" and override["tier"] == "tier4"
+    assert override["spawn_arguments"]["model"] == prompt_project.resolve_ai(tier="tier4")["model"]
+    assert override["spawn_arguments"]["reasoning_effort"] == prompt_project.resolve_ai(tier="tier4")["reasoning_effort"]
+    assert override["spawn_arguments"]["fork_turns"] == "none"
+    with pytest.raises(ValueError, match="one coordinator"):
         prompt_dispatch(prompt_project, receipt, control, role="unexpected", tier="tier1")
 
 
@@ -54,7 +75,7 @@ def test_dispatch_rejects_invalid_role_paths(prompt_project, tmp_path, role, pat
         prompt_dispatch(prompt_project, tmp_path / "receipt", tmp_path / "control", role=role, paths=paths)
 
 
-def test_render_reads_only_receipt_and_templates(prompt_project, tmp_path, monkeypatch):
+def test_coordinator_is_lazy_and_claimed_task_contains_bounded_hints(prompt_project, tmp_path, monkeypatch):
     from basepack.memory import store, maintenance
 
     def forbidden(*args, **kwargs):
@@ -62,9 +83,11 @@ def test_render_reads_only_receipt_and_templates(prompt_project, tmp_path, monke
 
     monkeypatch.setattr(store, "Memory", forbidden)
     monkeypatch.setattr(maintenance, "check", forbidden)
+    monkeypatch.setattr(type(prompt_project), "memory_password_file", property(forbidden))
     receipt = tmp_path / "receipt.json"
     write_receipt(prompt_project, receipt, {"semantic": [{"path": "one.md", "large": "secret-body",
-                                                 "members": [{"id": "member:one", "reasons": ["changed"]}],
+                                                 "members": [{"id": "member:one", "reasons": ["changed"],
+                                                              "source_version": "fixed-v19", "locator": {"page": 3}}],
                                                  "uncovered_ranges": [{"start_line": 1, "end_line": 2,
                                                                        "text": "secret-body"}]}],
                                    "pending_relations": [{"id": "edge", "basis": [{"member": "member:one"}]},
@@ -72,38 +95,46 @@ def test_render_reads_only_receipt_and_templates(prompt_project, tmp_path, monke
     control = tmp_path / "new" / "control"
     coordinator = render_prompt(prompt_project, receipt, control)
     assert coordinator["role"] == "coordinator" and coordinator["tier"] == "tier2"
-    assert "1 semantic sources, 2 pending relations and 0 reports" in coordinator["prompt"]
+    assert "1 semantic sources, 2 pending relations, 0 reports" in coordinator["prompt"]
     assert "secret-body" not in coordinator["prompt"]
-    assert "sole publisher" in coordinator["prompt"]
-    assert "Source-group delivery" in coordinator["prompt"]
-    assert "until the active scope is handled" in coordinator["prompt"]
-    reader_ai = prompt_project.resolve_ai(tier="tier1")
-    assert reader_ai["model"] in coordinator["prompt"]
-    assert reader_ai["reasoning_effort"] in coordinator["prompt"]
+    assert "single maintenance wave coordinator and publisher" in coordinator["prompt"]
+    assert "finite wave" in coordinator["prompt"]
     assert "`spawn_arguments` object" in coordinator["prompt"]
-    assert "Run the following command and follow the `prompt` field in its JSON output:" in coordinator["prompt"]
-    assert "do not launch an audit" in coordinator["prompt"].lower()
-    assert "no-knowledge or duplicate disposition" in coordinator["prompt"]
+    assert "--readers" in coordinator["prompt"] and "<reader-count>" in coordinator["prompt"]
+    assert "verifies this exact coordinator turn ended and is idle" in coordinator["prompt"]
+    assert "do not wait, poll, dispatch more readers" in coordinator["prompt"]
+    assert "no routine independent re-reading or semantic audit" in coordinator["prompt"]
     assert "<batch.json>" not in coordinator["prompt"]
     assert str(control) in coordinator["prompt"]
     assert not control.parent.exists() and not prompt_project.memory_dir.exists()
-    reader = render_prompt(prompt_project, receipt, control, role="reader", paths=["one.md"])
-    assert reader["tier"] == "tier1" and reader["role"] == "reader"
+    monkeypatch.setattr(type(prompt_project), "max_concurrent_subagents", property(forbidden))
+    reader = render_claimed_task(prompt_project, receipt, control, ["one.md"])
     assert 'one.md' in reader["prompt"]
     assert '"related_pending_relations": [{"id": "edge"' in reader["prompt"]
     assert '"unresolved_pending_relations_count": 1' in reader["prompt"]
     assert '"id": "unknown"' not in reader["prompt"]
     assert "secret-body" not in reader["prompt"]
+    assert '"source_version": "fixed-v19"' in reader["prompt"]
+    assert '"locator": {"page": 3}' in reader["prompt"]
+    assert "private flags" in reader["prompt"]
+    assert "exact source versions, locators, privacy" in reader["prompt"]
     assert "<reading.json>" not in reader["prompt"]
     assert "<batch.json>" not in reader["prompt"]
-    assert "open the original `image_path`" in reader["prompt"]
-    batch = reader["prompt"].split("Batch artifact: ", 1)[1].splitlines()[0]
-    assert str(prompt_project.root / "tmp" / "basepack-maintenance" / receipt.stem) in batch
-    assert not Path(batch).parent.exists()
-    again = render_prompt(prompt_project, receipt, control, role="reader", paths=["one.md"])
-    assert batch != again["prompt"].split("Batch artifact: ", 1)[1].splitlines()[0]
-    assert "do not apply" in reader["prompt"]
-    assert "model" in reader and "reasoning_effort" in reader
+    assert "open and inspect the original `image_path`" in reader["prompt"]
+    assert str(prompt_project.root / "tmp" / "basepack-waves") in reader["work"]
+    assert not Path(reader["work"]).exists()
+    assert "do not publish" in reader["prompt"]
+    assert "represented, no-knowledge/duplicate, deferred refinement, or unresolved" in reader["prompt"]
+    assert ("A full-file summary spans line 1 through the current EOF, including framing; a partial summary must state its `coverage_gaps`." in reader["prompt"]
+            and "For a text read with an explicit `--source-version`, supply the saved `--start-line` and `--end-line`." in reader["prompt"])
+    wave_id = Path(reader["work"]).parent.name
+    run = owner.status(prompt_project.memory_dir)["run_id"]
+    assert "Keep all submitted files' bytes fixed; a repair uses a new path and hash." in worker_prompt(
+        prompt_project, control, run, wave_id, "reader")["prompt"]
+    wave_path = prompt_project.memory_dir / "maintenance" / "wave.json"
+    before = wave_path.read_bytes(), receipt.read_bytes()
+    assert task_prompt(prompt_project, control, run, wave_id, "reader", "reading") == reader
+    assert (wave_path.read_bytes(), receipt.read_bytes()) == before
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows path separators")
@@ -111,7 +142,7 @@ def test_reader_hints_match_windows_paths(prompt_project, tmp_path):
     receipt = tmp_path / "receipt.json"
     write_receipt(prompt_project, receipt, {"semantic": [{"path": "folder/one.md", "members": [
         {"id": "member:one", "reasons": ["changed"]}]}], "pending_relations": []})
-    reader = render_prompt(prompt_project, receipt, tmp_path / "control", role="reader", paths=[r"folder\one.md"])
+    reader = render_claimed_task(prompt_project, receipt, tmp_path / "control", [r"folder\one.md"])
     assert '"sources": [{"path": "folder/one.md"' in reader["prompt"]
 
 
@@ -128,15 +159,17 @@ def test_render_preserves_codex_provenance_pointers_without_opening_them(
                                    "pending_relations": [], "codex": codex})
     coordinator = render_prompt(prompt_project, receipt, tmp_path / "control")
     assert f"Codex provenance inputs: {json.dumps(codex, ensure_ascii=False)}" in coordinator["prompt"]
-    reader = render_prompt(prompt_project, receipt, tmp_path / "control", role="reader", paths=["attachment.png"])
-    hint_text = reader["prompt"].split("Bounded receipt hints: ", 1)[1].splitlines()[0]
+    reader = render_claimed_task(prompt_project, receipt, tmp_path / "control", ["attachment.png"])
+    hint_text = reader["prompt"].split("Receipt hints: ", 1)[1].splitlines()[0]
     hints = json.loads(hint_text)
     assert hints["codex"] == codex
     assert hints["sources"] == [{"path": "attachment.png", "members": []}]
-    for result in (coordinator, reader):
-        assert "match both the handed-off `codex.project_id`" in result["prompt"]
-        assert "An unavailable project ID leaves the origin unresolved." in result["prompt"]
-    assert not prompt_project.memory_dir.exists()
+    assert "verify both project ID and `managed_attachment` against the assigned image" in coordinator["prompt"]
+    assert "An unavailable project ID leaves origin unresolved." in coordinator["prompt"]
+    assert "match the project ID and managed attachment against the capture receipt or retained framing" in reader["prompt"]
+    assert "leave an unavailable origin unresolved" in reader["prompt"]
+    assert not Path(codex["capture_dir"]).exists()
+    assert not Path(codex["attachment_dir"]).exists()
 
 
 def test_render_preserves_input_errors(prompt_project, tmp_path):
@@ -174,7 +207,7 @@ def test_posix_command_quotes_literal_arguments(prompt_project, monkeypatch):
 @pytest.mark.parametrize("budget", [0, 1, 4, 5, 6, 12, 50])
 @pytest.mark.parametrize("work_items", [0, 1, 3, 6, 50])
 def test_layout_sizes_roster_from_work_with_capacity_as_ceiling(prompt_project, mode, budget, work_items):
-    reserve = 1 if mode == "automatic" else 0
+    reserve = 1
     prompt_project.raw["ai"]["max_concurrent_subagents"] = budget + reserve
     layout = maintenance_layout(prompt_project, mode, budget + reserve, work_items=work_items,
                                 run_id="12345678-full-run-id")
@@ -182,17 +215,17 @@ def test_layout_sizes_roster_from_work_with_capacity_as_ceiling(prompt_project, 
     assert layout["work_items"] == work_items
     assert "used_subagents" not in layout
     planned = layout["planned_subagents"]
-    expected = min(work_items, budget, 5) if mode == "automatic" else min(work_items, budget)
-    assert planned == expected
+    readers = min(work_items, max(0, budget - 1))
+    assert planned == (readers + 1 if readers else 0)
+    assert layout["organization"] == "finite-wave-v1"
     assert layout["unused_subagents"] == budget - planned
     assert sum(1 + len(team["reader_task_names"]) for team in layout["teams"]) == planned
-    assert bool(layout["teams"]) is bool(work_items and budget)
-    if mode == "automatic":
-        assert len(layout["teams"]) <= 1
+    assert bool(layout["teams"]) is bool(readers)
+    assert len(layout["teams"]) <= 1
     names = []
     for team, assigned in enumerate(layout["teams"]):
         assert assigned["task_name"] == f"bp_mem_12345678_coord_{team}"
-        assert len(assigned["reader_task_names"]) <= 4
+        assert len(assigned["reader_task_names"]) == readers
         assert assigned["reader_task_names"] == [f"bp_mem_12345678_read_{team}_{r}"
                                                   for r in range(len(assigned["reader_task_names"]))]
         names.extend([assigned["task_name"], *assigned["reader_task_names"]])
@@ -205,8 +238,8 @@ def test_layout_sizes_roster_from_work_with_capacity_as_ceiling(prompt_project, 
 
 
 @pytest.mark.parametrize("configured,available,mode,budget,readers", [
-    (4, 4, "automatic", 3, 2), (4, 4, "manual", 4, 3),
-    (5, 5, "automatic", 4, 3), (5, 5, "manual", 5, 4),
+    (4, 4, "automatic", 3, 2), (4, 4, "manual", 3, 2),
+    (5, 5, "automatic", 4, 3), (5, 5, "manual", 4, 3),
     (12, 4, "automatic", 3, 2), (4, 12, "automatic", 3, 2),
     (12, 0, "manual", 0, 0), (0, 12, "automatic", 0, 0)])
 def test_layout_caps_availability_before_reserve(prompt_project, configured, available, mode, budget, readers):
@@ -224,8 +257,8 @@ def test_unknown_availability_is_a_ceiling_not_idle_capacity(prompt_project):
     assert layout["capacity_status"] == "organization_ceiling"
     assert layout["concurrency_source"] == prompt_project.concurrency_source
     assert len(layout["teams"]) == 1
-    assert layout["planned_subagents"] == 1
-    assert layout["unused_subagents"] == 10
+    assert layout["planned_subagents"] == 2
+    assert layout["unused_subagents"] == 9
 
 
 def test_layout_run_identity_is_stable_when_saved_and_distinct_for_new_runs(prompt_project, tmp_path):
@@ -254,40 +287,28 @@ def test_layout_rejects_invalid_work_count(prompt_project, work_items):
         maintenance_layout(prompt_project, work_items=work_items)
 
 
-def test_pending_dispatch_shrinks_only_unstarted_without_charging_started_twice(prompt_project):
-    layout = maintenance_layout(prompt_project)
-    original = deepcopy(layout)
-    team = layout["teams"][0]
-    started = [team["task_name"], team["reader_task_names"][0]]
-    workers = pending_workers(layout, 3, started)
-    assert [worker["task_name"] for worker in workers] == team["reader_task_names"][1:]
-    assert all(worker["publisher"] is False for worker in workers)
-    assert layout == original
-    workers = pending_workers(layout, 6, [team["task_name"] for team in layout["teams"]])
-    assert len(workers) == 6
-    assert all(worker["role"] == "reader" for worker in workers)
-    assert pending_workers(layout, 0, started) == []
-    automatic = maintenance_layout(prompt_project, "automatic")
-    started_automatic = [automatic["teams"][0]["task_name"]]
-    assert len(pending_workers(automatic, 3, started_automatic)) == 2
-    assert pending_workers(automatic, 1, started_automatic) == []
-    with pytest.raises(ValueError, match="outside the saved layout"):
-        pending_workers(layout, 3, ["someone_elses_worker"])
+@pytest.mark.parametrize("legacy_layout", [{}, {"organization": "teams-v0", "teams": []}])
+def test_legacy_receipt_is_rejected_without_capacity_or_store_fallback(prompt_project, tmp_path, monkeypatch, legacy_layout):
+    from basepack.memory import store
+
+    receipt, control = tmp_path / "receipt.json", tmp_path / "control"
+    write_receipt(prompt_project, receipt, {"semantic": [], "pending_relations": []}, layout=legacy_layout)
+    monkeypatch.setattr(store, "Memory", lambda *a: pytest.fail("legacy rejection opened store"))
+    monkeypatch.setattr(type(prompt_project), "max_concurrent_subagents",
+                        property(lambda *a: pytest.fail("legacy receipt replanned from current capacity")))
+    with pytest.raises(ValueError, match="Legacy maintenance receipt"):
+        render_prompt(prompt_project, receipt, control)
+    with pytest.raises(ValueError, match="Legacy maintenance receipt"):
+        prompt_dispatch(prompt_project, receipt, control, layout=legacy_layout)
+    assert not prompt_project.memory_dir.exists() and not control.exists()
 
 
-def test_pending_manual_dispatch_leaves_new_partial_teams_unstarted(prompt_project):
-    layout = maintenance_layout(prompt_project, work_items=10)
-    team0 = [layout["teams"][0]["task_name"], *layout["teams"][0]["reader_task_names"]]
-    team1 = [layout["teams"][1]["task_name"], *layout["teams"][1]["reader_task_names"]]
-    for available in (0, 1, 2, 3, 4):
-        assert pending_workers(layout, available, team0) == []
-        assert pending_workers(layout, available) == []
-    whole = pending_workers(layout, 5, team0)
-    assert [worker["task_name"] for worker in whole] == team1
-    partial = pending_workers(layout, 2, [*team0, team1[0]])
-    assert [worker["task_name"] for worker in partial] == team1[1:3]
-    assert all(not worker["publisher"] for worker in partial)
-    assert len(pending_workers(maintenance_layout(prompt_project, "automatic"), 3)) == 2
+@pytest.mark.parametrize("options", [{"role": "reader", "paths": ["one.md"]},
+                                     {"team": 1}, {"reader": 1}, {"paths": ["one.md"]}])
+def test_old_per_group_dispatch_has_an_explicit_wave_error(prompt_project, tmp_path, options):
+    with pytest.raises(ValueError, match="readers are registered by wave create"):
+        prompt_dispatch(prompt_project, tmp_path / "receipt", tmp_path / "control", **options)
+    assert not prompt_project.memory_dir.exists()
 
 
 def test_render_uses_saved_layout_models_names_and_permissions(prompt_project, tmp_path, monkeypatch):
@@ -310,52 +331,38 @@ def test_render_uses_saved_layout_models_names_and_permissions(prompt_project, t
     assert publisher["model"] == layout["teams"][0]["coordinator_ai"]["model"]
     assert "changed-after-start" not in publisher["prompt"]
     assert "--team" in publisher["render_command"]
-    reading = render_prompt(prompt_project, receipt, control, team=1, paths=["one.md"])
-    assert reading["task_name"] == layout["teams"][1]["task_name"] and not reading["publisher"]
-    assert reading["parent_task_name"] == layout["teams"][0]["task_name"]
-    assert "--team" in reading["render_command"]
-    assert "do not apply, resolve feedback" in reading["prompt"]
-    assert "'apply'" not in reading["prompt"]
-    assert layout["teams"][1]["reader_task_names"][0] in reading["prompt"]
-    assert layout["teams"][0]["reader_task_names"][-1] not in reading["prompt"].split("Fixed round layout:")[0]
-    reader = render_prompt(prompt_project, receipt, control, role="reader", team=1, reader=3, paths=["one.md"])
-    assert reader["task_name"] == layout["teams"][1]["reader_task_names"][3] and not reader["publisher"]
-    assert reader["parent_task_name"] == layout["teams"][1]["task_name"]
+    assert publisher["spawn_arguments"]["model"] == layout["teams"][0]["coordinator_ai"]["model"]
+    assert publisher["spawn_arguments"]["reasoning_effort"] == layout["teams"][0]["coordinator_ai"]["reasoning_effort"]
+    assert publisher["spawn_arguments"]["task_name"] == publisher["task_name"]
+    with pytest.raises(ValueError, match="one coordinator"):
+        render_prompt(prompt_project, receipt, control, team=1, paths=["one.md"])
+    with pytest.raises(ValueError, match="wave create"):
+        render_prompt(prompt_project, receipt, control, role="reader", paths=["one.md"])
     assert not control.parent.exists() and not prompt_project.memory_dir.exists()
 
 
-def test_reading_coordinator_requires_explicit_bounded_paths(prompt_project, tmp_path):
+@pytest.mark.parametrize("available", [0, 1, 2])
+def test_insufficient_capacity_never_creates_a_readerless_coordinator(prompt_project, tmp_path, available):
     receipt, control = tmp_path / "receipt.json", tmp_path / "control"
-    write_receipt(prompt_project, receipt, {"semantic": [
-        {"path": "one.md", "members": []}, {"path": "other.md", "members": []}], "pending_relations": []})
-    with pytest.raises(ValueError, match="requires at least one project-relative path"):
-        render_prompt(prompt_project, receipt, control, team=1)
-    with pytest.raises(ValueError, match="project-relative"):
-        prompt_dispatch(prompt_project, receipt, control, team=1, paths=["../outside.md"])
-    reading = render_prompt(prompt_project, receipt, control, team=1, paths=["one.md"])
-    assert 'Assigned paths: ["one.md"]' in reading["prompt"]
-    assert '"sources": [{"path": "one.md", "members": []}]' in reading["prompt"]
-    assert "other.md" not in reading["prompt"]
-    assert "--paths" in reading["render_command"]
-    assert not reading["publisher"]
-    publisher = render_prompt(prompt_project, receipt, control)
-    assert "<project-relative-source>" in publisher["prompt"]
+    layout = maintenance_layout(prompt_project, available_subagents=available, work_items=1)
+    assert layout["teams"] == [] and layout["planned_subagents"] == 0
+    write_receipt(prompt_project, receipt, {"semantic": [], "pending_relations": []}, layout=layout)
+    with pytest.raises(IndexError):
+        prompt_dispatch(prompt_project, receipt, control, layout=layout)
+    assert not prompt_project.memory_dir.exists()
 
 
-def test_saved_solo_and_zero_capacity_permissions(prompt_project, tmp_path):
+def test_one_work_item_has_one_reader_and_a_reserved_coordinator_seat(prompt_project, tmp_path):
     receipt, control = tmp_path / "receipt.json", tmp_path / "control"
-    write_receipt(prompt_project, receipt, {"semantic": [], "pending_relations": []},
-                  layout=maintenance_layout(prompt_project, work_items=1))
+    layout = maintenance_layout(prompt_project, available_subagents=3, work_items=1)
+    write_receipt(prompt_project, receipt, {"semantic": [], "pending_relations": []}, layout=layout)
     result = render_prompt(prompt_project, receipt, control)
-    assert result["reader_task_names"] == []
-    assert "personally perform the complete prepare, original reading, chunking, summaries, relations" in result["prompt"]
-    assert "0 reader slots" in result["prompt"]
-    with pytest.raises(IndexError):
-        render_prompt(prompt_project, receipt, control, role="reader", paths=["one.md"])
-    zero = maintenance_layout(prompt_project, available_subagents=0)
-    assert zero["teams"] == []
-    with pytest.raises(IndexError):
-        prompt_dispatch(prompt_project, receipt, control, layout=zero)
+    assert len(result["reader_task_names"]) == 1
+    assert layout["reserve"] == 1 and layout["planned_subagents"] == 2
+    assert "reserved recovery seat" in result["prompt"]
+    assert "same coordinator" in result["prompt"]
+    assert "original parent" in result["prompt"]
+    assert not prompt_project.memory_dir.exists()
 
 
 def test_retrieval_dispatch_is_independent_and_lazy(prompt_project, tmp_path, monkeypatch):

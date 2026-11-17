@@ -53,7 +53,8 @@ def prepare_stage(config, receipt, control, handoff, output, *, workers_ended, p
                   available_subagents=None):
     """Validate a host-confirmed boundary and save one new stage; never spawn agents."""
     from .owner import save_stage
-    from .prompts import maintenance_layout, pending_workers, prompt_dispatch
+    from .prompts import _wave_layout, maintenance_layout, prompt_dispatch
+    from .waves import inspect
 
     if not workers_ended:
         raise ValueError("Confirm that the previous coordinator and its workers ended")
@@ -63,22 +64,38 @@ def prepare_stage(config, receipt, control, handoff, output, *, workers_ended, p
     if previous_stage is not None:
         previous = load_stage(receipt, control, previous_stage)
         previous_ref = {**fixed_reference(previous_stage), "index": previous["index"]}
-        scope, layout, index = previous["remaining"], previous["layout"], previous["index"] + 1
+        scope, layout, index = previous["remaining"], _wave_layout(previous["layout"]), previous["index"] + 1
     else:
-        scope, layout, index = receipt_scope(material), material["layout"], 1
+        scope, layout, index = receipt_scope(material), _wave_layout(material["layout"]), 1
     # Every original candidate is either finished by this group or carried forward.
     for kind in ("paths", "relations", "feedback"):
         completed, remaining = boundary["completed"][kind], boundary["remaining"][kind]
         if (len(set(completed)) != len(completed) or len(set(remaining)) != len(remaining)
                 or set(completed) & set(remaining) or set(completed) | set(remaining) != set(scope[kind])):
             raise ValueError(f"Handoff completed/remaining {kind} must exactly partition the previous scope")
+    wave = inspect(config.memory_dir, control, material["owner_run_id"], boundary["wave_id"])
+    if not wave["closed"]:
+        raise ValueError("Close the wave after publication and notification resolution before a stage handoff")
+    receipts = []
+    for ref in wave["history"]:
+        previous_wave = _read_reference(ref)
+        if previous_wave["run_id"] != material["owner_run_id"]:
+            continue
+        if previous_wave["receipt"] is None:
+            raise ValueError("An earlier wave in this run has no fixed execution receipt")
+        receipts.append(_read_reference(previous_wave["receipt"]))
+    receipts.append(_read_reference(wave["receipt"]))
+    expected_handles = {name: worker["handle"] for receipt in receipts
+                        for name, worker in receipt["workers"].items() if worker["handle"]}
     workers = boundary["workers"]
     names = [worker["task_name"] for worker in workers]
-    pending_workers(layout, 0, names)  # Reuse the saved-layout identity boundary.
     if not layout["teams"] or layout["teams"][0]["task_name"] not in names:
         raise ValueError("Handoff must identify the ended publisher coordinator")
     if len(set(names)) != len(names) or any(worker["status"] != "ended" or not worker["handle"] for worker in workers):
         raise ValueError("Handoff workers must have unique task names and ended host handles")
+    observed = {worker["task_name"]: worker["handle"] for worker in workers}
+    if any(observed.get(name) != handle for name, handle in expected_handles.items()):
+        raise ValueError("Handoff must identify each started wave worker's ended host handle")
     for reference in boundary["completed_drafts"]:
         if not reference["assignment"].strip():
             raise ValueError("Completed draft must identify its assignment")
@@ -93,7 +110,7 @@ def prepare_stage(config, receipt, control, handoff, output, *, workers_ended, p
                                                     for kind in ("paths", "relations", "feedback")),
                                      run_id=material["owner_run_id"])
     if not next_layout["teams"]:
-        raise ValueError("No subagent capacity for a new stage; retry this handoff when capacity is available")
+        raise ValueError("A coordinator, reader and reserved recovery seat are required for a new stage")
     stage = {"index": index, "receipt": receipt_ref, "control": str(Path(control).resolve()),
              "owner_run_id": material["owner_run_id"], "previous_stage": previous_ref,
              "handoff": handoff_ref, "completed": boundary["completed"], "remaining": boundary["remaining"],
