@@ -7,3 +7,5 @@
 普通构建还拦下build/lib残留旧模板的增量候选，未安装；构建入口改用uv默认sdist→wheel，最终wheel SHA为9ec178d95bfde63550f1696431866efb22cd7c4f9c7d49d2ac7abe70ae19117d，已核两旧模板不存在。共享embedding及正式数据库进程保持。
 
 完整授权与生命周期合同见[维护计划](../../tasks/20261115-real-use-rectification/maintenance-waves.md)，原Terra用量原因和各次修正证据见[调查](../../tasks/20261115-real-use-rectification/research/terra-usage-20261117.md)。
+
+纯文件宿主实测已收口：同一Terra两turn、中段329.781秒无记录到response/tool/usage，最后Luna唯一回调的空响应保pending，由原父实际核宿主终态后恢复通知并关闭释放。没有语义或SQL发布。受管入口已刷新且块外字节与真实事实metadata不变；文档另纠正workset授权、0.18 stage的关闭波次边界及tmp固定引用恢复要求。真实8来源小批继续，不据该探针宣称完整维护通过。

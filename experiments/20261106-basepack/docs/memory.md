@@ -89,7 +89,7 @@ memory maintain --mode automatic --holder '<本thread身份>' --control '<memory
 
 ### 有限任务池与两段式 Terra
 
-本节为已授权的0.18接入合同，尚未安装；当前0.17.4轮次沿原固定回执自然收口，不能把任务池协议套给旧worker。详细设计维护源为[有限任务池合同](../../../devDoc/tasks/20261115-real-use-rectification/maintenance-waves.md)；安装后以 `memory guide` 返回的随包流程和CLI生成的命令、prompt与身份执行。新入口为 `memory wave`：create不传wave-id并返回该标识，其余动作均显式传 `--control <同一control> --run-id <owner run_id> --wave-id <wave_id>`。各动作字段以 `memory wave <action> --help` 为准，reader直接执行生成prompt中的命令。
+本节描述已普通安装的0.18。纯文件宿主probe已实际关闭，父任务按已核宿主事实完成通知恢复、owner=null；真实8条小批已新鲜预检，尚未作者发布，不代表完整维护通过。旧组织仍须按原固定回执收口，不能把任务池协议套给旧worker。详细设计维护源为[有限任务池合同](../../../devDoc/tasks/20261115-real-use-rectification/maintenance-waves.md)；安装后以 `memory guide` 返回的随包流程和CLI生成的命令、prompt与身份执行。新入口为 `memory wave`：create不传wave-id并返回该标识，其余动作均显式传 `--control <同一control> --run-id <owner run_id> --wave-id <wave_id>`。各动作字段以 `memory wave <action> --help` 为准，reader直接执行生成prompt中的命令。
 
 1. `acquired=false` 时报告已有owner并继续业务；显式维护报告该阻塞。`acquired=true` 后保留原receipt/control和父任务stop权限。只有 `needs_semantic=true` 才按返回名称、模型和推理强度实际创建Terra；初始化成功仅表示准备了一波工作。
 2. Terra第一turn规划有限、可独立阅读写稿的语义任务，将每项的 `id/goal/paths/write_targets/outputs` 写入tasks JSON数组，用 `memory wave create --receipt <固定receipt> --control <control> --run-id <owner run_id> --tasks <tasks.json> --coordinator <实际非根Terra规范路径> --readers <N>` 建波；长组先发，工作量差异明显的任务分组。依赖前一波新发布知识的任务留下一波。N必须在1至min(任务数,固定reader上限)内，由规划者按工作量选择较小固定池，供多轮领取，不以容量满编为目标。程序预登记worker，保留Terra第二turn恢复名额；余量不再默认补无reader协调者。
@@ -100,13 +100,15 @@ memory maintain --mode automatic --holder '<本thread身份>' --control '<memory
 
 已确认publisher终态、无提交且owner.publications为空时，原父任务可用 `memory wave publication-failed --error <原错> --publisher-ended --no-commit` 固定错误并终止旧intent，未发稿保留给有限修复波。未知提交仍保留原intent与owner，不能标失败或重发；先沿原固定frozen及数据库回执核结果。
 
-任务的 `paths` 仅列当前stage的remaining.paths内拟处置来源；无stage时限原receipt的semantic处置来源。可选 `read_paths` 只为额外共读，prepare可读两者，但draft.sources与member.path必须属于paths。图／feedback-only任务可用 `paths=[]`，必要时先检索；新发现来源留下一wave，不自动纳入本波接受。
+任务的 `paths` 仅列当前stage的remaining.paths内拟处置来源；无stage时限原receipt的 `workset.included`，包含本轮已授权纳入的stable来源。可选 `read_paths` 只为额外共读，prepare可读两者，但draft.sources与member.path必须属于paths。图／feedback-only任务可用 `paths=[]`，必要时先检索；新发现来源不自动纳入本波接受；后续wave仍须满足当时的固定授权范围。
 
 回执固定来源候选及采集观察，prepare固定实际阅读版本；冲突由作者重新prepare并正常修稿。共享节点／关系各有一个写owner，程序不代替语义判断。已接受后新改的原件不自动重开旧任务，回执外来源和后续未接受成果保留原件入口与有限后续范围。普通成功不追加例行全文审计，也不以一波结束宣布全授权范围完成。
 
 ### 同一轮的阶段接续
 
-0.17的stage交接只用于原协议轮次收口；0.18默认由上述有限wave接续，不再逐来源组恢复Terra续派。切换前固定旧轮接受／未发稿、剩余范围和发布终态，旧worker结束后由原父任务正确stop/release；新轮显式承接全部未完范围，不继承旧worker协议。两种方式的恢复材料均保留实际固定引用，不能因更换客户端重置发布身份。
+0.18的 `memory stage` 用于已关闭的finite-wave-v1边界；需要更换Terra上下文时，可沿原receipt／owner／control建立干净新协调者，维护轮次继续。先完成当前wave的发布及通知处置并close，handoff须含该 `wave_id`，其completed／remaining的paths、relations、feedback完整分割待交接scope；同时固定draft／publication结果引用、errors／jobs，并列出本run所有wave（含历史）中实际启动worker的已结束宿主句柄，以及本阶段publisher的已结束句柄。
+
+宿主实际确认旧句柄结束后，程序核固定引用与交接中的终态声明，保存stage及hash并返回新worker；宿主按其spawn_arguments实际创建干净协调者，下一wave使用返回的stage／hash及remaining范围。stage不创建新owner，也不表示整轮维护完成。当前客户端拒绝旧组织receipt／stage，0.17历史材料只保留旧版收口证据，不能由0.18接续执行。
 
 ### 停止与恢复
 

@@ -84,6 +84,8 @@
 
 `memory publish` 继续与 freeze/apply 共用发布合同；作者提案引用固定 prepare path/hash，由程序编译依赖及身份。固定稿接续保留 batch_id 和 UUID，数据库 receipt 为权威；本地 result 写失败保留同一 frozen 及 owner/control，不为补投影新建 batch。旧作者稿先结清或作废后重新 prepare；纯 Python 编译仍须传项目配置，见 [发布流程](memory.md#首建与维护)。0.18有限任务池不改变memory schema或行为算法；接入新轮前先在自然边界结束旧worker，固定接受／未发稿与范围、确认发布终态，再由原父任务正确关闭旧轮。新波不继承旧worker协议。Terra二段固定发布结果即FINAL，原父任务在核Terra FINAL与最后Luna通知ack／宿主终态后机械关闭wave，不为等待ack增加Terra轮次。任务池、预登记worker、固定稿、执行回执及通知受理状态随原owner/control保留恢复，停止、claimed、全异常或未明通知不能自动释放；见[任务池生命周期](memory.md#有限任务池与两段式-terra)。
 
+有限wave恢复须从当前 `maintenance/wave.json` 按固定引用收集wave history／closure、初始化与执行回执、stage／handoff、作者草稿及其prepare、coverage／errors、frozen／result和宿主通知证据。部分文件可能在项目 `tmp/`，只复制memory目录不足以恢复。保留原文件字节及原项目根／原绝对路径到恢复位置的映射，按hash核对全部引用；映射本身不表示已支持迁址。跨项目根直接resume旧wave尚未验证，不自动改写固定JSON或新增通用重绑定机制。
+
 | 本次改变 | 需要保留的恢复材料 | 最小实际确认 |
 | --- | --- | --- |
 | 仅客户端代码、提示词或生成入口 | 新旧 wheel、原配置/凭据及入口块外业务正文；沿用已有可用的数据恢复链 | 在源码外核安装路径与版本，执行受影响操作；刷新托管块并核业务正文 |

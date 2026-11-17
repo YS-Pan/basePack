@@ -1,6 +1,6 @@
 # 项目记忆实现
 
-本页描述0.18.0源码：SurrealDB原证与知识图、独立采集、prepare提案编译、单owner发布、严格交付事实及Gaussian行为访问投影。2026-11-18核对，稳定客户端已普通安装0.18.0[behavior]，新有限wave宿主probe进行中、闭环待验；已推广至正式18080/store-0.17；首批100候选实际维护已完成，后续全项目维护尚未完成，实际部署与维护边界见[部署合同](../deployment.md)和[实施记录](../../tasks/20261115-real-use-rectification/execution.md)。0.16既有验收见[整改结果](../../tasks/20261115-real-use-rectification/result.md)，历史实现见[记忆专项进度](../../tasks/20261106-memory-system/progress.md)。首建和维护由宿主订阅agent阅读生成，程序提交成功即完成普通批次，默认无额外审计。用户流程见[记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
+本页描述0.18.0源码：SurrealDB原证与知识图、独立采集、prepare提案编译、单owner发布、严格交付事实及Gaussian行为访问投影。2026-11-18核对，稳定客户端已普通安装0.18.0[behavior]，纯文件宿主probe已closed并由父核通知恢复；真实8条小批仅新鲜预检，作者发布仍待验；已推广至正式18080/store-0.17；首批100候选实际维护已完成，后续全项目维护尚未完成，实际部署与维护边界见[部署合同](../deployment.md)和[实施记录](../../tasks/20261115-real-use-rectification/execution.md)。0.16既有验收见[整改结果](../../tasks/20261115-real-use-rectification/result.md)，历史实现见[记忆专项进度](../../tasks/20261106-memory-system/progress.md)。首建和维护由宿主订阅agent阅读生成，程序提交成功即完成普通批次，默认无额外审计。用户流程见[记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
 
 ## 职责与数据
 
@@ -44,7 +44,7 @@ maintain默认从项目Git清单加source_scope发现原件，并加入根`priva
 
 安装agent取得不含主agent、包含后代的宿主容量及来源并写入AI配置；实时可用席位另传。[prompts.py](../../../experiments/20261106-basepack/src/basepack/memory/prompts.py)保存finite-wave-v1布局、单一Terra身份、reader上限及AI快照；容量不足以提供reader和恢复名额时保留阻塞，不补默认无reader协调者。`memory prompt`只读配置／模板／固定回执渲染唯一协调者，不读凭据、不连库或模型；宿主仍须实际派工，Luna由wave create返回完整spawn_arguments，旧逐组派工／pending-dispatch已被替代，旧组织receipt不会静默转换。
 
-[waves.py](../../../experiments/20261106-basepack/src/basepack/memory/waves.py)和[wave_cli.py](../../../experiments/20261106-basepack/src/basepack/memory/wave_cli.py)维护项目本地`memory_dir/maintenance/wave.json`，固定任务、worker、初始化／执行回执、通知及publication intent。Terra每波首turn规划独立语义任务并显式选`--readers N`较小固定池，N受任务数及保存reader上限限制；长组先发，依赖前波新发布知识者留下一波。task.paths限当前stage.remaining或receipt.semantic拟处置来源，read_paths只供额外共读，draft.sources与member.path不越paths；图／feedback-only可paths=[]，新发现来源不自动纳入接受。
+[waves.py](../../../experiments/20261106-basepack/src/basepack/memory/waves.py)和[wave_cli.py](../../../experiments/20261106-basepack/src/basepack/memory/wave_cli.py)维护项目本地`memory_dir/maintenance/wave.json`，固定任务、worker、初始化／执行回执、通知及publication intent。Terra每波首turn规划独立语义任务并显式选`--readers N`较小固定池，N受任务数及保存reader上限限制；长组先发，依赖前波新发布知识者留下一波。task.paths限当前stage.remaining.paths；无stage时限receipt.workset.included（含本轮授权的stable来源），read_paths只供额外共读，draft.sources与member.path不越paths；图／feedback-only可paths=[]，新发现来源不自动纳入接受。
 
 Terra预登记并实际启动全部Luna，交固定初始化回执后结束turn。Luna首turn事件等待go，未封口不能领取或退队；原父任务保留句柄和Terra恢复席位，核其真实空闲及成员启动／失败终态后seal并发一次go。Luna原子claim→脚本task-prompt→阅读与正常修稿→固定引用submit循环；无任务时退队与活动数变更原子进行。最后正常退队者保存执行回执、取得唯一票，再实际followup同一Terra；普通早退只留消息，程序资格不等于宿主已受理。
 
@@ -52,7 +52,7 @@ Terra第二turn按汇总固定引用、覆盖和异常编译／唯一发布，�
 
 主任务约十分钟以内保留brief并跳过整个自动maintain；长任务在宿主支持生命周期时并行启动，子任务不递归维护，显式维护不受门槛限制。owner在预检前原子取得，冲突报告原持有者；结束stop、取消自有后代，核发布终态后release。领取、通知处理和发布均核owner/control/wave及stop；已在途followup可能迟唤醒，第二turn先核停止并拒绝发布。异常worker、全体消失或残留claimed由原父据宿主事实恢复，不超时抢回。HTTP查询和反馈不要求owner；CLI apply使用自有control，Python apply省略时仅在空闲项目取得短期owner。控制不终止共享服务或已开始推理。语义派工前失败，仅本进程自有且确认无派工／在途／未明发布时才stop/release，清理错误与原错一并保留；独立采集失败与此链分开，他人owner及未明状态保持。
 
-固定候选中的来源组由Luna作者负责理解、关系及普通修复，共享图写目标唯一归属；保留mandatory、覆盖、gaps、feedback和实际接受版本。同稿FINAL不重复处理，改稿用新path/hash。接受后新增变化和回执外来源留下一有限范围；执行回执不证明语义接受、全范围完成或最终磁盘fresh。[stages.py](../../../experiments/20261106-basepack/src/basepack/memory/stages.py)仍提供固定上下文边界和剩余范围交接，不能作为逐任务恢复Terra的默认循环；旧轮在自然边界正确收口后再接入新组织。详见[有限wave设计](../../tasks/20261115-real-use-rectification/maintenance-waves.md)及[产品流程](../../../experiments/20261106-basepack/docs/memory.md#有限任务池与两段式-terra)。
+固定候选中的来源组由Luna作者负责理解、关系及普通修复，共享图写目标唯一归属；保留mandatory、覆盖、gaps、feedback和实际接受版本。同稿FINAL不重复处理，改稿用新path/hash。接受后新增变化和回执外来源留下一有限范围；执行回执不证明语义接受、全范围完成或最终磁盘fresh。[stages.py](../../../experiments/20261106-basepack/src/basepack/memory/stages.py)只接受finite-wave-v1，在当前wave已closed后核handoff.wave_id、完整scope分割、固定稿／发布结果引用及本run全部实际启动worker（含历史wave）及本阶段publisher的ended句柄，沿原owner/control返回干净新协调者与剩余范围。它不作为逐任务恢复Terra的默认循环，也不执行0.17旧组织stage。详见[有限wave设计](../../tasks/20261115-real-use-rectification/maintenance-waves.md)及[产品流程](../../../experiments/20261106-basepack/docs/memory.md#有限任务池与两段式-terra)。
 
 [feedback.py](../../../experiments/20261106-basepack/src/basepack/memory/feedback.py)在新增feedback表持久保存观察版本、漏检查询和处理结果；报告可并发，无需维护owner，未决报告进入needs_semantic及固定回执。修复先据当前版本apply，再由owner解决报告；旧报告不覆盖新版，未决不假关闭，原生导出恢复保留。检索只做业务所需阅读，发现问题就报告；只有用户明确的审计意图启动手动审计。
 

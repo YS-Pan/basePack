@@ -1,6 +1,6 @@
 # 当前basePack总体逻辑
 
-2026-11-18核对。以下两张流程图记录0.16.0历史基线；本项目现已普通安装0.18.0，正式18080/store-0.17保持，共享embedding服务保持0.15.0。首批100候选实际维护已完成，后续全项目维护尚未完成。当前独立采集、真实工作集、prepare提案编译、严格交付事实及Gaussian行为投影合同见[实现概览](overview.md)、[记忆模块](modules/memory.md)，实际推广见[迁移结果](../tasks/20261115-real-use-rectification/migration-result.md)。源码目标与普通安装均为0.18.0有限wave，新宿主probe进行中、闭环待验；当前实现与验收不改写旧图的历史含义。
+2026-11-18核对。以下两张流程图记录0.16.0历史基线；本项目现已普通安装0.18.0，正式18080/store-0.17保持，共享embedding服务保持0.15.0。首批100候选实际维护已完成，后续全项目维护尚未完成。当前独立采集、真实工作集、prepare提案编译、严格交付事实及Gaussian行为投影合同见[实现概览](overview.md)、[记忆模块](modules/memory.md)，实际推广见[迁移结果](../tasks/20261115-real-use-rectification/migration-result.md)。源码目标与普通安装均为0.18.0有限wave，纯文件宿主probe已closed并经父核通知恢复，真实8条小批仅新鲜预检、作者发布待验；当前实现与验收不改写旧图的历史含义。
 
 2026-11-17的[修改前/修改后完整系统图](../tasks/20261115-real-use-rectification/forgetting-options.md#修改前后的完整系统)是方案图，图源及生成说明在[任务图目录](../tasks/20261115-real-use-rectification/diagrams/README.md)；它们不证明0.17已安装、迁移或完成长期效果验收。本页不重绘该批SVG/PNG。0.16验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)和[完整维护观察](../tasks/20261115-real-use-rectification/maintenance-20261116-result.md)，实际路径与服务入口见[部署合同](deployment.md)及[环境记录](environment.md)。
 

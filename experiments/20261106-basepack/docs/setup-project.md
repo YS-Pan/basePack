@@ -156,15 +156,15 @@ Codex 宿主按项目归属默认接入可取得的聊天，不要求逐 thread 
 
 ## 版本升级
 
-### 升级到 0.18：有限任务池（尚未安装）
+### 升级到 0.18：有限任务池
 
-0.18计划将维护改为有限本地任务池和两段式Terra，memory schema、行为算法、项目UUID及原证版本合同保持。先在自然来源组边界固定旧轮的接受／未发稿、剩余范围和发布终态，确认旧worker结束，由原父任务正确stop/release后才开新轮。当前0.17.4仍按其已安装skill收口，不把新协议交给旧worker，也不靠覆盖客户端解除旧owner。
+0.18已普通安装，维护采用有限本地任务池和两段式Terra，memory schema、行为算法、项目UUID及原证版本合同保持。本机纯文件宿主probe已关闭，父任务依据实际宿主证据补记通知结果并释放owner；真实8条小批仅新鲜预检，作者发布与完整维护仍待验。升级旧组织时，先固定原轮的接受／未发稿、剩余范围和发布终态，结束旧worker后由原父正确stop/release；0.18拒绝旧组织receipt／stage，不把新协议套给旧worker或用安装解除旧owner。
 
 安装后运行 `memory init` 刷新托管入口，核包版本、实际导入路径及宿主能力：父任务能确认Terra当前turn已结束而身份空闲，能封口后只发一次go，并核早到go留邮箱／晚到go唤醒事件等待，最后Luna能实际followup同一非根Terra，并将待通知与宿主受理结果分开保留。容量必须留下Terra恢复名额。最小实际宿主闭环通过后再维护真实材料；普通安装或队列状态成功不能代替该验收。流程见[有限任务池](memory.md#有限任务池与两段式-terra)，当前授权设计见[维护合同](../../../devDoc/tasks/20261115-real-use-rectification/maintenance-waves.md)。
 
 ### 升级到 0.17
 
-0.17 使用 memory schema 3，member identity 仍为 2。它更新采集、提案、交付事实和行为访问合同；**0.16 旧库先离线迁移并验证，再同时切换库与客户端**。`memory init` 只安装 schema，不执行旧数据桥接。先 stop 自有维护、取消后代、确认发布终态并 release；结清或明确作废旧作者稿、回执与未确认交付，保留其恢复原件。准备旧 wheel/解释器、停写后的原生 export、配置与原凭据、公私原件、受管附件/assets 及必要恢复回执。
+以下为0.17历史客户端的升级边界，旧库桥接仍是必要恢复依据；当前0.18维护组织及stage按上节与现行记忆流程执行。0.17使用memory schema 3，member identity仍为2。它更新采集、提案、交付事实和行为访问合同；**0.16 旧库先离线迁移并验证，再同时切换库与客户端**。`memory init` 只安装 schema，不执行旧数据桥接。先 stop 自有维护、取消后代、确认发布终态并 release；结清或明确作废旧作者稿、回执与未确认交付，保留其恢复原件。准备旧 wheel/解释器、停写后的原生 export、配置与原凭据、公私原件、受管附件/assets 及必要恢复回执。
 
 用原生 export 在两个独立物理目录和独立端口恢复同一份旧库，一个作为只读比较基线，一个作为目标。配置中的正式端口与这两个端口各不相同。使用保留的 0.16 解释器运行配套 [离线桥接工具](../src/basepack/memory/migration.py)，先 `migrate`，再 `finalize`。finalize 先逐字段执行 verify，通过后显式写入 schema marker 3 并读取确认，例如：
 
@@ -177,7 +177,7 @@ if ($LASTEXITCODE -ne 0) { throw "migration finalize failed ($LASTEXITCODE)" }
 
 验证逐字段保留原件、知识版本、图、依据、mandatory/private 和未变向量；旧 delivery 保留原清单、非空顺序与原 context，不补造历史锚点或完整新 J。新事实从切换 J=0 起计；无法证明的旧接受时点保持 `j_enter=null`，另固定 `observed_j=0`／`age_origin=legacy_cutover`，表示新政策开始观察而非命中或历史年龄已恢复。有真实旧命中的版本保留可证奖励。finalize 的标记确认后，再由新客户端运行 `memory init` 安装新 schema，核原证／精确版本／查询／交付重试及受影响操作，最后切换正式配置与 launcher。新库 init 自动建立 marker 3；已绑定但无标记的库会被拒绝，init 不代替桥接或重置已建立的 J。finalize 结果未明时先核目标标记和原回执，不能盲重试。保留旧物理库和旧 wheel 作回退；schema 回退使用对应旧恢复点。
 
-训练端安装可选 `behavior` extra；不训练的客户端可只装轻量包。共享 embedding 服务及未变输入的语义身份不随本版客户端更新，本项目保持服务 0.15；无需因此重装模型服务。新模型引用的 `memory.data_dir/behavior/<sha>.json` 纳入恢复链。完成安装后运行 `memory init` 刷新托管块，核块外路径及独立 skills 副本，并按新 prepare 提案和检索回执合同验证。0.17旧轮的[阶段接续](memory.md#同一轮的阶段接续)保留原owner/control/receipt与父stop；0.18任务池在旧轮正确收口后按新合同接入。
+训练端安装可选 `behavior` extra；不训练的客户端可只装轻量包。共享 embedding 服务及未变输入的语义身份不随本版客户端更新，本项目保持服务 0.15；无需因此重装模型服务。新模型引用的 `memory.data_dir/behavior/<sha>.json` 纳入恢复链。完成安装后运行 `memory init` 刷新托管块，核块外路径及独立 skills 副本，并按新 prepare 提案和检索回执合同验证。0.17旧客户端的stage回执仅作其历史收口证据；当前0.18不执行旧组织stage。0.18自己的[阶段接续](memory.md#同一轮的阶段接续)须在当前finite wave关闭后，沿原owner/control/receipt及完整固定交接创建干净新协调者。
 
 ### 0.16 历史升级边界
 
