@@ -46,3 +46,5 @@ N0—N4初始实现已提交`9d3e479`。普通wheel首次49项/40步验证使用
 已stop自有control、确认全部团队结束/中断及publications=[]后release，独立owner=null；一次已冻结source-only批次在提交前被stop明确拒绝，无未知提交。原始停工分区和未发布清单在`tmp/basepack-maintenance/456d252ffd1a41c996756490caf54bf1/a18ef1ecfea344039a86342bb6fc4bc7/`；阶段小型观测在`tmp/20261117-implementation/pilot-1/`。
 
 修复版0.17.1按精确知识版本物化/遍历已接受历史依赖，current expected另保留，缺失版本仍报错，private沿实际版本传播。独立内存库最终publish/proposals 22 passed，此前维护组合70 passed。独立实际样本中4个原件字节未变，旧installed0.17.0精确复现原错；仅替换prepare路径/hash，新源码freeze保留原46成员/10section/1节点/3边语义。prepare约15.498秒、330历史版本、2,303,978字节，freeze约0.015秒；J0/C24/model/owner不变。稳定0.17.1 wheel安装后同一语义稿freeze也通过，无数据库写入。接下来以新control继续原100来源的未完项及修复相关变化，再做实际检索；新库仍18176、正式18080未推广，整体维护未完成。
+
+用户追加要求：结合最近小时Terra/Luna用量图，在之后的实际维护中调查其与此前协调成本问题是否同源；存在需要修复的浪费时继续修复。调查分支以Sol协调、一次跨历史Luna检索及本机统计证据并行进行，按实现/迁移/维护阶段、主任务/协调者/reader和实际input/cached/output拆分，核图表全机范围与聚合口径，再比较既有修复。真实检索的实际交付单独登记，不能将其引起的J/C变化归为维护生成事实；不新增正式监控或benchmark平台。下一轮按两个实际调查agent占用后的raw free=10安排维护，重用原100范围，不重复计已接受的46项。
