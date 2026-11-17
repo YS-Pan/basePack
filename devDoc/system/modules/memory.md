@@ -12,7 +12,7 @@
 - [images.py](../../../experiments/20261106-basepack/src/basepack/memory/images.py) 保留原图 hash 快照与定位，完整写入并核 hash 后原子发布，已有损坏快照仍报错；[vectors.py](../../../experiments/20261106-basepack/src/basepack/memory/vectors.py) 复用现有 EmbeddingClient 批量编码，查询使用原生 cosine 与排名融合，普通返回省略数值大数组。图文模型和服务沿 R9 共用。
 - 原字节 revision 识别来源；input_revision 绑定实际编码输入（文字为 title 加 text，图片为原字节），description_revision 独立跟踪图片识读文字；knowledge_revision 用于逐记录乐观写入，embedding_identity 绑定模型语义空间。apply 核本批改写、退休、更正目标及实际使用的既有依据成员、关系两端的 expected；不核无关条目，保留无关并行。同批新建记录走不存在检查，不能省略已有依赖的版本。
 
-[privacy.py](../../../experiments/20261106-basepack/src/basepack/memory/privacy.py)集中计算布尔字段`private`。根`private/`始终私有，项目`memory.private_scope`可增加原位文件/目录，默认`[]`，`['.']`表示全项目；按规范化路径及目录边界匹配，分类不扩大discovery。freeze固定规则及revision，apply核当前规则并拒绝冻结后规则变化；纯Python freeze显式传`config=memory.config`。成员、节点及关系沿自身来源版本、`basis`与固定知识版本端点传播，有一项私有依据即整条标为true。旧版本依据使用其当时标记，状态更新保留标记；正文仅含可选私有路径引用不触发传播。prepare、检索、brief、知识历史与原证回读交付相应标记，成员和原证的标记分别保留。
+[privacy.py](../../../experiments/20261106-basepack/src/basepack/memory/privacy.py)集中计算布尔字段`private`，表示项目约定的限制分发边界，涵盖隐私、机密及版权/许可受限资料，不细分原因或自动判断许可。根`private/`始终私有，项目`memory.private_scope`可增加原位文件/目录，默认`[]`，`['.']`表示全项目；按规范化路径及目录边界匹配，分类不扩大discovery。freeze固定规则及revision，apply核当前规则并拒绝冻结后规则变化；纯Python freeze显式传`config=memory.config`。成员、节点及关系沿自身来源版本、`basis`与固定知识版本端点传播，有一项私有依据即整条标为true。旧版本依据使用其当时标记，状态更新保留标记；正文仅含可选私有路径引用不触发传播。prepare、检索、brief、知识历史与原证回读交付相应标记，成员和原证的标记分别保留。
 
 私有规则改变沿新来源版本处理，不覆写旧快照分类；编码身份和实际输入未变的向量继续复用。存量补标或原位来源迁移另按确认映射限定范围，旧依据不足时报告未知，缺标不代表已确认为公开，不默认执行全库语义审计。完整库继续保存公私资料，受管快照、聊天和工作包沿[本机目录约定](../project-data-layout.md)保留。标记不提供访问控制或净化原生导出；公开分享副本的筛选工具留待后续。
 

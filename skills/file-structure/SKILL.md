@@ -20,7 +20,7 @@ Choose a layout by purpose, maintenance lifecycle, and execution or delivery bou
 | --- | --- |
 | Long-term guidance, current implementation, active work, and history are mixed | [Development documentation](references/dev-docs.md) |
 | Experiment routes have tangled code, dependencies, data, or results | [Experiment routes](references/experiment-packages.md) |
-| Confidential development context needs a separate local version and publication boundary | [Private context](references/private-context.md) |
+| Privacy, confidentiality, copyright or licensing requires a separate local version and distribution boundary | [Private context](references/private-context.md) |
 | Documentation and experiment problems occur together | Read both references together and combine the layers |
 | Another layout problem | Propose the smallest layout that fits its purpose, lifecycle, and execution or delivery boundaries |
 

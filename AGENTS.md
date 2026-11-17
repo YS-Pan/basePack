@@ -14,7 +14,7 @@
 - 新建、调整或归档开发文档时读 [文档维护约定](devDoc/documentation.md)。
 - 修改代码、配置或开发文档时，主任务读一次[持续整改索引](devDoc/tasks/ongoing/README.md)，先处理到期项，再按已定范围选择有效主题；子任务由 brief 交接相关主题，实际整改服从本次授权。
 - 推荐、设计或整理项目文件结构时使用 [file-structure](skills/file-structure/SKILL.md)。
-- 机密业务原件与人工分析放根 `private/`，由独立本机 Git 保存；公共引用可选，公开内容保持自足。读取或公开私有资料、处理记忆返回的 `private` 标记时，按 [私有上下文边界](skills/file-structure/references/private-context.md) 执行。
+- 隐私、机密及因版权或许可需限制分发的资料放根 `private/`，由独立本机 Git 保存；公共引用可选，公开内容保持自足。读取或公开此类资料、处理记忆返回的 `private` 标记时，按 [私有资料边界](skills/file-structure/references/private-context.md) 执行。
 - 每项任务开始或接续时应用 [agent-team](skills/agent-team/SKILL.md) 的组织判断；当前上下文已有有效规则时直接复用。
 
 ## 实施

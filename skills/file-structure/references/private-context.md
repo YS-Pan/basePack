@@ -1,6 +1,6 @@
-# Private development context
+# Private materials
 
-Use this pattern when confidential originals, attachments, analysis or excerpts need local version history beside a public project. The project defines what may be published from the content and the owner's intent; a personal detail or a short excerpt is not automatically public or private. This pattern works independently of any memory tool.
+Use this pattern when privacy, confidentiality, copyright or licensing calls for keeping originals, attachments, analysis or excerpts outside public distribution. Publicly accessible papers can belong here even when they contain no personal or business secrets. The project defines the boundary using the content, applicable permissions and the owner's publication intent. This pattern works independently of any memory tool.
 
 ## Minimal structure and boundaries
 
@@ -13,21 +13,23 @@ project/
     .git/                       Complete independent local repository
     .gitignore                  Private repository's own disposable/generated files
     README.md                   Local index and backup/recovery entry point
-    sources/context-001/        Confidential originals and adjacent attachments
-    devDoc/tasks/<task-key>/     Confidential evidence for the same public task key
-    tmp/                        Disposable confidential derivatives
-    artifacts/                  Selected confidential evidence and outputs
+    sources/context-001/        Restricted originals and adjacent attachments
+    devDoc/tasks/<task-key>/     Restricted evidence for the same public task key
+    tmp/                        Disposable restricted derivatives
+    artifacts/                  Selected restricted evidence and outputs
 ```
 
-Create only the parts with real content. Combine the [development documentation](dev-docs.md) and [experiment](experiment-packages.md) patterns as needed: the public tree owns plans, progress and delivery conclusions; the private tree supplies confidential context without mirroring that state. Confidentiality chooses the boundary first; purpose and retention then choose a location within it.
+Create only the parts with real content. Combine the [development documentation](dev-docs.md) and [experiment](experiment-packages.md) patterns as needed: the public tree owns plans, progress and delivery conclusions; the private tree supplies restricted context without mirroring that state. Distribution restrictions choose the boundary first; purpose and retention then choose a location within it.
+
+For retained literature, keep the original file with its source URL, retrieved version/date and a checksum in the adjacent index or manifest. Record verified licensing information where available; leave uncertain permissions explicit. Local storage does not grant redistribution rights. Public bibliography, links and independently written analysis may remain public within the applicable publication boundary; placing an original here does not make every fact about it confidential.
 
 The outer repository ignores the whole `/private/` tree. The inner repository has its own objects, index and history; keep it independent of the public Git storage rather than registering a submodule, gitlink or worktree. Address each repository explicitly when inspecting or committing. Keep its initial use local, with no inherited public remote or automatic upload. Record an actual separate backup location and recovery steps, including needed originals and attachments ignored by the inner Git; local Git history alone is not an independent backup.
 
-These are version and publication boundaries, not encryption or access control. Whole-directory archives, explicit exports, synchronization and tool transfers follow their actual sharing scope. A project's managed tool state may retain confidential copies elsewhere; identify and protect those locations separately rather than assuming every confidential byte lives in `private/`.
+These are version and distribution boundaries, not encryption or access control. Whole-directory archives, explicit exports, synchronization and tool transfers follow their actual sharing scope. A project's managed tool state may retain restricted copies elsewhere; identify and protect those locations separately rather than assuming every restricted byte lives in `private/`.
 
 ## Public references
 
-Write public requirements, decisions and necessary rationale completely in their owning public documents. Keep confidential originals and manually maintained derivatives inside the private boundary. Installation, build, tests, documentation generation and product operation remain usable without the private tree.
+Write public requirements, decisions and necessary rationale completely in their owning public documents. Keep restricted originals and manually maintained derivatives inside the private boundary. Installation, build, tests, documentation generation and product operation remain usable without the private tree.
 
 An optional reference may use a neutral path such as `private/sources/context-001/notes.md#scope`, adjusted relative to the referring file, and explicitly say “private source, optional.” Use code text when a missing local target would be misleading as a link. Names and headings in the reference must also be safe to publish. Link checks exempt only explicitly marked optional private references; ordinary broken links still need repair. Public summaries, fixtures, screenshots, commit messages and release notes follow the same content boundary.
 
