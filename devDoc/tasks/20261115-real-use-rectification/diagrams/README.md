@@ -4,10 +4,10 @@
 
 | 版本 | 范围 | 可编辑源 | 预览 | 矢量采用件 |
 | --- | --- | --- | --- | --- |
-| 修改前 | 已部署客户端 0.16；共享 embedding 服务 0.15 | [SVG](memory-system-before.svg) | [PNG](memory-system-before.png) | [PDF](memory-system-before.pdf) |
-| 修改后 | 未来目标，尚未实现或部署 | [SVG](memory-system-after.svg) | [PNG](memory-system-after.png) | [PDF](memory-system-after.pdf) |
+| 修改前 | 实施前基线：客户端0.16、共享embedding0.15 | [SVG](memory-system-before.svg) | [PNG](memory-system-before.png) | [PDF](memory-system-before.pdf) |
+| 修改后 | 制图时的0.17目标合同，其后已实现；接入状态见实施结果 | [SVG](memory-system-after.svg) | [PNG](memory-system-after.png) | [PDF](memory-system-after.pdf) |
 
-当前实现依据[系统图](../../../system/diagrams.md)及 0.16 的维护、freeze/apply、访问和 rank 源码。目标依据[目标架构](../target-architecture.md)与本轮最新决定：独立采集、有限语义工作组、程序编译及唯一发布；真实共交付训练标准 KL-NMF，Gaussian 连续降权，权重可低但材料保持可检索。数值投影使用 H 累计与未知证据区间；本图不包含退出、删除或 GC。
+修改前基线依据0.16的维护、freeze/apply、访问和rank源码。目标依据[目标架构](../target-architecture.md)：独立采集、有限语义工作组、程序编译及唯一发布；真实共交付训练标准KL-NMF，Gaussian连续降权，权重可低但材料保持可检索。数值投影使用H累计与未知证据区间；本图不包含退出、删除或GC。图形保持制图时的前后对照，当前接入进度见[实施结果](../implementation-result.md)，实际部署见[系统图入口](../../../system/diagrams.md)。本次只更新说明，没有改图形或重新生成视觉验收记录。
 
 ## 同源与修改范围
 
