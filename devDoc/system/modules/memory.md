@@ -1,6 +1,6 @@
 # 项目记忆实现
 
-本页描述2026-11-17的0.17.0源码：SurrealDB原证与知识图、独立采集、prepare提案编译、单owner发布、严格交付事实及Gaussian行为访问投影。本项目实际安装仍为0.16.0，共享embedding服务为0.15.0；安装、隔离验证与正式切换沿[实施记录](../../tasks/20261115-real-use-rectification/execution.md)和[部署合同](../deployment.md)，不从源码推定生产已启用。0.16验收见[整改结果](../../tasks/20261115-real-use-rectification/result.md)，历史实现见[记忆专项进度](../../tasks/20261106-memory-system/progress.md)。首建和维护由宿主订阅agent阅读生成，程序提交成功即完成普通批次，默认无额外审计。用户流程见[记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
+本页描述0.17.0实现：SurrealDB原证与知识图、独立采集、prepare提案编译、单owner发布、严格交付事实及Gaussian行为访问投影。2026-11-17稳定客户端已安装0.17.0[behavior]，当前处于staging、promotion待办，实际部署与维护边界见[部署合同](../deployment.md)和[实施记录](../../tasks/20261115-real-use-rectification/execution.md)。0.16既有验收见[整改结果](../../tasks/20261115-real-use-rectification/result.md)，历史实现见[记忆专项进度](../../tasks/20261106-memory-system/progress.md)。首建和维护由宿主订阅agent阅读生成，程序提交成功即完成普通批次，默认无额外审计。用户流程见[记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
 
 ## 职责与数据
 

@@ -1,6 +1,6 @@
 # 系统实现概览
 
-唯一active路线是[20261106-basepack](../../experiments/20261106-basepack/README.md)。2026-11-17源码已实现0.17.0合同，本项目实际安装仍为0.16.0，共享embedding服务为0.15.0；本页描述0.17源码，安装及数据库切换以[部署合同](deployment.md)和[实施记录](../tasks/20261115-real-use-rectification/execution.md)为准，不从源码推定生产能力。0.16已验收能力见[整改结果](../tasks/20261115-real-use-rectification/result.md)。代码、依赖锁、测试、产品文档、示例和随包skill位于实验工程；根devDoc维护现行实现和活动工作。实测边界见[环境记录](environment.md)，共享资源基线见[R9结果](../archive/20261107-resource-coordination/r9-result.md)。
+唯一active路线是[20261106-basepack](../../experiments/20261106-basepack/README.md)。本页描述0.17实现；2026-11-17稳定客户端已安装0.17.0[behavior]，当前处于staging、promotion待办，实际部署与维护边界见[部署合同](deployment.md)和[实施记录](../tasks/20261115-real-use-rectification/execution.md)。0.16既有验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)。代码、依赖锁、测试、产品文档、示例和随包skill位于实验工程；根devDoc维护现行实现和活动工作。实测边界见[环境记录](environment.md)，共享资源基线见[R9结果](../archive/20261107-resource-coordination/r9-result.md)。
 
 本仓库提供三项可独立使用的 skill：[engineering-judgment](../../skills/engineering-judgment/SKILL.md) 用于设计、错误处理、兼容和使用流程的工程取舍，保留独立形态，通过长期使用反馈维护；[file-structure](../../skills/file-structure/SKILL.md) 推荐或整理开发文档、实验工程及私有开发上下文布局；[agent-team](../../skills/agent-team/SKILL.md) 为每项任务选择组织，按完整交付过程判断独立完成、简单协作或清晰分层，并使用宿主已有的订阅 subagent 能力。安装时选择完整目录放入目标 `.agents/skills/`，或把已有项目原件联接到该发现目录，核对相对引用与宿主实际列表；`init` 与 core doctor 不覆盖这项验收。完整步骤见 [项目接入](../../experiments/20261106-basepack/docs/setup-project.md#独立-skills-安装与发现)。组织选择与协作已有指令层实现，复杂广读的质量与总成本对照仍见 [专项记录](../tasks/20261106-rebuild/research/agent-team.md)。
 

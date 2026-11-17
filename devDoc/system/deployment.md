@@ -1,6 +1,6 @@
 # 项目配置与部署合同
 
-更新：2026年11月17日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)，源码已实现0.17.0合同；本项目实际安装仍为0.16.0、共享embedding服务为0.15.0。新客户端和memory schema 3的隔离验证、正式切换以[实施记录](../tasks/20261115-real-use-rectification/execution.md)为准，0.16既有验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)。本文维护部署边界；操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入，修改配置时按[维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)同步受影响状态。
+更新：2026年11月17日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)，稳定客户端已普通安装0.17.0[behavior]，新store-0.17通过staging配置运行；实际维护样本及promotion仍待完成，根AGENTS/instructions/serve入口尚未刷新。共享embedding服务保持0.15.0。memory schema 3隔离验证及切换进度沿[实施记录](../tasks/20261115-real-use-rectification/execution.md)，安装不代表N5或维护已完成；0.16既有验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)。本文维护部署边界；操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入，修改配置时按[维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)同步受影响状态。
 
 ## 位置与责任
 
@@ -15,7 +15,9 @@
 | 运行托管与日志 | 共享模型沿用 Shawl/SCM；项目库可由普通用户手动启动，也可选管理员 SCM；日志分别保存 |
 | 普通作业容量与策略 | HTCondor 独立安装并唯一维护 |
 
-本机共享服务沿R9使用`C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe`与`D:/AgentTools/state/basepack/embedding/logs/`；SurrealDB4.0.0 exe为`D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。2026-11-16本项目稳定客户端`D:/AgentTools/envs/basepack-client-0.10/`已普通安装0.16.0，目录名不表示包版本；共享embedding服务仍为已验收的0.15.0，未重启或更换模型。客户端升级与保全核对见[整改结果](../tasks/20261115-real-use-rectification/result.md)，此前服务实际HTTP、旧索引查询见[交付结果](../archive/20261115-runtime-and-maintenance/result.md)。本项目库为`.basepack/memory/store-0.13`并由原serve.ps1监听18080，旧store只作恢复。原模型/identity/依赖版本和Shawl定义沿用。其它项目共用的`D:/AgentTools/envs/basepack-client/`仍为0.9.1，未代迁其数据库。公共代码通过配置定位，不写死这些本机位置。
+本机共享服务沿R9使用`C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe`与`D:/AgentTools/state/basepack/embedding/logs/`；SurrealDB4.0.0 exe为`D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。2026-11-17本项目稳定Python `D:/AgentTools/envs/basepack-client-0.10/Scripts/python.exe`已普通安装0.17.0[behavior]，目录名不表示包版本；最终wheel的SHA256为`902aaec7f5e426f35636b063fac2939d23fc714a67eadee360cdfd744aea216f`，与site-packages的65个包文件逐字节一致。源码提交为`9d3e479`，此前实施记录提交为`73613d7`，过程见[实施记录](../tasks/20261115-real-use-rectification/execution.md)。共享embedding仍为0.15.0/PID31000，未重启或更换模型，原identity、依赖版本和Shawl定义沿用。
+
+本项目原18080已停写关闭；旧`.basepack/memory/store-0.13`在18174/PID107592仅作只读保全，目标`.basepack/memory/store-0.17`在18176/PID36780运行。当前以`.basepack/staging-0.17.toml`接入，data_dir仍为本项目`.basepack/memory`；先完成首批约100条候选的实际维护再promotion，N5及维护尚未完成。根AGENTS、instructions和serve入口仍待刷新，原入口不代表当前staging端点。其它项目共用的`D:/AgentTools/envs/basepack-client/`及其数据库未代迁；公共代码通过配置定位，不写死这些本机位置。
 
 根 file-structure、agent-team、engineering-judgment 独立维护，resources skill 归 active 实验。memory skill 与英文 coordinator/reader 提示词随包安装，分别通过无需配置的 `memory guide` 和显式配置的 `memory prompt` 使用；提示词渲染不要求数据库、密码文件或模型在线。独立技能选择完整目录复制到项目 `.agents/skills/`，或联接已有项目原件；同名冲突保留并报告，正确入口复用。`init` 与 core doctor 不安装或验收它们；忽略的本机联接在新检出后重建，核宿主实际发现。开发环境、构建缓存和夹具在根 tmp，交付及回滚 wheel 在实验 dist，选留原证在根 artifacts/runs；寿命见 [文档约定](../documentation.md)。
 
