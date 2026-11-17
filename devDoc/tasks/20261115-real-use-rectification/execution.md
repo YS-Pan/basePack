@@ -150,3 +150,14 @@ wheel SHA49e9884a11f7be85c78d3a41f2c9945144497376ce423cf1ecc7d57dcc9c50a9已普�
 按用户实用验收的要求定点检查新修改发现：d93c稿导入父聊天/Git/维护结果却`evidence=[]`，dd9c稿只pin自身capture而导入外部runtime/release结果；文本ID或路径没有构成N0依赖。原父保留dd9c/d93c/d933三份成员稿未发布，后续以实际共读包和精确版本证据修复。0.18.4只补作者指引：跨来源事实须实际纳入并阅读相关accepted member或原件，显式声明evidence；只读prepare不扩大写范围，缺必要scope留有限交接，合法原文chunk仍可空evidence。没有新增语义推断校验、全面审计或数据模型。139项相关检查通过，末次渲染复验通过；root合并通知指引后136项prompt再通过23.04秒。9f候选同样原样留为candidate-2且未安装。
 
 父恢复的第二协调者turn实际65.133秒，只发布e3bc/b97f两份submitted source-only稿，批次`ad1824284cbc406d9fa9179acb18ed93`提交2来源、0成员/图写入；failed的resources/e459部分稿保留。全队实际结束后wave已closed，通知仍如实failed。原生/精确历史回读证实178成员含完整向量完全未变，8原文hash未变，9历史KV的44gap保留，实际J3→3；当前44gap中1不可得+6细化决定持久化，37项仍待后续，不能把coverage文字或成功提交当全范围闭合。验证脚本和结果在本机`tmp/20261117-implementation/wave-gap-repair-3/functional-readback.json`；完整恢复集合在全范围维护结束后另做。
+
+
+### 82来源实际波、冻结校验缺项与有界恢复
+
+0.18.4 run c217d323/wave4a7426ed采用14个有限任务、9名实际Luna/max、同一Terra/ultra。原父核初始化FINAL/idle后seal并各go一次；14任务全submitted，9reader逐个退队，只有最后r8实际followup同一协调者。native证明2个Terra完成turn，5779.855秒中段无已记录response/tool/usage；其余8reader followup为0、无父续派协调者。最后宿主响应未知保持pending，原父在全部实际completed（r0前端notLoaded而末turn/native均completed）及第二Terra结束后核受理为accepted。此处accepted仅指回调，不指知识提交。原生10角色metadata保存在本机tmp/20261117-implementation/full-maintenance-0184/wave1-terminal-native-001/。
+
+定点测试再次发现e3bc/e459把“摘要写明缺结果”当coarse-covered fine；e459还继承旧失败作者的成员权限结论，虽当前paths已授权。两份固定稿被排除，另发现job_related内d933两项同类不可得被误fine，留新作者重判。新job稿对d93c/dd9c已补20/30条prepared evidence，分别有5/9条外源，e96c有10条、其中2条外源；这里只是稿级依赖检查，未称native接受。
+
+其余11稿冻结为1c138e8ae4394007a438309ed55bb329：78来源、281成员、3节点、17边，frozen SHA256 b267a2b992af88fb0cac564f1599c250faee79c9de027b518275da53180a5a5f。apply抛出`Chunk member:ee59821dc08e455e97bc7bd302b7a2a9 text differs from its original range`，位置为公开作业原证分析3–25行。store在实际_publish之前验证，原错误/frozen/intent保留，明确publication-failed/no-commit；原父另查该batch native receipt确为None，未盲重试。通知恢复后close，13份submitted稿全部未发布，owner保留供同run新stage恢复。该失败不撤销先前0.18.3已接受的2来源决定。
+
+离线扫描188chunks，仅job_related的11处显式text不等于固定prepare原文：公开分析、私有属性/README/六份log/manifest。其余177块匹配，范围/prepare无错误。按既有合同省略这些原文块text即可由程序取原文，保留选区、摘要和依赖；原稿字节不能改，须另写新稿。新编译检查从固定prepare而非变动中的原件重建原文，核source revision并复用content.original_text；接受端校验仍保留，不改旧frozen格式/重放。0.18.5同时收窄fine分支：缺事实的实质须已粗层表达，范围包含或写明缺失不足；必要成员纠正沿当前paths执行，不继承旧权限判断。189项相关检查通过11.78秒，普通5版对真实错误稿freeze拒绝且无frozen；69包文件三方相同、pip check通过。后续只刷新实际变动来源、修上述原文与缺口决定，复用有效固定分析；此处不宣称恢复发布、全范围或最终备份已完成。

@@ -54,7 +54,7 @@ batch = compile_proposals(drafts, config=memory.config)
 
 0.17 作者提案使用固定 prepare 合同；切换前结清或明确作废旧作者稿，保留恢复原件，再按新客户端 prepare。已保存 frozen 的恢复沿对应版本的原始合同处理，不手工补造其规则或依赖字段。
 
-apply 核对来源版本，以及本批改写、退役、更正目标、实际依据、父引用和关系端点的 expected 版本，再原子写入；无关 expected 不阻塞，缺 expected 仅允许本批新建记录。chunk 按范围取原词；摘要、依据、更正和旧快照持久保存。旧草稿冲突重新 prepare、阅读后提交。作者完成必要理解、生成批次并由程序成功发布即完成普通批次，不追加独立语义复核、例行回读/检索抽查。失败或结果未明保持未决。
+apply 核对来源版本，以及本批改写、退役、更正目标、实际依据、父引用和关系端点的 expected 版本，再原子写入；无关 expected 不阻塞，缺 expected 仅允许本批新建记录。chunk 按范围取原词，作者通常省略text；显式提供text时，freeze先对固定prepare原文核验行/locator及精确文本，apply保留对冻结输入的核验。摘要、依据、更正和旧快照持久保存。旧草稿冲突重新 prepare、阅读后提交。作者完成必要理解、生成批次并由程序成功发布即完成普通批次，不追加独立语义复核、例行回读/检索抽查。失败或结果未明保持未决。
 
 粗层摘要使用实际已读的精选chunks支持，保留独有事实及已有mandatory。已阅但无新增知识／重复可登记 `sources[].dispositions`；实际已读且有fresh粗层表示覆盖、只是暂不细化时才用 `deferred_refinement`。证据不可取得属于下节的unavailable，不能借细化延期表示该证据已读。字段与定位细则见[批次合同](../src/basepack/memory/SKILL.md#direct-batch-interface)。
 

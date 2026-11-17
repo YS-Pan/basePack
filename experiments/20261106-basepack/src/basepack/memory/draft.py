@@ -224,6 +224,36 @@ def compile_proposals(proposals, *, config=None):
 
     batch = freeze(proposals, config=config)
     batch['prepare_packages'] = package_refs
+    # Explicit chunk text is a literal original, not an author summary. Check
+    # the same exact range/locator used by apply against the pinned prepare.
+    from .content import SourceContent, original_text
+    selected_sources = {source['path']: source for source in batch['sources'] if not source.get('deleted')}
+    prepared_sources = {(source['path'], source['revision']): source
+                        for package in packages for source in package['sources'] if not source.get('deleted')}
+    originals = {}
+    for item in batch.get('members', []):
+        if item.get('kind') != 'chunk' or 'text' not in item:
+            continue
+        path = item['path']
+        selected = selected_sources[path]
+        key = (path, selected['revision'])
+        if key not in originals:
+            source = prepared_sources[key]
+            if source['kind'] != 'text':
+                raise ValueError(f'Chunk requires a text source: {path}')
+            lines = []
+            for number, line in enumerate(source['numbered_text'].splitlines(keepends=True), 1):
+                prefix = f'{number}: '
+                if not line.startswith(prefix):
+                    raise ValueError(f'Invalid numbered original in prepare: {path}')
+                lines.append(line[len(prefix):])
+            raw = ''.join(lines)
+            if sha256(raw.encode('utf-8')).hexdigest() != selected['revision']:
+                raise ValueError(f'Prepared original revision mismatch: {path}')
+            originals[key] = SourceContent(path, selected['revision'], len(raw.encode('utf-8')), 0, raw)
+        raw = original_text(originals[key], item['start_line'], item['end_line'], item.get('locator'))
+        if item['text'] != raw:
+            raise ValueError(f"Chunk {item['id']} text differs from its original range: {path}")
     # Apply checks precisely the writes and dependencies it uses. Keep only that
     # closure and reject unknown external references before the frozen file exists.
     new = {_record(identity) for identity in batch['new_members']}

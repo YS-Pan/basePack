@@ -19,6 +19,64 @@ def prepared(tmp_path, *, expected=None, members=None):
     return {'path': str(path), 'file_sha256': sha256(path.read_bytes()).hexdigest()}
 
 
+def chunk_prepare(tmp_path):
+    ref = prepared(tmp_path)
+    path = tmp_path / 'reading.json'
+    package = json.loads(path.read_text(encoding='utf-8'))
+    source = package['sources'][0]
+    source['revision'] = sha256('αbeta\r\n尾行\n'.encode('utf-8')).hexdigest()
+    source['numbered_text'] = '1: αbeta\r\n2: 尾行\n'
+    path.write_text(json.dumps(package, ensure_ascii=False), encoding='utf-8')
+    ref['file_sha256'] = sha256(path.read_bytes()).hexdigest()
+    return ref
+
+
+def test_explicit_chunk_uses_fixed_prepare_original_exact_lines_and_locator(tmp_path):
+    ref = chunk_prepare(tmp_path)
+    # The live source is different; freeze uses the hash-pinned reading package.
+    (tmp_path / 'a.md').write_text('changed after prepare', encoding='utf-8')
+    chunks = [
+        {'kind': 'chunk', 'path': 'a.md', 'start_line': 1, 'end_line': 2,
+         'text': 'αbeta\r\n尾行\n'},
+        {'kind': 'chunk', 'path': 'a.md', 'start_line': 1, 'end_line': 1,
+         'locator': {'start_col': 1, 'end_col': 4}, 'text': 'bet'},
+        {'kind': 'chunk', 'path': 'a.md', 'start_line': 2, 'end_line': 2},
+        {'kind': 'file', 'path': 'a.md', 'start_line': 1, 'end_line': 2, 'text': 'Author summary'},
+    ]
+    batch = freeze_file([{'prepare': ref, 'sources': ['a.md'], 'members': chunks}], tmp_path / 'frozen.json')
+    assert batch['members'][0]['text'] == 'αbeta\r\n尾行\n'
+    assert batch['members'][1]['text'] == 'bet'
+    assert 'text' not in batch['members'][2]
+    assert batch['members'][3]['text'] == 'Author summary'
+
+
+@pytest.mark.parametrize('chunk', [
+    {'start_line': 1, 'end_line': 2, 'text': 'Author paraphrase'},
+    {'start_line': 1, 'end_line': 1, 'text': 'αbeta\n'},
+    {'start_line': 1, 'end_line': 1, 'locator': {'start_col': 1, 'end_col': 4}, 'text': 'beta'},
+])
+def test_freeze_rejects_nonliteral_chunk_without_writing_batch(tmp_path, chunk):
+    ref = chunk_prepare(tmp_path)
+    proposal = {'prepare': ref, 'sources': ['a.md'],
+                'members': [{'kind': 'chunk', 'path': 'a.md', **chunk}]}
+    output = tmp_path / 'frozen.json'
+    with pytest.raises(ValueError, match='text differs from its original range'):
+        freeze_file([proposal], output)
+    assert not output.exists()
+
+
+def test_freeze_rejects_prepared_original_that_does_not_match_source_revision(tmp_path):
+    ref = chunk_prepare(tmp_path)
+    path = tmp_path / 'reading.json'
+    package = json.loads(path.read_text(encoding='utf-8'))
+    package['sources'][0]['numbered_text'] = '1: changed\n'
+    path.write_text(json.dumps(package, ensure_ascii=False), encoding='utf-8')
+    ref['file_sha256'] = sha256(path.read_bytes()).hexdigest()
+    with pytest.raises(ValueError, match='Prepared original revision mismatch'):
+        compile_proposals([{'prepare': ref, 'sources': ['a.md'], 'members': [
+            {'kind': 'chunk', 'path': 'a.md', 'start_line': 1, 'end_line': 1, 'text': 'changed\n'}]}])
+
+
 def test_compiles_source_versions_scoped_members_and_graph(tmp_path):
     ref = prepared(tmp_path)
     proposals = [{'prepare': ref, 'sources': ['a.md'], 'members': [

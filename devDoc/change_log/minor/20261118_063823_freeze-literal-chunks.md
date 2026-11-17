@@ -1,0 +1,7 @@
+# 冻结前验证原文chunk并明确细化条件
+
+82来源真实维护在整批提交前被一个错误原文chunk阻止。作者已有“原文块省略text”合同，但compiler未校验显式文本，直到apply才发现，导致有效固定稿一起留未发。
+
+0.18.5从固定prepare还原原文并核revision，复用相同行/locator函数，在freeze立即拒绝不匹配的显式chunk；apply仍验证不受信任frozen，缺省text、摘要、图和历史pin格式不变。fine指引要求覆盖缺失实质，区分审批缺结果与细化，并以当前paths授权纠正，不沿用旧失败权限结论。
+
+189项proposals/wave integration/waves/prompts检查通过；普通安装的真实旧错误稿freeze被拒且未生成frozen。69包文件源码/wheel/site一致、pip check通过；wheel SHA256 46c98b794f9ae3a0dc9ea4a7e57163b54c7ba3ceb65101cf0c546a9a3e1d6470。旧完整memory首轮的8项初始化HTTP超时及补验口径不变，不宣称全套新跑green。失败波无native receipt、13稿固定保留；实际恢复接受、训练和最终恢复仍继续，详见所属任务进度/执行记录。
