@@ -1,6 +1,6 @@
 # 项目记忆实现
 
-本页描述0.18.0源码：SurrealDB原证与知识图、独立采集、prepare提案编译、单owner发布、严格交付事实及Gaussian行为访问投影。2026-11-18核对，稳定客户端已普通安装0.18.0[behavior]，纯文件宿主probe已closed并由父核通知恢复；真实8条小批仅新鲜预检，作者发布仍待验；已推广至正式18080/store-0.17；首批100候选实际维护已完成，后续全项目维护尚未完成，实际部署与维护边界见[部署合同](../deployment.md)和[实施记录](../../tasks/20261115-real-use-rectification/execution.md)。0.16既有验收见[整改结果](../../tasks/20261115-real-use-rectification/result.md)，历史实现见[记忆专项进度](../../tasks/20261106-memory-system/progress.md)。首建和维护由宿主订阅agent阅读生成，程序提交成功即完成普通批次，默认无额外审计。用户流程见[记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
+本页描述0.18系列记忆实现：SurrealDB原证与知识图、独立采集、prepare提案编译、单owner发布、有限wave、严格交付事实及Gaussian行为访问投影。实际安装版本、wheel及验收状态以[部署合同](../deployment.md)为唯一维护源，维护范围与余项沿[进度](../../tasks/20261115-real-use-rectification/progress.md)。0.16既有验收见[整改结果](../../tasks/20261115-real-use-rectification/result.md)，历史实现见[记忆专项进度](../../tasks/20261106-memory-system/progress.md)。首建和维护由宿主订阅agent阅读生成，程序提交成功即完成普通批次，默认无额外审计。用户流程见[记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
 
 ## 职责与数据
 

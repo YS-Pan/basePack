@@ -158,7 +158,7 @@ Codex 宿主按项目归属默认接入可取得的聊天，不要求逐 thread 
 
 ### 升级到 0.18：有限任务池
 
-0.18已普通安装，维护采用有限本地任务池和两段式Terra，memory schema、行为算法、项目UUID及原证版本合同保持。本机纯文件宿主probe已关闭，父任务依据实际宿主证据补记通知结果并释放owner；真实8条小批仅新鲜预检，作者发布与完整维护仍待验。升级旧组织时，先固定原轮的接受／未发稿、剩余范围和发布终态，结束旧worker后由原父正确stop/release；0.18拒绝旧组织receipt／stage，不把新协议套给旧worker或用安装解除旧owner。
+0.18系列维护采用有限本地任务池和两段式Terra，memory schema、行为算法、项目UUID及原证版本合同保持。实际安装与验收状态见[部署合同](../../../devDoc/system/deployment.md)，接受范围与余项见[进度](../../../devDoc/tasks/20261115-real-use-rectification/progress.md)。升级旧组织时，先固定原轮的接受／未发稿、剩余范围和发布终态，结束旧worker后由原父正确stop/release；0.18拒绝旧组织receipt／stage，不把新协议套给旧worker或用安装解除旧owner。
 
 安装后运行 `memory init` 刷新托管入口，核包版本、实际导入路径及宿主能力：父任务能确认Terra当前turn已结束而身份空闲，能封口后只发一次go，并核早到go留邮箱／晚到go唤醒事件等待，最后Luna能实际followup同一非根Terra，并将待通知与宿主受理结果分开保留。容量必须留下Terra恢复名额。最小实际宿主闭环通过后再维护真实材料；普通安装或队列状态成功不能代替该验收。流程见[有限任务池](memory.md#有限任务池与两段式-terra)，当前授权设计见[维护合同](../../../devDoc/tasks/20261115-real-use-rectification/maintenance-waves.md)。
 

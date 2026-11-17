@@ -1,6 +1,6 @@
 # 系统结构与边界
 
-当前唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)。本页描述0.18.0源码；2026-11-18核对，稳定客户端已普通安装0.18.0[behavior]，纯文件宿主probe已closed并由父核通知恢复；真实8条小批仅新鲜预检，作者发布仍待验；新库store-0.17已推广至正式18080，实际部署与维护边界见[部署说明](deployment.md)和[实施记录](../tasks/20261115-real-use-rectification/execution.md)。0.16既有验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)和[维护实测](../tasks/20261115-real-use-rectification/maintenance-20261116-result.md)。[逻辑图](diagrams.md)标明各图版本；设计依据与尚待真实使用验证的目标见[目标架构](../tasks/20261115-real-use-rectification/target-architecture.md)。
+当前唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)。本页描述0.18系列结构与边界；实际安装版本、wheel及验收状态以[部署说明](deployment.md)为唯一维护源，维护范围与余项沿[进度](../tasks/20261115-real-use-rectification/progress.md)。0.16既有验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)和[维护实测](../tasks/20261115-real-use-rectification/maintenance-20261116-result.md)。[逻辑图](diagrams.md)标明各图版本；技术合同及尚待验证的目标见[目标架构](../tasks/20261115-real-use-rectification/target-architecture.md)。
 
 ## 当前组成
 

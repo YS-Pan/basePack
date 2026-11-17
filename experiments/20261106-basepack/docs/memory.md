@@ -89,7 +89,7 @@ memory maintain --mode automatic --holder '<本thread身份>' --control '<memory
 
 ### 有限任务池与两段式 Terra
 
-本节描述已普通安装的0.18。纯文件宿主probe已实际关闭，父任务按已核宿主事实完成通知恢复、owner=null；真实8条小批已新鲜预检，尚未作者发布，不代表完整维护通过。旧组织仍须按原固定回执收口，不能把任务池协议套给旧worker。详细设计维护源为[有限任务池合同](../../../devDoc/tasks/20261115-real-use-rectification/maintenance-waves.md)；安装后以 `memory guide` 返回的随包流程和CLI生成的命令、prompt与身份执行。新入口为 `memory wave`：create不传wave-id并返回该标识，其余动作均显式传 `--control <同一control> --run-id <owner run_id> --wave-id <wave_id>`。各动作字段以 `memory wave <action> --help` 为准，reader直接执行生成prompt中的命令。
+本节描述0.18系列的有限任务池维护。实际安装与验收状态见[部署合同](../../../devDoc/system/deployment.md)，接受范围与余项见[进度](../../../devDoc/tasks/20261115-real-use-rectification/progress.md)。旧组织仍须按原固定回执收口，不能把任务池协议套给旧worker。详细设计维护源为[有限任务池合同](../../../devDoc/tasks/20261115-real-use-rectification/maintenance-waves.md)；安装后以 `memory guide` 返回的随包流程和CLI生成的命令、prompt与身份执行。新入口为 `memory wave`：create不传wave-id并返回该标识，其余动作均显式传 `--control <同一control> --run-id <owner run_id> --wave-id <wave_id>`。各动作字段以 `memory wave <action> --help` 为准，reader直接执行生成prompt中的命令。
 
 1. `acquired=false` 时报告已有owner并继续业务；显式维护报告该阻塞。`acquired=true` 后保留原receipt/control和父任务stop权限。只有 `needs_semantic=true` 才按返回名称、模型和推理强度实际创建Terra；初始化成功仅表示准备了一波工作。
 2. Terra第一turn规划有限、可独立阅读写稿的语义任务，将每项的 `id/goal/paths/write_targets/outputs` 写入tasks JSON数组，用 `memory wave create --receipt <固定receipt> --control <control> --run-id <owner run_id> --tasks <tasks.json> --coordinator <实际非根Terra规范路径> --readers <N>` 建波；长组先发，工作量差异明显的任务分组。依赖前一波新发布知识的任务留下一波。N必须在1至min(任务数,固定reader上限)内，由规划者按工作量选择较小固定池，供多轮领取，不以容量满编为目标。程序预登记worker，保留Terra第二turn恢复名额；余量不再默认补无reader协调者。
