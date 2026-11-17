@@ -1,6 +1,6 @@
-# 新行为架构迁移演练
+# 新行为架构迁移与推广
 
-2026-11-17。正式停写备份与新库隔离接入已完成；**18080正式入口尚未恢复**，首批真实维护及推广尚待验收。预备演练导出发生在生产库仍可写期间，正式迁移另用停写后的新鲜导出。
+2026-11-17。正式停写备份、数据迁移、首批真实维护和18080入口推广已完成；全项目授权维护及其最终恢复点仍待完成。预备演练导出发生在生产库仍可写期间，正式迁移另用停写后的新鲜导出。
 
 ## 数据合同
 
@@ -13,11 +13,11 @@
 ## 正式恢复和切换门
 
 1. 等待新版本集成门通过。停止自有维护和所有写入、确认无在途发布；保存旧客户端wheel及执行环境、项目配置和凭据、launcher、托管入口、原生新鲜导出、必要原件/图片/assets及回执；切换后恢复集合还须包含`memory_dir/behavior/`模型工件及对应数据库投影。保留整个旧物理库。恢复集合和哈希清单放项目既有`.basepack/memory/backups/`，按私有资料管理。
-2. 用同一份新鲜export依次导入两个不同的隔离物理store，源库保持只读；原生重新导出源库并对SHA-256与输入逐字节比较。端点必须与配置中的生产端点不同，源、目标端点也不同。
+2. 源库停写并保持只读，保存新鲜原生export；将其导入不同的隔离物理目标，再原生重导出目标并对SHA-256与输入逐字节比较。端点必须与配置中的生产端点不同，源、目标端点也不同。
 3. 使用保存的旧0.16客户端运行一次性数据桥（下例为演练端口；配置及数据路径按实际替换）：
 
 ```powershell
-$oldPython = 'D:/AgentTools/envs/basepack-client-0.10/Scripts/python.exe'
+$oldPython = '<保留的0.16客户端Python绝对路径>'
 $bridge = 'experiments/20261106-basepack/src/basepack/memory/migration.py'
 & $oldPython -X utf8 $bridge migrate '.basepack/config.toml' 'http://127.0.0.1:18171' 'http://127.0.0.1:18172'
 if ($LASTEXITCODE -ne 0) { throw 'migration failed; leave target closed' }
@@ -31,10 +31,22 @@ finalize先比较数据库定义、各表索引及事件、所有旧记录和明
 
 ## 正式停写与隔离接入
 
-正式停写前核唯一18080进程的工作目录、参数与`store-0.13`绝对路径，owner为null。停止进程后，首个端口检查仍瞬间显示监听而按保护中止；后续独立核实原PID退出、18080无监听、旧库锁已释放，再把原库以18174启动。保留首次错误与回执；未重复停止。18080继续关闭，旧store不删除。
+正式停写前核唯一18080进程的工作目录、参数与`store-0.13`绝对路径，owner为null。停止进程后，首个端口检查仍瞬间显示监听而按保护中止；后续独立核实原PID退出、18080无监听、旧库锁已释放，再把原库以18174启动。保留首次错误与回执；未重复停止。该阶段18080保持关闭，旧store不删除。
 
 冻结源实际event=24、delivery=24、feedback=9。恢复集合位于本机`.basepack/memory/backups/architecture-0.17.0-20261117/`：原生导出、旧0.16 wheel、配置和凭据、入口、assets、受管聊天、维护材料及回执共2702文件、951,738,769字节，有逐文件SHA-256清单。源导出SHA-256为`67d138a62c3897d044fb3bff34156ff5f477acda594ee6a6771e39c668ef45aa`。新`store-0.17`在18176原生导入并重导出，字节哈希与源完全一致；旧客户端执行数据桥与finalize，十一表、全部记录及原有schema/索引/事件逐项等价，保留139条旧访问状态、24交付及9反馈，并显式写schema marker 3。原生数据、回执和清单均按私有边界保管。
 
-稳定客户端已普通安装0.17.0及behavior依赖，模型训练使用NumPy 2.5.5、SciPy 1.18.1、scikit-learn 1.9.1。隔离staging配置为本机`.basepack/staging-0.17.toml`，绑定18176并沿用本项目memory目录及assets；它不刷新根托管入口。新模型编译J=0、C=24、23个共用篮，139个旧精确版本实际命中数与重放投影一致。真实共享embedding查询返回5项，8005/8005旧向量兼容；brief保留3条mandatory，文本和图片read、history和neighbors只读通过。没有向正式staging写合成交付。详见私有`handoff-verified.json`及`staging-read-verification.json`。
+当时稳定客户端普通安装0.17.0及behavior依赖，模型训练使用NumPy 2.5.5、SciPy 1.18.1、scikit-learn 1.9.1。当时隔离staging配置为本机`.basepack/staging-0.17.toml`，绑定18176并沿用本项目memory目录及assets；该阶段未刷新根托管入口。新模型编译J=0、C=24、23个共用篮，139个旧精确版本实际命中数与重放投影一致。真实共享embedding查询返回5项，8005/8005旧向量兼容；brief保留3条mandatory，文本和图片read、history和neighbors只读通过。没有向正式staging写合成交付。详见私有`handoff-verified.json`及`staging-read-verification.json`。
 
-用户要求先以约100候选真实维护测试，再按发现的问题修复与小批复验；这阶段在18176进行，记录实际处置、发布回执、J及模型/投影游标，不逐批全库导出。推广前等待单独执行信号，确认owner/publisher终态并保存必要数据，再关闭隔离服务、核端口及锁，更新本项目launcher/config/托管入口指向新库并核实际功能；旧库和旧wheel继续保留。全部维护完成后保留最终恢复点。
+用户要求先以约100候选真实维护测试，再按发现的问题修复与小批复验。该阶段在18176执行，记录实际处置、发布回执、J及模型/投影游标，不逐批全库导出。旧库和旧wheel继续保留；全部维护完成后保留最终恢复点。
+
+## 真实维护后推广
+
+首轮测试发现历史pin编译误判，修复后在0.17.1复验；第二轮54个来源范围均已接受，29个publication均达终态，未处理范围外来源。主任务停止并释放owner后，最终0.17.2 wheel经普通安装，SHA-256为`60af6c2504d85132c4c90b66f651841a532087c015482bdb6a7529362f964c47`。此范围通过不代表全项目维护已完成；业务处置细节和后续范围以任务进度为准。
+
+推广前按PID、工作目录和参数确认新`store-0.17`在18176、旧`store-0.13`在18174，owner=null且端口无已建立连接；停止两个已核进程，等端口关闭并核两个锁释放。保留旧物理库，更新launcher并以隐藏进程在18080启动同一新库。启动和ready检查分开：launcher PID 48740，数据库 PID 115116；独立检查证实后者绑定18080并打开`store-0.17`。
+
+切换前、启动后、普通`memory init`后及原staging配置重指18080后，精确delivery集合摘要、知识版本数10607、来源数1626、J=compiled J=2、C=26、模型`3c69a1307fa077bfb0860ff26277bb78daec95c92afa2aa699fc673d3e64791f`均一致。26次delivery包括24次旧事实及两次推广前实际新交付；未补造测试交付或重训。保留中的`.basepack/staging-0.17.toml`只改唯一endpoint字节，其余字节不变；原文件备份于任务临时目录。根AGENTS托管块外字节未变，普通init刷新受管入口，项目instructions块外仅修正客户端版本、当前store和迁移前恢复集合位置；runtime记录实际launcher PID。
+
+独立只读验收：owner=null，brief含3条mandatory，共享embedding查询返回5项，8250/8250内容向量兼容；文本和图片read、历史回读及实际图边neighbors通过。旧18174和临时18176端口关闭；旧库保留但不运行，共享embedding设施未变。临时检查记录位于`tmp/20261117-implementation/migration/`。
+
+最终完整恢复点待全部授权维护完成后制作一次，须包括届时原生数据库、匹配wheel及配置/凭据、launcher、原件/图片/assets、受管快照和回执、对应behavior模型工件，以及独立private Git和需保留的忽略原件。`private/README.md`所列同盘bundle在推广准备时包含private HEAD；另有13个忽略文件共3,706,415字节，均在private/tmp，可在最终恢复点一并保全。同盘副本不提供设备故障保护。
