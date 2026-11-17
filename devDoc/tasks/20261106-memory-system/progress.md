@@ -1,5 +1,7 @@
 # 记忆系统进度
 
+2026-11-17连续遗忘补研后，[长期计划](../20261115-real-use-rectification/plan.md)与[目标架构](../20261115-real-use-rectification/target-architecture.md)已将旧稀疏门控/局部钟替换为纯行为表示＋连续相似度机会年龄，明确正ε、unknown区间和单状态跨用途边界。研究、实际检查及原文获取缺口沿该任务[进度](../20261115-real-use-rectification/progress.md)唯一维护；当前0.16运行行为不变。以下旧记录保留各自时点。
+
 2026-11-17用户要求按长期普适/简洁/易维护选型，下一阶段已统一为[长期整改计划](../20261115-real-use-rectification/plan.md)与[目标架构](../20261115-real-use-rectification/target-architecture.md)，实施状态只在该任务[进度](../20261115-real-use-rectification/progress.md)维护。已完成计划与前后总体逻辑图，尚未实现N0—N5；当前客户端仍0.16，不把旧已交付批次重新排为待办。
 
 2026-11-16 [0.16整改已实现、安装本项目并公开发行](../20261115-real-use-rectification/result.md)：同事务大源分消息、M2跳新采集／启动清理、C1固定交稿及有界协作、C2同receipt／owner／control实际干净接续、S2分类与规则版本均已验证。真实两阶段精确回读／查询与父stop成立，正式库11表／mandatory／UUID／配置不变，最终owner=null；SQLite14默认采集问题、聊天freshness及token收益不计作已解决。外部项目不在本轮接入范围；GitHub main／标签已推送，Release公开附件与Latest已核。
