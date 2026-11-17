@@ -134,3 +134,9 @@ wheel SHA49e9884a11f7be85c78d3a41f2c9945144497376ce423cf1ecc7d57dcc9c50a9已普�
 新增2项legacy隐私回归首次都在fixture install_schema HTTP30秒timeout，测试体未执行，真实portable旧稿1项通过。独立核自有测试服务发现Surreal后台node registration反复Transaction write conflict及60秒timeout；health仍200，无残留pytest或已建立连接。只证明隔离服务异常，不证明根因或产品失败；保留全部原证后核身份停止旧48040/74424，不复用其store。全新attempt4/18194的86520/96416经下一次工具独立核PID/exe/cwd/参数/store/监听及health，再运行新增2例及旧portable，3 passed/23.86秒。未改产品超时或盲重试，正式库与共享设施未动。
 
 0.18.3已默认sdist→wheel普通构建安装，SHA256 `21ebcb39bb3cf1fd366431075a56951ab080d08997f6d48c173686a0b38a9cbf`；69文件集/字节source=wheel=site-packages、pip check通过。独立全memory在新attempt4串行运行；生产新鲜81cb6715同8来源预检取得自有owner，真实作者小批重新启动，后续全范围/真实行为训练/完整恢复继续。修复前两次停止波的原件及未发稿均保留，未伪造发布或task终态。
+
+最终全memory首轮实际为666 passed、6 skipped、8 setup errors，2646.34秒，0 assertion failures；新unavailable组25/25通过。8个错误均在fixture install_schema的HTTP30秒超时（5个namespace/db/meta初始化、3个BEGIN+schema），业务body未执行。原实例只读INFO当时该NS含194DB，计数不是原因证明；官方4.0源码显示heartbeat失败后继续调度，日志“60s”标签不等于实际阻塞60秒，health200不核DDL，当前没有证据将后台警告与setup超时连成因果。保留首轮全部log/XML及逐case原trace后，核停原实例、以fresh attempt5/18195同源码/默认timeout仅补验8个精确case，8 passed/54.06秒。首轮仍非green，根因未修；666与8分别报告，不合并伪称一次全过。所有自有测试native/launcher已独立核停，18193/94/95无监听，正式库/共享设施未动。本机整合原证在`tmp/wave-tests/integration-0183-result.md`及同名JSON。
+
+真实小批的首个e3bc来源已提交source-only unavailable，保留原gap和成员；针对性核其理由，明确区分原capture截断字节与后来查到的Git/维护结果。该样本只核新合同，不增加整波逐稿语义复审。related_resources则发现TTS成员三条“终态未知”可由六份本项目原生日志补证；原8来源scope不能新增这些来源，作者正确failed留续，R9的13条valid unavailable草稿随回执保留但尚未发布。当前关系已明确共享历史背景和授权边界，作者判断不需应用旧未发关系稿，所有历史endpoint pin保持。
+
+为后续正常修复波新增[六个历史作业终态核验](research/job-terminals-20261118.md)：直接核6份events.log的字节/SHA及终态行，仅确认退出码/aborted，保留cleanup和原capture缺口未知，未操作旧作业。完整9595字节原件副本、原路径映射和manifest放独立private Git，提交`0605a2e0fec2abea0b2cbb827dccb79e2c08abf8`；6份.log按binary存档，Git暂存字节与原件逐一相同。公开分析只含可公开事实，无本机标识或完整日志；原件可选，public保持自足。新证据接受、TTS成员修正、其新KV的缺口重判及其余全项目范围仍待后续波，不将源外原件直接塞进当前任务或把可恢复内容统一标成不可得。

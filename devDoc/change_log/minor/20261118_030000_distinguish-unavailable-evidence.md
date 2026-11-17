@@ -9,3 +9,5 @@
 新增23项原生数据库行为回归、现有143项prompt/proposal及7项定向检查通过；普通旧0.18.1生成并接受的两份真实frozen在新metadata之后重放，hash/receipt及新记录均保留。完整回归、实际安装及真实同批复验沿[执行记录](../../tasks/20261115-real-use-rectification/execution.md)和[部署合同](../../system/deployment.md)继续记录，不能以这些程序检查代替真实维护完成。
 
 0.18.3最终新增两项legacy隐私case与真实旧portable重放合计3项通过；69文件source/wheel/site-packages字节一致、pip check通过，已普通安装。真实同批与新鲜隔离全memory继续，早先隔离服务注册冲突的两个fixture timeout保留原证，不宣称已根因修复。前后整系统图亦完成状态标注与PNG/PDF视觉复核，共同画布XML相同；当前进度从链接读取。
+
+最终完整memory首轮666通过/6跳过/8项初始化HTTP超时，新增字段25/25通过、无断言失败；同参数fresh限定8项补验全过54.06秒。首轮非green，根因未修，所有自有测试服务已核停。真实样本另查实3条旧作业终态可补证，新增公开自足分析和独立private原件存档，尚待后波接受修正；具体边界见执行记录。
