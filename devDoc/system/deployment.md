@@ -19,6 +19,8 @@
 
 0.18.0真实小批已发布2来源／7成员，主任务逐项原文、版本、history及embedding metadata回读通过；8来源、9成员仍有44个未匹配gap。0.18.1新鲜同材料预检已实证8来源重进semantic；执行发现缺失原文和未知结果不能等同细化暂缓，该波由父stop且所有角色实际终态、无发布，固定稿/原错保留。0.18.2将不可得条件独立持久化，原coverage_gaps保持可见；同材料修复复验及随后全范围仍须完成，不能据旧170/178作者计数声明闭合。0.18.1旧wheel SHA256为`cf8f36029941925d0fa22328810bf5c8d96196ebf18f08243c189d90cd2a7047`，提示词修订和136项检查保留为过程证据。
 
+0.18.4候选已准备，仅澄清wave-task中来源/成员paths与共享图write_targets的职责；69包文件相对0.18.3只有该MD变化，全部Python及schema字节相同。136项prompt检查、source/wheel文件集及字节核对通过，候选SHA256 `ae165f0231b2405ab1c636fb490821fbde3bf3a3b5959541e841e711a114de9d`。当前仍安装0.18.3供在途波完整收口；确认宿主/发布终态后再切换，不据候选构建宣布已安装或真实成员修正已完成。
+
 此前0.18.0 wheel SHA256为`9ec178d95bfde63550f1696431866efb22cd7c4f9c7d49d2ac7abe70ae19117d`，源码提交a710e335；当时69文件三方字节一致、pip check与wave create help通过。全memory程序检查649 passed、6 skipped（1483.62秒），最后定向259 passed（8.91秒）；跳过2项原生导出及4项未启用共享模型专项，不据此宣称GPU专项重跑。纯文件宿主probe在该版已closed，由父按宿主事实完成通知恢复、owner=null；这是该轮结束截点，不能代替后续真实维护。
 
 此前0.17.4 wheel的SHA256为`49e9884a11f7be85c78d3a41f2c9945144497376ce423cf1ecc7d57dcc9c50a9`，当时66个包文件逐字节一致、pip check通过。0.17.2同步等待、固定稿、范围和dispositions提示词合同；0.17.3新增共享prepare输出读取合同，139项相关测试及49项安装/渲染检查通过，实际读取效果沿后续阶段观察。0.17.4因实际reader误派新增完整spawn_arguments，最终139相关测试及142安装/渲染静态检查通过；后续干净小批4reader的requested与actual均为Luna/max，4批发布完成9来源，uv.lock部分留续；该样本不保证所有未来host调用。0.17.1修复历史pin闭包，其wheel SHA256为`cd9c12b9b590c8b95f95eada65319b56e4344e9a84db0b96fbdc9142bb80d4bb`，当时65文件逐字节一致、pip check及原失败语义稿freeze通过。0.17.0首次wheel SHA256为`902aaec7f5e426f35636b063fac2939d23fc714a67eadee360cdfd744aea216f`，源码提交`9d3e479`及此前记录提交`73613d7`保留为历史样本。实际修复与维护进展见[实施记录](../tasks/20261115-real-use-rectification/execution.md)，推广事实见[迁移结果](../tasks/20261115-real-use-rectification/migration-result.md)。共享embedding仍为0.15.0/PID31000，未重启或更换模型，原identity、依赖版本和Shawl定义沿用。

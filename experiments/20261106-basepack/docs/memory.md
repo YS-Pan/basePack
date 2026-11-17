@@ -110,7 +110,7 @@ memory maintain --mode automatic --holder '<本thread身份>' --control '<memory
 
 已确认publisher终态、无提交且owner.publications为空时，原父任务可用 `memory wave publication-failed --error <原错> --publisher-ended --no-commit` 固定错误并终止旧intent，未发稿保留给有限修复波。未知提交仍保留原intent与owner，不能标失败或重发；先沿原固定frozen及数据库回执核结果。
 
-任务的 `paths` 仅列当前stage的remaining.paths内拟处置来源；无stage时限原receipt的 `workset.included`，包含本轮已授权纳入的stable来源。可选 `read_paths` 只为额外共读，prepare可读两者，但draft.sources与member.path必须属于paths。图／feedback-only任务可用 `paths=[]`，必要时先检索；新发现来源不自动纳入本波接受；后续wave仍须满足当时的固定授权范围。
+任务的 `paths` 仅列当前stage的remaining.paths内拟处置来源；无stage时限原receipt的 `workset.included`，包含本轮已授权纳入的stable来源。它授权这些来源及其成员的必要修改；`write_targets` 协调共享节点／关系的写归属，空列表不让已授权路径的成员变成只读。可选 `read_paths` 只为额外共读，prepare可读两者，但draft.sources与member.path必须属于paths。图／feedback-only任务可用 `paths=[]`，必要时先检索；新发现来源不自动纳入本波接受；后续wave仍须满足当时的固定授权范围。
 
 回执固定来源候选及采集观察，prepare固定实际阅读版本；冲突由作者重新prepare并正常修稿。共享节点／关系各有一个写owner，程序不代替语义判断。已接受后新改的原件不自动重开旧任务，回执外来源和后续未接受成果保留原件入口与有限后续范围。普通成功不追加例行全文审计，也不以一波结束宣布全授权范围完成。
 

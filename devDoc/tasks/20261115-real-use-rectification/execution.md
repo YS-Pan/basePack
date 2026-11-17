@@ -140,3 +140,5 @@ wheel SHA49e9884a11f7be85c78d3a41f2c9945144497376ce423cf1ecc7d57dcc9c50a9已普�
 真实小批的首个e3bc来源已提交source-only unavailable，保留原gap和成员；针对性核其理由，明确区分原capture截断字节与后来查到的Git/维护结果。该样本只核新合同，不增加整波逐稿语义复审。related_resources则发现TTS成员三条“终态未知”可由六份本项目原生日志补证；原8来源scope不能新增这些来源，作者正确failed留续，R9的13条valid unavailable草稿随回执保留但尚未发布。当前关系已明确共享历史背景和授权边界，作者判断不需应用旧未发关系稿，所有历史endpoint pin保持。
 
 为后续正常修复波新增[六个历史作业终态核验](research/job-terminals-20261118.md)：直接核6份events.log的字节/SHA及终态行，仅确认退出码/aborted，保留cleanup和原capture缺口未知，未操作旧作业。完整9595字节原件副本、原路径映射和manifest放独立private Git，提交`0605a2e0fec2abea0b2cbb827dccb79e2c08abf8`；6份.log按binary存档，Git暂存字节与原件逐一相同。公开分析只含可公开事实，无本机标识或完整日志；原件可选，public保持自足。新证据接受、TTS成员修正、其新KV的缺口重判及其余全项目范围仍待后续波，不将源外原件直接塞进当前任务或把可恢复内容统一标成不可得。
+
+继续实用验收发现e459任务因“没有write_targets”将已发现的file/tail成员纠正留后波。现有程序按paths校验source与member，write_targets协调共享图归属；但wave-task又写“own only its stated write targets”，与前文路径授权矛盾。原父对两位仍运行作者各发一次有界澄清，明确不重开已固定的failed/submitted任务，不扩大来源范围；成员有依据的纠正可在本路径执行，其新KV缺口重判仍须等接受后。0.18.4源码因此只修该角色措辞及版本/说明，后端、schema、Gaussian、scope guard和旧frozen不变；136项prompt检查通过。为保持本波安装上下文，当前仍运行0.18.3，候选包准备后等本波宿主/发布终态再安装，不在途替换客户端。这两条父干预应在实际用量复验中单列。
