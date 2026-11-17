@@ -144,3 +144,9 @@ wheel SHA49e9884a11f7be85c78d3a41f2c9945144497376ce423cf1ecc7d57dcc9c50a9已普�
 继续实用验收发现e459任务因“没有write_targets”将已发现的file/tail成员纠正留后波。现有程序按paths校验source与member，write_targets协调共享图归属；但wave-task又写“own only its stated write targets”，与前文路径授权矛盾。原父对两位仍运行作者各发一次有界澄清，明确不重开已固定的failed/submitted任务，不扩大来源范围；成员有依据的纠正可在本路径执行，其新KV缺口重判仍须等接受后。0.18.4源码因此只修该角色措辞及版本/说明，后端、schema、Gaussian、scope guard和旧frozen不变；136项prompt检查通过。为保持本波安装上下文，当前仍运行0.18.3，候选包准备后等本波宿主/发布终态再安装，不在途替换客户端。这两条父干预应在实际用量复验中单列。
 
 对当前单个资源writer的定点观察还发现，一次job文件检查输出36,858字符并带入嵌套spec等记录。不能把整个输出都算冗余，但prepare-only白名单没有覆盖该表面。0.18.4最终指引因此把字段选择扩展到本地证据元数据，必要原始输出另读；不可得理由绑定实际核过的来源/直接引用，不声称全局不存在，也不把每个gap扩成所有不变父历史的审计。版本仍逐条判断，确有直接原证可补的内容继续正常纠正/留续，未自动批量背书。136项prompt检查再通过3.04秒；最终候选9f133ea1与源码同69文件、相对0.18.3仅两份MD变化，全部Python/schema相同。初候选AE字节/核对记录原样保留且未安装，当前波仍用原3客户端。
+
+81cb6715真实波最后reader的claim实际返回`retired=true`、自身`notification.worker`及`status=eligible`，但它直接FINAL，未登记pending或followup；两reader均实际completed/idle，协调者仍只有初始化turn。原父按宿主终态将未尝试通知记为failed，再唯一followup同一协调者恢复发布，没有按年龄抢占或伪造accepted。0.18.4的worker指引因此改为先精确判断自己的通知资格，完成通知分支后才结束；这是agent漏执行的指引收敛，不能宣称程序已硬性保证宿主调用。末次返回及FINAL转录证据位于本机`tmp/20261117-implementation/wave-44c19d-last-claim-evidence.json`，明确不是原生日志字节导出。
+
+按用户实用验收的要求定点检查新修改发现：d93c稿导入父聊天/Git/维护结果却`evidence=[]`，dd9c稿只pin自身capture而导入外部runtime/release结果；文本ID或路径没有构成N0依赖。原父保留dd9c/d93c/d933三份成员稿未发布，后续以实际共读包和精确版本证据修复。0.18.4只补作者指引：跨来源事实须实际纳入并阅读相关accepted member或原件，显式声明evidence；只读prepare不扩大写范围，缺必要scope留有限交接，合法原文chunk仍可空evidence。没有新增语义推断校验、全面审计或数据模型。139项相关检查通过，末次渲染复验通过；root合并通知指引后136项prompt再通过23.04秒。9f候选同样原样留为candidate-2且未安装。
+
+父恢复的第二协调者turn实际65.133秒，只发布e3bc/b97f两份submitted source-only稿，批次`ad1824284cbc406d9fa9179acb18ed93`提交2来源、0成员/图写入；failed的resources/e459部分稿保留。全队实际结束后wave已closed，通知仍如实failed。原生/精确历史回读证实178成员含完整向量完全未变，8原文hash未变，9历史KV的44gap保留，实际J3→3；当前44gap中1不可得+6细化决定持久化，37项仍待后续，不能把coverage文字或成功提交当全范围闭合。验证脚本和结果在本机`tmp/20261117-implementation/wave-gap-repair-3/functional-readback.json`；完整恢复集合在全范围维护结束后另做。
