@@ -1,6 +1,6 @@
 # 系统结构与边界
 
-当前唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)，源码与本项目客户端为0.16.0，共享embedding服务保持0.15.0；已部署能力及公开发行见[整改结果](../tasks/20261115-real-use-rectification/result.md)，维护观察见[本项目实测](../tasks/20261115-real-use-rectification/maintenance-20261116-result.md)。配置和安装合同见[部署说明](deployment.md)，资源基线见[R9结果](../archive/20261107-resource-coordination/r9-result.md)。本页只述已实现行为，[当前图](diagrams.md)与[未来目标架构](../tasks/20261115-real-use-rectification/target-architecture.md)分开维护。
+当前唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)。本页描述2026-11-17的0.17.0源码；本项目实际客户端仍为0.16.0、共享embedding服务为0.15.0，安装和数据库切换见[部署说明](deployment.md)与[实施记录](../tasks/20261115-real-use-rectification/execution.md)。0.16验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)和[维护实测](../tasks/20261115-real-use-rectification/maintenance-20261116-result.md)。[逻辑图](diagrams.md)标明各图版本；设计依据与尚待真实使用验证的目标见[目标架构](../tasks/20261115-real-use-rectification/target-architecture.md)。
 
 ## 当前组成
 
@@ -42,18 +42,19 @@ artifacts/runs/                    选留运行和迁移原证，Git 忽略
 - 产品代码、模板和资源 skill 各有一个维护源。运行代码通过普通 wheel 安装；业务项目只保存自己的接入配置、数据和产物。
 - 项目显式指定 schema 2 接入配置，绑定运行 Python 和 schema 1 机器配置。project.root 相对项目配置，受管理数据进入该业务项目 `.basepack/`；机器相对路径以机器配置为基准。ProjectConfig 只解析公共绑定，各功能按需读取自身节；memory guide/rank在项目解析前处理自身输入；owner/stop/release/recover-owner需配置定位状态但不读凭据或连库。
 - 项目 `[ai]` 配置维护 tier1 至 tier4 的模型和推理强度及用途默认值；`config ai` 输出所选配置，宿主负责把 model 和 reasoning_effort 传入派工接口，程序不调用模型。
-- `init` 从安装包模板生成配置和详细 instructions，根AGENTS合并关键动作及详情链接；memory init绑定原UUID并刷新AGENTS和本机入口，保留托管块外字节。旧格式先经保留的 0.4.0 迁移，当前版本直接读取 schema 2。
+- `init`从安装包模板生成配置和详细instructions，根AGENTS合并关键动作及详情链接；memory init绑定原UUID并刷新AGENTS和本机入口，保留托管块外字节。新库设置memory_schema_version=3，已绑定且缺失或不符的库须离线迁移，普通init明确拒绝；迁移finalize核等价后显式交接标记，新版init保留既有J。项目配置仍读schema 2；更旧配置先按历史迁移入口处理。
 - memory endpoint 在唯一配置边界只接受 HTTP(S) 显式回环 IP；数据库保留认证。客户端与 launcher 按配置读取唯一 password_file（默认 memory_dir/password.txt）及 username，config show 只显示路径。缺失/权限/认证错误直接失败；项目UUID防误连。升级保留项目身份与凭据，0.13的成员身份变化先离线迁库再同步切换客户端。
 - 项目记忆只用 SurrealDB。member 同时是层级、检索表示与图节点；source_version、change 和必要图像 assets 保存原文依据及更正。source revision、input_revision、knowledge_revision 与 embedding_identity 各管来源、编码输入、并发更正和语义空间。原生WebSocket事务按完整语句透明分消息、原子接受，原生 CLI 负责服务、导出与恢复；没有多后端层或自建 MCP。
-- member身份统一为程序分配的UUID。作者草稿按数组位置引用本草稿或指定草稿内的新对象，freeze统一解析父项、依据与边端点并冻结批次；更新沿用prepare提供的UUID和expected。apply只接受新协议，重复写入与冲突更新明确失败，同一冻结批次重放幂等。存量转换工具及映射属于离线恢复材料，正常读写不查旧ID别名。
-- 结构解析只供定位。独立`memory maintain --holder <thread> --control <fresh>`先原子取得项目owner，再采集已绑定宿主聊天、比较原件与各成员实际接受版本，程序完成机械等价小批并输出必要变化与未决范围。智能块、摘要、识图、关系和评分的语义余项由宿主订阅 agent 同读完成，按来源核版本后原子发布内容与所需向量；机械匹配不替代语义判断。查询使用已发布知识与对应依据快照，brief 交付启动信息且不扫描或写入。宿主stop自有control、取消自有后代、确认发布结束后release；未决发布保留owner。普通批次作者生成并成功提交后结束，使用反馈持久待办，已阅/延期处置避免重复首建；仅用户明确审计意图启动审计。详细合同见 [记忆模块](modules/memory.md)。
-- Codex 来源适配仅通过受支持的 App Server 读取持久化消息；宿主提供当前项目绑定及完整注册根，以 projectId 优先、root/worktree 与其它注册项目根排冲突。每聊天的受管导出进入既有 source_version/prepare/apply，消息定位从已核快照解析；来源发现、正文采集、语义接受与向量覆盖各自可见。能力缺失或归属不明保留缺口，非 Codex 继续文件功能。
+- member身份统一为程序分配的UUID。作者提案引用固定prepare的path/file_sha256，写语义内容及草稿局部引用；编译器从prepare取得来源版本、已有身份、expected、依据闭包与private，再freeze唯一批次。历史端点可经prepare的historical-versions显式pin。apply仍负责原子接受、冲突和同稿幂等，不另建发布事务或作者状态库；存量转换工具属于离线恢复材料。
+- 结构解析只供定位。独立`memory collect`保全原件并记录采集观察；绑定Codex的`memory maintain`明确消费`--collection`或`--retained`，随后以自有holder/control原子取得单owner。显式scope限制实际来源工作集，默认全项目接续。采集回执加载核hash，prepare另固定本批实际版本；跨阶段不是全库不可变快照。机械等价小批与待语义范围分别报告。智能块、摘要、识图和关系由宿主订阅agent同读生成，程序核版本并原子发布内容及所需向量；普通批次成功接受即结束。布局按work_items和可用容量启用，有限来源组由唯一publisher提交；stage沿同receipt/owner/control固定干净接续。宿主stop自有control、取消自有后代、确认发布结束后release，未知发布保留owner。反馈和已读处置沿原职责保留，仅显式审计意图启动审计。详细合同见[记忆模块](modules/memory.md)。
+- Codex来源适配仅通过受支持的App Server读取持久化消息；宿主提供当前项目绑定及完整注册根，以projectId优先、root/worktree与其它注册项目根排冲突。collect不持维护owner，失败保留原错与独立回执；retained明确表示已有原件，freshness未知。受管导出进入source_version/prepare/apply，来源发现、采集、语义接受与向量覆盖各自可见；能力缺失或归属不明保留缺口，非Codex继续文件功能。
 - 项目现状及历史决定由同一检索worker核已有知识和必要新聊天。只读freshness脚本返回新增、可能变化、实际正文已覆盖和未知清单；端点或更新时间不证明正文一致。worker选择相关原证补读，明确采集与语义边界，不取得维护owner或发布知识。触发仍由宿主agent遵循指令。
-- 默认查询直接从全部粒度取得全文及兼容向量候选，按配置的 vector/hybrid 查询交给 worker；worker 核原文、展开图和评分，selection 按预算交付完整内容与省略入口。必保留内容经 brief 独立交付，模型或兼容向量缺失明确失败，hybrid 保留文字匹配和精确查找。
+- 默认查询从全部粒度取得全文及兼容向量候选，按配置的vector/hybrid查询；retrieval.py唯一维护请求与派工身份。retrieval-start固定基础锚点、知识观察和行为候选，同请求各轮共用，worker核原文及图后一次综合评分；selection仅排序、去重、预算。retrieval-receipt保存实际候选与交付版本，主agent实收后确认delivery。零席位由主agent执行同一完整流程，查询不需维护owner。brief独立交付mandatory，非mandatory地图在有界结构样本中精算Gaussian访问区间后组内排序、跨组交错，交付模型/游标/区间及遗漏边界。UTC日仅轮换展示采样，不改J/C/hits或年龄；低权重无硬过滤。概要与投影读取仍有实际成本，这不是常数成本或完整语义覆盖承诺。
+- 交付事实与行为投影分开：稳定delivery_id首次确认（含空清单）推进J，非空才推进C，技术重试两者均不推进。严格context保留独立原始锚点/份额/基础质量、知识截点、query/episode、实际候选/预算、策略与模型；精确版本命中不奖励新版或传播到邻居。纯共交付ID经KL-NMF形成固定非负行为向量，逐anchor Gaussian机会年龄以H/R及每版本标量基准编译，重训全史重放后原子切换。读API仅报告模型、事实头和编译截点，不隐式训练/补写。缺失证据保留区间，低权重保持原文、图、向量、训练ID及基础检索资格。
 - embedding 的编码由 Sentence Transformers 负责；薄 LitAPI 在 setup 加载模型、predict 编码，LitServe 管理 HTTP、队列和单推理 worker，Shawl 的 Job Object 拥有 Windows 服务进程树。服务位于 Condor 作业树之外，多项目通过同一 endpoint 共用模型。CPU/CUDA 按相同语义合同编码，设备自动选择不改变身份。向量语义身份独立于 HTTP 等待和服务部署，见 [资源模块](modules/resources.md)。
 - 普通任务的进程树、限时策略、容量、队列和站点GPU策略归Condor；basePack保留参数封装和不确定提交查询恢复，按原生queue/history/事件观察结果。调用者等待到期不取消作业，取消请求与终态分别报告；不另核OS进程族。背景服务与普通作业的额度由管理员预留协调。
 - 后续路线复用明确版本的发行包或公开 HTTP/API；模型、环境和缓存可以显式共享，项目知识和试验状态分别保存。运行环境不依赖另一条路线的可变源码或临时工作区。
 
 数据库物理文件与图像快照属于业务项目；每项目独立进程/端口，多聊天共享。源码外普通安装和机器观测见 [环境说明](environment.md)；文件结构建议、宿主协作与项目知识分别由对应模块维护。
 
-知识版本归档与交付状态仍在同一项目数据库。原生同步事件为今后的 member/node/semantic 知识版本保留前后像，关系端点另外绑定知识版本；旧原证版本不冒充旧知识表示。交付短事务持久化稳定 delivery_id、实际观察版本和全局事件，独立于语义维护 owner 与向量输入。宿主负责实际派工/接收/确认，CLI 与 Python 共用内核；渲染、search、read 和 rank 不构成交付。权重只按交付事件惰性计算，不读取时钟、不传播强化。brief 不做任务相关检索，worker 同次阅读和综合评分；不新增跨来源的当前理解同步层。
+知识版本、交付事实和行为投影的权威元数据仍在同一项目SurrealDB。知识首次接受保存真实事实头，h=0先验不冒充命中；旧版无法证明的接受截点保持未知，只记录迁移观察起点。模型数值工件按hash保存在项目memory_dir/behavior，连同原始事实参与恢复，仍受项目限制分发边界约束。宿主负责实际派工、接收和确认；渲染、search、read、neighbors及rank只读已发布内容，不构成交付或推进投影。默认rank/epsilon/beta/strength是实现初值，长期检索收益和规模性能以真实使用反馈判断。

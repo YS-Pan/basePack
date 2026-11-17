@@ -1,6 +1,6 @@
 # 项目配置与部署合同
 
-更新：2026年11月16日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)，源码面向0.16.0；本轮范围与实际验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)，此前0.14安装见[交付进度](../archive/20261114-next-maintenance/progress.md)，0.13身份切换见[上批交付](../archive/20261114-delivery-closeout/result.md)。本文维护部署边界；操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入，修改配置时按[维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)同步受影响状态。
+更新：2026年11月17日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)，源码已实现0.17.0合同；本项目实际安装仍为0.16.0、共享embedding服务为0.15.0。新客户端和memory schema 3的隔离验证、正式切换以[实施记录](../tasks/20261115-real-use-rectification/execution.md)为准，0.16既有验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)。本文维护部署边界；操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入，修改配置时按[维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)同步受影响状态。
 
 ## 位置与责任
 
@@ -35,6 +35,7 @@
       assets/                    按 hash 保留的必要原图版本
       codex/                     受管聊天 UTF-8 原文导出
       codex-attachments/         可读取的受支持聊天原图，按 hash 保留
+      behavior/                  0.17不可变行为模型，<sha256>.json，纳入恢复集合
       maintenance/               owner、稳定控制及机械/语义/采集回执
       logs/                      项目数据库运行日志
 ```
@@ -70,15 +71,19 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 
 项目 `.basepack` 的推荐内部结构、生产状态与临时/选留材料的边界见[本机数据目录约定](project-data-layout.md)；现行工作包进入根tmp，历史保留例外和已执行清理在该页区分。
 
-依赖由 pyproject.toml 与 uv.lock 维护，CUDA 来源明确。系统环境不做清理式同步，共享服务环境不安装无关 MCP 集成。源码与 wheel 验证分别核导入位置；普通安装从源码外运行。
+依赖由[pyproject.toml](../../experiments/20261106-basepack/pyproject.toml)与uv.lock维护，CUDA来源明确。0.17的behavior extra提供numpy、scipy及锁定的scikit-learn 1.9.1，仅实际训练KL-NMF需要；基础采集、发布、检索及既有模型回读不要求安装训练依赖。系统环境不做清理式同步，共享服务环境不安装无关MCP集成。源码与wheel验证分别核导入位置；普通安装从源码外运行。
 
 共享 embedding 沿用 Shawl/SCM，Manual、LocalSystem、no-restart/kill-process-tree；LitServe 单 worker 常驻，客户端超时只结束等待。项目 SurrealDB 可沿用已有普通用户隐藏手动认证进程。cwd、原生 store、日志与启动材料在项目 memory 目录；serve.ps1 从同一配置取得显式回环地址、username 和密码文件，设置原生认证入口后调用稳定 exe，不启用 unauthenticated。新库一次安全随机生成文件，已有库缺文件时恢复原凭据；launcher 不生成密码。SCM 是管理员可选方式，本轮未配置。basepack 只连接，停止项目库不停止共享模型。
 
 改写密码文件不会轮换数据库内的存储账户；轮换由管理员显式更新账户并同步同一文件。访问和认证失败保留原错，客户端不回退无认证。操作见 [管理员部署](../../experiments/20261106-basepack/docs/administrator.md#项目-surrealdb)。
 
-搬迁先停止该项目库并确认进程退出，再移动完整项目、调整启动 cwd/日志/endpoint，保留 UUID 后复核。在线备份使用原生 export；恢复集合含 export、配置、原凭据文件、业务原件、受管聊天导出、codex-attachments 原件与定位回执、必要 assets。已接受语义与更正必须恢复，向量可以从保留表示重建。长期备份位置和保留周期由业务项目确定，Git 忽略和本机目录不代替备份。
+搬迁先停止该项目库并确认进程退出，再移动完整项目、调整启动cwd/日志/endpoint，保留UUID后复核。在线备份用原生export；恢复集合含export、配置、原凭据文件、业务原件、受管聊天导出、附件原件/定位回执和必要assets。0.17还须保留memory_dir/behavior/<sha256>.json与其引用的数据库事实/模型元数据；模型工件按hash核字节，缺失或损坏明确失败。已接受语义、更正、真实交付及原始锚点必须恢复，行为投影可重放，内容向量可从保留表示重建。数值模型和原生导出仍属项目限制分发资料，不因无正文而自动可公开。备份位置和保留周期由项目确定，Git忽略和本机目录不代替备份。
 
 ## 升级与回退
+
+0.17.0新增严格memory_schema_version=3标记，保持项目配置schema 2、机器schema 1和member identity 2。新库memory init写入3，已绑定且缺失或不符标记的库由新版init及普通读写明确拒绝，须先完成离线桥。独立collect与显式collection/retained替代maintain内采集及skip-codex-collection；scope实际限制来源工作集，作者提案引用固定prepare并由程序编译，检索使用请求专属身份及严格交付context。新J从切换基点开始，首次空/非空确认均推进，非空机会C另计；新版init只在不存在时创建事实头，不重置已有J。读API不隐式写行为投影。客户端升级不要求更新共享embedding服务或重算未变向量。
+
+旧库按停写后的新鲜export恢复到独立物理实例，使用保留的0.16客户端运行离线[migration.py](../../experiments/20261106-basepack/src/basepack/memory/migration.py)：migrate转换事实，finalize内部执行verify逐字段/模式/索引/事件核等价，通过后显式写入schema 3交接标记；随后新版memory init安装schema且保留J。验证恢复与受影响功能后才同步切换客户端和库，不把源码测试或预备导出当成正式切换。保留旧wheel、配置/凭据、原库和完整恢复集合；0.16未提交作者稿按新prepare重做，已提交batch先核原数据库receipt，保持原身份避免重复发布。旧delivery保留原清单、非空顺序及原context，不伪造新J或原始锚点；旧context无新锚点时按unknown重放，仍可训练真实共交付。旧知识版本无法证明j_enter时保留未知，另记observed_j=0及age_origin=legacy_cutover，只表示从切换处观察，h=0不冒充命中，重训不移动起点。迁移策略与本项目实际执行见[实施记录](../tasks/20261115-real-use-rectification/execution.md)。
 
 0.16.0增加大源快照分消息、显式跳过新聊天采集、有界协作与同轮干净阶段、原位私有范围。客户端升级前结束自有维护并保留旧wheel／配置／凭据／原生export及既有完整恢复链；普通安装后`memory init`保留UUID、配置及托管块外业务内容。无需迁库、重算未变向量或升级共享服务。已提交receipt先恢复；0.15固定稿仅在两规则字段同时缺失且当前额外私有范围为空时沿已知根private合同接续，非空新规则明确冲突。阶段文件、handoff、原receipt、固定稿及结果需一起保留，owner.json.stage是唯一当前阶段指针；宿主负责实际旧组结束和fresh spawn。恢复材料边界与实测见[本轮结果](../tasks/20261115-real-use-rectification/result.md)。
 

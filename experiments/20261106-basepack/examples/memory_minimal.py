@@ -1,6 +1,7 @@
 """One-time memory walkthrough in an initialized, disposable project."""
 
 import argparse
+from hashlib import sha256
 import json
 import os
 import subprocess
@@ -33,7 +34,8 @@ run_id = "example-" + uuid4().hex
 work = project.root / "tmp" / run_id
 work.mkdir(parents=True)
 control = project.memory_dir / "maintenance" / (run_id + ".control")
-owner = run("maintain", "--holder", run_id, "--control", str(control))
+selection = ["--retained"] if project.raw["memory"].get("codex", {}).get("project_id") else []
+owner = run("maintain", "--holder", run_id, "--control", str(control), "--scope", source_path, *selection)
 if not owner["acquired"]:
     raise RuntimeError(f"Project maintenance is owned by {owner['owner']}")
 reading_path, draft_path, batch_path = work / "reading.json", work / "draft.json", work / "batch.json"
@@ -42,8 +44,8 @@ reading = json.loads(reading_path.read_text(encoding="utf-8"))
 source = reading["sources"][0]
 print(source["numbered_text"], flush=True)
 batch = {
-    "expected": reading["expected"],
-    "sources": [{"path": source["path"], "revision": source["revision"]}],
+    "prepare": {"path": str(reading_path), "file_sha256": sha256(reading_path.read_bytes()).hexdigest()},
+    "sources": [source["path"]],
     "members": [
         {"kind": "file", "path": source_path, "parent": None,
          "start_line": 1, "end_line": 4, "title": "试用说明",

@@ -6,7 +6,7 @@ import pytest
 from basepack.memory import owner
 from basepack.memory.maintenance import MaintenanceStopped
 from basepack.memory.prompts import maintenance_layout, pending_workers, render_prompt
-from basepack.memory.stages import fixed_reference, load_stage, prepare_stage
+from basepack.memory.stages import fixed_reference, load_stage, prepare_stage, stage_layout
 from basepack.project.config import load_project_config
 from basepack.project.init import init_project
 
@@ -25,12 +25,14 @@ def stage_project(tmp_path):
                                    "pending_relations": [{"id": "semantic:r", "basis": []}],
                                    "feedback": [{"id": "feedback:f"}],
                                    "discovery": {"gaps": [{"path": "unknown.bin", "reason": "binary"}]},
-                                   "layout": maintenance_layout(config)}), encoding="utf-8")
+                                   "layout": maintenance_layout(config, work_items=3, run_id=claim["owner"]["run_id"])}), encoding="utf-8")
     return config, receipt, control
 
 
-def write_handoff(tmp_path, name, *, task="bp_mem_coord_0", completed=("a.md",), remaining=("b.md", "c.md")):
-    path = tmp_path / name
+def write_handoff(receipt, name, *, task=None, completed=("a.md",), remaining=("b.md", "c.md")):
+    if task is None:
+        task = json.loads(receipt.read_text(encoding="utf-8"))["layout"]["teams"][0]["task_name"]
+    path = receipt.parent / name
     path.write_text(json.dumps({"completed": {"paths": list(completed), "relations": [], "feedback": []},
                                 "remaining": {"paths": list(remaining), "relations": ["semantic:r"], "feedback": ["feedback:f"]},
                                 "workers": [{"task_name": task, "handle": "host-handle-" + task, "status": "ended"}],
@@ -42,14 +44,18 @@ def test_two_serial_stages_keep_original_lifecycle_and_unfinished_scope(stage_pr
     config, receipt, control = stage_project
     original = receipt.read_bytes()
     run_id = owner.status(config.memory_dir)["run_id"]
-    first = prepare_stage(config, receipt, control, write_handoff(tmp_path, "first-handoff.json"),
+    first = prepare_stage(config, receipt, control, write_handoff(receipt, "first-handoff.json"),
                           tmp_path / "first-stage.json", workers_ended=True)
     assert first["worker"]["task_name"] == f"bp_mem_{run_id[:8]}_s1_coord_0"
+    first_saved = load_stage(receipt, control, first["stage"]["path"])
+    assert first_saved["layout"]["work_items"] == 2
+    assert first_saved["layout"]["planned_subagents"] == 2
+    assert first_saved["layout"]["teams"][0]["reader_task_names"] == [f"bp_mem_{run_id[:8]}_s1_read_0_0"]
     assert first["worker"]["fork_turns"] == "none"
     assert "--stage" in first["worker"]["render_command"]
     assert first["stage"]["file_sha256"] in first["worker"]["render_command"]
     second = prepare_stage(config, receipt, control,
-                           write_handoff(tmp_path, "second-handoff.json", task=first["worker"]["task_name"],
+                           write_handoff(receipt, "second-handoff.json", task=first["worker"]["task_name"],
                                          completed=("b.md",), remaining=("c.md",)),
                            tmp_path / "second-stage.json", workers_ended=True, previous_stage=first["stage"]["path"])
     assert second["worker"]["task_name"] == f"bp_mem_{run_id[:8]}_s2_coord_0"
@@ -59,6 +65,9 @@ def test_two_serial_stages_keep_original_lifecycle_and_unfinished_scope(stage_pr
     assert not owner.status(config.memory_dir)["stopped"] and control.read_bytes() == b""
     assert receipt.read_bytes() == original
     stage = load_stage(receipt, control, second["stage"]["path"])
+    assert stage["layout"]["work_items"] == 1
+    assert stage["layout"]["planned_subagents"] == 1
+    assert stage["layout"]["teams"][0]["reader_task_names"] == []
     assert stage["previous_stage"] == first["stage"]
     assert stage["receipt"] == fixed_reference(receipt)
     rendered = render_prompt(config, receipt, control, stage=second["stage"]["path"])
@@ -75,7 +84,7 @@ def test_two_serial_stages_keep_original_lifecycle_and_unfinished_scope(stage_pr
 
 def test_same_previous_stage_cannot_create_a_second_publisher(stage_project, tmp_path):
     config, receipt, control = stage_project
-    handoff = write_handoff(tmp_path, "handoff.json")
+    handoff = write_handoff(receipt, "handoff.json")
     first = prepare_stage(config, receipt, control, handoff, tmp_path / "first.json", workers_ended=True)
     with pytest.raises(ValueError, match="not the current owner stage"):
         prepare_stage(config, receipt, control, handoff, tmp_path / "duplicate.json", workers_ended=True)
@@ -99,17 +108,17 @@ def test_stage_rejects_uncertain_publication_parent_stop_or_wrong_run(stage_proj
         owner.acquire(config.memory_dir, config.raw["memory"]["project_id"], "new-parent", control)
         expected = PermissionError
     with pytest.raises(expected):
-        prepare_stage(config, receipt, control, write_handoff(tmp_path, "handoff.json"),
+        prepare_stage(config, receipt, control, write_handoff(receipt, "handoff.json"),
                       tmp_path / "stage.json", workers_ended=True)
     assert not (tmp_path / "stage.json").exists()
 
 
 def test_stage_rejects_lost_work_and_changed_fixed_drafts(stage_project, tmp_path):
     config, receipt, control = stage_project
-    handoff = write_handoff(tmp_path, "handoff.json", remaining=("b.md",))
+    handoff = write_handoff(receipt, "handoff.json", remaining=("b.md",))
     with pytest.raises(ValueError, match="exactly partition"):
         prepare_stage(config, receipt, control, handoff, tmp_path / "stage.json", workers_ended=True)
-    handoff = write_handoff(tmp_path, "handoff.json")
+    handoff = write_handoff(receipt, "handoff.json")
     boundary = json.loads(handoff.read_text(encoding="utf-8"))
     draft = tmp_path / "draft.json"
     draft.write_text("{}", encoding="utf-8")
@@ -123,7 +132,7 @@ def test_stage_rejects_lost_work_and_changed_fixed_drafts(stage_project, tmp_pat
 
 def test_stage_render_is_read_only_and_fixed_inputs_remain_verifiable(stage_project, tmp_path, monkeypatch):
     config, receipt, control = stage_project
-    handoff = write_handoff(tmp_path, "handoff.json")
+    handoff = write_handoff(receipt, "handoff.json")
     result = prepare_stage(config, receipt, control, handoff, tmp_path / "stage.json", workers_ended=True)
     def forbidden(*args, **kwargs):
         pytest.fail("stage prompt consulted runtime ownership or capacity")
@@ -138,7 +147,7 @@ def test_stage_render_is_read_only_and_fixed_inputs_remain_verifiable(stage_proj
 
 def test_generated_stage_hash_rejects_changed_layout(stage_project, tmp_path):
     config, receipt, control = stage_project
-    result = prepare_stage(config, receipt, control, write_handoff(tmp_path, "handoff.json"),
+    result = prepare_stage(config, receipt, control, write_handoff(receipt, "handoff.json"),
                            tmp_path / "stage.json", workers_ended=True)
     stage_path = Path(result["stage"]["path"])
     changed = json.loads(stage_path.read_text(encoding="utf-8"))
@@ -146,3 +155,108 @@ def test_generated_stage_hash_rejects_changed_layout(stage_project, tmp_path):
     stage_path.write_text(json.dumps(changed), encoding="utf-8")
     with pytest.raises(ValueError, match="SHA256 mismatch"):
         render_prompt(config, receipt, control, stage=stage_path, stage_sha256=result["stage"]["file_sha256"])
+
+
+@pytest.mark.parametrize("kind", ["relations", "feedback"])
+def test_stage_keeps_remaining_non_source_work_without_extra_readers(stage_project, kind):
+    config, receipt, control = stage_project
+    handoff = write_handoff(receipt, "non-source.json", completed=("a.md", "b.md", "c.md"), remaining=())
+    boundary = json.loads(handoff.read_text(encoding="utf-8"))
+    completed_kind = "feedback" if kind == "relations" else "relations"
+    boundary["completed"][completed_kind] = boundary["remaining"][completed_kind]
+    boundary["remaining"][completed_kind] = []
+    handoff.write_text(json.dumps(boundary), encoding="utf-8")
+    result = prepare_stage(config, receipt, control, handoff, receipt.parent / "non-source-stage.json",
+                           workers_ended=True)
+    stage = load_stage(receipt, control, result["stage"]["path"])
+    assert stage["remaining"]["paths"] == []
+    assert len(stage["remaining"][kind]) == 1
+    assert stage["layout"]["planned_subagents"] == 1
+    assert stage["layout"]["teams"][0]["reader_task_names"] == []
+    assert result["worker"]["publisher"]
+
+
+def test_stage_defers_at_zero_capacity_without_changing_saved_boundary(stage_project):
+    config, receipt, control = stage_project
+    original = receipt.read_bytes()
+    first = prepare_stage(config, receipt, control, write_handoff(receipt, "first.json"),
+                          receipt.parent / "first-stage.json", workers_ended=True)
+    next_handoff = write_handoff(receipt, "next-handoff.json", task=first["worker"]["task_name"],
+                                  completed=("b.md",), remaining=("c.md",))
+    boundary = next_handoff.read_bytes()
+    previous_stage = Path(first["stage"]["path"]).read_bytes()
+    prior_owner = owner.status(config.memory_dir)
+    target = receipt.parent / "next-stage.json"
+    with pytest.raises(ValueError, match="No subagent capacity"):
+        prepare_stage(config, receipt, control, next_handoff, target, workers_ended=True,
+                      previous_stage=first["stage"]["path"], available_subagents=0)
+    assert not target.exists()
+    assert owner.status(config.memory_dir) == prior_owner
+    assert receipt.read_bytes() == original
+    assert next_handoff.read_bytes() == boundary
+    assert Path(first["stage"]["path"]).read_bytes() == previous_stage
+    assert control.read_bytes() == b""
+    resumed = prepare_stage(config, receipt, control, next_handoff, target, workers_ended=True,
+                            previous_stage=first["stage"]["path"], available_subagents=1)
+    stage = load_stage(receipt, control, resumed["stage"]["path"])
+    assert stage["layout"]["planned_subagents"] == 1
+    assert stage["layout"]["maintenance_budget"] == 1
+    assert resumed["remaining"] == {"paths": ["c.md"], "relations": ["semantic:r"], "feedback": ["feedback:f"]}
+    assert stage["previous_stage"] == first["stage"]
+    assert stage["owner_run_id"] == owner.status(config.memory_dir)["run_id"]
+    assert receipt.read_bytes() == original
+    assert control.read_bytes() == b""
+
+
+def test_stage_unknown_capacity_remains_a_ceiling_and_saved_identity_is_stable(stage_project):
+    config, receipt, control = stage_project
+    result = prepare_stage(config, receipt, control, write_handoff(receipt, "handoff.json"),
+                           receipt.parent / "stage.json", workers_ended=True)
+    stage = load_stage(receipt, control, result["stage"]["path"])
+    assert stage["layout"]["available_subagents"] is None
+    assert stage["layout"]["capacity_status"] == "organization_ceiling"
+    assert stage["layout"]["planned_subagents"] == 2
+    first = render_prompt(config, receipt, control, stage=result["stage"]["path"])
+    again = render_prompt(config, receipt, control, stage=result["stage"]["path"])
+    assert first["task_name"] == again["task_name"] == result["worker"]["task_name"]
+    assert first["reader_task_names"] == again["reader_task_names"]
+    assert pending_workers(stage["layout"], 0) == []
+    assert pending_workers(stage["layout"], 1) == []
+
+
+def test_stage_caps_remaining_work_by_new_host_availability(stage_project):
+    config, receipt, control = stage_project
+    result = prepare_stage(config, receipt, control, write_handoff(receipt, "handoff.json"),
+                           receipt.parent / "stage.json", workers_ended=True, available_subagents=1)
+    stage = load_stage(receipt, control, result["stage"]["path"])
+    assert stage["layout"]["work_items"] == 2
+    assert stage["layout"]["planned_subagents"] == 1
+    assert stage["layout"]["available_subagents"] == 1
+    assert stage["layout"]["capacity_status"] == "verified_available"
+    assert stage["remaining"]["paths"] == ["b.md", "c.md"]
+    assert result["worker"]["reader_task_names"] == []
+
+
+def test_stage_names_are_stable_per_stage_and_distinct_across_runs(stage_project):
+    config, _, _ = stage_project
+    first = maintenance_layout(config, work_items=2, run_id="12345678-first")
+    saved = stage_layout(first, 1, "12345678-first")
+    assert stage_layout(first, 1, "12345678-first") == saved
+    second = stage_layout(first, 2, "12345678-first")
+    other = stage_layout(first, 1, "abcdefgh-other")
+    names = [{team["task_name"], *team["reader_task_names"]}
+             for team in (saved["teams"][0], second["teams"][0], other["teams"][0])]
+    assert names[0].isdisjoint(names[1]) and names[0].isdisjoint(names[2])
+    assert first["teams"][0]["task_name"] == "bp_mem_12345678_coord_0"
+
+
+@pytest.mark.parametrize("workers_ended,worker_status", [(False, "ended"), (True, "running")])
+def test_stage_requires_actual_worker_end_confirmation(stage_project, workers_ended, worker_status):
+    config, receipt, control = stage_project
+    handoff = write_handoff(receipt, "handoff.json")
+    boundary = json.loads(handoff.read_text(encoding="utf-8"))
+    boundary["workers"][0]["status"] = worker_status
+    handoff.write_text(json.dumps(boundary), encoding="utf-8")
+    with pytest.raises(ValueError, match="ended"):
+        prepare_stage(config, receipt, control, handoff, receipt.parent / "stage.json", workers_ended=workers_ended)
+    assert "stage" not in owner.status(config.memory_dir)

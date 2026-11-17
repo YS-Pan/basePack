@@ -25,34 +25,35 @@ def _capacity(config, available_subagents):
     return configured, min(configured, available)
 
 
-def maintenance_layout(config, mode="manual", available_subagents=None):
-    """Compute one round's fixed organization; absent availability is only a ceiling."""
+def maintenance_layout(config, mode="manual", available_subagents=None, *, work_items=None, run_id=None):
+    """Allocate a fixed roster from actual work; capacity remains an upper bound."""
     reserve = MAINTENANCE_RESERVE[mode]
     configured, limit = _capacity(config, available_subagents)
     budget = max(0, limit - reserve)
+    work_items = budget if work_items is None else _nonnegative(work_items, "work_items")
+    remaining = min(work_items, budget)
+    identity = run_id or uuid4().hex
+    prefix = f"bp_mem_{identity[:8]}_"
     teams = []
-    if budget:
+    while remaining:
+        team = len(teams)
+        readers = min(4, remaining - 1)
+        teams.append({"team": team, "task_name": f"{prefix}coord_{team}",
+                      "parent_task_name": f"{prefix}coord_0" if team else None,
+                      "publisher": team == 0,
+                      "reader_task_names": [f"{prefix}read_{team}_{reader}" for reader in range(readers)],
+                      "coordinator_ai": config.resolve_ai(tier="tier2"),
+                      "reader_ai": config.resolve_ai(tier="tier1")})
+        remaining -= 1 + readers
         if mode == "automatic":
-            count, readers = 1, min(4, budget - 1) if budget >= 4 else 0
-        else:
-            count, readers = (min(10, budget // 5), 4) if budget >= 5 else (1, 0)
-        for team in range(count):
-            teams.append({
-                "team": team,
-                "task_name": f"bp_mem_coord_{team}",
-                "parent_task_name": "bp_mem_coord_0" if team else None,
-                "publisher": team == 0,
-                "reader_task_names": [f"bp_mem_read_{team}{reader}" for reader in range(readers)],
-                "coordinator_ai": config.resolve_ai(tier="tier2"),
-                "reader_ai": config.resolve_ai(tier="tier1"),
-            })
-    used = sum(1 + len(team["reader_task_names"]) for team in teams)
-    return {"mode": mode, "configured_subagents": configured,
-            "concurrency_source": config.concurrency_source,
+            break
+    planned = sum(1 + len(team["reader_task_names"]) for team in teams)
+    return {"mode": mode, "run_id": identity, "work_items": work_items,
+            "configured_subagents": configured, "concurrency_source": config.concurrency_source,
             "available_subagents": available_subagents, "reserve": reserve,
             "maintenance_budget": budget,
             "capacity_status": "verified_available" if available_subagents is not None else "organization_ceiling",
-            "used_subagents": used, "unused_subagents": budget - used, "teams": teams}
+            "planned_subagents": planned, "unused_subagents": budget - planned, "teams": teams}
 
 
 def memory_command(config, *args):
@@ -149,10 +150,10 @@ def _reader_hints(material, paths):
         sources.append({key: item[key] for key in
                         ("path", "reason", "category", "current_revision", "accepted_source_version") if key in item})
         sources[-1]["members"] = [{key: member[key] for key in
-                                   ("id", "kind", "reasons", "source_version", "start_line", "end_line")
+                                   ("id", "kind", "reasons", "source_version", "start_line", "end_line", "locator")
                                    if key in member} for member in item["members"]]
         if item.get("uncovered_ranges"):
-            sources[-1]["uncovered_ranges"] = [{key: row[key] for key in ("start_line", "end_line")}
+            sources[-1]["uncovered_ranges"] = [{key: row[key] for key in ("start_line", "end_line", "locator") if key in row}
                                                   for row in item["uncovered_ranges"]]
     relevant, unknown = [], 0
     for relation in material["pending_relations"]:
@@ -234,112 +235,3 @@ def render_prompt(config, receipt, control, *, role="coordinator", tier=None, pa
         "tier": dispatch["tier"],
     }
     return {"prompt": template.substitute(values), "stage_context": stage_context, **dispatch}
-
-
-def retrieval_dispatch(config, request_path, slot=0, available_subagents=None, tier=None):
-    """Describe one complete retrieval delegation, independently of maintenance ownership."""
-    slot = _nonnegative(slot, "slot")
-    configured, limit = _capacity(config, available_subagents)
-    worker = config.resolve_ai(purpose="retrieval", tier=tier) if limit else {
-        "tier": None, "model": None, "reasoning_effort": None}
-    args = ["retrieval-prompt", "--request", Path(request_path).resolve(), "--slot", slot]
-    if available_subagents is not None:
-        args.extend(["--available-subagents", available_subagents])
-    if tier:
-        args.extend(["--tier", tier])
-    return {"status": "prepared", "started": False,
-            "host_action": "Spawn the assigned worker and receive its final result" if limit else
-                           "Run the complete retrieval in the main agent; no subagent seat is available",
-            "executor": "worker" if limit else "main", "task_name": f"bp_mem_search_{slot}" if limit else None,
-            "slot": slot, "configured_subagents": configured, "available_subagents": available_subagents,
-            "capacity_status": "verified_available" if available_subagents is not None else "organization_ceiling",
-            **worker, "render_command": memory_command(config, *args)}
-
-
-def _retrieval_request(request_path):
-    from .query import load_json_file, normalize_scope
-
-    request = load_json_file(request_path)
-    if not isinstance(request["question"], str) or not request["question"].strip():
-        raise ValueError("question must be a nonempty string")
-    request["scope"] = normalize_scope(request.get("scope", ""))
-    request["content_budget"] = request.get("content_budget", 6000)
-    if not _nonnegative(request["content_budget"], "content_budget"):
-        raise ValueError("content_budget must be positive")
-    # Existing request files remain read-only and acquire the same identity on every render.
-    identity = str(Path(request_path).resolve()) + "\n" + json.dumps(request, sort_keys=True, ensure_ascii=False)
-    request.setdefault("delivery_id", "retrieval-" + sha256(identity.encode("utf-8")).hexdigest())
-    if not isinstance(request["delivery_id"], str) or not request["delivery_id"].strip():
-        raise ValueError("delivery_id must be a nonempty string")
-    return request
-
-
-def prepare_retrieval(config, *, question=None, request_path=None, scope="", budget=6000,
-                      slot=0, available_subagents=None, tier=None):
-    """Prepare sensible defaults; the host owns actual execution and final receipt."""
-    from .query import normalize_scope
-
-    if question is None and request_path is None:
-        return {"status": "needs_input", "started": False, "required_input": "question",
-                "message": "Provide --question with the business question, or --request to reuse a prepared retrieval."}
-    if request_path is None:
-        if not isinstance(question, str) or not question.strip():
-            raise ValueError("question must be a nonempty string")
-        scope = normalize_scope(scope)
-        if not _nonnegative(budget, "content_budget"):
-            raise ValueError("content_budget must be positive")
-        # Resolve capacity/model and reject invalid host parameters before creating a request.
-        retrieval_dispatch(config, config.root / "tmp/request.json", slot, available_subagents, tier)
-        work = config.root / "tmp" / "basepack-retrieval" / uuid4().hex
-        request_path = work / "request.json"
-        work.mkdir(parents=True)
-        request_path.write_text(json.dumps({"question": question, "scope": scope, "content_budget": budget,
-                                           "delivery_id": "retrieval-" + uuid4().hex},
-                                          ensure_ascii=False, indent=2), encoding="utf-8")
-    request = _retrieval_request(request_path)
-    dispatch = retrieval_dispatch(config, request_path, slot, available_subagents, tier)
-    return {**dispatch, "request": str(Path(request_path).resolve()),
-            "delivery_id": request["delivery_id"], "scope": request["scope"],
-            "content_budget": request["content_budget"],
-            "work": str(_retrieval_work(config, request_path, request)),
-            "delivery_receipt": str(_retrieval_work(config, request_path, request) / "delivery.json"),
-            "delivery_command": memory_command(config, "delivery", "--input",
-                                                _retrieval_work(config, request_path, request) / "delivery.json")}
-
-
-def _retrieval_work(config, request_path, request):
-    path = Path(request_path).resolve()
-    if path.parent.parent == (config.root / "tmp" / "basepack-retrieval").resolve():
-        return path.parent
-    identity = str(path) + "\n" + request["delivery_id"]
-    return config.root / "tmp" / "basepack-retrieval" / sha256(identity.encode("utf-8")).hexdigest()[:32]
-
-
-def render_retrieval_prompt(config, request_path, slot=0, available_subagents=None, tier=None):
-    """Read the retrieval request and template only; never claim or inspect maintenance state."""
-    dispatch = retrieval_dispatch(config, request_path, slot, available_subagents, tier)
-    request = _retrieval_request(request_path)
-    work = _retrieval_work(config, request_path, request)
-    template = Template((Path(__file__).with_name("prompts") / "retrieval.md").read_text(encoding="utf-8"))
-    assignment = (f"retrieval worker {dispatch['task_name']}, assigned {dispatch['tier']} / "
-                  f"{dispatch['model']} / {dispatch['reasoning_effort']}" if dispatch["executor"] == "worker"
-                  else "main agent performing retrieval directly because no subagent seat is available")
-    search = ["search", "--text", "<terms>"]
-    if request["scope"]:
-        search.extend(["--scope", request["scope"]])
-    values = {"assignment": assignment, "root": str(config.root), "config": str(config.path),
-              "skill": str(Path(__file__).with_name("SKILL.md").resolve()),
-              "request": json.dumps(request, ensure_ascii=False), "work": str(work),
-              "python": str(config.python), "delivery_id": request["delivery_id"],
-              "scope": json.dumps(request["scope"], ensure_ascii=False),
-              "search_command": memory_command(config, *search),
-              "freshness_command": memory_command(config, "freshness"),
-              "read_command": memory_command(config, "read", "<member-id>", "--knowledge-revision", "<observed-knowledge-revision>"),
-              "knowledge_command": memory_command(config, "knowledge", "<record-id>", "--knowledge-revision", "<observed-knowledge-revision>"),
-              "history_command": memory_command(config, "history", "<record-id>"),
-              "neighbors_command": memory_command(config, "neighbors", "<record-id>", "--knowledge-revision", "<observed-knowledge-revision>"),
-              "rank_command": memory_command(config, "rank", "--input", work / "scored.json",
-                                               "--budget", request["content_budget"])}
-    return {"prompt": template.substitute(values), "delivery_id": request["delivery_id"],
-            "search_command": values["search_command"],
-            "work": str(work), "scope": request["scope"], **dispatch}

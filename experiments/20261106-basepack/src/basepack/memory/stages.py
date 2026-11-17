@@ -31,7 +31,7 @@ def stage_layout(layout, index, run_id):
     for team in layout["teams"]:
         team["task_name"] = f"{prefix}coord_{team['team']}"
         team["parent_task_name"] = f"{prefix}coord_0" if team["team"] else None
-        team["reader_task_names"] = [f"{prefix}read_{team['team']}{reader}"
+        team["reader_task_names"] = [f"{prefix}read_{team['team']}_{reader}"
                                      for reader in range(len(team["reader_task_names"]))]
     return layout
 
@@ -49,10 +49,11 @@ def load_stage(receipt, control, stage_path, *, file_sha256=None):
     return stage
 
 
-def prepare_stage(config, receipt, control, handoff, output, *, workers_ended, previous_stage=None):
+def prepare_stage(config, receipt, control, handoff, output, *, workers_ended, previous_stage=None,
+                  available_subagents=None):
     """Validate a host-confirmed boundary and save one new stage; never spawn agents."""
     from .owner import save_stage
-    from .prompts import pending_workers, prompt_dispatch
+    from .prompts import maintenance_layout, pending_workers, prompt_dispatch
 
     if not workers_ended:
         raise ValueError("Confirm that the previous coordinator and its workers ended")
@@ -86,10 +87,17 @@ def prepare_stage(config, receipt, control, handoff, output, *, workers_ended, p
         _read_reference(reference)
     if not any(boundary["remaining"].values()):
         raise ValueError("No remaining work requires a new stage; finish the original run")
+    next_layout = maintenance_layout(config, mode=layout["mode"],
+                                     available_subagents=available_subagents,
+                                     work_items=max(len(boundary["remaining"][kind])
+                                                    for kind in ("paths", "relations", "feedback")),
+                                     run_id=material["owner_run_id"])
+    if not next_layout["teams"]:
+        raise ValueError("No subagent capacity for a new stage; retry this handoff when capacity is available")
     stage = {"index": index, "receipt": receipt_ref, "control": str(Path(control).resolve()),
              "owner_run_id": material["owner_run_id"], "previous_stage": previous_ref,
              "handoff": handoff_ref, "completed": boundary["completed"], "remaining": boundary["remaining"],
-             "layout": stage_layout(layout, index, material["owner_run_id"]), "workers_ended": True,
+             "layout": stage_layout(next_layout, index, material["owner_run_id"]), "workers_ended": True,
              "errors": boundary["errors"], "jobs": boundary["jobs"],
              "completion": "Previous bounded group ended; the maintenance run remains open."}
     reference = save_stage(config.memory_dir, control, stage, output)

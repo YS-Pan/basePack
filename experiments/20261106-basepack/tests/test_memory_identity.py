@@ -56,7 +56,14 @@ def test_freeze_command_persists_mapping_once(tmp_path):
 
     draft = tmp_path / 'draft.json'
     output = tmp_path / 'batch.json'
-    draft.write_text(json.dumps({'sources': [], 'members': [{'kind': 'chunk', 'start_line': 1, 'end_line': 1}]}), encoding='utf-8')
+    from hashlib import sha256
+    from basepack.memory.privacy import privacy_rules, rules_revision
+    rules = privacy_rules()
+    reading = tmp_path / 'reading.json'
+    reading.write_text(json.dumps({'sources': [{'path': 'a.md', 'revision': 'r1', 'kind': 'text', 'members': []}], 'neighborhood': {'members': [], 'nodes': [], 'edges': []},
+                                   'expected': {}, 'privacy_rules': rules, 'privacy_rules_revision': rules_revision(rules)}), encoding='utf-8')
+    draft.write_text(json.dumps({'prepare': {'path': str(reading), 'file_sha256': sha256(reading.read_bytes()).hexdigest()},
+                                 'sources': ['a.md'], 'members': [{'kind': 'chunk', 'path': 'a.md', 'start_line': 1, 'end_line': 1}]}), encoding='utf-8')
     args = SimpleNamespace(memory_action='freeze', drafts=[str(draft)], output=str(output))
     result, status = dispatch(args, None)
     stored = json.loads(output.read_text(encoding='utf-8'))
@@ -178,3 +185,21 @@ def test_same_source_identity_cannot_be_written_twice(memory):
     with pytest.raises(ValueError, match='Duplicate source identity'):
         memory.apply(batch)
     assert memory.sources() == before
+
+
+def test_schema_three_requires_explicit_legacy_handoff_and_preserves_fact_head(memory):
+    project = memory._execute('SELECT * FROM ONLY meta:project;')[0]
+    assert project['memory_schema_version'] == 3
+    memory._execute('UPDATE meta:delivery SET j=7;')
+    memory.install_schema()
+    assert memory._execute('SELECT * FROM ONLY meta:delivery;')[0]['j'] == 7
+    memory._execute('UPDATE meta:project UNSET memory_schema_version;', check_project=False)
+    for action in (
+        memory.install_schema,
+        lambda: memory._execute("CREATE feedback:schema_gate SET issue='must not write';"),
+        lambda: memory._publish(['BEGIN;', "CREATE feedback:schema_gate SET issue='must not write';", 'COMMIT;']),
+    ):
+        with pytest.raises(RuntimeError, match='schema 3 offline migration required'):
+            action()
+    assert memory._execute('SELECT * FROM ONLY feedback:schema_gate;', check_project=False)[0] is None
+    assert memory._execute('SELECT * FROM ONLY meta:delivery;', check_project=False)[0]['j'] == 7

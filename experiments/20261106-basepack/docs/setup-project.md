@@ -138,9 +138,9 @@ brief、search、read 只读上次已发布知识及其依据快照。主任务�
 
 Codex 宿主按项目归属默认接入可取得的聊天，不要求逐 thread 配置。宿主从当前聊天与完整项目清单取得项目 ID、其它已注册项目根，在 `init` 时自动传 `--codex-project-id`、可重复的 `--codex-other-project-root` 和 `--codex-registry-complete`；已有项目由宿主更新配置的 `[memory.codex]`。这是宿主元数据接法，Codex 项目 ID 与 basePack 的 `memory.project_id` UUID 各自保留。
 
-首次启用或旧项目升级时，instructions 指引 Codex 宿主补齐绑定；请求本轮新聊天采集时刷新完整注册根。`memory maintain --holder <本thread身份> --control <全新稳定路径> --codex-registry <UTF-8-JSON>` 可传本轮 `{project_id, other_project_roots, registry_complete:true}`，覆盖本轮采集绑定。注册清单工作文件放根 tmp，采集原件与定位回执保留在实际 memory 目录。需要明确跳过本轮新采集时加 `--skip-codex-collection`，保留已登记聊天、历史与依赖；选择、状态和缺口说明见 [维护入口](memory.md#自动维护与手动维护)。
+首次启用或旧项目升级时，instructions 指引 Codex 宿主补齐绑定；请求本轮新聊天采集时刷新完整注册根。独立运行 `memory collect --codex-registry <UTF-8-JSON> --output <collection.json>`，传入本轮 `{project_id, other_project_roots, registry_complete:true}`，覆盖本轮采集绑定但不写回 TOML。注册清单放根 tmp，采集原件与定位回执保留在实际 memory 目录。绑定项目随后明确 `memory maintain --collection <collection.json>` 或 `--retained`；retained 使用已保留原件，当前聊天 freshness 未核。采集不取得维护 owner，失败保留原错与独立回执，不能冒充语义接受。见 [维护入口](memory.md#自动维护与手动维护)。
 
-维护入口通过受支持的 App Server 列出 active 与 archived 聊天并分页读取正文。明确的项目 ID 优先；线程未带项目 ID 时，用项目根、Git worktree/common-dir 与宿主其它注册项目根排除冲突。不能确认的条目留在 unresolved/gaps；标题与关键词不判定归属。受管 UTF-8 导出保存在项目 `memory.data_dir/codex/`，由同一维护入口加入发现范围；无需把每个 thread 填入 `source_scope`，也不递归扫描数据库、控制文件和维护回执。
+采集入口通过受支持的 App Server 列出 active 与 archived 聊天并分页读取正文。明确的项目 ID 优先；线程未带项目 ID 时，用项目根、Git worktree/common-dir 与宿主其它注册项目根排除冲突。不能确认的条目留在 unresolved/gaps；标题与关键词不判定归属。受管 UTF-8 导出保存在项目 `memory.data_dir/codex/`，维护显式消费所选回执或 retained；无需把每个 thread 填入 `source_scope`，也不递归扫描数据库、控制文件和维护回执。加载回执核已记录的原件 hash，回执不是全库不可变截点。
 
 采集回执的 discovered、unresolved、gaps 和路径描述本轮原文发现与采集；`needs_semantic` 与语义回执描述仍需阅读的范围。brief 的 `codex_collection.status` 为 `unavailable`、`registry_incomplete` 或 `not_checked`，只表示绑定能力或查询未检查采集，不能证明全部聊天已入库。可取得的受支持 localImage 会作为独立原图来源保存到 codex-attachments；附件不可取得、缺少的 subagent 与归属不明范围保留缺口。当前实际验收边界见 [本轮进度](../../../devDoc/archive/20261110-onboarding-simplification/progress.md)；附件原件、完整分叉/继承身份和全部项目聊天覆盖仍需真实使用验证。
 
@@ -156,13 +156,26 @@ Codex 宿主按项目归属默认接入可取得的聊天，不要求逐 thread 
 
 ## 版本升级
 
-### 升级到 0.16
+### 升级到 0.17
 
-本版更新轻量客户端、记忆角色提示词和生成入口，提供整源分段传输、原位私有范围、跳过新聊天采集及阶段接续。先结束自有维护并确认发布结果，保留新旧 wheel、项目／机器配置、原凭据和对应 [恢复集合](memory.md#备份与恢复)，再从目标解释器安装并运行 `memory init` 刷新托管块；核块外路径及复制安装的独立 skills。配置 schema、项目 UUID 和原数据库继续使用，不默认迁库、迁移来源或启动全库语义审计。
+0.17 使用 memory schema 3，member identity 仍为 2。它更新采集、提案、交付事实和行为访问合同；**0.16 旧库先离线迁移并验证，再同时切换库与客户端**。`memory init` 只安装 schema，不执行旧数据桥接。先 stop 自有维护、取消后代、确认发布终态并 release；结清或明确作废旧作者稿、回执与未确认交付，保留其恢复原件。准备旧 wheel/解释器、停写后的原生 export、配置与原凭据、公私原件、受管附件/assets 及必要恢复回执。
 
-本版不改变共享 embedding 的语义身份或依赖锁，无需为此次客户端升级重启或重装共享服务；兼容且输入未变的向量继续复用。核实际客户端版本／安装路径、生成入口和本次受影响操作，不能用安装成功代替宿主实际派工。长维护按 [阶段接续](memory.md#同一轮的阶段接续) 使用同一 owner/control/receipt，真实新上下文和父 stop 仍须宿主实现。
+用原生 export 在两个独立物理目录和独立端口恢复同一份旧库，一个作为只读比较基线，一个作为目标。配置中的正式端口与这两个端口各不相同。使用保留的 0.16 解释器运行配套 [离线桥接工具](../src/basepack/memory/migration.py)，先 `migrate`，再 `finalize`。finalize 先逐字段执行 verify，通过后显式写入 schema marker 3 并读取确认，例如：
 
-原位私有规则以项目 `[memory].private_scope` 为准；纯 Python freeze 须显式传项目配置。0.15 冻结稿的接续条件与规则冲突处理见 [发布合同](memory.md#首建与维护)，保留原 frozen、batch_id 与 UUID，不手工修改冻结规则字段。
+```powershell
+& $oldPython '<matching-source>/experiments/20261106-basepack/src/basepack/memory/migration.py' migrate $config 'http://127.0.0.1:<baseline-port>' 'http://127.0.0.1:<target-port>'
+if ($LASTEXITCODE -ne 0) { throw "migration failed ($LASTEXITCODE)" }
+& $oldPython '<matching-source>/experiments/20261106-basepack/src/basepack/memory/migration.py' finalize $config 'http://127.0.0.1:<baseline-port>' 'http://127.0.0.1:<target-port>' --report '<new-finalize-report.json>'
+if ($LASTEXITCODE -ne 0) { throw "migration finalize failed ($LASTEXITCODE)" }
+```
+
+验证逐字段保留原件、知识版本、图、依据、mandatory/private 和未变向量；旧 delivery 保留原清单、非空顺序与原 context，不补造历史锚点或完整新 J。新事实从切换 J=0 起计；无法证明的旧接受时点保持 `j_enter=null`，另固定 `observed_j=0`／`age_origin=legacy_cutover`，表示新政策开始观察而非命中或历史年龄已恢复。有真实旧命中的版本保留可证奖励。finalize 的标记确认后，再由新客户端运行 `memory init` 安装新 schema，核原证／精确版本／查询／交付重试及受影响操作，最后切换正式配置与 launcher。新库 init 自动建立 marker 3；已绑定但无标记的库会被拒绝，init 不代替桥接或重置已建立的 J。finalize 结果未明时先核目标标记和原回执，不能盲重试。保留旧物理库和旧 wheel 作回退；schema 回退使用对应旧恢复点。
+
+训练端安装可选 `behavior` extra；不训练的客户端可只装轻量包。共享 embedding 服务及未变输入的语义身份不随本版客户端更新，本项目保持服务 0.15；无需因此重装模型服务。新模型引用的 `memory.data_dir/behavior/<sha>.json` 纳入恢复链。完成安装后运行 `memory init` 刷新托管块，核块外路径及独立 skills 副本，并按新 prepare 提案和检索回执合同验证。长维护仍按 [阶段接续](memory.md#同一轮的阶段接续) 使用原 owner/control/receipt，宿主负责实际新上下文与父 stop。
+
+### 0.16 历史升级边界
+
+0.16 本身只更新客户端、提示词及入口，沿用其当时配置、UUID、凭据和数据库；该结论不适用于 0.17 schema 3 的离线桥接。更早 frozen 的恢复沿相应版本合同，保留原 batch_id、UUID 及文件，按新版本重新 prepare 作者提案。
 
 ### 更早版本的迁移与接口变化
 

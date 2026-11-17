@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "basepack"
-version = "0.16.0"
+version = "0.17.0"
 description = "Project-local tools with shared embedding and HTCondor resources"
 readme = "README.md"
 license = "MIT"
@@ -13,6 +13,7 @@ requires-python = ">=3.13"
 dependencies = ["websocket-client>=1.8,<2"]
 
 [project.optional-dependencies]
+behavior = ["numpy>=2.5,<3", "scipy>=1.18,<2", "scikit-learn==1.9.1"]
 embedding = ["sentence-transformers==6.2.0", "litserve==0.2.19", "torch==2.10.0", "torchvision==0.25.0", "transformers==5.22.1", "Pillow>=13,<15"]
 embedding-cpu = ["basepack[embedding]", "torch==2.10.0+cpu", "torchvision==0.25.0+cpu"]
 embedding-cuda = ["basepack[embedding]", "torch==2.10.0+cu128", "torchvision==0.25.0+cu128"]

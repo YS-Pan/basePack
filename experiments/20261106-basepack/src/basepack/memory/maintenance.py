@@ -63,7 +63,7 @@ def check(path):
     begin_commit(path)
 
 
-def maintain(memory, scope, *, control=None, timeout=600):
+def maintain(memory, scope, *, include_registered=False, control=None, timeout=600):
     """Refresh mechanically equivalent originals and retain a semantic handoff.
 
     This is an explicit maintenance action. Query actions never call it.
@@ -75,7 +75,7 @@ def maintain(memory, scope, *, control=None, timeout=600):
     import re
     from uuid import uuid4
 
-    from .content import comparison_text, line_changes, locate_lines, mapped_line_range
+    from .content import SourceContent, comparison_text, line_changes, locate_lines, mapped_line_range, original_text
     from . import feedback
     from .images import ImageSource
     from .store import _record, _sql
@@ -83,8 +83,15 @@ def maintain(memory, scope, *, control=None, timeout=600):
     if control:
         check(control)
     known = memory._rows('source')
-    by_path = {row['path']: row for row in known if not row.get('deleted')}
-    changes = memory._check_changes(known, list(dict.fromkeys([*scope, *by_path])), deep=True)
+    all_by_path = {row['path']: row for row in known if not row.get('deleted')}
+    root = memory.config.root.resolve()
+    selected = [(root / path).resolve() for path in scope]
+    def in_scope(path):
+        candidate = (root / path).resolve()
+        return any(candidate == prefix or candidate.is_relative_to(prefix) for prefix in selected)
+    by_path = {path: row for path, row in all_by_path.items() if include_registered or in_scope(path)}
+    included = list(dict.fromkeys([*scope, *by_path]))
+    changes = memory._check_changes(list(by_path.values()), included, deep=True)
     members = memory._rows('member')
     nodes = memory._rows('node')
     edges = memory._rows('semantic')
@@ -101,7 +108,19 @@ def maintain(memory, scope, *, control=None, timeout=600):
         return snapshots[version]
 
     normalize = comparison_text
+
+    def same_locator(row, old, current):
+        if not row.get('locator'):
+            return True
+        previous = original_text(SourceContent(row['path'], '', 0, 0, old), row['start_line'],
+                                 row['end_line'], row['locator'])
+        try:
+            return previous == original_text(current, row['start_line'], row['end_line'], row['locator'])
+        except ValueError:
+            # A changed source can move or remove the old location; reread it.
+            return False
     receipts = []
+    accepted_scope = []
     reused_chunks = []
     candidates = {}
     mechanical_dependency_pending = set()
@@ -134,12 +153,13 @@ def maintain(memory, scope, *, control=None, timeout=600):
         # accepted: compare every active member's own version.
         equivalent = not any(row['stale'] for row in active) and all(
             snapshot(row['source_version'])['kind'] == 'text' and
-            normalize(snapshot(row['source_version'])['text']) == normalize(current.text) for row in active)
+            normalize(snapshot(row['source_version'])['text']) == normalize(current.text) and
+            same_locator(row, snapshot(row['source_version'])['text'], current) for row in active)
         if not equivalent:
             by_id = {row['id']: row for row in members}
             accepted = []
             for row in active:
-                if row['kind'] != 'chunk' or row['stale'] or row.get('basis'):
+                if row['kind'] != 'chunk' or row['stale'] or row.get('basis') or row.get('locator'):
                     continue
                 old = snapshot(row['source_version'])
                 if old['kind'] != 'text':
@@ -177,6 +197,8 @@ def maintain(memory, scope, *, control=None, timeout=600):
         for row in active:
             item = {key: row[key] for key in ('id', 'kind', 'path', 'parent', 'title', 'start_line',
                                                'end_line', 'mandatory', 'coverage_gaps')}
+            if row.get('locator'):
+                item['locator'] = row['locator']
             item['evidence'] = [basis['member'] for basis in row.get('basis', [])]
             if row['kind'] != 'chunk':
                 item['text'] = row['text']
@@ -230,10 +252,12 @@ def maintain(memory, scope, *, control=None, timeout=600):
         receipts.append(memory.apply(freeze([{'sources': [candidates[path]['source'] for path in sorted(group)],
                                       'expected': {row['id']: row['knowledge_revision'] for row in members},
                                       'members': accepted}], config=memory.config), control=control, timeout=timeout))
+        accepted_scope.extend({'path': path, 'revision': candidates[path]['source']['revision']} for path in sorted(group))
         refreshed_privacy.update(group)
         reused_chunks.extend(member for path in sorted(group) for member in candidates[path]['reused'])
         known = memory._rows('source')
-        by_path = {row['path']: row for row in known if not row.get('deleted')}
+        by_path = {row['path']: row for row in known if not row.get('deleted')
+                   and (include_registered or in_scope(row['path']))}
         members = memory._rows('member')
 
     semantic = {}
@@ -294,7 +318,7 @@ def maintain(memory, scope, *, control=None, timeout=600):
         return dispositions, deferred
 
     for row in members:
-        if row['retired']:
+        if row['retired'] or row['path'] not in by_path:
             continue
         path = row['path']
         reasons = []
@@ -314,6 +338,8 @@ def maintain(memory, scope, *, control=None, timeout=600):
         if current is not None and current.revision != row['source_revision']:
             old = snapshot(row['source_version'])
             if isinstance(current, ImageSource) or old['kind'] != 'text':
+                reasons.append('changed')
+            elif not same_locator(row, old['text'], current):
                 reasons.append('changed')
             elif normalize(old['text']) != normalize(current.text):
                 before, after = normalize(old['text']).splitlines(keepends=True), normalize(current.text).splitlines(keepends=True)
@@ -380,6 +406,7 @@ def maintain(memory, scope, *, control=None, timeout=600):
         current_lines = current.text.splitlines(keepends=True)
         line_count = len(current_lines)
         covered = set()
+        partial = {}
         for entry in [*dispositions, *deferred]:
             covered.update(range(entry['start_line'], entry['end_line'] + 1))
         for row in active:
@@ -397,7 +424,32 @@ def maintain(memory, scope, *, control=None, timeout=600):
                 mapped = mapped_line_range(opcodes, row['start_line'], row['end_line'])
                 if mapped is None or len(locate_lines(old['text'], current.text, row['start_line'], row['end_line'])) != 1:
                     continue
-            covered.update(range(mapped[0], mapped[1] + 1))
+            locator = row.get('locator')
+            if locator:
+                for number in range(mapped[0], mapped[1] + 1):
+                    start_col = locator['start_col'] if number == mapped[0] else 0
+                    end_col = locator['end_col'] if number == mapped[1] else len(current_lines[number - 1])
+                    partial.setdefault(number, []).append((start_col, end_col))
+            else:
+                covered.update(range(mapped[0], mapped[1] + 1))
+        # A partial line is covered only when its actual characters are covered.
+        partial_missing = []
+        for number, intervals in partial.items():
+            if number in covered:
+                continue
+            line = current_lines[number - 1]
+            position = 0
+            for left, right in sorted(intervals):
+                if left > position and line[position:left].strip():
+                    partial_missing.append({'start_line': number, 'end_line': number,
+                                            'locator': {'start_col': position, 'end_col': left},
+                                            'text': line[position:left]})
+                position = max(position, right)
+            if position < len(line) and line[position:].strip():
+                partial_missing.append({'start_line': number, 'end_line': number,
+                                        'locator': {'start_col': position, 'end_col': len(line)},
+                                        'text': line[position:]})
+            covered.add(number)
         # Independent current ranges retain gaps across arbitrarily many source
         # versions, including a first partial acceptance without a predecessor.
         missing = []
@@ -408,8 +460,10 @@ def maintain(memory, scope, *, control=None, timeout=600):
                     start = number
             elif start is not None:
                 text = ''.join(current_lines[start - 1:number - 1])
-                missing.append({'start_line': start, 'end_line': number - 1, 'text': text})
+                if text.strip():
+                    missing.append({'start_line': start, 'end_line': number - 1, 'text': text})
                 start = None
+        missing.extend(partial_missing)
         if missing:
             item = semantic.setdefault(path, {'path': path, 'members': [], 'versions': []})
             if not active:
@@ -432,10 +486,22 @@ def maintain(memory, scope, *, control=None, timeout=600):
         item['related_edges'] = [row for row in edges if not row['retired'] and (
             row['in'] in ids | node_ids or row['out'] in ids | node_ids or
             any(basis['member'] in ids for basis in row.get('basis', [])))]
+    selected_ids = {row['id'] for row in members if row['path'] in by_path}
+    relevant_graph = {row['id'] for row in nodes if any(
+        basis['member'] in selected_ids for basis in row.get('basis', []))}
+    relevant_graph.update(row['id'] for row in edges if (
+        row['in'] in selected_ids | relevant_graph or row['out'] in selected_ids | relevant_graph or
+        any(basis['member'] in selected_ids for basis in row.get('basis', []))))
     pending_relations = [{'id': row['id'], 'basis': row.get('basis', [])}
-                         for row in [*nodes, *edges] if row['stale'] and not row['retired']]
-    pending_feedback = feedback.pending(memory)
-    material = {'changes': changes, 'mechanical': receipts, 'reused_chunks': reused_chunks,
+                         for row in [*nodes, *edges] if row['stale'] and not row['retired']
+                         and (include_registered or row['id'] in relevant_graph)]
+    reports = feedback.pending(memory)
+    pending_feedback = [row for row in reports if include_registered or
+                        row.get('target') in selected_ids | relevant_graph or
+                        (row.get('source') and in_scope(row['source']))]
+    material = {'workset': {'discovered': list(scope), 'included': included,
+                            'accepted': accepted_scope},
+                'changes': changes, 'mechanical': receipts, 'reused_chunks': reused_chunks,
                 'semantic': list(semantic.values()),
                 'pending_relations': pending_relations, 'feedback': pending_feedback,
                 'acceptance_scope': {'kind': 'fixed_candidate_set', 'priority_owner': 'host_agent',

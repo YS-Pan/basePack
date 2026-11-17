@@ -14,7 +14,7 @@ from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
 
 from basepack.project.config import ProjectConfig
-from .content import SourceContent, _project_path, detect_changes, numbered_text, read_source, reading_units
+from .content import SourceContent, _project_path, detect_changes, numbered_text, read_source, reading_units, original_text, line_slices
 from .images import IMAGE_SUFFIXES, ImageSource, read_image, retain_image
 from .privacy import derive_private, privacy_rules, rules_revision, source_private
 
@@ -103,11 +103,16 @@ def _snapshot_sql(version: _Record, snapshot: dict) -> list[str]:
     return statements
 
 
-def _original(source: SourceContent, start: int, end: int) -> str:
-    lines = source.text.splitlines(keepends=True)
-    if not 1 <= start <= end <= len(lines):
-        raise ValueError(f"Invalid line range {start}:{end} for {source.path}")
-    return "".join(lines[start - 1:end])
+def _original(source: SourceContent, start: int, end: int, locator=None) -> str:
+    return original_text(source, start, end, locator)
+
+
+def _matches_original(source: SourceContent, member: dict) -> bool:
+    try:
+        return _digest(_original(source, member["start_line"], member["end_line"], member.get("locator"))) == member["raw_revision"]
+    except ValueError:
+        # A valid previous location can disappear after a source change.
+        return False
 
 
 class SqlResponseError(RuntimeError):
@@ -132,15 +137,20 @@ class Memory:
         credential = f"{self.connection['username']}:{self._password}"
         self._authorization = "Basic " + b64encode(credential.encode("utf-8")).decode("ascii")
 
+    def _project_guard(self):
+        return (f"IF meta:project.project_id != {_sql(self.connection['project_id'])} "
+                "{ THROW 'Memory database belongs to another project or is not initialized'; };\n"
+                "IF meta:project.member_identity_version = NONE OR meta:project.member_identity_version != 2 "
+                "{ THROW 'Memory member identity migration required'; };\n"
+                "IF meta:project.memory_schema_version = NONE OR meta:project.memory_schema_version != 3 "
+                "{ THROW 'Memory schema 3 offline migration required'; };")
+
     def _execute(self, sql: str, *, check_project: bool = True) -> list:
         connection = self.connection
         if check_project:
             # SurrealDB executes later statements after a failed IF. Complete
             # the gate separately so a rejected request cannot still write.
-            self._execute(f"IF meta:project.project_id != {_sql(connection['project_id'])} "
-                          "{ THROW 'Memory database belongs to another project or is not initialized'; };\n"
-                          "IF meta:project.member_identity_version = NONE OR meta:project.member_identity_version != 2 "
-                          "{ THROW 'Memory member identity migration required'; };", check_project=False)
+            self._execute(self._project_guard(), check_project=False)
         body = sql.encode("utf-8")
         request = Request(connection["endpoint"].rstrip("/") + "/sql", body, {
             "Authorization": self._authorization,
@@ -166,10 +176,7 @@ class Memory:
 
         limit = _MESSAGE_LIMIT
         marker = _Record("meta", "publication_" + uuid4().hex)
-        project_check = (f"IF meta:project.project_id != {_sql(self.connection['project_id'])} "
-                         "{ THROW 'Memory database belongs to another project or is not initialized'; };\n"
-                         "IF meta:project.member_identity_version = NONE OR meta:project.member_identity_version != 2 "
-                         "{ THROW 'Memory member identity migration required'; };")
+        project_check = self._project_guard()
         statements = [project_check, *statements[1:-1],
                       f"CREATE {_sql(marker)} SET committed=true RETURN NONE;"]
         # Measure the actual JSON wire message, including escaped SQL and transaction id.
@@ -276,10 +283,15 @@ class Memory:
                  "{ THROW 'Memory database belongs to another project'; }; "
                  "IF meta:project.project_id != NONE AND (meta:project.member_identity_version = NONE OR "
                  "meta:project.member_identity_version != 2) "
-                 "{ THROW 'Memory member identity migration required'; }; ")
+                 "{ THROW 'Memory member identity migration required'; }; "
+                 "IF meta:project.project_id != NONE AND (meta:project.memory_schema_version = NONE OR "
+                 "meta:project.memory_schema_version != 3) "
+                 "{ THROW 'Memory schema 3 offline migration required'; }; ")
         self._execute(gates, check_project=False)
         self._execute("BEGIN;\n" + gates + schema + "\n"
-                      f"UPSERT meta:project SET project_id={project_id}, member_identity_version=2; COMMIT;", check_project=False)
+                      "IF meta:delivery.id = NONE { CREATE meta:delivery SET j=0; };\n"
+                      f"UPSERT meta:project SET project_id={project_id}, member_identity_version=2, "
+                      "memory_schema_version=3; COMMIT;", check_project=False)
         return {"namespace": self.connection["namespace"], "database": self.connection["database"]}
 
     def _rows(self, table: str) -> list[dict]:
@@ -303,12 +315,24 @@ class Memory:
         from .access import record_delivery
         return record_delivery(self, delivery_id, items, context=context)
 
+    def behavior_candidates(self, anchors, limit=20, *, scope=""):
+        from .behavior_projection import behavior_candidates
+        return behavior_candidates(self, anchors, limit=limit, scope=scope)
+
+    def train_behavior(self, rank=8, epsilon=0.001, beta=0.2, strength=8.0):
+        from .behavior_projection import train_behavior
+        return train_behavior(self, rank=rank, epsilon=epsilon, beta=beta, strength=strength)
+
+    def compile_behavior(self):
+        from .behavior_projection import compile_behavior
+        return compile_behavior(self)
+
     def _load_source(self, path: str, kind: str | None = None) -> SourceContent | ImageSource:
         if kind == "image" or Path(path).suffix.lower() in IMAGE_SUFFIXES:
             return read_image(self.config.root, path)
         return read_source(self.config.root, path)
 
-    def prepare(self, paths: list[str]) -> dict:
+    def prepare(self, paths: list[str], *, historical_versions: list[dict] | None = None) -> dict:
         """Supply explicit new/old originals and existing knowledge for one reading."""
         for path in paths:
             if _project_path(self.config.root.resolve(), path).is_dir():
@@ -352,6 +376,7 @@ class Memory:
                                                         "encoded_snapshot_bytes": _query_wire_size(sql),
                                                         "statement_count": len(pieces),
                                                         "message_limit_bytes": _MESSAGE_LIMIT},
+                                 "line_slices": line_slices(source),
                                  "reading_units": [{"kind": unit.kind, "start_line": unit.start_line, "end_line": unit.end_line}
                                                    for unit in reading_units(source)]})
             item["members"] = [row for row in members if row["path"] == item["path"]]
@@ -387,10 +412,29 @@ class Memory:
         selected_members = [member for member in members if member["id"] in selected]
         related.update(basis["member"] for row in selected_members + related_nodes + edges
                        for basis in row.get("basis", []))
+        # Include the complete accepted evidence/parent chain in the fixed reading
+        # package; the author still chooses the semantic evidence independently.
+        members_by_id = {member["id"]: member for member in members}
+        frontier = list(related)
+        while frontier:
+            member = members_by_id.get(frontier.pop())
+            if member is None:
+                continue
+            refs = [entry["member"] for entry in member.get("basis", [])]
+            if member.get("parent"):
+                refs.append(member["parent"])
+            for ref in refs:
+                if ref not in related:
+                    related.add(ref)
+                    frontier.append(ref)
         neighborhood_members = [member for member in members if member["id"] in related - selected]
         expected = {row["id"]: row["knowledge_revision"] for row in
                     [member for item in prepared for member in item["members"]] + neighborhood_members + nodes + edges}
-        return {"sources": prepared, "privacy_rules": rules, "privacy_rules_revision": rules_hash,
+        from .history import knowledge
+        historical = [knowledge(self, item["id"], knowledge_revision=item["knowledge_revision"])
+                      for item in historical_versions or []]
+        return {"sources": prepared, "historical_versions": historical,
+                "privacy_rules": rules, "privacy_rules_revision": rules_hash,
                 "neighborhood": {"members": neighborhood_members, "edges": edges,
                 "nodes": nodes}, "expected": expected,
                 "instruction": "Read originals together. Choose semantic boundaries, summaries, and evidenced relations in one batch; reading_units are structural hints only."}
@@ -432,7 +476,7 @@ class Memory:
                            for position in insertions[key]):
                         affected.add(member["id"])
             if source is None or member["end_line"] > len(source.text.splitlines()) or (
-                    member["raw_revision"] != _digest(_original(source, member["start_line"], member["end_line"]))):
+                    not _matches_original(source, member)):
                 affected.add(member["id"])
         return self._expand_affected(affected, members)
 
@@ -558,6 +602,7 @@ class Memory:
         if any(parent.table != "member" for parent in parents):
             raise ValueError("Parent must reference a member")
         dependencies.update(parents)
+        dependencies.update(_record(value) for value in batch.get("dependency_closure", []))
         expected = {_record(key): value for key, value in batch.get("expected", {}).items()}
         from .reviewed import dependencies as review_dependencies
         dependencies.update(review_dependencies(self, batch, before_members, targets, expected))
@@ -635,7 +680,7 @@ class Memory:
         affected = self._affected(current, before_members)
         for item in batch.get("members", []):
             key = _record(item["id"]).key
-            intended_text = (_original(current[item["path"]], item["start_line"], item["end_line"])
+            intended_text = (_original(current[item["path"]], item["start_line"], item["end_line"], item.get("locator"))
                              if item["kind"] == "chunk" else item["text"])
             if key in existing and existing[key].get("description_revision", existing[key]["input_revision"]) != _input_revision(item.get("title", ""), intended_text):
                 affected.add(existing[key]["id"])
@@ -674,9 +719,14 @@ class Memory:
                               "input_revision": source.revision, "description_revision": _input_revision(title, text),
                               "embedding_kind": "image", "description_kind": "agent_visual_read"})
             else:
-                raw = _original(source, item["start_line"], item["end_line"])
+                raw = _original(source, item["start_line"], item["end_line"], item.get("locator"))
                 lines = source.text.splitlines()
                 outside = lines[:item["start_line"] - 1] + lines[item["end_line"]:]
+                locator = item.get("locator")
+                if locator:
+                    raw_lines = source.text.splitlines(keepends=True)
+                    outside += [raw_lines[item["start_line"] - 1][:locator["start_col"]],
+                                raw_lines[item["end_line"] - 1][locator["end_col"]:]]
                 if item["kind"] == "file" and not item.get("coverage_gaps") and any(line.strip() for line in outside):
                     raise ValueError(f"Partial file summary requires explicit coverage_gaps: {item['id']}")
                 if item["kind"] == "chunk":
@@ -686,7 +736,7 @@ class Memory:
                 elif item["kind"] not in {"file", "section"}:
                     raise ValueError(f"Unknown member kind: {item['kind']}")
                 value.update({"text": text, "start_line": item["start_line"], "end_line": item["end_line"],
-                              "raw_revision": _digest(raw), "input_revision": _input_revision(title, text),
+                              "locator": item.get("locator"), "raw_revision": _digest(raw), "input_revision": _input_revision(title, text),
                               "embedding_kind": "text"})
             submitted[_record(item["id"]).key] = value
         if submitted:
@@ -706,7 +756,7 @@ class Memory:
                     source = self._load_source(member["path"], member["kind"])
                     if source.revision != member["source_revision"]:
                         unchanged = (not isinstance(source, ImageSource) and
-                                     _digest(_original(source, member["start_line"], member["end_line"])) == member["raw_revision"])
+                                     _matches_original(source, member))
                         if not unchanged:
                             raise ValueError(f"Evidence source revision mismatch for {member['path']}")
                 result.append({"member": _record(value), "input_revision": member["input_revision"],
@@ -753,14 +803,27 @@ class Memory:
                 accepted[key] = knowledge(self, target, knowledge_revision=revision)
             return {**accepted[key], "id": target}
 
-        def mark_private(value):
+        frozen_private = batch.get("compiled_private")
+        if "prepare_packages" in batch:
+            if not isinstance(frozen_private, dict):
+                raise ValueError("Frozen author batch requires compiled_private")
+            expected_private_ids = {_record(item["id"], table) for table, field in
+                                    (("member", "members"), ("node", "nodes"), ("semantic", "edges"))
+                                    for item in batch.get(field, [])}
+            frozen_private = {_record(identity): marker for identity, marker in frozen_private.items()}
+            if set(frozen_private) != expected_private_ids or any(type(marker) is not bool for marker in frozen_private.values()):
+                raise ValueError("Frozen private markers must cover exactly the written records")
+
+        def mark_private(record, value):
             marker = derive_private(value, source_version=source_version, knowledge_version=knowledge_version)
             if marker is None:
                 raise ValueError("Private marker requires retained version-pinned provenance")
+            if frozen_private is not None and frozen_private[record] != marker:
+                raise ValueError(f"Frozen private marker changed for {record}")
             value["private"] = marker
 
-        for _, value, _ in writes:
-            mark_private(value)
+        for record, value, _ in writes:
+            mark_private(record, value)
         for record, value, table in writes:
             statements.append(f"CREATE {_sql(_Record('change', uuid4().hex))} SET operation='accept', target={_sql(record)}, previous=(SELECT * OMIT embedding FROM ONLY {_sql(record)}), at=time::now(), context={_sql(context)};")
             if table == "node":
@@ -793,7 +856,7 @@ class Memory:
                             f"SELECT VALUE knowledge_revision FROM ONLY {_sql(target)};")[0]
                 endpoints[endpoint] = {"id": target, "knowledge_revision": revision}
             value["endpoint_versions"] = endpoints
-            mark_private(value)
+            mark_private(record, value)
             statements.append(f"CREATE {_sql(_Record('change', uuid4().hex))} SET operation='accept_edge', target={_sql(record)}, previous=(SELECT * FROM ONLY {_sql(record)}), at=time::now(), context={_sql(context)};")
             # Native endpoints are immutable. Recreate only this accepted edge
             # in the same transaction, after retaining its actual prior record.
@@ -919,6 +982,8 @@ class Memory:
                     "source_version": version, "image_path": str(asset), "locator": locator}}
         if source_version is None:
             start_line, end_line = member["start_line"], member["end_line"]
+            if locator is None:
+                locator = member.get("locator")
         elif start_line is None or end_line is None:
             raise ValueError("Reading an explicit source version requires start_line and end_line")
         text = snapshot["text"]
@@ -928,7 +993,7 @@ class Memory:
         original = {"member_id": member["id"], "path": path, "revision": revision,
                     "private": snapshot.get("private", source_private(path)),
                     "source_version": version, "start_line": start_line, "end_line": end_line,
-                    "text": _original(content, start_line, end_line)}
+                    "locator": locator, "text": _original(content, start_line, end_line, locator)}
         if (self.config.root / path).resolve().parent == (self.config.memory_dir / "codex").resolve():
             from .codex_locator import message_locations
             original["chat_locations"] = message_locations(text, start_line, end_line)
@@ -961,13 +1026,14 @@ class Memory:
     def brief(self, task: str = "", *, limit: int = 6) -> dict:
         """Read published startup material without searching or inspecting originals."""
         sources = self.sources()
-        mandatory, stale_members, stale_nodes, stale_edges, gaps, overview = self._execute(
+        mandatory, stale_members, stale_nodes, stale_edges, gaps, overview, overview_nodes = self._execute(
             "SELECT * OMIT embedding FROM member WHERE mandatory=true AND retired!=true; "
             "SELECT id,path,kind,private FROM member WHERE stale=true AND retired!=true; "
             "SELECT id,kind,private FROM node WHERE stale=true AND retired!=true; "
             "SELECT id,kind,private FROM semantic WHERE stale=true AND retired!=true; "
             "SELECT id,path,private,coverage_gaps AS gaps FROM member WHERE retired!=true AND array::len(coverage_gaps)>0; "
-            f"SELECT * OMIT embedding FROM member WHERE stale=false AND retired!=true AND mandatory=false AND kind IN ['file','section','image'] ORDER BY kind,path LIMIT {int(limit)};")
+            "SELECT * OMIT embedding FROM member WHERE stale=false AND retired!=true AND mandatory=false AND kind IN ['file','section','image']; "
+            "SELECT * FROM node WHERE stale=false AND retired!=true;")
         registered = {_record(row["id"]): row for row in sources}
         basis_versions = {_record(basis["source_version"], "source_version")
                           for row in mandatory for basis in row.get("basis", [])}
@@ -992,12 +1058,25 @@ class Memory:
                                     "basis_mismatches": mismatches,
                                     "note": "Registered source metadata only; originals not checked."}
         stale = stale_members + stale_nodes + stale_edges
-        clues = [dict(row, clue_role="map") for row in overview]
+        from datetime import datetime, timezone
+        from .query import overview_working_set, startup_overview
+        chat_prefix = (self.config.memory_dir / "codex").resolve().relative_to(self.config.root.resolve()).as_posix()
+        rotation = datetime.now(timezone.utc).date().isoformat()
+        workset = overview_working_set(overview, overview_nodes, limit, chat_prefix=chat_prefix, rotation=rotation)
+        candidates = self.access_hints(workset) if workset else []
+        maps = startup_overview(overview, overview_nodes, sources, limit, mandatory=mandatory,
+                                chat_prefix=chat_prefix, candidates=candidates)
+        clues = maps["clues"]
         fields = {"id", "kind", "title", "text", "path", "source_revision", "source_version", "start_line", "end_line",
                   "parent", "parent_version", "stale", "retired", "coverage_gaps", "locator", "clue_role", "knowledge_revision",
-                  "conditions", "claim_type", "known_unsynced", "sync_evidence", "private"}
+                  "conditions", "claim_type", "known_unsynced", "sync_evidence", "private", "record_type", "text_truncated",
+                  "access_interval", "access_status", "access_model", "access_compiled_j", "access_fact_j",
+                  "access_support", "access_prior"}
         def startup_item(row):
-            return {key: value for key, value in row.items() if key in fields}
+            item = {key: value for key, value in row.items() if key in fields}
+            if row.get("record_type") == "node" and "basis" in row:
+                item["basis"] = row["basis"]
+            return item
         detail_limit = max(20, limit)
         codex = self.connection.get("codex", {})
         project_id = codex.get("project_id")
@@ -1008,12 +1087,17 @@ class Memory:
         return {"mandatory": [startup_item(row) for row in mandatory],
                 "mandatory_pending_count": sum(row["stale"] for row in mandatory),
                 "mandatory_known_unsynced_count": sum(row["known_unsynced"] for row in mandatory),
-                "clues": [startup_item(row) for row in clues[:limit]],
+                "clues": [startup_item(row) for row in clues],
+                "overview_groups": maps["overview_groups"], "overview_count": maps["overview_count"],
+                "overview_sampling": {"candidates": len(workset), "rotation_utc_date": rotation},
+                "clues_omitted_count": maps["clues_omitted_count"], "unmapped_sources": maps["unmapped_sources"],
+                "unmapped_count": maps["unmapped_count"], "unmapped_omitted_count": maps["unmapped_omitted_count"],
                 "pending": stale[:detail_limit], "pending_count": len(stale),
                 "sources": [{key: row[key] for key in ("id", "path", "kind", "deleted", "private") if key in row}
                             for row in sources[:detail_limit]],
                 "source_count": len(sources),
                 "coverage_gaps": gaps[:detail_limit], "coverage_gaps_count": len(gaps),
+                "coverage_gaps_omitted_count": max(0, len(gaps) - detail_limit),
                 "vector_coverage": {"status": "not_checked"},
                 "codex_collection": codex_collection,
                 "discovery_scope": self.connection.get("source_scope", []),
@@ -1026,14 +1110,14 @@ class Memory:
     def changes(self, scope: list[str], *, deep: bool = False) -> list[dict]:
         return self._check_changes(self.sources(), scope, deep=deep)
 
-    def maintain(self, scope: list[str], *, control: str | None = None, timeout: float = 600) -> dict:
+    def maintain(self, scope: list[str], *, include_registered: bool = False, control: str | None = None, timeout: float = 600) -> dict:
         """Run deterministic maintenance and retain the semantic handoff."""
         from .maintenance import maintain
         from .owner import check_owned
         if not control:
             raise ValueError("Maintenance requires the project owner's control")
         check_owned(self.config.memory_dir, control)
-        return maintain(self, scope, control=control, timeout=timeout)
+        return maintain(self, scope, include_registered=include_registered, control=control, timeout=timeout)
 
     def _check_changes(self, known: list[dict], scope: list[str], *, deep: bool) -> list[dict]:
         changes = detect_changes(self.config.root, [source for source in known if not source.get("deleted")], scope, deep=deep)

@@ -161,11 +161,24 @@ def test_missing_read_id_reports_the_target(memory):
         memory.read("member:missing-order")
 
 
-@pytest.mark.parametrize('field,item,missing', [
-    ('nodes', {'kind': 'entity', 'text': 'missing identity'}, 'id'),
-    ('edges', {'in': 'node:a', 'out': 'node:b', 'kind': 'supports'}, 'id'),
-    ('edges', {'id': 'relation', 'kind': 'supports'}, 'in, out'),
+@pytest.mark.parametrize('field,item,prefix', [
+    ('nodes', {'kind': 'entity', 'text': 'generated identity'}, 'node'),
+    ('edges', {'in': 'node:a', 'out': 'node:b', 'kind': 'supports'}, 'semantic'),
 ])
-def test_freeze_locates_missing_node_or_relation_fields(field, item, missing):
-    with pytest.raises(ValueError, match=rf'drafts\[0\]\.{field}\[0\] missing required fields: {missing}'):
-        freeze([{'sources': [], field: [item]}])
+def test_freeze_generates_graph_identity(field, item, prefix):
+    first = freeze([{'sources': [], field: [item]}])[field][0]['id']
+    second = freeze([{'sources': [], field: [item]}])[field][0]['id']
+    assert _record(first).table == prefix
+    assert len(_record(first).key) == 32
+    assert int(_record(first).key, 16) >= 0
+    assert first != second
+
+
+@pytest.mark.parametrize('item,missing', [
+    ({'id': 'relation', 'kind': 'supports'}, 'in, out'),
+    ({'id': 'relation', 'out': 'node:b', 'kind': 'supports'}, 'in'),
+    ({'id': 'relation', 'in': 'node:a', 'kind': 'supports'}, 'out'),
+])
+def test_freeze_locates_missing_relation_endpoints(item, missing):
+    with pytest.raises(ValueError, match=rf'drafts\[0\]\.edges\[0\] missing required fields: {missing}'):
+        freeze([{'sources': [], 'edges': [item]}])

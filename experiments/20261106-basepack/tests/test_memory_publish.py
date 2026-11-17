@@ -14,7 +14,22 @@ from basepack.memory.draft import freeze_file
 from test_memory_store import memory
 
 
-def completed_file(tmp_path, draft, *, name='draft.json', assignment='reader-0/assignment-1'):
+def completed_file(tmp_path, draft, *, name='draft.json', assignment='reader-0/assignment-1', prepared=None):
+    from basepack.memory.privacy import privacy_rules, rules_revision
+    rules = privacy_rules()
+    if any('path' not in member for member in draft.get('members', [])):
+        source_path = name + '.md'
+        draft = {**draft, 'sources': [*draft.get('sources', []), {'path': source_path, 'revision': 'r1'}],
+                 'members': [{**member, 'path': member.get('path', source_path)} for member in draft['members']]}
+    if prepared is None:
+        prepared = {'sources': [{**source, 'kind': source.get('kind', 'text'), 'members': []}
+                                for source in draft.get('sources', [])],
+                    'neighborhood': {'members': [], 'nodes': [], 'edges': []},
+                    'expected': {}, 'privacy_rules': rules, 'privacy_rules_revision': rules_revision(rules)}
+    reading = tmp_path / (name + '.reading.json')
+    reading.write_text(json.dumps(prepared, ensure_ascii=False), encoding='utf-8')
+    draft = {**draft, 'prepare': {'path': str(reading), 'file_sha256': sha256(reading.read_bytes()).hexdigest()},
+             'sources': [{'path': source['path']} for source in draft.get('sources', [])]}
     path = tmp_path / name
     path.write_text(json.dumps(draft, ensure_ascii=False, indent=2), encoding='utf-8')
     return {'path': str(path), 'file_sha256': sha256(path.read_bytes()).hexdigest(),
@@ -23,11 +38,12 @@ def completed_file(tmp_path, draft, *, name='draft.json', assignment='reader-0/a
 
 def completed_source(memory, tmp_path):
     (memory.config.root / 'one.md').write_bytes(b'line one\nline two\n')
-    source = memory.prepare(['one.md'])['sources'][0]
+    prepared = memory.prepare(['one.md'])
+    source = prepared['sources'][0]
     return [completed_file(tmp_path, {
         'sources': [{'path': source['path'], 'revision': source['revision']}],
         'members': [{'kind': 'chunk', 'path': 'one.md', 'start_line': 1, 'end_line': 1,
-                     'title': 'First line'}]})]
+                     'title': 'First line'}]}, prepared=prepared)]
 
 
 def paths(tmp_path):
@@ -50,7 +66,7 @@ def publication_paths(memory, tmp_path):
 def test_completed_drafts_keep_order_scopes_and_receipt_details(tmp_path):
     completed = [completed_file(tmp_path, {'sources': [], 'members': [{'kind': 'chunk', 'start_line': 1, 'end_line': 1}]}, name='a.json'),
                  completed_file(tmp_path, {'sources': [], 'members': [{'kind': 'chunk', 'start_line': 1, 'end_line': 1}],
-                     'edges': [{'id': 'edge', 'in': {'draft': 0, 'member': 0}, 'out': {'member': 0},
+                     'edges': [{'in': {'draft': 0, 'member': 0}, 'out': {'member': 0},
                                 'evidence': [{'draft': 0, 'member': 0}, {'member': 0}]}]}, name='b.json')]
     files = paths(tmp_path)
     applied = {'sources': 0, 'members': 2, 'nodes': 0, 'edges': 1, 'invalidated': ['member:old']}
@@ -123,7 +139,8 @@ def test_original_apply_error_leaves_fixed_batch_for_explicit_resume(tmp_path):
 
 def test_result_projection_cannot_overwrite_fixed_batch(tmp_path):
     frozen = tmp_path / 'frozen.json'
-    batch = freeze_file([{'sources': []}], frozen)
+    reference = completed_file(tmp_path, {'sources': []})
+    batch = freeze_file([json.loads(Path(reference['path']).read_text(encoding='utf-8'))], frozen)
     with pytest.raises(ValueError, match='different path'):
         publish(SimpleNamespace(apply=lambda *a, **kw: pytest.fail('applied path collision')),
                 frozen=frozen, result=frozen, control='owner.control')
@@ -185,3 +202,75 @@ def test_cli_uses_the_python_helper_and_returns_compact_summary(tmp_path, monkey
                               '--result', 'result.json'])
     assert dispatch(args, None) == ({'batch_id': 'summary'}, 0)
     assert calls[-1][1]['completed'] is None and calls[-1][1]['output'] is None
+
+
+def test_frozen_private_is_checked_for_members_nodes_and_edges(memory, tmp_path, publication_paths):
+    public = memory.config.root / 'public.md'
+    private = memory.config.root / 'private' / 'secret.md'
+    private.parent.mkdir(exist_ok=True)
+    public.write_text('public fact\n', encoding='utf-8')
+    private.write_text('private fact\n', encoding='utf-8')
+    reading = memory.prepare(['public.md', 'private/secret.md'])
+    proposal = {'sources': [{'path': 'public.md'}, {'path': 'private/secret.md'}],
+                'members': [
+                    {'kind': 'chunk', 'path': 'public.md', 'start_line': 1, 'end_line': 1, 'title': 'public'},
+                    {'kind': 'chunk', 'path': 'private/secret.md', 'start_line': 1, 'end_line': 1, 'title': 'private'}],
+                'nodes': [{'kind': 'topic', 'text': 'private topic', 'evidence': [{'member': 1}]}],
+                'edges': [{'kind': 'relates', 'text': 'linked', 'in': {'member': 0}, 'out': {'node': 0},
+                           'evidence': [{'member': 1}]}]}
+    ref = completed_file(tmp_path, proposal, prepared=reading)
+    proposal = json.loads(Path(ref['path']).read_text(encoding='utf-8'))
+    batch = freeze_file([proposal], tmp_path / 'private-frozen.json', config=memory.config)
+    public_id, private_id = (member['id'] for member in batch['members'])
+    node_id, edge_id = batch['nodes'][0]['id'], batch['edges'][0]['id']
+    assert batch['compiled_private'] == {public_id: False, private_id: True, node_id: True, edge_id: True}
+    from copy import deepcopy
+    tampered = deepcopy(batch)
+    tampered['compiled_private'][edge_id] = False
+    with pytest.raises(ValueError, match='Frozen private marker changed'):
+        memory.apply(tampered, control=publication_paths['control'])
+    assert not memory._rows('member')
+    applied = memory.apply(batch, control=publication_paths['control'])
+    assert (applied['members'], applied['nodes'], applied['edges']) == (2, 1, 1)
+    assert {row['id']: row['private'] for row in memory._rows('member')} == {public_id: False, private_id: True}
+    assert memory._rows('node')[0]['private'] and memory._rows('semantic')[0]['private']
+
+
+def test_history_private_from_exact_prepare_version(memory, tmp_path, publication_paths):
+    from basepack.memory.draft import freeze
+
+    (memory.config.root / 'guide.md').write_text('example\n', encoding='utf-8')
+    memory.connection['private_scope'] = ['guide.md']
+    reading = memory.prepare(['guide.md'])
+    draft = {'sources': [{'path': 'guide.md', 'revision': reading['sources'][0]['revision']}],
+             'members': [{'kind': 'chunk', 'path': 'guide.md', 'title': 'example',
+                          'start_line': 1, 'end_line': 1}]}
+    original = freeze([draft], config=memory.config)
+    memory.apply(original, control=publication_paths['control'])
+    identity = original['members'][0]['id']
+    old = memory.knowledge(identity)
+    assert old['private'] is True
+    memory.connection['private_scope'] = []
+    current_package = memory.prepare(['guide.md'])
+    draft['expected'] = current_package['expected']
+    draft['members'][0]['id'] = identity
+    memory.apply(freeze([draft], config=memory.config), control=publication_paths['control'])
+    assert memory.knowledge(identity)['private'] is False
+    old_version = {'id': identity, 'knowledge_revision': old['knowledge_revision']}
+    proposal = {'sources': [{'path': 'guide.md'}],
+                'members': [{'kind': 'chunk', 'path': 'guide.md', 'title': 'current',
+                             'start_line': 1, 'end_line': 1}],
+                'edges': [{'kind': 'evolution', 'text': 'evolution', 'in': identity, 'out': {'member': 0},
+                           'endpoint_versions': {'in': old_version}, 'evidence': [{'member': 0}]}]}
+    missing_ref = completed_file(tmp_path, proposal, name='missing.json', prepared=memory.prepare(['guide.md']))
+    missing = json.loads(Path(missing_ref['path']).read_text(encoding='utf-8'))
+    with pytest.raises(ValueError, match='Historical endpoint private classification absent'):
+        freeze_file([missing], tmp_path / 'missing-frozen.json', config=memory.config)
+    prepared = memory.prepare(['guide.md'], historical_versions=[old_version])
+    ref = completed_file(tmp_path, proposal, name='with-history.json', prepared=prepared)
+    batch = freeze_file([json.loads(Path(ref['path']).read_text(encoding='utf-8'))],
+                        tmp_path / 'history-frozen.json', config=memory.config)
+    edge = batch['edges'][0]['id']
+    assert batch['compiled_private'][edge] is True
+    memory.apply(batch, control=publication_paths['control'])
+    assert memory._rows('semantic')[0]['private'] is True

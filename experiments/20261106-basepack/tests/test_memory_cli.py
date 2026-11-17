@@ -185,15 +185,16 @@ def test_maintain_defaults_to_project_scope_and_passes_control(tmp_path, monkeyp
     receipt.write_text('{"semantic": [], "pending_relations": []}', encoding="utf-8")
     monkeypatch.setattr("basepack.memory.store.Memory.maintain",
                         lambda self, scope, **kwargs: calls.append((scope, kwargs)) or
-                        {"needs_semantic": 0, "receipt": str(receipt)})
+                        {"needs_semantic": False, "semantic_sources": 0, "pending_relations": 0,
+                         "feedback": 0, "receipt": str(receipt)})
     parser = argparse.ArgumentParser()
     register_commands(parser.add_subparsers(dest="command"))
     args = parser.parse_args(["memory", "maintain", "--holder", "thread", "--control", "task.control"])
     result, status = dispatch(args, config)
     assert status == 0 and result["needs_semantic"] == 0
-    assert result["codex"]["status"] == "binding_unavailable"
+    assert result["codex"]["status"] == "not_configured"
     control = str(Path("task.control").resolve())
-    assert calls == [(["docs/new.md"], {"control": control, "timeout": 600})]
+    assert calls == [(["docs/new.md"], {"control": control, "timeout": 600, "include_registered": True})]
     assert result["control"] == control
     assert result["discovery"] == {"mode": "configured", "sources": 1, "gaps": []}
     assert "worker" not in result
@@ -262,12 +263,14 @@ def test_rank_directory_input_reports_the_file_contract(tmp_path):
         dispatch(_memory_args("rank", "--input", str(tmp_path)), None)
 
 
-@pytest.mark.parametrize("mode,available,expected_teams,expected_name", [
-    ("automatic", 0, 0, None), ("automatic", 4, 1, "bp_mem_coord_0"),
-    ("automatic", 12, 1, "bp_mem_coord_0"), ("manual", 12, 2, "bp_mem_coord_0"),
+@pytest.mark.parametrize("mode,available,counts,planned", [
+    ("automatic", 0, (8, 0, 0), 0), ("automatic", 4, (2, 0, 0), 2),
+    ("automatic", 12, (8, 0, 0), 5), ("manual", 12, (6, 0, 0), 6),
+    ("manual", 12, (0, 0, 0), 0), ("manual", 12, (0, 3, 0), 3),
+    ("manual", 12, (0, 0, 2), 2),
 ])
-def test_maintain_saves_layout_and_respects_zero_capacity(tmp_path, monkeypatch, mode, available,
-                                                       expected_teams, expected_name):
+def test_maintain_saves_layout_for_actual_work_and_capacity(tmp_path, monkeypatch, mode, available,
+                                                         counts, planned):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
     config = load_project_config(init_project(tmp_path / "project", machine,
@@ -276,12 +279,11 @@ def test_maintain_saves_layout_and_respects_zero_capacity(tmp_path, monkeypatch,
     receipt = config.memory_dir / "maintenance/receipt.json"
     receipt.parent.mkdir()
     receipt.write_text('{"semantic": [], "pending_relations": []}', encoding="utf-8")
-    monkeypatch.setattr("basepack.memory.cli._collect_codex", lambda *a, **kw:
-                        {"project_id": None, "paths": [], "status": "binding_unavailable"})
     monkeypatch.setattr("basepack.memory.discovery.discover_sources", lambda *a:
                         {"mode": "configured", "paths": [], "gaps": []})
     monkeypatch.setattr("basepack.memory.store.Memory.maintain", lambda *a, **kw:
-                        {"needs_semantic": True, "receipt": str(receipt)})
+                        {"needs_semantic": bool(max(counts)), "semantic_sources": counts[0],
+                         "pending_relations": counts[1], "feedback": counts[2], "receipt": str(receipt)})
     result, status = dispatch(_memory_args("maintain", "--holder", "thread", "--control",
                                           str(receipt.with_suffix(".control")), "--mode", mode,
                                           "--available-subagents", str(available)), config)
@@ -289,13 +291,16 @@ def test_maintain_saves_layout_and_respects_zero_capacity(tmp_path, monkeypatch,
     saved = json.loads(receipt.read_text(encoding="utf-8"))["layout"]
     assert saved == result["layout"]
     assert saved["capacity_status"] == "verified_available"
-    assert len(saved["teams"]) == expected_teams
-    if expected_name:
-        assert result["worker"]["task_name"] == expected_name
-        assert f"'--team' '0'" in result["worker"]["render_command"]
+    assert saved["work_items"] == max(counts)
+    assert saved["planned_subagents"] == planned
+    assert saved["run_id"] == result["owner"]["run_id"]
+    if planned:
+        assert result["worker"]["task_name"] == f"bp_mem_{saved['run_id'][:8]}_coord_0"
+        assert "'--team' '0'" in result["worker"]["render_command"]
     else:
         assert "worker" not in result
-        assert result["needs_semantic"] and result["dispatch_blocked"]
+        assert saved["teams"] == []
+        assert bool(result.get("dispatch_blocked")) is bool(max(counts))
 
 
 @pytest.mark.parametrize("available,executor", [(0, "main"), (1, "worker")])
@@ -315,16 +320,20 @@ def test_independent_retrieval_cli_and_pending_layout_never_open_store(tmp_path,
         result, status = dispatch(_memory_args(action, "--request", str(request), "--slot", "1",
                                               "--available-subagents", str(available)), config)
         assert status == 0 and result["executor"] == executor
-        assert result["task_name"] == ("bp_mem_search_1" if available else None)
+        if available:
+            assert result["task_name"].startswith("bp_mem_search_") and result["task_name"].endswith("_1")
+        else:
+            assert result["task_name"] is None
         if action == "retrieval-prompt":
             assert result["prompt"]
     receipt = tmp_path / "receipt.json"
-    receipt.write_text(json.dumps({"layout": maintenance_layout(config, mode="manual")}), encoding="utf-8")
+    layout = maintenance_layout(config, mode="manual", work_items=5)
+    receipt.write_text(json.dumps({"layout": layout}), encoding="utf-8")
     pending, status = dispatch(_memory_args("pending-dispatch", "--receipt", str(receipt),
                                            "--available-subagents", "2", "--started-task-names",
-                                           "bp_mem_coord_0"), config)
+                                           layout["teams"][0]["task_name"]), config)
     assert status == 0
-    assert [w["task_name"] for w in pending["workers"]] == ["bp_mem_read_00", "bp_mem_read_01"]
+    assert [w["task_name"] for w in pending["workers"]] == layout["teams"][0]["reader_task_names"][:2]
     assert not config.memory_dir.exists()
     assert not config.memory_password_file.exists()
 
@@ -354,210 +363,202 @@ def test_prompt_cli_never_constructs_memory_or_creates_state(tmp_path, monkeypat
     assert not config.memory_dir.exists()
 
 
-def test_maintain_discovers_git_project_and_emits_complete_worker_command(tmp_path, monkeypatch):
+def _maintenance_setup(tmp_path, monkeypatch, *, semantic=1, relations=0, feedback=0, registered=()):
+    from types import SimpleNamespace
+
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
-    _provision_password(config)
+    config = load_project_config(init_project(tmp_path / "project", machine,
+                                             max_concurrent_subagents=12, concurrency_source="test fixture"))
+    receipt = config.memory_dir / "maintenance" / "receipt.json"
+    receipt.parent.mkdir(parents=True)
+    receipt.write_text(json.dumps({"semantic": [{"path": f"source-{i}.md", "members": []}
+                                               for i in range(semantic)],
+                                   "pending_relations": [{"id": f"relation:{i}", "basis": []}
+                                                         for i in range(relations)],
+                                   "feedback": [{"id": f"feedback:{i}"} for i in range(feedback)]}), encoding="utf-8")
+    calls = []
+    def maintain(scope, **kwargs):
+        calls.append((scope, kwargs))
+        return {"needs_semantic": bool(semantic or relations or feedback), "semantic_sources": semantic,
+                "pending_relations": relations, "feedback": feedback, "receipt": str(receipt)}
+    monkeypatch.setattr("basepack.memory.store.Memory", lambda config: SimpleNamespace(
+        maintain=maintain, sources=lambda: [{"path": path} for path in registered]))
+    return config, receipt, calls
+
+
+def _collection_receipt(config, paths):
+    from hashlib import sha256
+
+    config.raw["memory"]["codex"]["project_id"] = "owned-project"
+    snapshots = []
+    for relative in paths:
+        target = config.root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"captured original")
+        snapshots.append({"path": relative, "sha256": sha256(target.read_bytes()).hexdigest()})
+    receipt = config.memory_dir / "maintenance" / "collection.json"
+    receipt.write_text(json.dumps({"status": "captured", "root": str(config.root),
+                                   "project_id": "owned-project", "paths": paths,
+                                   "snapshots": snapshots, "receipt": str(receipt)}), encoding="utf-8")
+    return receipt
+
+
+def _retained_capture(config):
+    config.raw["memory"]["codex"]["project_id"] = "owned-project"
+    capture = config.memory_dir / "codex" / "old.txt"
+    capture.parent.mkdir(parents=True)
+    capture.write_bytes(json.dumps({"project_id": "owned-project", "thread_id": "old", "byte_length": 3,
+                                    "managed_attachment": "codex-attachments/old.png"}).encode() + b"\nold\n")
+    attachment = config.memory_dir / "codex-attachments" / "old.png"
+    attachment.parent.mkdir()
+    attachment.write_bytes(b"retained image")
+    return [attachment.relative_to(config.root).as_posix(), capture.relative_to(config.root).as_posix()]
+
+
+def test_maintain_discovers_git_project_and_emits_complete_worker_command(tmp_path, monkeypatch):
+    config, receipt, calls = _maintenance_setup(tmp_path, monkeypatch)
     subprocess.run(["git", "init", "-q"], cwd=config.root, check=True)
     (config.root / "outside-current-task.md").write_text("Project wide", encoding="utf-8")
     (config.root / "unsupported.bin").write_bytes(b"binary\0content")
-    calls = []
-    receipt = str(config.memory_dir / "maintenance/receipt.json")
-    Path(receipt).parent.mkdir(parents=True, exist_ok=True)
-    Path(receipt).write_text('{"semantic": [], "pending_relations": []}', encoding="utf-8")
-    monkeypatch.setattr("basepack.memory.store.Memory.maintain", lambda self, scope, **kwargs:
-                        calls.append((scope, kwargs)) or {"needs_semantic": True, "receipt": receipt})
-    result, status = dispatch(_memory_args("maintain", "--holder", "thread", "--control", str(config.memory_dir / "maintenance" / "task.control")), config)
+    result, status = dispatch(_memory_args("maintain", "--holder", "thread", "--control",
+                                          str(config.memory_dir / "maintenance" / "task.control")), config)
     assert status == 0
     assert "outside-current-task.md" in calls[0][0]
     assert all(not path.startswith(".basepack/") for path in calls[0][0])
     assert result["discovery"]["mode"] == "git"
     assert result["discovery"]["gaps"] == [{"path": "unsupported.bin", "reason": "binary"}]
-    assert result["worker"]["role"] == "coordinator"
-    assert result["worker"]["tier"] == "tier2"
-    assert result["worker"]["model"] == config.resolve_ai(tier="tier2")["model"]
-    assert result["worker"]["reasoning_effort"] == config.resolve_ai(tier="tier2")["reasoning_effort"]
-    assert "prompt" not in result["worker"]
+    worker = result["worker"]
+    assert worker["role"] == "coordinator" and worker["tier"] == "tier2"
+    assert worker["model"] == config.resolve_ai(tier="tier2")["model"]
+    assert worker["reasoning_effort"] == config.resolve_ai(tier="tier2")["reasoning_effort"]
+    assert "prompt" not in worker
     control = Path(result["control"])
     assert control.is_absolute() and control.parent == config.memory_dir / "maintenance"
-    assert str(control) in result["worker"]["render_command"]
-    assert receipt in result["worker"]["render_command"]
-    assert calls[0][1] == {"control": str(control), "timeout": 600}
-    material = json.loads(Path(receipt).read_text(encoding="utf-8"))
-    assert material["codex"] == {**result["codex"],
-                                  "capture_dir": str(config.memory_dir / "codex"),
-                                  "attachment_dir": str(config.memory_dir / "codex-attachments")}
+    assert str(control) in worker["render_command"] and str(receipt) in worker["render_command"]
+    assert calls[0][1] == {"control": str(control), "timeout": 600, "include_registered": True}
+    material = json.loads(receipt.read_text(encoding="utf-8"))
     assert material["layout"] == result["layout"]
-    assert result["worker"]["task_name"] == "bp_mem_coord_0"
-    assert len(material["layout"]["teams"]) == 2
-    assert material["layout"]["unused_subagents"] == 2
+    assert worker["task_name"] == f"bp_mem_{result['owner']['run_id'][:8]}_coord_0"
+    assert material["layout"]["planned_subagents"] == 1
+    assert material["layout"]["unused_subagents"] == 11
 
 
-def test_maintain_receipt_keeps_current_and_retained_codex_provenance(tmp_path, monkeypatch):
-    machine = tmp_path / "machine.toml"
-    machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
-    _provision_password(config)
-    receipt = config.memory_dir / "maintenance" / "semantic.json"
-    receipt.parent.mkdir()
-    receipt.write_text('{"semantic": [], "pending_relations": []}', encoding="utf-8")
-    capture_receipt = receipt.with_name('capture.json')
-    monkeypatch.setattr("basepack.memory.cli._collect_codex", lambda *args, **kwargs:
-                        {"project_id": "owned", "status": "captured", "paths": [],
-                         "receipt": str(capture_receipt)})
-    monkeypatch.setattr("basepack.memory.discovery.retained_codex_paths", lambda *args:
-                        {"paths": [".basepack/memory/codex-attachments/retained.png"], "gaps": []})
-    monkeypatch.setattr("basepack.memory.store.Memory.maintain", lambda *args, **kwargs:
-                        {"needs_semantic": True, "receipt": str(receipt)})
-    result, status = dispatch(_memory_args("maintain", "--holder", "thread", "--control", str(config.memory_dir / "maintenance" / "task.control"), "--scope", "no-new-discovery"), config)
-    assert status == 0
+def test_maintain_consumes_verified_collection_and_hands_off_provenance(tmp_path, monkeypatch):
+    config, receipt, calls = _maintenance_setup(tmp_path, monkeypatch, semantic=2)
+    captured = ".basepack/memory/codex-attachments/captured.png"
+    collection = _collection_receipt(config, [captured])
+    monkeypatch.setattr("basepack.memory.collection.collect", lambda *a, **kw: pytest.fail("maintain collected implicitly"))
+    monkeypatch.setattr("basepack.memory.discovery.discover_sources", lambda *a: {"mode": "configured", "paths": [], "gaps": []})
+    result, status = dispatch(_memory_args("maintain", "--holder", "thread", "--control", str(tmp_path / "control"),
+                                          "--collection", str(collection)), config)
+    assert status == 0 and calls[0][0] == [captured]
     material = json.loads(receipt.read_text(encoding="utf-8"))
-    assert material["codex"] == {**result["codex"],
-                                  "capture_dir": str(config.memory_dir / "codex"),
+    assert material["codex"] == {**result["codex"], "capture_dir": str(config.memory_dir / "codex"),
                                   "attachment_dir": str(config.memory_dir / "codex-attachments")}
-    from basepack.memory.prompts import render_prompt
-    rendered = render_prompt(config, result["receipt"], result["control"], role="reader",
-                             paths=[".basepack/memory/codex-attachments/retained.png"])
-    hints = json.loads(rendered["prompt"].split('Bounded receipt hints: ', 1)[1].splitlines()[0])
-    assert hints['codex'] == material['codex']
-
-
-def test_maintain_keeps_owned_retained_captures_when_collection_is_unavailable(tmp_path, monkeypatch):
-    import json
-
-    machine = tmp_path / "machine.toml"
-    machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
-    _provision_password(config)
-    config.raw["memory"]["codex"]["project_id"] = "owned-project"
-    capture = config.memory_dir / "codex" / "old-thread.txt"
-    capture.parent.mkdir()
-    body = "已保留且未登记的旧聊天。".encode("utf-8")
-    header = {"project_id": "owned-project", "thread_id": "old-thread", "byte_length": len(body),
-              "managed_attachment": "codex-attachments/old.png"}
-    capture.write_bytes(json.dumps(header).encode() + b"\n" + body + b"\n")
-    attachment = config.memory_dir / "codex-attachments" / "old.png"
-    attachment.parent.mkdir()
-    attachment.write_bytes(b"image")
-    calls = []
-    receipt = config.memory_dir / "maintenance/receipt.json"
-    receipt.parent.mkdir()
-    receipt.write_text('{"semantic": [], "pending_relations": []}', encoding="utf-8")
-    monkeypatch.setattr("basepack.memory.store.Memory.maintain", lambda self, scope, **kwargs:
-                        calls.append(scope) or {"needs_semantic": False, "receipt": str(receipt)})
-    result, _ = dispatch(_memory_args("maintain", "--holder", "thread", "--control", str(config.memory_dir / "maintenance" / "task.control"), "--scope", "no-new-discovery"), config)
-    assert result["codex"]["status"] == "binding_unavailable"
-    assert result["codex"]["retained_sources"] == 2
-    assert result["codex"]["retained_gaps"] == []
-    assert calls == [[".basepack/memory/codex-attachments/old.png", ".basepack/memory/codex/old-thread.txt"]]
-
-
-def test_codex_registry_is_used_for_maintenance_scope(tmp_path, monkeypatch):
-    import json
-    from basepack.memory.cli import _collect_codex
-    from basepack.memory import codex, codex_binding
-    machine = tmp_path / "machine.toml"
-    machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
-    registry = tmp_path / "registry.json"
-    registry.write_text(json.dumps({"project_id": "host-project", "registry_complete": True,
-                                    "other_project_roots": []}), encoding="utf-8")
-    source = config.memory_dir / "codex" / "thread.txt"
-    class Client:
-        def __init__(self, executable): pass
-        def close(self): pass
-    monkeypatch.setattr(codex, "AppServer", Client)
-    monkeypatch.setattr(codex, "list_threads", lambda client, control: [{"id": "thread"}])
-    monkeypatch.setattr(codex_binding, "discover_binding", lambda *args: {"gaps": []})
-    monkeypatch.setattr(codex_binding, "classify_threads", lambda *args: {
-        "matched": [{"id": "thread"}],
-        "excluded": [{"thread": {"id": "other", "preview": "other project private text"}, "reason": "outside"}],
-        "unresolved": [], "gaps": []})
-    seen = []
-    def collect(*args, **kwargs):
-        seen.append(kwargs['project_binding'])
-        return {"paths": [str(source)], "gaps": [], "threads": []}
-    monkeypatch.setattr(codex, "collect_codex", collect)
-    result = _collect_codex(config, registry, control="task.control")
-    assert result["paths"] == [".basepack/memory/codex/thread.txt"]
-    assert result["discovered"] == 1
-    assert seen == [{"gaps": []}]
-    assert Path(result["receipt"]).is_file()
-    assert "other project private text" not in Path(result["receipt"]).read_text(encoding="utf-8")
-
-
-def test_skip_collection_retains_existing_capture_and_explicit_registry(tmp_path, monkeypatch):
-    machine = tmp_path / "machine.toml"
-    machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine,
-                                             max_concurrent_subagents=4, concurrency_source="test"))
-    _provision_password(config)
-    (config.root / "current.md").write_text("Current project file", encoding="utf-8")
-    registry = tmp_path / "registry.json"
-    registry.write_text(json.dumps({"project_id": "explicit-project"}), encoding="utf-8")
-    capture = config.memory_dir / "codex" / "old.txt"
-    capture.parent.mkdir()
-    capture.write_bytes(json.dumps({"project_id": "explicit-project", "thread_id": "old", "byte_length": 3,
-                                    "managed_attachment": "codex-attachments/old.png"}).encode() + b"\nold\n")
-    attachment = config.memory_dir / "codex-attachments" / "old.png"
-    attachment.parent.mkdir()
-    attachment.write_bytes(b"retained")
-    receipt = config.memory_dir / "maintenance" / "receipt.json"
-    receipt.parent.mkdir()
-    receipt.write_text('{"semantic": [], "pending_relations": []}', encoding="utf-8")
-    scopes = []
-    monkeypatch.setattr("basepack.memory.cli._collect_codex", lambda *a, **k: pytest.fail("collector was called"))
-    monkeypatch.setattr("basepack.memory.store.Memory.maintain", lambda self, scope, **k:
-                        scopes.append(scope) or {"needs_semantic": True, "receipt": str(receipt)})
-    result, _ = dispatch(_memory_args("maintain", "--holder", "thread", "--control", str(tmp_path / "control"),
-                                     "--skip-codex-collection", "--codex-registry", str(registry),
-                                     "--scope", "current.md"), config)
-    assert set(scopes[0]) == {"current.md", ".basepack/memory/codex/old.txt", ".basepack/memory/codex-attachments/old.png"}
-    assert result["codex"]["status"] == "not_requested"
-    assert result["codex"]["retained_sources"] == 2
-    assert result["worker"]["task_name"] == "bp_mem_coord_0"
-    material = json.loads(receipt.read_text(encoding="utf-8"))
-    assert material["codex"]["status"] == "not_requested"
+    assert result["codex"]["status"] == "captured" and result["codex"]["receipt"] == str(collection)
     assert material["owner_run_id"] == result["owner"]["run_id"]
+    from basepack.memory.prompts import render_prompt
+    rendered = render_prompt(config, result["receipt"], result["control"], role="reader", paths=[captured])
+    hints = json.loads(rendered["prompt"].split("Bounded receipt hints: ", 1)[1].splitlines()[0])
+    assert hints["codex"] == material["codex"]
 
 
-def test_default_collector_failure_is_original_error_and_releases_startup(tmp_path, monkeypatch):
+def test_maintain_retained_is_explicit_and_freshness_remains_unknown(tmp_path, monkeypatch):
+    config, _, calls = _maintenance_setup(tmp_path, monkeypatch, semantic=0)
+    retained = _retained_capture(config)
+    monkeypatch.setattr("basepack.memory.collection.collect", lambda *a, **kw: pytest.fail("retained invoked collector"))
+    monkeypatch.setattr("basepack.memory.discovery.discover_sources", lambda *a: {"mode": "configured", "paths": [], "gaps": []})
+    result, status = dispatch(_memory_args("maintain", "--holder", "thread", "--control", str(tmp_path / "control"),
+                                          "--retained"), config)
+    assert status == 0 and calls[0][0] == retained
+    assert result["codex"]["status"] == "retained" and result["codex"]["freshness"] == "unknown"
+    assert calls[0][1]["include_registered"] is True
+
+
+def test_explicit_scope_excludes_unrelated_captures_and_registered_pending(tmp_path, monkeypatch):
+    config, _, calls = _maintenance_setup(tmp_path, monkeypatch, registered=("docs/deleted.md", "docs2/unrelated.md"))
+    _retained_capture(config)
+    (config.root / "docs").mkdir()
+    (config.root / "docs/current.md").write_text("Current source", encoding="utf-8")
+    result, status = dispatch(_memory_args("maintain", "--holder", "thread", "--control", str(tmp_path / "control"),
+                                          "--retained", "--scope", "docs"), config)
+    assert status == 0
+    assert calls[0][0] == ["docs/current.md", "docs/deleted.md"]
+    assert calls[0][1]["include_registered"] is False
+    assert result["discovery"]["mode"] == "explicit" and result["discovery"]["sources"] == 2
+
+
+def test_explicit_scope_can_select_retained_chat_directory(tmp_path, monkeypatch):
+    config, _, calls = _maintenance_setup(tmp_path, monkeypatch)
+    retained = _retained_capture(config)
+    result, status = dispatch(_memory_args("maintain", "--holder", "thread", "--control", str(tmp_path / "control"),
+                                          "--retained", "--scope", ".basepack/memory/codex"), config)
+    assert status == 0 and calls[0][0] == [retained[1]]
+    assert calls[0][1]["include_registered"] is False
+
+
+def test_bound_project_requires_collection_selection_and_releases_failed_startup(tmp_path, monkeypatch):
     from basepack.memory import owner
 
-    machine = tmp_path / "machine.toml"
-    machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine,
-                                             max_concurrent_subagents=4, concurrency_source="test"))
+    config, _, _ = _maintenance_setup(tmp_path, monkeypatch)
+    config.raw["memory"]["codex"]["project_id"] = "owned-project"
+    monkeypatch.setattr("basepack.memory.store.Memory", lambda config: pytest.fail("selection error opened store"))
+    control = tmp_path / "control"
+    with pytest.raises(ValueError, match="--collection.*--retained"):
+        dispatch(_memory_args("maintain", "--holder", "thread", "--control", str(control)), config)
+    assert owner.status(config.memory_dir) is None
+    assert control.read_bytes() == b"S"
+
+
+def test_maintenance_collection_choices_are_exclusive_and_skip_flag_is_removed():
+    for options in (("--collection", "receipt.json", "--retained"), ("--skip-codex-collection",)):
+        with pytest.raises(SystemExit):
+            _memory_args("maintain", "--holder", "thread", "--control", "control", *options)
+
+
+def test_collect_cli_is_independent_of_store_and_maintenance_owner(tmp_path, monkeypatch):
+    from basepack.memory import owner
+
+    config, _, _ = _maintenance_setup(tmp_path, monkeypatch)
+    monkeypatch.setattr("basepack.memory.store.Memory", lambda config: pytest.fail("collect opened store"))
+    monkeypatch.setattr(owner, "acquire", lambda *a, **kw: pytest.fail("collect acquired maintenance owner"))
+    calls = []
+    output = config.memory_dir / "maintenance" / "collection.json"
+    result = {"status": "captured", "receipt": str(output), "paths": []}
+    monkeypatch.setattr("basepack.memory.collection.collect", lambda *a, **kw: calls.append((a, kw)) or result)
+    assert dispatch(_memory_args("collect", "--codex-registry", "registry.json", "--output", str(output)), config) == (
+        {"status": "captured", "output": str(output)}, 0)
+    assert calls == [((config, "registry.json"), {"output": str(output)})]
+    assert owner.status(config.memory_dir) is None
+
+
+def test_collection_failure_preserves_original_error_without_owner_cleanup(tmp_path, monkeypatch):
+    from basepack.memory import owner
+
+    config, _, _ = _maintenance_setup(tmp_path, monkeypatch)
     error = RuntimeError("collector SQLite error 14")
     def failed(*args, **kwargs):
         raise error
-    monkeypatch.setattr("basepack.memory.cli._collect_codex", failed)
-    control = tmp_path / "control"
-    args = _memory_args("maintain", "--holder", "thread", "--control", str(control), "--scope", "missing")
+    monkeypatch.setattr("basepack.memory.collection.collect", failed)
     with pytest.raises(RuntimeError) as failure:
-        dispatch(args, config)
-    assert failure.value is error
-    assert owner.status(config.memory_dir) is None
-    assert control.read_bytes() == b"S"
+        dispatch(_memory_args("collect"), config)
+    assert failure.value is error and owner.status(config.memory_dir) is None
 
 
 def test_startup_cleanup_failure_keeps_both_errors(tmp_path, monkeypatch):
     from basepack.memory import owner
 
-    machine = tmp_path / "machine.toml"
-    machine.write_text("schema_version=1\n", encoding="utf-8")
-    config = load_project_config(init_project(tmp_path / "project", machine,
-                                             max_concurrent_subagents=4, concurrency_source="test"))
-    original, cleanup = RuntimeError("collector failed"), OSError("owner state is unavailable")
+    config, _, _ = _maintenance_setup(tmp_path, monkeypatch)
+    original, cleanup = RuntimeError("selected receipt failed"), OSError("owner state is unavailable")
     def fail_original(*args, **kwargs):
         raise original
     def fail_cleanup(*args, **kwargs):
         raise cleanup
-    monkeypatch.setattr("basepack.memory.cli._collect_codex", fail_original)
+    monkeypatch.setattr("basepack.memory.collection.load_collection", fail_original)
     monkeypatch.setattr(owner, "release_failed_startup", fail_cleanup)
     with pytest.raises(ExceptionGroup) as failure:
         dispatch(_memory_args("maintain", "--holder", "thread", "--control", str(tmp_path / "control"),
-                              "--scope", "missing"), config)
+                              "--collection", "receipt.json"), config)
     assert failure.value.exceptions == (original, cleanup)
     assert owner.status(config.memory_dir)["holder"] == "thread"

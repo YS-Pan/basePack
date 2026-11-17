@@ -1,8 +1,10 @@
 # 当前basePack总体逻辑
 
-2026-11-17核对。以下是已部署0.16.0客户端的逻辑，不是下一代设计；共享embedding服务保持0.15.0。实现与验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)、[完整维护观察](../tasks/20261115-real-use-rectification/maintenance-20261116-result.md)，本机路径与服务入口见[部署合同](deployment.md)和[环境记录](environment.md)。新目标另见[长期架构](../tasks/20261115-real-use-rectification/target-architecture.md)。
+2026-11-17核对。以下两张流程图保留已部署0.16.0客户端的版本含义；本项目尚未切换0.17，共享embedding服务保持0.15.0。0.17源码已实现独立采集、真实工作集、prepare提案编译、严格交付事实及Gaussian行为投影，合同见[实现概览](overview.md)、[记忆模块](modules/memory.md)和[实施记录](../tasks/20261115-real-use-rectification/execution.md)。源码状态不改写旧图的验收范围。
 
-## 当前总体流程
+2026-11-17的[修改前/修改后完整系统图](../tasks/20261115-real-use-rectification/forgetting-options.md#修改前后的完整系统)是方案图，图源及生成说明在[任务图目录](../tasks/20261115-real-use-rectification/diagrams/README.md)；它们不证明0.17已安装、迁移或完成长期效果验收。本页不重绘该批SVG/PNG。0.16验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)和[完整维护观察](../tasks/20261115-real-use-rectification/maintenance-20261116-result.md)，实际路径与服务入口见[部署合同](deployment.md)及[环境记录](environment.md)。
+
+## 0.16总体流程
 
 ```mermaid
 flowchart TD
@@ -29,7 +31,7 @@ brief不按当前问题搜索；mandatory独立保留。检索worker回源、展
 
 当前访问偏好只按真实非空交付事件计算，没有日历衰减；全项目G意味着持续做A仍可能改变B的访问提示。尚无已部署的行为向量、自动视角或局部钟。行为重要性不控制语义有效性，也不删除冷材料。
 
-## 当前维护与生命周期
+## 0.16维护与生命周期
 
 ```mermaid
 flowchart LR
@@ -47,7 +49,7 @@ flowchart LR
   S --> R[发布终态明确后 release]
 ```
 
-`--skip-codex-collection`只明确跳过本轮新聊天采集，不证明聊天已更新。现行`--scope`不等于对所有已登记来源和历史pending做真实限域。阶段接续保持同轮receipt/owner/control，已实际验证；全队成本与组内机械往返仍有局限。普通维护在作者处置和程序接受后结束，审计只在用户明确要求时执行。
+0.16的`--skip-codex-collection`只跳过本轮新聊天采集，`--scope`未对所有已登记来源和历史pending真实限域。0.17已替代这两项合同，具体见[记忆模块](modules/memory.md)。0.16阶段接续保持同轮receipt/owner/control，已实际验证；全队成本与组内机械往返仍有局限。普通维护在作者处置和程序接受后结束，审计只在用户明确要求时执行。
 
 ## 代码、项目数据与共享设施
 

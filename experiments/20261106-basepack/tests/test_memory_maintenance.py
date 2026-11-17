@@ -17,14 +17,14 @@ def memory(store_memory):
     memory = store_memory
     maintain = memory.maintain
 
-    def owned_maintain(scope, *, control=None, timeout=600):
+    def owned_maintain(scope, *, include_registered=True, control=None, timeout=600):
         if control is not None:
-            return maintain(scope, control=control, timeout=timeout)
+            return maintain(scope, include_registered=include_registered, control=control, timeout=timeout)
         control = memory.config.memory_dir / "maintenance" / f"test-{uuid4().hex}.control"
         claim = owner.acquire(memory.config.memory_dir, memory.connection["project_id"], "test", control)
         assert claim["acquired"]
         try:
-            return maintain(scope, control=str(control), timeout=timeout)
+            return maintain(scope, include_registered=include_registered, control=str(control), timeout=timeout)
         finally:
             owner.stop_owned(memory.config.memory_dir, control)
             if not owner.status(memory.config.memory_dir)["publications"]:
@@ -424,7 +424,7 @@ def test_multiple_partial_versions_keep_earlier_uncovered_text(memory):
 
 
 @pytest.mark.parametrize('addition', [b'\n', b' \n', b'  indented\n'])
-def test_uncovered_whitespace_and_indentation_remain_pending(memory, addition):
+def test_uncovered_whitespace_is_covered_but_text_remains_pending(memory, addition):
     path = memory.config.root / 'notes.md'
     path.write_bytes(b'old\n')
     prepared = memory.prepare(['notes.md'])
@@ -435,7 +435,12 @@ def test_uncovered_whitespace_and_indentation_remain_pending(memory, addition):
     for _ in range(2):
         result = memory.maintain(['notes.md'])
         report = json.loads(open(result['receipt'], encoding='utf-8').read())
-        assert report['semantic'][0]['uncovered_ranges'][0]['text'] == addition.decode()
+        if addition.strip():
+            assert result['needs_semantic']
+            assert report['semantic'][0]['uncovered_ranges'][0]['text'] == addition.decode()
+        else:
+            assert not result['needs_semantic']
+            assert report['semantic'] == []
     prepared = memory.prepare(['notes.md'])
     next_batch = freeze([{'sources': [{'path': 'notes.md', 'revision': prepared['sources'][0]['revision']}],
                   'expected': prepared['expected'], 'members': [
@@ -837,3 +842,46 @@ def test_retired_unchanged_history_keeps_source_version_and_can_be_explicitly_re
     previous = memory._execute("SELECT * FROM ONLY change:revive_storage;")[0]["previous"]
     assert previous["retired"] is True
     assert previous["source_version"] == retired[storage_id]["source_version"]
+
+
+def test_explicit_workset_excludes_unselected_registered_sources_and_pending(memory):
+    original = "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n"
+    memory.apply(freeze([batch_for(memory, original)]))
+    (memory.config.root / "guide.md").write_text(original + "变化\n", encoding="utf-8")
+    (memory.config.root / "selected.md").write_text("已选内容\n", encoding="utf-8")
+    result = memory.maintain(["selected.md"], include_registered=False)
+    report = json.loads(open(result["receipt"], encoding="utf-8").read())
+    assert {item["path"] for item in report["semantic"]} == {"selected.md"}
+    assert report["workset"]["included"] == ["selected.md"]
+    assert not any(item["path"] == "guide.md" for item in report["changes"])
+
+
+def test_partial_line_locator_is_read_exactly_and_leaves_coverage_gap(memory):
+    text = "甲乙丙丁戊己庚辛\n"
+    (memory.config.root / "long.txt").write_bytes(text.encode("utf-8"))
+    prepared = memory.prepare(["long.txt"])
+    batch = freeze([{"sources": [{"path": "long.txt", "revision": prepared["sources"][0]["revision"]}],
+                     "members": [{"kind": "chunk", "path": "long.txt", "parent": None,
+                                  "start_line": 1, "end_line": 1, "title": "片段",
+                                  "locator": {"start_col": 2, "end_col": 5}}]}])
+    memory.apply(batch)
+    assert memory.read(batch["members"][0]["id"])["original"]["text"] == "丙丁戊"
+    result = memory.maintain(["long.txt"], include_registered=False)
+    report = json.loads(open(result["receipt"], encoding="utf-8").read())
+    gaps = report["semantic"][0]["uncovered_ranges"]
+    assert [item["text"] for item in gaps] == ["甲乙", "己庚辛\n"]
+
+
+def test_changed_or_removed_column_locator_requires_rereading(memory):
+    path = memory.config.root / "columns.txt"
+    path.write_bytes("甲乙丙丁戊己\n".encode("utf-8"))
+    prepared = memory.prepare(["columns.txt"])
+    batch = freeze([{"sources": [{"path": "columns.txt", "revision": prepared["sources"][0]["revision"]}],
+                     "members": [{"kind": "chunk", "path": "columns.txt", "parent": None,
+                                  "start_line": 1, "end_line": 1, "title": "片段",
+                                  "locator": {"start_col": 2, "end_col": 5}}]}])
+    memory.apply(batch)
+    path.write_bytes("甲乙\n".encode("utf-8"))
+    result = memory.maintain(["columns.txt"], include_registered=False)
+    report = json.loads(open(result["receipt"], encoding="utf-8").read())
+    assert report["semantic"][0]["members"][0]["reasons"] == ["changed"]

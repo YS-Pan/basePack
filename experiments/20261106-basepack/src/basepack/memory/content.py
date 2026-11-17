@@ -97,6 +97,49 @@ def numbered_text(source: SourceContent) -> str:
                    enumerate(source.text.splitlines(keepends=True), 1))
 
 
+def original_text(source: SourceContent, start_line: int, end_line: int,
+                  locator: Mapping | None = None) -> str:
+    """Return exact original text for an inclusive line range and optional columns.
+
+    Columns are Unicode code-point offsets within the first and last original
+    lines, zero-based and half-open. Original line endings are part of a line.
+    """
+    lines = source.text.splitlines(keepends=True)
+    if not 1 <= start_line <= end_line <= len(lines):
+        raise ValueError(f"Invalid line range {start_line}:{end_line} for {source.path}")
+    selected = lines[start_line - 1:end_line]
+    if locator is None:
+        return "".join(selected)
+    if set(locator) != {"start_col", "end_col"}:
+        raise ValueError("Text locator requires start_col and end_col")
+    start, end = locator["start_col"], locator["end_col"]
+    if (not isinstance(start, int) or isinstance(start, bool)
+            or not isinstance(end, int) or isinstance(end, bool)
+            or not 0 <= start < len(selected[0])
+            or not 0 < end <= len(selected[-1])
+            or (len(selected) == 1 and start >= end)):
+        raise ValueError(f"Invalid text locator {locator} for {source.path}:{start_line}:{end_line}")
+    if len(selected) == 1:
+        return selected[0][start:end]
+    return selected[0][start:] + "".join(selected[1:-1]) + selected[-1][:end]
+
+
+def line_slices(source: SourceContent, max_chars: int = 4000) -> list[dict]:
+    """Expose addressable bounded slices for lines too long to read as a unit."""
+    if max_chars <= 0:
+        raise ValueError("max_chars must be positive")
+    slices = []
+    for number, line in enumerate(source.text.splitlines(keepends=True), 1):
+        if len(line) <= max_chars:
+            continue
+        for start in range(0, len(line), max_chars):
+            end = min(start + max_chars, len(line))
+            slices.append({"start_line": number, "end_line": number,
+                           "locator": {"start_col": start, "end_col": end},
+                           "text": line[start:end]})
+    return slices
+
+
 def reading_units(source: SourceContent) -> list[ReadingUnit]:
     """Locate Markdown ATX headings and nonblank paragraphs, not semantic blocks."""
     lines = source.text.splitlines(keepends=True)

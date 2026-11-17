@@ -49,22 +49,59 @@ def test_vector_search_reports_missing_identity_instead_of_silent_text_fallback(
 
 
 @pytest.mark.parametrize("mode", ["vector", "hybrid"])
-def test_brief_reads_published_overview_without_search_or_model(mode, tmp_path, monkeypatch):
+@pytest.mark.parametrize("limit", [0, 1, 6])
+@pytest.mark.parametrize("projected", [False, True])
+def test_brief_reads_published_overview_without_search_or_model(mode, limit, projected, tmp_path, monkeypatch):
     password_file = tmp_path / "password.txt"
     password_file.write_text("test-password", encoding="utf-8")
+    root = tmp_path / "project"
     config = SimpleNamespace(memory_search_mode=mode, memory_password_file=password_file,
+                             root=root, memory_dir=root / ".basepack" / "memory",
                              raw={"memory": {"username": "root", "source_scope": ["docs"]}})
     memory = Memory(config)
     memory.sources = lambda: []
-    memory._execute = lambda sql: [[], [], [], [], [], [{"id": "member:map", "title": "overview"}]]
+    mandatory = {"id": "member:mandatory", "source": "source:must", "path": "docs/must.md",
+                 "source_revision": "accepted", "stale": False, "text": "Always deliver this."}
+    overview = {"id": "member:map", "knowledge_revision": "member-revision", "path": "docs/map.md",
+                "kind": "file", "title": "overview"}
+    node = {"id": "node:map", "knowledge_revision": "node-revision", "kind": "decision",
+            "title": "n" * 200, "text": "x" * 1000,
+            "internal_detail": "Do not copy into startup context."}
+    memory._execute = lambda sql: [[mandatory], [], [], [], [], [overview], [node]]
+    projection_reads = []
+    access = {"access_interval": [0.05, 0.2] if projected else [0.0, 1.0],
+              "access_status": "ready" if projected else "cold_start",
+              "access_model": "model:observed" if projected else None,
+              "access_compiled_j": 7 if projected else None, "access_fact_j": 7,
+              "access_support": 2 if projected else None, "access_prior": False if projected else None}
+    def read_projection(items):
+        projection_reads.append(items)
+        return [{**item, **access} for item in items]
+    memory.access_hints = read_projection
     memory._check_changes = lambda *args, **kwargs: pytest.fail("brief scanned sources")
     for name in ("vector_search", "hybrid_search"):
         setattr(memory, name, lambda *args, **kwargs: pytest.fail("brief searched"))
     memory.search = lambda *args, **kwargs: pytest.fail("brief searched")
     monkeypatch.setattr("basepack.embedding.admin.status", lambda *args, **kwargs: pytest.fail("brief inspected the model"))
-    result = memory.brief("semantic task", limit=6)
-    assert result["clues"][0]["id"] == "member:map"
-    assert result["clues"][0]["clue_role"] == "map"
+    result = memory.brief("semantic task", limit=limit)
+    assert [item["id"] for item in result["mandatory"]] == ["member:mandatory"]
+    assert result["mandatory"][0]["text"] == "Always deliver this."
+    assert len(result["clues"]) == min(limit, 2)
+    assert all(item["clue_role"] == "map" for item in result["clues"])
+    assert result["overview_count"] == 2
+    assert result["clues_omitted_count"] == 2 - len(result["clues"])
+    assert result["overview_groups"] == {"graph_nodes": 1, "project_summaries": 1,
+                                          "managed_chat_summaries": 0}
+    assert all(all(item[key] == value for key, value in access.items()) for item in result["clues"])
+    assert result["overview_sampling"]["candidates"] == (2 if limit else 0)
+    if limit:
+        assert len(projection_reads) == 1
+        assert {item["id"] for item in projection_reads[0]} == {"member:map", "node:map"}
+        clue = next(item for item in result["clues"] if item["id"] == "node:map")
+        assert len(clue["text"]) == 800 and len(clue["title"]) == 160
+        assert clue["text_truncated"] and "internal_detail" not in clue
+    else:
+        assert projection_reads == []
     assert result["vector_coverage"] == {"status": "not_checked"}
     assert "vector_pending_count" not in result
     assert "changes" not in result

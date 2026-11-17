@@ -6,7 +6,7 @@ import pytest
 
 from basepack.memory.codex import collect_codex
 from basepack.memory.freshness import _receipt, inspect_codex
-from basepack.memory.prompts import prepare_retrieval, render_retrieval_prompt
+from basepack.memory.retrieval import prepare_retrieval, render_retrieval_prompt
 from basepack.project.config import load_project_config
 from basepack.project.init import init_project
 

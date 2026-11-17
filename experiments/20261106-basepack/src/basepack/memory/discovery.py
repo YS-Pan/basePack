@@ -19,13 +19,17 @@ def _allowed(path: Path) -> bool:
 
 
 def _selected_files(root: Path, scopes):
+    def raise_walk_error(error):
+        raise error
+
     for scope in scopes:
         target = _project_path(root, scope)
         relative = target.relative_to(root)
         if not _allowed(relative):
             continue
         if target.is_dir():
-            for directory, names, files in os.walk(target, followlinks=False):
+            for directory, names, files in os.walk(target, followlinks=False,
+                                                    onerror=raise_walk_error):
                 names[:] = [name for name in names if name not in _EXCLUDED]
                 for name in files:
                     path = Path(directory) / name

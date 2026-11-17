@@ -1,6 +1,6 @@
 # 系统实现概览
 
-唯一active路线是[20261106-basepack](../../experiments/20261106-basepack/README.md)，源码及本项目客户端为0.16.0；本轮能力与验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)，实际安装状态见[部署合同](deployment.md)。此前私有开发上下文与同库标记见[交付进度](../archive/20261114-next-maintenance/progress.md)，统一身份与资源收敛见[上批交付](../archive/20261114-delivery-closeout/progress.md)，知识历史与访问状态见[使用整改进度](../archive/20261112-usage-rectification/progress.md)。代码、依赖锁、测试、产品文档、示例和随包skill位于实验工程；根devDoc维护现行实现和活动工作。实测和历史边界见[环境记录](environment.md)，共享资源基线见[R9结果](../archive/20261107-resource-coordination/r9-result.md)。
+唯一active路线是[20261106-basepack](../../experiments/20261106-basepack/README.md)。2026-11-17源码已实现0.17.0合同，本项目实际安装仍为0.16.0，共享embedding服务为0.15.0；本页描述0.17源码，安装及数据库切换以[部署合同](deployment.md)和[实施记录](../tasks/20261115-real-use-rectification/execution.md)为准，不从源码推定生产能力。0.16已验收能力见[整改结果](../tasks/20261115-real-use-rectification/result.md)。代码、依赖锁、测试、产品文档、示例和随包skill位于实验工程；根devDoc维护现行实现和活动工作。实测边界见[环境记录](environment.md)，共享资源基线见[R9结果](../archive/20261107-resource-coordination/r9-result.md)。
 
 本仓库提供三项可独立使用的 skill：[engineering-judgment](../../skills/engineering-judgment/SKILL.md) 用于设计、错误处理、兼容和使用流程的工程取舍，保留独立形态，通过长期使用反馈维护；[file-structure](../../skills/file-structure/SKILL.md) 推荐或整理开发文档、实验工程及私有开发上下文布局；[agent-team](../../skills/agent-team/SKILL.md) 为每项任务选择组织，按完整交付过程判断独立完成、简单协作或清晰分层，并使用宿主已有的订阅 subagent 能力。安装时选择完整目录放入目标 `.agents/skills/`，或把已有项目原件联接到该发现目录，核对相对引用与宿主实际列表；`init` 与 core doctor 不覆盖这项验收。完整步骤见 [项目接入](../../experiments/20261106-basepack/docs/setup-project.md#独立-skills-安装与发现)。组织选择与协作已有指令层实现，复杂广读的质量与总成本对照仍见 [专项记录](../tasks/20261106-rebuild/research/agent-team.md)。
 
@@ -10,15 +10,17 @@
 
 根`private/`是公共Git忽略的独立本机仓库，容纳隐私、机密及因版权/许可需限制分发的资料；公共开发说明继续自足。默认来源发现自动加入其内层Git清单；`memory.private_scope`可额外声明原位私有文件／目录，分类不扩大来源发现或控制Git发行。freeze固定归一规则及分类，新source_version纳入分类与规则版本，apply在编码前及提交前核规则，历史依据保持原分类。私有资料进入原项目记忆，`private`标记沿固定版本依据和关系端点传播并随检索/回读交付。存量补标保留知识身份与未变向量，无法确认的旧记录留未知。受管记忆与工作包沿现有忽略目录保留，完整恢复仍需数据库导出和相应文件；标记及原生导出不构成公开分享副本。详见[记忆模块](modules/memory.md)与[本机目录](project-data-layout.md)。
 
-member新建由freeze分配UUID并解析草稿局部位置引用，更新沿用prepare中的UUID与expected；冻结批次重试复用相同身份，apply只接受新协议。未迁移库明确拒绝，不自动转换或解析旧别名。存量按项目停写、备份、离线转换与验证后同步切换，原文/向量/知识版本及交付访问状态保留。
+作者提案引用固定prepare文件的path/file_sha256。程序从prepare编译来源版本、UUID、expected、依据闭包与private，解析草稿局部位置引用；可选historical-versions明确固定历史端点。冻结批次重试复用相同身份，apply沿用原原子接受链。0.17严格核memory schema 3、member identity 2；新库init写入标记，已绑定旧库须经离线桥verify/finalize后才能用新版init，普通init不替代迁移或重置J。存量按项目停写、备份、隔离转换和验证后同步切换，保留原文、向量、知识历史及真实交付事实，行为投影可重建。
 
 `memory publish` CLI与Python helper共用完成稿hash核对、freeze/validate、固定稿保存和原apply这一条组合链；数据库batch receipt仍是权威，本地result为详细投影。固定稿接续保持原batch_id与UUID，真实修稿才生成新path/hash后重新freeze。其余准备和条件组合沿既有原子工具／普通Python，合组、拆组、共读与返工仍由agent判断，宿主负责实际派工及生命周期；见[发布合同](../../experiments/20261106-basepack/docs/memory.md#最小闭环示例)。
 
-memory init绑定原UUID并刷新AGENTS关键动作与本机详细入口，固定Python、显式配置和原凭据文件。主任务直觉预计约十分钟以内跳过整个自动维护，保留brief；长任务以全项目maintain取得单owner并行业务。容量快照由安装agent采集，脚本按模式及可得空闲额度固定本轮布局与名称：自动仅0队，手动满队，低并发coord亲读，仅coord_0发布。其它聊天继续业务，反馈加入下轮派工。普通批次作者生成并由程序提交即完成，默认不追加审计；显式审计另按授权。发布采用原生WebSocket事务透明分消息，大源snapshot按实际JSON wire大小分段追加，保留同一事务、完整原文和版本。维护可显式跳过新聊天采集，既有来源与依赖仍接续。长维护可由宿主在旧组结束后用`memory stage`固定交接，沿同receipt／owner／control实际派新上下文；有限来源组、固定交稿和自有分支观察由角色prompt约束。结束stop、取消后代，确认发布结束才release；未知结果保留owner。详见[记忆模块](modules/memory.md)。
+memory init绑定原UUID并刷新AGENTS关键动作与本机详细入口，固定Python、显式配置和原凭据文件。独立`memory collect`保全聊天并给出采集截点、hash及缺口；已绑定Codex的maintain明确消费`--collection`回执或`--retained`已有原件，采集失败不替代语义维护结果。回执加载核hash，prepare固定本批实际版本，不声明全项目不可变快照。默认全项目接续，显式scope实际限制新发现、已登记及删除来源。主任务预计约十分钟以内保留brief并跳过整个自动维护；长任务maintain取得单owner并行业务。固定布局按实际work_items与可用容量启用，容量是上限，只有coord_0发布。普通批次作者生成并由程序提交即完成，默认不追加审计。发布仍用原生WebSocket事务分消息保留整源。长维护由宿主结束旧组后用`memory stage`固定交接，可传当前可用席位，沿同receipt/owner/control实际派干净上下文。结束stop、取消后代，确认发布结束才release；未知结果保留owner。详见[记忆模块](modules/memory.md)。
 
-CLI检索默认读memory.search_mode，新项目为vector；hybrid/vector按相同语义身份查询，缺模型或兼容向量明确失败。CLI和Python返回`{matches, vector_coverage}`；采集、语义接受与向量覆盖分别报告，结果保留观察knowledge_revision供反馈。检索派工独立使用retrieval-dispatch/retrieval-prompt，名称bp_mem_search_s，零席位由主agent直接执行；不要求维护回执或owner。guide/rank不需配置；owner/stop/release/recover-owner不连库；prompt、pending-dispatch及检索渲染只读配置和各自输入。doctor默认core，模型及Condor显式选查。
+CLI检索默认读memory.search_mode，新项目为vector；hybrid/vector按相同语义身份查询，缺模型或兼容向量明确失败。CLI和Python返回`{matches, vector_coverage}`；采集、语义接受与向量覆盖分别报告，结果保留观察knowledge_revision供反馈。独立检索由[retrieval.py](../../experiments/20261106-basepack/src/basepack/memory/retrieval.py)统一请求、工作目录与派工身份，每个请求加slot区分worker；零席位由主agent执行完整流程，不要求维护owner。guide/rank不需配置；owner/stop/release/recover-owner不连库；prompt、pending-dispatch及检索渲染只读配置和各自输入。doctor默认core，模型及Condor显式选查。
 
-brief 每任务直接读取已发布必保留、已有摘要索引和缺口，不执行检索/embedding，也不按新 shell 重复。`memory retrieve --question` 准备默认全项目/6000字请求，宿主真正执行并在收妥结果后确认交付。精确知识历史与图端点共用 `id + knowledge_revision`，原证另有版本；程序按稳定 delivery_id 幂等记录并按全项目交付事件计算访问权重，不按时间、不传播强化、不影响 embedding。已有 tier1 一次综合评分参考访问线索，rank 无二次加权。关系和条件由维护作者接受；没有独立当前理解同步层。
+brief每任务读取mandatory、跨来源摘要/图节点地图、未映射或未读入口及缺口，不执行检索/embedding，也不按新shell重复。非mandatory地图从有界结构样本计算Gaussian访问区间，组内按区间优先、跨组交错；UTC日仅轮换展示样本，不改变访问事实或年龄，低权重仍可被基础检索找到。`memory retrieve --question`准备默认全项目/6000字请求；worker运行retrieval-start固定独立基础锚点和行为候选，再回源并一次综合评分，rank仅排序/去重/预算。retrieval-receipt从实际候选数组和rank结果形成待确认清单，主agent收到内容后执行delivery。精确知识历史与图端点共用`id + knowledge_revision`，原证另有版本。首次确认（包括空清单）推进严格事实J，只有非空交付推进机会C，重试均不推进。
+
+行为表示只从共同交付逻辑ID学习无正则KL-NMF；默认rank=8、epsilon=0.001、beta=0.2、strength=8是工程初值。固定模型文件位于memory_dir/behavior/<sha256>.json。访问年龄逐原始锚点求Gaussian后加权，以H/R和精确版本标量基准增量编译；未知锚点份额保留为区间，重训重放原始事实后原子切换。读API不补写投影，返回事实/编译截点及未知状态。低权重不删除或排除原文、图、向量和训练ID，mandatory独立保留；数值工件仍属项目受限材料。数值训练使用可选behavior extra，基础采集、发布和检索不依赖训练成功。关系和条件仍由维护作者接受，没有独立当前理解同步层。
 
 项目现状、余项与历史要求触发同一worker完整检索；`memory freshness`脚本只读比较当前Codex清单、采集回执和端点，必要时分页读取指定聊天逐正文核对，返回新增/可能变化/已覆盖/未知。worker补读相关新原证并说明采集截止、待语义范围及未核状态；探查不写记忆、不生成向量，触发仍依赖agent指令。安装升级由独立[basepack-setup](../../experiments/20261106-basepack/skills/basepack-setup/SKILL.md)指向既有操作文档，日常使用和维护仍用随包memory skill。
 

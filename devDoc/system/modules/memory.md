@@ -1,12 +1,12 @@
 # 项目记忆实现
 
-源码面向0.16.0，实现SurrealDB多层文字、原图向量与统一知识图、知识版本历史、单owner维护、纯访问状态及同源发布组合。本轮整源快照、原位私有规则、维护入口与阶段接续的实施、安装和宿主验收状态沿[真实使用整改进度](../../tasks/20261115-real-use-rectification/progress.md)；此前0.15发行见[进度](../../tasks/20261115-release-0.15.0/progress.md)，私有发现和历史实现沿[记忆专项进度](../../tasks/20261106-memory-system/progress.md)。首建和维护由宿主订阅agent阅读生成，程序提交成功即完成普通批次，默认无额外审计。用户流程见[记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
+本页描述2026-11-17的0.17.0源码：SurrealDB原证与知识图、独立采集、prepare提案编译、单owner发布、严格交付事实及Gaussian行为访问投影。本项目实际安装仍为0.16.0，共享embedding服务为0.15.0；安装、隔离验证与正式切换沿[实施记录](../../tasks/20261115-real-use-rectification/execution.md)和[部署合同](../deployment.md)，不从源码推定生产已启用。0.16验收见[整改结果](../../tasks/20261115-real-use-rectification/result.md)，历史实现见[记忆专项进度](../../tasks/20261106-memory-system/progress.md)。首建和维护由宿主订阅agent阅读生成，程序提交成功即完成普通批次，默认无额外审计。用户流程见[记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
 
 ## 职责与数据
 
 认证在客户端构造边界统一完成：CLI/Python 共用 ProjectConfig 解析的 username 与 memory_password_file，以 UTF-8 解码文件（兼容 BOM，保留 CRLF/首尾空白）并发送 Basic Authorization；默认文件为实际 memory_dir/password.txt。config show 不读 secret，guide/rank/stop 与 prompt 不创建数据库客户端。password_env 手工桥退出；缺文件、权限或错密保留原错，不生成替代密钥或免认证回退。新库凭据由首次部署显式准备，launcher 读取同一文件；已有库和凭据随普通升级保留。
 
-- [content.py](../../../experiments/20261106-basepack/src/basepack/memory/content.py) 读取项目内 UTF-8 原字节版本与 1-based 闭区间，保留 CRLF；结构单元仅供备读，快/深变化检查不生成语义边界。
+- [content.py](../../../experiments/20261106-basepack/src/basepack/memory/content.py)读取项目内UTF-8原字节版本与1-based行闭区间，保留CRLF。长单行可用locator的start_col/end_col精确定位，列为Unicode码点的0-based半开区间；prepare提供有界line_slices。结构单元及切片仅供定位，变化检查不生成语义边界。
 - [store.py](../../../experiments/20261106-basepack/src/basepack/memory/store.py)通过HTTP查询领域记录，apply走原生WebSocket事务，完整语句按实际RPC消息字节透明分组，统一提交。大文字快照在同一事务内分段传输、组装为完整`source_version.text`，保留原字节、hash和来源版本；中途失败回滚整个批次，原生导出/恢复仍保存完整正文。`prepare`各来源的`snapshot_transport`提前报告原文字节、封装字节、语句数与消息上限，不能通过缩语义chunk或抬常数替代整源处理。没有多后端层或自建MCP，原生CLI负责服务与导出/恢复。
 - `source_version` 保存文字原文快照或图片快照引用及接受时路径，新版本身份包含路径、分类及私有规则版本，正文未变而分类改变也保留独立历史；图片原字节在 `memory.data_dir` 下的 assets 中。`member` 同时承载来源层级、智能块/摘要、范围及默认检索表示。`node` 表达实体/决定，`semantic` 使用有属性原生 relation；`change` 保存实际旧记录、时间及宿主可取得的执行信息。
 - [images.py](../../../experiments/20261106-basepack/src/basepack/memory/images.py) 保留原图 hash 快照与定位，完整写入并核 hash 后原子发布，已有损坏快照仍报错；[vectors.py](../../../experiments/20261106-basepack/src/basepack/memory/vectors.py) 复用现有 EmbeddingClient 批量编码，查询使用原生 cosine 与排名融合，普通返回省略数值大数组。图文模型和服务沿 R9 共用。
@@ -18,7 +18,7 @@
 
 ## 已有行为
 
-prepare 时包括本批所用依据与关系两端的材料，取得同读的新旧原文、当前与历史相关邻域及 expected 知识版本；邻域包含以所选成员为依据的 node→node 关系，并在 neighborhood.members 补齐相关成员端点与直接依据，关联原文仍需 read 或扩充 prepare 核实。agent 同次决定边界、摘要和有依据关系，apply 核来源与知识版本后原子接受；旧草稿冲突须重新 prepare、共读。程序按原范围取得 chunk，显式文字须逐字一致；更正的 previous 从实际旧记录取得。独立增边保留其它边。
+prepare固定本批实际读取的来源版本、同读新旧原文、相关邻域和expected知识版本；邻域包含以所选成员为依据的node→node关系，并补齐相关成员端点与直接依据。历史端点通过可选`--historical-versions`的`{id, knowledge_revision}`数组显式固定，关联原文仍需read或扩充prepare核实。agent同次决定边界、摘要和有依据关系，apply核来源与知识版本后原子接受；冲突须重新prepare并共读。程序按精确范围和locator取得chunk，显式文字须逐字一致；更正的previous来自实际旧记录，独立增边保留其它边。
 
 变化检查只发现待维护来源，不改已发布状态。apply 核版本并发布本批变更；未被本批替换的内容保留其实际依据快照，显式退役、更正及受影响关系按状态处理。接受删除保留旧快照与更正，不反复报告已处理删除。
 
@@ -28,46 +28,62 @@ vector/hybrid 的 Python 与 CLI 检索统一返回 `matches` 和 `vector_covera
 
 read 以 member ID 和可选的依据版本、位置回读保留的原文或原图快照。同 source 保留读取该来源任意已发布版本的合同；跨 source 由 change.previous 或其 members 历史证明成员曾属该来源，不要求成员精确接受过请求版本。路径优先使用 snapshot.path；旧快照缺路径时，优先取请求版本的成员历史路径，否则使用已证明同 source 的当前/历史成员唯一路径，多路径歧义报错。不强制改写旧快照，也不宣称能恢复未记录的精确历史路径。核语义关系时必须沿 basis 的 source_version 与文字范围或图片 locator 回读 original，stable ID 的当前 member 不能替换已保存的旧依据。快照缺失或损坏直接失败。neighbors 默认过滤 stale 的父子/语义展开，历史复核显式 include_stale。
 
-成员使用程序生成的 UUID。[draft.py](../../../experiments/20261106-basepack/src/basepack/memory/draft.py)在freeze接收边界区分作者draft与frozen，提前定位文字成员起止行、`nodes.id`及`edges.id/in/out`缺字段，报告draft/数组位置及字段。通过后为各reader独立draft中的新成员分配身份，解析草稿位置作用域与跨草稿引用，将一对一映射保留在冻结批次；更新使用prepare返回的UUID与expected。apply拒绝旧协议、重复更新及未迁移库，已提交的相同冻结批次返回事务回执。UUID切换前的member_identity_version门禁沿原离线迁移合同，不在线解析旧ID；0.16客户端升级本身不要求迁库。0.15 frozen同时缺`privacy_rules`与`privacy_rules_revision`且当前private_scope为空时，可保原batch_id/UUID接续；未提交旧稿遇非空规则明确冲突，已提交相同稿仍返回原回执。不存在的read目标明确报错，输入方式见用户流程及随包skill。
+成员使用程序生成的UUID。[draft.py](../../../experiments/20261106-basepack/src/basepack/memory/draft.py)的compile_proposals从作者提案的`prepare: {path, file_sha256}`核固定阅读包；作者提供语义选择和局部引用，程序编译source revision、UUID、expected、实际依据闭包与private。现有写入/退役/更正须在prepare中可证，缺依赖、冲突版本、无效依据或私有分类不明均明确失败；编译只跟随已表达的依据，不替作者选择证据。新记录局部引用和跨稿位置在freeze统一解析，生成的prepare_packages、dependency_closure和compiled_private随固定稿保存。改稿产生新文件/hash并重冻，同一冻结批次重放使用原batch_id/UUID。apply继续核原协议及原子接受；身份版本仍为2，0.17新增memory schema 3，旧库按隔离迁移合同切换。不存在的read目标明确报错。
 
 [publish.py](../../../experiments/20261106-basepack/src/basepack/memory/publish.py)提供稳定 Python 组合 helper，`memory publish` CLI 调同一实现。有序完成稿引用为 path/file_sha256/assignment；publisher 根据具体 assignment 的显式交付和自有宿主句柄声明完成，程序不从文件或聊天结束推断它。helper 核文件 SHA256，复用 draft.py 的 freeze/validate/独占保存，再调用原 Memory.apply；没有另一套发布事务或作者状态库。短结果报告写入/invalidated 数量，本地详细 result 是原 DB batch receipt 的投影。首次从完成稿生成新 frozen；显式 `--frozen` 接续原 batch_id/UUID，包括本地结果写失败后的恢复。文件字节 SHA256 和 apply 的规范化 batch_hash 分开；改稿才经当前 prepare/阅读产生新 path/hash 与 freeze。未知提交继续原 marker/owner 合同，不自动重试或 release。其余原子工具仍可由 agent 用普通 Python 自由组合，语义修订归原作者，宿主继续负责实际派工和事件等待。
 
-brief、search 和 read 只读取已发布状态及其依据版本，不扫描原件或触发维护。brief 直接交付 mandatory、现有文件/章节概况索引和已知缺口，不执行搜索或连接 embedding；task 只是标签。stale mandatory 仍交付并标待核，known_unsynced 独立比较已登记来源与该表示/直接依据的接受版本；未发现的原件变化保持未知，false 不证明现行。changes 由维护显式调用，发现来源变化不改已发布记录，避免旧检查覆盖新接受态。
+brief、search、read、neighbors和access-hints只读取已发布状态及其依据版本，不扫描原件、触发维护或补写行为投影。brief不搜索或连接embedding；task只是标签。`startup_overview`在图节点、项目摘要和受管聊天摘要三路结构入口中交错选有界代表，默认六条，每条正文最多800字符并标text_truncated。正limit时非mandatory工作集按`min(max(limit×8,24),96)`取样，默认最多48条，只对这些候选计算精确access-hints；组内优先访问区间上界再下界，跨节点类型/项目顶层目录/聊天组交错，低权重无硬过滤。所选clues保留实际区间、支持度、模型、事实/编译游标及状态。overview_sampling披露候选数和rotation_utc_date，UTC日只确定无持久状态的展示轮换，不改变J/C/hits/年龄，不构成日历遗忘。
+
+overview_groups/overview_count及clues_omitted_count披露库存与遗漏，unmapped_sources最多三条项目/聊天交错入口，并保留总数和遗漏数；已有未读缺口另交付，不把未映射等同未读。brief仍需读取现有概要和投影，有界候选只限制精确Gaussian核计算，不承诺常数总成本或完整语义覆盖。mandatory独立保留，stale mandatory仍交付并标待核。known_unsynced比较已登记来源与表示/依据的接受版本，未发现变化保持未知，false不证明现行。changes由维护显式调用，发现变化不改已发布记录。
 
 向量绑定实际输入版本及 embedding_identity；仅支持 vector/hybrid，默认 vector。search 报告已发布范围内相同 identity 的兼容与待建数量，brief 明示未检查；缺少兼容向量时明确报错，真实空范围与空命中保持可辨。旧 text 配置须先改为 vector 或 hybrid，再 embed 补建索引；CPU/CUDA 的相同语义 identity 共用向量。apply 先准备候选向量，并在同一短事务发布内容和匹配向量；模型失败保留原错误并停止本批，不发布无匹配向量的内容。输入版本与 identity 未变化的向量可复用。
 
-`memory maintain` 默认以项目 Git 清单（已跟踪与未忽略的未跟踪文件）加 source_scope 显式包含项发现原件，并自动加入根`private/`独立Git的已跟踪与未忽略新文件，尊重内层忽略并排除Git存储、工具状态、环境和缓存；私有区不存在时正常发现其它来源。私有资料沿外层项目UUID、数据库与维护生命周期处理，无需另配source_scope。非 Git 项目使用声明范围。显式`--scope`替换新文件发现范围，不自动追加私有区；已登记来源、历史 pending/未接受范围与可归属 Codex 原件持续参与。零行文字且无活动知识时仅登记来源；清空旧正文仍须处理旧成员及依赖，重新出现正文继续发现。机械候选按成员依据闭合共批，组外依据须为仍有效且原件版本一致的知识；不能证明闭合时转语义候选。完整回执保存深比较与机械等价证据；短结果报告 discovery 边界/缺口、receipt、control 及 worker 派工元数据。历史 stale 不能仅因最后一次事件为 detected_change 就恢复；枚举与机械更新不证明完整语义覆盖。
+`memory collect`独立执行Codex归属与原件保全，不取得维护owner；回执记录捕获范围、正文hash及缺口，失败保留原错和失败回执。绑定Codex的`memory maintain`必须明确选择`--collection <receipt>`或`--retained`，后者只声明消费已保留原件，freshness未知；没有skip-codex-collection旁路。load_collection核项目身份、路径清单和当前字节hash，prepare随后固定本批实际读取版本，apply再核版本；该观察不锁定文件，也不构成全项目不可变快照。
 
-安装agent取得不含主agent、包含后代的宿主容量及来源，写入项目AI配置，已有项目用config set-concurrency显式刷新。ProjectConfig统一解析；缺少快照的旧项目须先补齐，查询和普通资源用途不因此失败。[prompts.py](../../../experiments/20261106-basepack/src/basepack/memory/prompts.py)集中维护纯布局算法和固定名称；maintain --mode automatic/manual接收可得原始空闲额度，回执保存layout及AI快照。额度未知仅标组织上限。自动仅0队，手动仅满队，低预算由单coord兼reader；只有coord_0发布，其它队有界阅读合稿。数量边界及完整流程见用户说明。
+maintain默认从项目Git清单加source_scope发现原件，并加入根`private/`独立Git的已跟踪及未忽略新文件；非Git项目按声明范围发现。默认全项目接续已登记、删除、pending和保留聊天来源；显式`--scope`按路径边界实际限制新发现、已登记及删除来源，不再仅限制新文件发现。范围外pending保持未处理，组外依赖只为本批闭包核实。零行且无活动知识时仅登记来源；清空旧正文仍处理旧成员和依赖。机械候选须按依据闭合，不能证明闭合则转语义；短结果与完整回执分别报告工作集、discovery缺口、机械证据和语义余项。枚举、机械更新或回执成功不证明全项目语义覆盖或最终磁盘全fresh。
 
-`memory prompt --receipt <receipt> --control <control>` 只读配置、英文模板与已保存布局，返回task_name、角色、模型、推理强度和render_command；不读凭据、不连库或模型、不写状态。--team/--reader定位固定槽位，reader及非0队coord必须给限定paths；仅显式--tier改档，配置中途变化不重组本轮。宿主原样设置返回的名称/模型/推理强度，再给英文启动句及命令。pending-dispatch只缩减未启动清单，不重命名已启动实例，手动未启动新队不足满队时留空。角色逻辑由模板维护。
+安装agent取得不含主agent、包含后代的宿主容量及来源并写入AI配置；旧项目用config set-concurrency显式刷新，实时可用席位另传。[prompts.py](../../../experiments/20261106-basepack/src/basepack/memory/prompts.py)按work_items、模式及容量上限启用本轮固定layout和唯一名称，automatic保留业务席位且最多一队，manual允许工作量决定的部分队伍，低预算coord亲读；只有coord_0发布。额度未知只标组织上限，容量不要求满员；回执保存layout和AI快照。
+
+`memory prompt --receipt <receipt> --control <control>`只读配置、英文模板与已保存布局，返回task_name、角色、模型、推理强度及render_command；不读凭据、不连库或模型、不写状态。--team/--reader定位固定槽位，reader及非0队coord必须给限定paths；仅显式--tier改档，配置中途变化不重组本轮。宿主原样使用返回身份及AI设置并实际派工。pending-dispatch只缩减未启动清单，保持已启动身份，适配本轮已固定的部分队伍；角色逻辑由模板维护。
 
 主任务启动时直觉判断业务经过时间，约十分钟以内保留brief并跳过整个自动maintain；长任务且宿主支持生命周期和可取消子任务时，异步执行`maintain --mode automatic --holder <thread> --control <fresh-path>`。范围明显扩大时可首次启动，子任务不递归维护；直接显式维护不受门槛限制，默认manual。命令在预检前原子取得项目owner；被占用时继续业务，不另派维护。协调者持续接批，显式维护须实际处置授权范围或报告阻塞。结束stop、取消自有后代、确认发布结束再release；未明发布保留owner。HTTP查询、反馈不要求owner；CLI apply使用自有control，Python apply省略时仅在空闲项目取得短期owner。控制不终止共享服务或已开始的推理。
 
-`maintain --skip-codex-collection`显式跳过本轮新聊天发现/采集，回执`codex.status=not_requested`；旧聊天、已登记来源、历史快照及依赖仍参与原增量链，默认collector失败仍抛原错。语义派工前启动失败，仅在本进程已取得自有owner、确认无派工且无在途/未明发布时stop/release，再抛原错；清理错误一并保留，状态未明留owner，不能解锁他人任务。
+语义派工前启动失败，仅在本进程已取得自有owner、确认无派工且无在途/未明发布时stop/release，再抛原错；清理错误一并保留，状态未明留owner，不能解锁他人任务。独立采集的失败与这条owner清理链分开记录。
 
 协调者将相关、非重叠的有限来源组交作者负责理解、关系和正常修复；保留mandatory、覆盖、端点共读、gaps及feedback，统一由唯一publisher发布。固定交稿、一次完成识别、自有分支事件/有界等待沿[来源组合同](../../../experiments/20261106-basepack/src/basepack/memory/SKILL.md#source-group-delivery)。回执固定候选身份/集合，`current_revision`只是发现观察；候选内每批prepare当前版本并报告实际accepted revision，冲突回原作者重prepare。接受后再改不自动重开阶段，后续未接受成果与回执外候选留原件入口和有限范围，旧回执成功不证明最终磁盘全fresh。
 
-[stages.py](../../../experiments/20261106-basepack/src/basepack/memory/stages.py)提供`memory stage`薄交接入口：旧组实际结束、发布终态明确后，固定handoff与stage文件/hash，沿同一receipt/owner/control串行生成新阶段身份；owner.json的`stage`保存当前固定引用，手工prompt/pending-dispatch可用`--stage-sha256`核包。程序不创建宿主agent，宿主须实际以返回身份及`fork_turns="none"`建立干净上下文并保留父stop句柄；无旧reader句柄接管能力时结束旧组再新建。阶段只结束本组，余项与原回执gaps继续保留，不stop/release整轮或重新采集；schema和宿主职责以[阶段合同](../../../experiments/20261106-basepack/src/basepack/memory/SKILL.md#stage-continuation)为准，入口成功不等于真实宿主验收完成。
+[stages.py](../../../experiments/20261106-basepack/src/basepack/memory/stages.py)提供`memory stage`薄交接入口：旧组实际结束、发布终态明确后，固定handoff与stage文件/hash，沿同一receipt/owner/control串行生成新阶段身份；按剩余work_items及本次`--available-subagents`计算新layout，无席位明确阻塞。owner.json的stage是当前固定引用，prompt/pending-dispatch可用`--stage-sha256`核包。程序不创建宿主agent，宿主实际以返回身份及`fork_turns="none"`建立干净上下文并保留父stop句柄；无旧reader句柄接管能力时先结束旧组。阶段只结束本组，余项与原receipt gaps继续保留，不stop/release整轮或重新采集；详见[阶段合同](../../../experiments/20261106-basepack/src/basepack/memory/SKILL.md#stage-continuation)。
 
 [feedback.py](../../../experiments/20261106-basepack/src/basepack/memory/feedback.py)在新增feedback表持久保存观察版本、漏检查询和处理结果；报告可并发，无需维护owner，未决报告进入needs_semantic及固定回执。修复先据当前版本apply，再由owner解决报告；旧报告不覆盖新版，未决不假关闭，原生导出恢复保留。检索只做业务所需阅读，发现问题就报告；只有用户明确的审计意图启动手动审计。
 
 [reviewed.py](../../../experiments/20261106-basepack/src/basepack/memory/reviewed.py)把非空来源实际已读范围的无新增/重复处置及已读待细化保存在source_version，核相关表示版本。有效处置抑制未变首建，来源/依赖变化重新入队；部分范围不代表整源。粗层表示仍保留精选原文依据和mandatory，未读缺口不伪作已读。非空parent纳入共用版本和解析检查；依赖临时写guard防止快照隔离写偏斜，逻辑版本和未变历史不增加。
 
-[selection.py](../../../experiments/20261106-basepack/src/basepack/memory/selection.py) 按真实 worker 分数排序，去重考虑成员、依据版本、位置及实际内容；按文字预算交付内容与省略入口，词法距离不冒充agent分数。已安装[skill](../../../experiments/20261106-basepack/src/basepack/memory/SKILL.md)驱动一次完整检索委托；retrieval-dispatch及retrieval-prompt读取结构化question/scope/content_budget，返回固定bp_mem_search_s名称及检索档位（默认tier1），不绑定维护回执/control/owner。零空闲席位明确由主agent执行。独立问题使用干净历史；同名冲突只复用生命周期兼容的自有句柄，否则报告原错。没有模型API、后台agent或持久槽位登记表。
+[selection.py](../../../experiments/20261106-basepack/src/basepack/memory/selection.py)按worker一次综合分数排序，去重考虑成员、依据版本、位置和实际内容；按文字预算交付内容与省略入口，不二次乘访问权重。[retrieval.py](../../../experiments/20261106-basepack/src/basepack/memory/retrieval.py)唯一维护请求、工作目录、稳定delivery_id及请求加slot的派工身份；prompts仅复用渲染入口。retrieval-dispatch/retrieval-prompt返回默认tier1及实际模型/推理强度，不绑定维护receipt/control/owner，零席位由主agent执行同一完整流程。新问题用新请求及干净历史，重试复用原请求；没有模型API、常驻agent或另一套槽位登记表。
 
-memory init 安装原生 schema 并绑定项目 UUID，同时刷新项目入口；普通 init 不建库。每个任务取得一次 brief，后续 shell 仅初始化该次所需参数，不为收尾再跑 brief。客户端与 launcher 读取同一密码文件，配置只接受回环 endpoint。入口同时定位本项目 launcher、cwd 和日志。数据库进程必须按项目独立物理目录启动，多聊天共用该进程。绑定核查防止误连另一项目；数据路径的实际归属仍须部署命令正确配置。
+memory init安装原生schema并绑定项目UUID、member identity 2和memory_schema_version=3，同时刷新项目入口；普通项目init不建库。已绑定库缺失或不符schema 3时，新版memory init及普通读写明确拒绝；离线桥在全字段verify后由finalize显式设置标记，再用新版init安装schema，保留已有J。每个任务一次brief，后续shell只初始化参数。客户端和launcher读取同一密码文件，配置只接受回环endpoint。数据库按项目独立物理目录/进程启动，多聊天共享；UUID核查防误连，实际数据归属仍由部署配置保证。
 
 ## 知识历史与最终交付
 
 [history.py](../../../experiments/20261106-basepack/src/basepack/memory/history.py)按 `id + knowledge_revision` 返回精确知识表示，和 `source_version` 的原证回读分开。schema 的同步事件在知识版本推进时保留前后像，覆盖显式接受、失效、更正、退役及关系重建；向量不进入历史。已有未归档版本使用安装基线事件 0，未来新版本保存实际出生事件；首次归档旧版不能重置其已衰减权重。init 不全量扫描或补造旧版本；旧 change.previous 中可证明的前像仍可读，存量缺口明确报告。关系 `endpoint_versions` 与层级 `parent_version` 指向观察版本；历史 neighbors 精确展开已固定端点，未留 pin 的存量旁路另外标为未知，不能用当前 stable ID 替代旧端点。`claim_type`、`conditions` 由作者接受，不按日期或热度自动推断替代。
 
-[access.py](../../../experiments/20261106-basepack/src/basepack/memory/access.py)用独立短事务记录宿主已确认的最终清单，材料单位是 member/node/semantic 的知识版本。稳定 delivery_id 原子去重，清单变更报错，成功空清单留回执但不推进全局事件 G。非空事件强化清单中的版本，其余全项目版本按 G 惰性降权；首版 `S=8×(1+hits)`，`w=1/(1+(G-L)/S)`，新版本的 L 从诞生事件起。时间和向量输入不参与计算，旧版交付不奖励新版，不向依据/父子/邻居传播。跨调用重试使用同一 ID，结果未明保留原因及待核身份。默认值是首版工程选择，真实使用效果仍需长期观察。
+[access.py](../../../experiments/20261106-basepack/src/basepack/memory/access.py)用独立短事务记录宿主确认的实际交付，单位为member/node/semantic的精确知识版本。稳定delivery_id原子去重，同ID清单或context改变报错。首次确认含空清单均推进严格事实J，非空事件才推进机会C；重试两者均不推进。context必含anchors、knowledge_cutoff、query、episode、candidates、budget、policy、model；每个锚点保存唯一逻辑ID、精确版本、alpha与base_quality，当前规则为去重后等份，总和为1。内部检索轮次、search/read/rank均不产生交付。未知提交保留同ID核验，已提交事实不因投影失败撤销。
 
-`memory retrieve --question` 提供空路径前缀/6000字预算/固定槽位的默认请求及稳定交付身份，缺问题返回 needs_input。scope 是项目相对路径前缀，中文和空格保持原值；业务范围写在 question。返回 prepared/started=false，宿主实际派 worker，接收最终内容后核实 manifest 并调用 delivery；现宿主没有可由 Python 直接订阅的最终交付回调，因此仍由宿主 agent 执行该协议，不能声称 CLI 自动启动了 agent。零席位由主 agent 执行同一完整流程。评分文件保存实际观察版本，原证版本/范围另列；node/semantic 用原生身份，不伪造路径。候选携带 access hints，原 tier1 同次综合评分，rank 只排序、去重与预算，不记交付。历史关系和低频关键旧成果仍由本次相关性与条件决定采用，不建设当前理解同步层。
+`memory retrieve --question`准备默认全项目/6000字请求，缺问题返回needs_input；scope是项目相对路径前缀，业务条件写question。返回prepared/started=false，宿主实际派工并接收。worker先运行`retrieval-start --request`，在行为候选进入前固定基础搜索结果、原始锚点/份额/基础质量和知识观察截点，再固定本请求的行为候选；同请求多轮复用，修改请求后不得继续原锚点包。worker回读原文及必要历史/图，保留实际观察候选数组，再一次综合评分并rank。`retrieval-receipt --request --ranked --candidates --output`从固定上下文及排序结果形成待确认delivery，候选文件为数组，须包括基础/行为候选及最终交付版本；主agent实收核清单后才调用delivery。评分、原证范围和知识版本分别保存，node/semantic不伪造路径。CLI不自动启动agent，也没有宿主最终交付回调。
+
+make_delivery_receipt在context.access_observations逐条保留base、behavior和followup实际返回的access_model、access_compiled_j、access_fact_j及access_interval，并标明来源及精确知识版本；同版本多次读取的不同快照均保留。context.model固定的是行为候选发现所用模型，后续回读若遇并发模型切换，可带不同访问快照，不能用context.model覆盖这些实际观察。
+
+## 行为表示与访问投影
+
+[behavior_model.py](../../../experiments/20261106-basepack/src/basepack/memory/behavior_model.py)只用真实共同交付逻辑ID篮子训练无正则KL-NMF，重复篮子按n/d频率忠实聚合；空篮子与单项篮子不提供共交付证据。训练记录支持度、求解器、依赖版本、尺度规则及截点，默认rank=8。行为模型不使用正文、query、LLM分数或旧权重，不因低权重过滤训练ID；普通修订继续同逻辑ID，精确版本有效性另核。训练所需numpy/scipy/scikit-learn由可选behavior extra提供，缺依赖明确失败，不阻挡基础采集、发布和检索。
+
+[behavior_projection.py](../../../experiments/20261106-basepack/src/basepack/memory/behavior_projection.py)默认epsilon=0.001、beta=0.2、strength=8，均为工程初值，不是效果最优结论。对各原始锚点分别计算Gaussian再按原alpha加权；未知向量或锚点份额形成区间，已知份额不重新归一。只有非空交付累计C、已知锚点质量H和未知质量R；命中版本先累计本事件，再重置其标量基准和真实hits。每精确版本保存C/H/R对应标量基准，首次接受记录事实头j_enter并形成h=0先验，不冒充使用。权重不依赖日历，不传播命中，旧版不奖励新版。
+
+`behavior-compile`在当前固定模型中按严格J增量推进，返回fact_j与compiled_j；未编译或冷启动保留unknown/pending/lagging状态。access-hints和behavior-candidates只读一致投影，不隐式训练、重放或写状态；delivery记账后显式接续编译，派生失败保留事实及原错。`behavior-train`保存不可变`memory_dir/behavior/<sha256>.json`，用原始交付和首次接受事实全史重放，在乐观事务中原子切换模型及投影；旧请求保留其实际模型及原始锚点，晚确认按当前提交顺序编译。旧事件缺原始锚点仍可提供真实共交付，机会质量保持unknown；不补造历史曝光或精确接受截点。
+
+低权重不触发正文、依据、历史、图、向量删除或训练ID退出，不设置GC/forgotten状态。所有保留材料仍有基础检索资格，实际交付可刷新该精确版本；mandatory独立交付。模型工件、事实及备份仍受private的限制分发边界约束，数值形式不构成公开副本。精确Gaussian按实际非零锚点质量计算，不保存全库相似矩阵；当前实现不承诺大规模性能或长期业务收益，效果沿真实使用反馈维护。
 
 ## Codex 来源边界
 
-`maintain` 可读取宿主提供的项目 ID 和完整注册项目根目录清单，或使用配置的绑定；缺少绑定时报告不可用并继续文件维护。采集通过 Codex App Server 受支持的线程与消息分页，显式项目 ID 优先；缺失 ID 时以项目根目录及 Git worktree/common-dir 判断归属，其他注册根冲突或无法取得 cwd 留待核。语义回执的 codex 与 reader 提示只交接项目 ID、采集回执及保留聊天/附件目录，身份记录仍以采集回执和 framed 原件为唯一依据；缺少可核归属留 gap。采集的受管 UTF-8 文件进入同一维护路径，采集不等于语义接受；历史来源、附件、继承身份与精确回源仍按实际能力和验收结果报告。查询不触发采集。
+`collect`读取宿主提供的项目ID和完整注册根或配置绑定；缺少绑定明确报告binding_unavailable，文件维护不依赖成功采集。采集通过Codex App Server受支持的线程与消息分页，显式项目ID优先；缺ID时以根目录及Git worktree/common-dir判断归属，其他注册根冲突或无cwd留待核。采集回执及framed原件保存身份和观察边界；maintain明确选择成功collection回执或retained，语义回执/reader提示交接项目ID、采集信息及保留目录。受管UTF-8文件沿同一来源版本维护，采集不等于语义接受；历史来源、附件、继承身份与精确回源按实际能力及验收报告。查询不触发采集。
 
 `memory freshness` 只读项目归属、分页、采集回执及原文比较，不取 owner、不写原件或发布；按相关候选和用户点名聊天补读，跨项目引用用宿主读取。最新捕获及可关联预检提供线索，预检 pending 为历史快照，不是当前语义状态；回执时间、端点及 updatedAt 不能单独证明全局正文覆盖。输出保留未摄入、待语义、补读及未知。

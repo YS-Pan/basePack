@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from basepack.memory.content import (
-    detect_changes, numbered_text, read_source, reading_units,
+    detect_changes, line_slices, numbered_text, original_text, read_source, reading_units,
 )
 
 
@@ -48,6 +48,31 @@ def test_empty_and_invalid_utf8_sources(tmp_path):
     write_source(tmp_path, "invalid", b"\xff")
     with pytest.raises(UnicodeDecodeError):
         read_source(tmp_path, "invalid")
+
+
+def test_long_unicode_line_slices_recover_exact_original(tmp_path):
+    raw = ("前🙂" * 4001 + "\r\nnext\r\n").encode("utf-8")
+    write_source(tmp_path, "long.txt", raw)
+    source = read_source(tmp_path, "long.txt")
+    slices = line_slices(source, max_chars=4000)
+    assert len(slices) == 3
+    assert "".join(original_text(source, item["start_line"], item["end_line"], item["locator"])
+                   for item in slices) == source.text.splitlines(keepends=True)[0]
+    assert all(original_text(source, item["start_line"], item["end_line"], item["locator"])
+               == item["text"] for item in slices)
+    assert original_text(source, 1, 2, {"start_col": 1, "end_col": 2}) == source.text[1:-4]
+    assert original_text(source, 2, 2) == "next\r\n"
+
+
+@pytest.mark.parametrize("locator", [
+    {}, {"start_col": 0}, {"start_col": 0, "end_col": 1, "extra": 1},
+    {"start_col": True, "end_col": 1}, {"start_col": 1, "end_col": 1},
+    {"start_col": -1, "end_col": 1}, {"start_col": 0, "end_col": 4},
+])
+def test_invalid_text_locator_is_rejected(tmp_path, locator):
+    write_source(tmp_path, "source", b"abc")
+    with pytest.raises(ValueError, match="locator"):
+        original_text(read_source(tmp_path, "source"), 1, 1, locator)
 
 
 def test_project_move_preserves_relative_identity_and_revision(tmp_path):

@@ -45,13 +45,18 @@ wheels = [
 
 [[package]]
 name = "basepack"
-version = "0.16.0"
+version = "0.17.0"
 source = { editable = "." }
 dependencies = [
     { name = "websocket-client" },
 ]
 
 [package.optional-dependencies]
+behavior = [
+    { name = "numpy" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+]
 dev = [
     { name = "build" },
     { name = "pytest" },
@@ -91,8 +96,11 @@ requires-dist = [
     { name = "basepack", extras = ["embedding"], marker = "extra == 'embedding-cuda'" },
     { name = "build", marker = "extra == 'dev'" },
     { name = "litserve", marker = "extra == 'embedding'", specifier = "==0.2.19" },
+    { name = "numpy", marker = "extra == 'behavior'", specifier = ">=2.5,<3" },
     { name = "pillow", marker = "extra == 'embedding'", specifier = ">=13,<15" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9" },
+    { name = "scikit-learn", marker = "extra == 'behavior'", specifier = "==1.9.1" },
+    { name = "scipy", marker = "extra == 'behavior'", specifier = ">=1.18,<2" },
     { name = "sentence-transformers", marker = "extra == 'embedding'", specifier = "==6.2.0" },
     { name = "torch", marker = "extra == 'embedding'", specifier = "==2.10.0" },
     { name = "torch", marker = "extra == 'embedding-cpu'", specifier = "==2.10.0+cpu", index = "https://download.pytorch.org/whl/cpu", conflict = { package = "basepack", extra = "embedding-cpu" } },
@@ -103,7 +111,7 @@ requires-dist = [
     { name = "transformers", marker = "extra == 'embedding'", specifier = "==5.22.1" },
     { name = "websocket-client", specifier = ">=1.8,<2" },
 ]
-provides-extras = ["embedding", "embedding-cpu", "embedding-cuda", "dev"]
+provides-extras = ["behavior", "embedding", "embedding-cpu", "embedding-cuda", "dev"]
 
 [[package]]
 name = "build"

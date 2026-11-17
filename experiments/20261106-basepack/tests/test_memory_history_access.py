@@ -46,6 +46,11 @@ def identity(record):
     return {"id": record["id"], "knowledge_revision": record["knowledge_revision"]}
 
 
+def delivery_context():
+    return {"anchors": [], "knowledge_cutoff": {}, "query": "history test", "episode": "test",
+            "candidates": [], "budget": 100, "policy": {}, "model": None}
+
+
 def hint(memory, record):
     return memory.access_hints([identity(record)])[0]
 
@@ -138,35 +143,6 @@ def test_legacy_change_requires_an_actual_recorded_preimage(memory):
         memory.knowledge("semantic:requires", knowledge_revision=old_edge["knowledge_revision"])
 
 
-def test_legacy_install_records_birth_before_future_deliveries_and_is_idempotent(memory):
-    batch = freeze([batch_for(memory, TEXT)])
-    memory.apply(batch)
-    storage = batch["members"][2]["id"]
-    retention = batch["members"][3]["id"]
-    old = memory.knowledge(storage)
-    other = memory.knowledge(retention)
-    # Simulate a database created before knowledge_version existed.
-    memory._execute("DELETE knowledge_version;")
-    memory.install_schema()
-    assert hint(memory, old)["access_event"] == 0
-    memory.record_delivery("other-delivered", [identity(other)])
-    before_update = hint(memory, old)
-    assert before_update["access_hits"] == 0
-    assert before_update["access_weight"] == pytest.approx(8 / 9)
-
-    updated = batch_for(memory, "# 数据库\n数据库离线运行并隔离项目。\n\n# 保留\n资料必须保留。\n", previous=batch)
-    memory.apply(freeze([updated]))
-    new = memory.knowledge(storage)
-    assert new["knowledge_revision"] != old["knowledge_revision"]
-    assert hint(memory, old)["access_weight"] == pytest.approx(before_update["access_weight"])
-    assert hint(memory, old)["access_event"] == before_update["access_event"]
-    assert hint(memory, new)["access_hits"] == 0
-    assert hint(memory, new)["access_weight"] == 1
-    old_state, new_state, other_state = (hint(memory, row) for row in (old, new, other))
-    memory.install_schema()
-    assert [hint(memory, row) for row in (old, new, other)] == [old_state, new_state, other_state]
-
-
 def test_intermediate_stale_and_retired_versions_are_addressable(memory):
     batch = freeze([batch_for(memory, TEXT)])
     memory.apply(batch)
@@ -215,17 +191,18 @@ def test_old_delivery_never_rewards_new_version_or_related_records(memory):
     storage = batch["members"][2]["id"]
     old = memory.knowledge(storage)
     parent = memory.knowledge(storage_section)
-    memory.record_delivery("pre-update", [identity(old)])
+    memory.train_behavior()
+    memory.record_delivery("pre-update", [identity(old)], context=delivery_context())
     updated = batch_for(memory, "# 数据库\n数据库离线运行并隔离项目。\n\n# 保留\n资料必须保留。\n", previous=batch)
     memory.apply(freeze([updated]))
     new = memory.knowledge(storage)
     parent = memory.knowledge(parent["id"])
     vectors = memory._execute("SELECT id, embedding, embedded_revision, input_revision FROM member ORDER BY id;")[0]
-    receipt = memory.record_delivery("observed-old", [identity(old)], context={"test": "history"})
+    receipt = memory.record_delivery("observed-old", [identity(old)], context=delivery_context())
     assert receipt["duplicate"] is False
     assert hint(memory, old)["access_hits"] == 2
     assert hint(memory, new)["access_hits"] == 0
-    assert hint(memory, new)["access_weight"] == pytest.approx(8 / 9)
+    assert hint(memory, new)["access_interval"] == pytest.approx([8 / 9, 8 / 8.001])
     assert hint(memory, parent)["access_hits"] == 0
     assert memory._execute("SELECT id, embedding, embedded_revision, input_revision FROM member ORDER BY id;")[0] == vectors
 
@@ -238,17 +215,20 @@ def test_delivery_is_idempotent_and_empty_delivery_does_not_advance(memory):
     one = memory.knowledge(storage)
     two = memory.knowledge(retention)
     item = identity(one)
-    first = memory.record_delivery("stable-id", [item])
-    duplicate = memory.record_delivery("stable-id", [item])
+    memory.train_behavior()
+    first = memory.record_delivery("stable-id", [item], context=delivery_context())
+    duplicate = memory.record_delivery("stable-id", [item], context=delivery_context())
     assert duplicate["duplicate"] is True
-    assert duplicate["event"] == first["event"]
+    assert duplicate["j"] == first["j"]
     assert hint(memory, one)["access_hits"] == 1
     with pytest.raises(ValueError):
-        memory.record_delivery("stable-id", [identity(two)])
-    empty = memory.record_delivery("empty", [])
-    assert memory.record_delivery("empty", [])["duplicate"] is True
-    later = memory.record_delivery("next", [identity(two)])
-    assert later["event"] == first["event"] + 1
+        memory.record_delivery("stable-id", [identity(two)], context=delivery_context())
+    empty = memory.record_delivery("empty", [], context=delivery_context())
+    assert memory.record_delivery("empty", [], context=delivery_context())["duplicate"] is True
+    later = memory.record_delivery("next", [identity(two)], context=delivery_context())
+    assert empty["j"] == first["j"] + 1
+    assert later["j"] == first["j"] + 2
+    assert later["projection"]["c"] == 2
     assert hint(memory, one)["access_hits"] == 1
     assert hint(memory, two)["access_hits"] == 1
     usage = memory.history(one["id"])
@@ -264,6 +244,7 @@ def test_delivery_recovers_only_when_a_lost_response_has_a_receipt(memory, monke
     memory.apply(batch)
     storage = batch["members"][2]["id"]
     item = identity(memory.knowledge(storage))
+    memory.train_behavior()
     execute = memory._execute
     fail_after_commit = True
 
@@ -276,9 +257,9 @@ def test_delivery_recovers_only_when_a_lost_response_has_a_receipt(memory, monke
         return execute(sql, **kwargs)
 
     monkeypatch.setattr(memory, "_execute", lost_response)
-    receipt = memory.record_delivery("lost-response", [item])
+    receipt = memory.record_delivery("lost-response", [item], context=delivery_context())
     assert receipt["duplicate"] is True
-    assert memory.record_delivery("lost-response", [item])["event"] == receipt["event"]
+    assert memory.record_delivery("lost-response", [item], context=delivery_context())["j"] == receipt["j"]
     assert hint(memory, item)["access_hits"] == 1
 
     def lost_before_commit(sql, **kwargs):
@@ -288,48 +269,30 @@ def test_delivery_recovers_only_when_a_lost_response_has_a_receipt(memory, monke
 
     monkeypatch.setattr(memory, "_execute", lost_before_commit)
     with pytest.raises(PublicationOutcomeUnknown, match="no-receipt") as uncertain:
-        memory.record_delivery("no-receipt", [item])
+        memory.record_delivery("no-receipt", [item], context=delivery_context())
     assert isinstance(uncertain.value.__cause__, ConnectionError)
     monkeypatch.setattr(memory, "_execute", execute)
     assert hint(memory, item)["access_hits"] == 1
-    recovered = memory.record_delivery("no-receipt", [item])
+    recovered = memory.record_delivery("no-receipt", [item], context=delivery_context())
     assert recovered["duplicate"] is False
-    assert recovered["event"] == receipt["event"] + 1
+    assert recovered["j"] == receipt["j"] + 1
     assert hint(memory, item)["access_hits"] == 2
 
 
-def test_lazy_weights_match_full_event_reference_and_reads_do_not_count(memory):
+def test_reads_do_not_count_as_delivery(memory):
     batch = freeze([batch_for(memory, TEXT)])
     memory.apply(batch)
-    guide = batch["members"][0]["id"]
     storage = batch["members"][2]["id"]
-    retention = batch["members"][3]["id"]
-    records = [memory.knowledge(storage), memory.knowledge(retention),
-               memory.knowledge(guide)]
-    hits = [0, 0, 0]
-    last = [0, 0, 0]
-    eager_weights = [1.0, 1.0, 1.0]
-    order = [0, 1, 0, 2, 1, 0, 0, 2, 1, 2, 2, 0]
-    for event, chosen in enumerate(order, 1):
-        eager_weights = [weight / (1 + weight / (8 * (1 + hit)))
-                         for weight, hit in zip(eager_weights, hits, strict=True)]
-        memory.record_delivery(f"event-{event}", [identity(records[chosen])])
-        hits[chosen] += 1
-        last[chosen] = event
-        eager_weights[chosen] = 1.0
-        supplied = [{**identity(record), "marker": i} for i, record in enumerate(records)]
-        result = memory.access_hints(supplied)
-        assert [row["id"] for row in result] == [record["id"] for record in records]
-        assert [row["marker"] for row in result] == list(range(len(records)))
-        for i, row in enumerate(result):
-            assert row["access_hits"] == hits[i]
-            assert row["access_event"] == last[i]
-            assert row["access_weight"] == pytest.approx(eager_weights[i])
-    before = memory.access_hints([identity(record) for record in records])
+    memory.train_behavior()
+    record = memory.knowledge(storage)
+    memory.record_delivery("observed", [identity(record)], context=delivery_context())
+    before = hint(memory, record)
     memory.search("数据库")
     memory.read(storage)
     memory.neighbors(storage)
-    assert memory.access_hints([identity(record) for record in records]) == before
+    assert hint(memory, record) == before
+    assert before["access_hits"] == 1
+    assert before["access_interval"] == [1.0, 1.0]
 
 
 def test_concurrent_deliveries_are_atomic_and_same_id_is_deduplicated(memory):
@@ -337,12 +300,13 @@ def test_concurrent_deliveries_are_atomic_and_same_id_is_deduplicated(memory):
     memory.apply(batch)
     storage = batch["members"][2]["id"]
     item = identity(memory.knowledge(storage))
+    memory.train_behavior()
     with ThreadPoolExecutor(max_workers=4) as executor:
-        receipts = list(executor.map(lambda i: memory.record_delivery(f"parallel-{i}", [item]), range(4)))
-    assert len({receipt["event"] for receipt in receipts}) == 4
+        receipts = list(executor.map(lambda i: memory.record_delivery(f"parallel-{i}", [item], context=delivery_context()), range(4)))
+    assert len({receipt["j"] for receipt in receipts}) == 4
     assert hint(memory, item)["access_hits"] == 4
     with ThreadPoolExecutor(max_workers=4) as executor:
-        duplicates = list(executor.map(lambda _: memory.record_delivery("same-parallel", [item]), range(4)))
+        duplicates = list(executor.map(lambda _: memory.record_delivery("same-parallel", [item], context=delivery_context()), range(4)))
     assert sum(not receipt["duplicate"] for receipt in duplicates) == 1
-    assert len({receipt["event"] for receipt in duplicates}) == 1
+    assert len({receipt["j"] for receipt in duplicates}) == 1
     assert hint(memory, item)["access_hits"] == 5

@@ -6,7 +6,7 @@
 
 按 [项目接入](setup-project.md#启用记忆) 选独立目录、回环 endpoint 和 UUID，再按 [项目 SurrealDB](administrator.md#项目-surrealdb) 准备认证服务与唯一密码文件，在独立调用核 ready/init/brief。同项目多聊天复用服务，另一个项目使用自己的物理目录、端口及 UUID；通用 exe 和模型可共用。服务在查询期间保持运行。前台排错可在普通用户终端直接执行同一个 serve.ps1，其 cwd 与 endpoint 仍来自目标配置。
 
-普通 init 只生成配置和未启用记忆的入口；memory init 才安装 schema 并绑定 UUID、刷新 instructions 与 AGENTS 的记忆指令块。共用托管块更新保留块外原字节；重复刷新幂等，损坏标记明确报错。误连其它 UUID 的库会失败。任务启动与 [新 shell 接续](setup-project.md#新-shell-接续) 以生成的 `.basepack/instructions.md#startup` 为准；客户端自动读 password_file（默认 memory_dir/password.txt）。升级或搬迁时先按 [配置维护要点](project-config-maintenance.md) 核实际路径，再运行 memory init 刷新托管块；instructions 块外旧路径另核。只用资源工具无需记忆数据库。
+普通 init 只生成配置和未启用记忆的入口；memory init 才安装 schema 并绑定 UUID、刷新 instructions 与 AGENTS 的记忆指令块。新库写入 schema marker 3；已绑定但缺少该标记的旧库须先离线桥接并 finalize，普通 init 明确拒绝，已合法建立的 J 不重置。共用托管块更新保留块外原字节；重复刷新幂等，损坏标记明确报错。误连其它 UUID 的库会失败。任务启动与 [新 shell 接续](setup-project.md#新-shell-接续) 以生成的 `.basepack/instructions.md#startup` 为准；客户端自动读 password_file（默认 memory_dir/password.txt）。升级或搬迁时先按 [配置维护要点](project-config-maintenance.md) 核实际路径，再运行 memory init 刷新托管块；instructions 块外旧路径另核。只用资源工具无需记忆数据库。
 
 ## 首建与维护
 
@@ -21,7 +21,7 @@ function memory {
     & $python -X utf8 -m basepack --config $config memory @args
     if ($LASTEXITCODE -ne 0) { throw "memory command failed ($LASTEXITCODE)" }
 }
-memory maintain --mode manual --holder '<本thread身份>' --control '<memory.data_dir>/maintenance/<全新标识>.control'
+memory maintain --mode manual --holder '<本thread身份>' --control '<memory.data_dir>/maintenance/<全新标识>.control' --retained
 # 仅 acquired=true 时继续；已有 owner 时报告持有者。
 memory prepare --paths '说明.md' '决定.md' --output '<project-root>/tmp/<run>/reading.json'
 # 阅读 prepare 输出，作者显式完成本次 assignment，publisher 保存有序完成稿引用。
@@ -35,24 +35,24 @@ memory changes --scope '资料目录'
 
 大来源仍以完整 `source.text` 保存，程序在同一事务内分段传输并组装，保留原文字节、hash、来源版本与原子接受，也支持原生导出恢复。当前回归样例覆盖到 8,943,755 原文字节，该数值不是通用上限。缩小语义 chunk 或抬高传输常数不替代整源快照处理。
 
-prepare 时包括本批所用依据与关系两端的材料；它提供新旧编号原文、已有与关联成员、节点、关系及 expected 知识版本，图片返回可打开的原图路径。关联记录的来源原文仍需 read 或扩充 prepare 范围核实。将材料交给订阅 agent，在同次阅读中选择最终块边界并生成摘要、节点和图边；结构备读单元只用于定位。批次 JSON 合同与操作流程在 `memory guide` 返回的已安装 skill 中，源码维护源为 [SKILL.md](../src/basepack/memory/SKILL.md)。
+prepare 时包括本批所用依据与关系两端的材料；它固定实际读到的原件及知识版本，提供新旧编号原文、已有与关联成员、节点、关系及私有标记，图片返回可打开的原图路径。长单行提供有界片段及 `locator:{start_col,end_col}`，使用 0-based Unicode 字符偏移、右端不含，行号仍为 1-based 闭区间。关联记录的原文仍需 read 或扩充 prepare 核实。将材料交给订阅 agent，在同次阅读中选择语义边界、摘要、节点和图边；结构备读单元只用于定位。批次合同在 `memory guide` 返回的已安装 skill 中，源码维护源为 [SKILL.md](../src/basepack/memory/SKILL.md)。
 
-新成员省略 ID，freeze 按各 draft 的成员位置分配 UUID 并解析引用；更新只使用 prepare 返回的 UUID 和 expected。跨 reader 保留 draft 作用域，重复更新报错。冻结 batch 及其映射必须保留，重试复用同一文件，已提交的相同批次返回原回执。仍使用 UUID 切换前协议的旧库，先按 [版本升级](setup-project.md#版本升级) 完成其离线迁移；0.16 客户端升级本身不要求迁库。详细位置引用见[批次合同](../src/basepack/memory/SKILL.md#direct-batch-interface)。
+作者 draft 以 `prepare:{path,file_sha256}` 引用固定阅读包，选择 `sources:["项目相对路径"]` 并声明内容、位置、依据与处置。程序编译 source revision、expected 依赖闭包、UUID 与 private，作者不用抄写这些机械字段。新成员省略 ID，已有记录使用 prepare 中的 ID；局部成员／节点引用由编译器解析，跨 draft 保留作用域，重复更新报错。需要关联已观察的历史端点时，prepare 加 `--historical-versions <JSON文件>`，内容为 `{id,knowledge_revision}` 数组，固定其历史分类。冻结稿及映射必须保留，重试复用同一文件，已提交的相同批次返回原回执。旧库升级先按 [版本升级](setup-project.md#版本升级) 完成相应离线迁移。详细合同见[批次接口](../src/basepack/memory/SKILL.md#direct-batch-interface)。
 
 `publish` 将核稿、freeze/validate、独占保存 frozen 和原 apply 顺序组合；CLI 与 Python 共用 `basepack.memory.publish` helper。`completed.json` 是有序 JSON 数组，每项为 `{"path":"<draft.json>","file_sha256":"<文件字节SHA256>","assignment":"<具体交付引用>"}`；相对路径按调用进程 cwd 解析。数组顺序即 draft 作用域顺序。一个完成稿可直接发布，多稿合组或拆组由 publisher 判断；各次发布各自原子。作者须针对该 assignment 显式交付，publisher 根据已有自有句柄声明完成；文件出现或整个聊天结束都不能代替它。
 
 Python 可直接传列表：`from basepack.memory import publish; publish(memory, completed=references, output="new-frozen.json", control=control, result="result.json")`。已有 `prepare/read/neighbors`、prompt 渲染和直接 `freeze/apply` 仍可自由调用；已知步骤可在一次宿主 exec 中用普通 Python 顺序或条件组合，需要判断时返回 agent。格式、覆盖、证据和语义分块修订交回原作者，跨 scope 判断共读解决。
 
-直接用 Python 冻结草稿时，显式传入该项目的配置以固定私有规则；CLI freeze 和 publish 自动使用当前项目配置：
+直接用 Python 编译提案时，显式传入项目配置以固定私有规则；CLI freeze 和 publish 自动使用当前项目配置：
 
 ```python
-from basepack.memory.draft import freeze
-batch = freeze(drafts, config=memory.config)
+from basepack.memory.draft import compile_proposals
+batch = compile_proposals(drafts, config=memory.config)
 ```
 
 固定稿接续用 `memory publish --frozen '<原batch.json>' --control '<同一control>' --result '<result.json>'`，Python 对应 `frozen=`，保留原 batch_id 与 UUID。来源或作者稿改变时才经当前 prepare/必要阅读产生新 path/hash 并重新 freeze。数据库 batch receipt 是发布权威；本地 result 仅为详细投影，写失败后也接续同一 frozen，不能为补回执生成新 batch。短返回给各类写入和 invalidated 数量，详细 result 保存原 apply 结果（包括 invalidated IDs）、batch_id、frozen 路径与文件 SHA256；接续时 completed 为 null。`file_sha256`/`frozen_file_sha256` 是文件字节校验，DB `batch_hash` 是 apply 规范化内容身份。未知提交沿原 marker/owner 合同核定，保留 fixed frozen，不自动重投或 release。
 
-0.15 frozen 同时缺少 `privacy_rules` 和 `privacy_rules_revision` 时，当前 `private_scope=[]` 可按原根 private 分类接续，保留 batch_id 和成员 UUID。尚未提交的旧 frozen 遇到非空 private_scope 明确冲突，应以当前项目配置重新 freeze；已经提交的相同批次仍返回原数据库回执。不要向旧 frozen 手补一半规则字段。
+0.17 作者提案使用固定 prepare 合同；切换前结清或明确作废旧作者稿，保留恢复原件，再按新客户端 prepare。已保存 frozen 的恢复沿对应版本的原始合同处理，不手工补造其规则或依赖字段。
 
 apply 核对来源版本，以及本批改写、退役、更正目标、实际依据、父引用和关系端点的 expected 版本，再原子写入；无关 expected 不阻塞，缺 expected 仅允许本批新建记录。chunk 按范围取原词；摘要、依据、更正和旧快照持久保存。旧草稿冲突重新 prepare、阅读后提交。作者完成必要理解、生成批次并由程序成功发布即完成普通批次，不追加独立语义复核、例行回读/检索抽查。失败或结果未明保持未决。
 
@@ -69,18 +69,19 @@ apply 核对来源版本，以及本批改写、退役、更正目标、实际�
 启动时分配稳定且全新的 control。程序预检前原子取得项目所有权；每个 thread 仍可 brief、报告问题及正常业务：
 
 ```powershell
-memory maintain --mode automatic --holder '<本thread身份>' --control '<memory.data_dir>/maintenance/<全新标识>.control' --output '<project-root>/tmp/<run>/summary.json'
+memory collect --output '<project-root>/tmp/<run>/collection.json'
+memory maintain --mode automatic --holder '<本thread身份>' --control '<memory.data_dir>/maintenance/<全新标识>.control' --collection '<project-root>/tmp/<run>/collection.json' --output '<project-root>/tmp/<run>/summary.json'
 ```
 
-需要跳过本轮新聊天发现／采集时，明确添加 `--skip-codex-collection`，automatic／manual 均可使用；回执记 `codex.status=not_requested`。文件、已登记聊天、保留快照及其依赖仍沿原增量链处理。默认采集失败仍保留原错，不自动转成文件维护成功；跳过须披露聊天覆盖缺口。
+`memory collect` 独立保全可取得的 Codex 原件，不取得维护 owner，成功与失败各有回执。绑定 Codex 的项目维护时必须明确消费 `--collection <成功回执>` 或 `--retained`；retained 使用已有原件，当前聊天 freshness 保持未知，可在采集失败后按授权明确选择。没有绑定的纯文件项目无需该选项。加载采集回执核项目归属和原件 hash；逐聊天观察截点不等于全局不可变快照，prepare 固定实际读到的版本。采集失败保留原错，语义维护结果单独报告。
 
 默认面向整个项目的受管来源，不按当前业务任务的文件缩小维护范围。Git 项目枚举项目内已跟踪和未忽略的未跟踪文件，并加入 `memory.source_scope` 显式包含项；非 Git 项目使用声明的 `source_scope`。默认发现还自动加入根 `private/` 独立 Git 的已跟踪及未忽略新文件，尊重内层忽略规则，无需逐项配置 source_scope；它们仍属同一项目 UUID、数据库与维护生命周期。不存在 `private/` 时正常完成默认发现。各范围排除 `.git/`、工具状态、环境与缓存。
 
-所有已登记来源、历史 pending/未接受范围和可归属 Codex 原件持续参与维护。`--scope <文件或目录> ...` 只覆盖本轮新文件发现，不自动追加 private 范围，也不把历史来源限制到所选范围；已登记私有来源的缺失仍按既有合同处理。无需为日常维护递归扫描 `.`；不支持的二进制材料留缺口，读取失败保留原错。
+默认工作集包含所有已登记来源（含已删除来源）、历史 pending/未接受范围和可归属 Codex 原件。`--scope <文件或目录> ...` 实际限制新增、已登记、缺失、聊天及待处理来源到指定项目相对路径，范围外工作保留待办；不自动追加 private 范围。无需为日常维护递归扫描 `.`；不支持的二进制材料留缺口，读取失败保留原错。
 
 零行文字来源且没有活动知识时，只需登记来源，不创建无效行范围的 member。已有正文被清空时，仍须退役旧成员并处理依赖；完成后不反复派发该空来源，重新出现正文会继续发现。
 
-请求采集时，预检先按 [Codex 绑定](setup-project.md#codex-项目聊天接入) 取得本次可读的持久化聊天截点，再比较来源及旧成员实际接受版本。Git 干净仍可能有尚未接受的原文。发现清单、聊天采集、语义接受和向量覆盖分别检查，不能据其中一项声称全部项目材料已接受。`changes` 提供显式变化查看，`maintain` 才负责机械更新与语义交接；查询不调用两者。
+请求采集时先按 [Codex 绑定](setup-project.md#codex-项目聊天接入) 独立取得本次可读的持久化聊天截点；维护随后比较选定来源及旧成员实际接受版本。Git 干净仍可能有尚未接受的原文。发现清单、聊天采集、语义接受和向量覆盖分别检查，不能据其中一项声称全部项目材料已接受。`changes` 显式查看变化，`maintain` 负责机械更新与语义交接；查询不调用两者。
 
 程序在依据闭合时处理原字节 hash 相同的元数据变化、完整正文仅 CRLF/LF 变化，以及有唯一定位且上下文可确认未变的原文块；相互依赖的机械候选共同发布，无法证明依赖仍有效的范围留给语义共读。完整回执保留机械批次、旧/新行映射、变化片段、受影响成员与关系；换行归一只用于比较，快照仍按真实原字节保存。编码输入及身份未变才复用向量；实际输入变化按现有 apply 合同编码。已有 stale、更正、退役或语义证据不足的范围保留待核，局部文字相同不表示父级摘要或关系均有效。
 
@@ -97,27 +98,27 @@ Run the following command and follow the `prompt` field in its JSON output:
 
 布局使用接入时保存的宿主上限 C（不含主 agent、含全部后代）。宿主已有实时可用额度 A 时传 `--available-subagents <A>`：A 已扣其它占用（含检索），尚未扣本轮业务预留；自动维护预留 1 席，手动维护预留 0 席。脚本计算 `M=max(0,min(C,A)-预留)`。无 A 时仅返回配置允许的组织上限，实时额度未核，实际创建仍受宿主准入约束；容量快照的刷新见 [配置维护要点](project-config-maintenance.md#修改并发上限或切换宿主profile)。
 
-自动模式始终仅第 0 队：M 为 1–3 时单协调者，M≥4 时加至多 4 名 reader。手动模式 M 为 1–4 时单协调者；M≥5 时启用 `min(10,floor(M/5))` 个满队，每队 1 协调者和 4 reader，余量留空。M=0 不派 worker，未处理材料保持待办。材料不足时少启用整队；零 reader 的协调者亲自 prepare、读原文、分块、摘要、建图、处置与发布，不等待 reader。所有队共用一份 owner/control/receipt，第 0 队协调者是唯一 apply 发布者及反馈结案者；其它队在其子树内交稿，不独立开维护或发布。
+程序根据实际 `work_items` 与 M 保存弹性布局；容量是上限，少量工作只启用所需人数。自动模式仅第 0 队，手动模式可启用更多有界组；M=0 时不派 worker，未处理材料保持待办。零 reader 的协调者亲自 prepare、阅读、分块、摘要、建图、处置与发布。所有队共用一份 owner/control/receipt，第 0 队协调者是唯一 apply 发布者及反馈结案者；其它队在其子树内交稿，不独立开维护或发布。
 
 同阶段的批次接续使用已知自有句柄，名称本身不证明实例归属。容量准入失败时保留原错与未派项、停止新增派工；取得新额度后用 `memory pending-dispatch --receipt <receipt> --available-subagents <A> --started-task-names <已启动名称...>` 仅缩减未启动清单，保留已启动名称和权限。不开第二个 owner，不以未派工冒充完成。
 
-协调者将相关且非重叠的有限来源组交作者负责阅读、关系与正常修复，按固定引用统一发布；只观察自有分支，按事件／有界等待接收一次完成交付。同稿的自动 FINAL 沿已收引用识别，修稿使用新文件／hash。具体合同见 [来源组交付](../src/basepack/memory/SKILL.md#source-group-delivery)，普通成功不追加语义审计。
+协调者按语义、共读端点、共享写目标和工作量分组；每个共享节点、关系及其它图写目标只有一个 owner，跨组依据交其共读。作者负责阅读、语义和正常修复，按固定引用统一发布；只观察自有分支，按事件／有界等待接收一次完成交付。同稿的自动 FINAL 沿已收引用识别，修稿使用新文件／hash。具体合同见 [来源组交付](../src/basepack/memory/SKILL.md#source-group-delivery)，普通成功不追加语义审计。
 
-回执固定候选身份／来源集合和聊天截点，`current_revision` 是发现时观察，`accepted_source_version` 是此前接受身份；候选内每批 prepare 当前原件，可接受当时版本并准确报告 accepted revision／覆盖，冲突仍回原作者重 prepare。优先用户约定、当前阶段与稳定成果入口，再补历史。接受后再改不自动重开本阶段；新路径、回执外候选及后续未接受成果列原件入口与有限后续范围。旧回执成功不等于最终磁盘全 fresh，业务收尾不默认再开全库维护。
+回执固定候选身份／来源集合和采集观察，`current_revision` 是发现时观察，`accepted_source_version` 是此前接受身份；候选内每批 prepare 固定实际原件，可接受当时版本并报告 accepted revision／覆盖，冲突回原作者重 prepare。优先用户约定、当前阶段与稳定成果入口，再补历史。接受后再改不自动重开本阶段；新路径、回执外候选及后续未接受成果列原件入口与有限后续范围。旧回执成功不等于最终磁盘全 fresh，业务收尾不默认再开全库维护。
 
 ### 同一轮的阶段接续
 
 长维护可在主题／来源组完成、旧协调者及作者均已结束、发布终态明确后串行接续。原宿主保存固定交接包，再运行：
 
 ```powershell
-memory stage --receipt '<原receipt>' --control '<原control>' --handoff '<固定handoff.json>' --workers-ended --output '<新stage.json>'
+memory stage --receipt '<原receipt>' --control '<原control>' --handoff '<固定handoff.json>' --workers-ended --available-subagents <当前可用额度> --output '<新stage.json>'
 ```
 
 下一次接续增加 `--previous-stage '<当前stage.json>'`。该入口只保存阶段身份与固定引用，不创建宿主 agent。宿主须按返回 worker 的名称、模型、推理强度及 `fork_turns="none"` 实际派新上下文；保留返回的 `stage.path`／`stage.file_sha256` 和原父任务的取消句柄。自动生成的 render 命令携带 hash；手工运行 `memory prompt` 或 `memory pending-dispatch` 时，使用同一 receipt/control，并同时传 `--stage <path> --stage-sha256 <hash>`。
 
 各阶段沿用同一 receipt、owner/control 和父 stop，始终一个 dispatcher／publisher；无句柄接管能力时先结束旧组再创建新 reader。压缩或同会话摘要不是干净接续。阶段完成仅结束本组，候选余项、未读范围、反馈与原回执 gaps 继续保留，不执行整轮 stop/release 或重新采集。schema 与宿主交接职责以 [阶段合同](../src/basepack/memory/SKILL.md#stage-continuation) 为准；入口成功不代替真实宿主接续验收。
 
-采集与发布沿用自有 control。业务完成时，以本项目配置 `memory stop --control <control>`，取消协调者及后代；通过 `memory owner` 核发布状态，再 `memory release --control <同一control>`。这些命令独立于 brief，不需要数据库或密码。stop 不撤销已获准提交，release 要求已停止且无未完成/未明发布。control 是协作授权凭证，只给持有者及其 worker，不能复用或按清理习惯删除。失败保留原错与 owner，业务答复报告余项。异常遗留先独立核旧持有者/后代已结束及事务结果已解决，再显式 `memory recover-owner --run-id <id> --owner-ended --publication-resolved`；不按文件年龄抢占。此机制用于协作互斥，不隔离有文件系统访问权的对手。
+维护与发布沿用自有 control，独立采集不持有它。业务完成时，以本项目配置 `memory stop --control <control>`，取消协调者及后代；通过 `memory owner` 核发布状态，再 `memory release --control <同一control>`。这些命令独立于 brief，不需要数据库或密码。stop 不撤销已获准提交，release 要求已停止且无未完成/未明发布。control 是协作授权凭证，只给持有者及其 worker，不能复用或按清理习惯删除。失败保留原错与 owner，业务答复报告余项。异常遗留先独立核旧持有者/后代已结束及事务结果已解决，再显式 `memory recover-owner --run-id <id> --owner-ended --publication-resolved`；不按文件年龄抢占。此机制用于协作互斥，不隔离有文件系统访问权的对手。
 
 自动小批接续已有积压，任务相关性只影响优先级。显式维护按授权范围交付实际处置、阻塞和余项，不以剩余数量或优先小批自行结案。普通业务结束不承诺清空历史；连续短任务的积压留下一次长任务或显式维护。特殊任务可按授权调整范围，固定名称和本轮容量仍由脚本提供。
 
@@ -131,7 +132,7 @@ memory stage --receipt '<原receipt>' --control '<原control>' --handoff '<固�
 
 ## 聊天来源与精确回读
 
-Codex 维护采集真实用户消息与可取得的助手文字，保留 thread/turn/item/part 身份和角色；系统、AGENTS、hook 与工具元数据不冒充用户 prompt。同一线程分页内重复的 turn/item 按身份去重，内容冲突保留错误；人类有意重复发送仍是不同消息。跨线程不按文字去重，完整继承身份尚未证实。每次以已捕获的持久化消息截点分页，当前任务中新增长度下次接续。采集只更新受管原件，不表示已经阅读、总结或发布知识。
+独立 Codex 采集保留真实用户消息与可取得的助手文字，以及 thread/turn/item/part 身份和角色；系统、AGENTS、hook 与工具元数据不冒充用户 prompt。同一线程分页内重复的 turn/item 按身份去重，内容冲突保留错误；人类有意重复发送仍是不同消息。跨线程不按文字去重，完整继承身份尚未证实。每次以已捕获的持久化消息截点分页，当前任务中新增长度下次接续。采集只更新受管原件，不表示已经阅读、总结或发布知识。
 
 受管聊天原文保存在 `memory.data_dir/codex/<thread>.txt`，版本 hash 属于该导出的真实 UTF-8 字节。接受后沿现有 source_version 保存快照；`read` 的 `original.chat_locations` 从所选已核快照返回聊天链接、thread/turn/item/part、UTF-8 字节范围及本次读取的正文交集，生成头与分隔符不当作人类原文。旧已发布版本可在原聊天续写或修订后继续核实。
 
@@ -150,7 +151,7 @@ $config = '<absolute-project-config>'
 if ($LASTEXITCODE -ne 0) { throw "memory example failed ($LASTEXITCODE)" }
 ```
 
-示例在项目根 `tmp/example-<UUID>/` 保存批次/编号原文；control 保留在实际 memory 目录的 maintenance 中，并显式取得、停止和释放 owner。`expected`、source path/revision 沿用 prepare。批次包含以下 parent/evidence，范围为 1-based 闭区间；chunk 不写 text，由程序取第 3–4 行原词：
+示例在项目根 `tmp/example-<UUID>/` 保存固定 prepare 与作者提案；control 保留在实际 memory 目录的 maintenance 中，并显式取得、停止和释放 owner。示例维护实际限域到新文件，绑定 Codex 时明确用 retained。提案引用 prepare 路径/hash，程序编译 source revision、expected 和身份。批次包含以下 parent/evidence，范围为 1-based 闭区间；chunk 不写 text，由程序取第 3–4 行原词：
 
 | 成员 ID / kind | 行范围 | parent | evidence |
 | --- | --- | --- | --- |
@@ -166,7 +167,7 @@ if ($LASTEXITCODE -ne 0) { throw "memory example failed ($LASTEXITCODE)" }
 
 任务开始执行一次 brief；同任务跨 shell 读写、反馈及维护收尾沿用已获内容，目标或上下文实质变化时按需补取。shell 初始化与任务启动的维护源是 [生成模板](../src/basepack/project/templates/memory-enabled.md)，实际 Python／配置见本项目 `.basepack/instructions.md#startup`。
 
-brief 直接读取已发布 mandatory、已有文件／章节摘要与已知缺口，不做 embedding、任务搜索或原件扫描。mandatory 无条件保留；stale 条目保留为待核义务。已知少量文件直接同批阅读；需要发现项目概况、任务前提、过去要求或跨材料依据时，用统一入口：
+brief 只读已发布 mandatory、概况入口与已知缺口，不做 embedding、任务搜索或原件扫描。mandatory 无条件保留；stale 条目保留为待核义务。概况从跨来源摘要／节点取得有界候选，默认展示 6 条时最多精算 48 条候选、总上限 96；候选按 UTC 日轮换展示采样，无持久状态，也不改变 J/C、hits 或年龄。候选组内按 Gaussian 访问区间上／下界保守排序，跨结构组交错，低权重始终保留检索资格；选中项披露实际模型、游标和区间。它仍须读取现有摘要／投影，并披露未映射来源、未读范围和遗漏，不承诺常数成本或完整语义覆盖，也不建立“当前理解”缓存。已知少量文件直接同批阅读；需要发现项目概况、任务前提、过去要求或跨材料依据时，用统一入口：
 
 ```powershell
 memory retrieve --question '历史要求如何演变？'
@@ -177,21 +178,20 @@ memory retrieve --question '文档中的现行约束是什么？' --scope 'devDo
 
 CLI 只准备派工。宿主实际按返回的 `task_name`、`model` 和 `reasoning_effort` 创建干净历史 worker，传英文启动句和 `render_command`，并接收其最终结果；`prepared`／`started=false` 不能称为已派工。默认 tier1，显式 `--tier` 可改档；共享可用额度已知时传 `--available-subagents <A>`。同一问题复用自有句柄完成多轮检索；独立并发问题用不同 `--slot`。零容量返回 `executor='main'`，或宿主无派工能力时，由主 agent 执行同一流程并如实说明执行者。检索与维护共享容量，但不取得维护 owner/control；短任务仍可检索。
 
-一次实际委托由同一 worker 完成 search → 必要原文与图关系回读 → 0–100 综合评分 → UTF-8 `scored.json` 落盘 → rank → 可用内容与版本清单。`access_weight` 只是历史使用辅助线索，相关性、适用条件和证据价值为主；低权重关键材料仍可进入。rank 直接按综合分排序、去重与字符预算选择，不做第二次访问调权，也不记交付。worker 实际用宿主文件工具或本机 Python 保存评分文件；保存或 rank 失败时保留原错、已读证据和未完成阶段。
+一次实际委托由同一 worker 先运行 `memory retrieval-start --request <request.json>`，固定行为筛选之前的基础锚点、逻辑 ID 份额、基础质量、逐版本观察截点、query/episode、预算与策略，再取得行为候选。后续补充 search → 必要原文与图关系回读 → 一次 0–100 综合评分 → UTF-8 `scored.json` → rank；内部多轮复用同一锚点包。访问区间、行为支持度及模型截点是辅助线索，相关性、适用条件和证据价值为主；低权重关键材料仍可进入，mandatory 独立交付。rank 只按综合分排序、去重和预算选择，不二次调权或记账。保存或 rank 失败时保留原错、已读证据和未完成阶段。
 
 候选、read/knowledge、scored、rank 与最终清单一路保留实际观察的 `id`／`knowledge_revision` 及已有 `private` 标记，原证的 `source_version`／`revision`、范围或图片 locator 另记。`record_type:'node'|'semantic'` 的独立知识节点／语义关系可无路径和行号，保留实际 basis、endpoint_versions；不能伪造来源来套成员格式。关系与条件用于判断本次适用性，区分用户要求、助手假设、代码事实和实验观察；旧要求热度不使其恢复现行身份，仍有效的旧实验可继续影响当前回答。完整评分形状与宿主步骤见 [随包 skill](../src/basepack/memory/SKILL.md#retrieve-in-one-delegation)。
 
-宿主确认最终内容已经实际收到后，将最终实交付项写入返回的 delivery_receipt 路径，再执行：
-
-```json
-{"delivery_id":"<request中的稳定ID>","items":[{"id":"<实交付ID>","knowledge_revision":"<实见版本>"}]}
-```
+worker 把实际观察的候选版本保存为 `candidates.json` 数组（含基础、行为、补检索和选中项），保留当时返回的 `access_model`、`access_compiled_j`、`access_fact_j` 和 `access_interval`。同版本有不同模型／游标观察时分别保留；不事后查新版覆盖。保存 rank 输出后生成固定 context 的交付回执：
 
 ```powershell
+memory rank --input '<scored.json>' --budget 6000 --output '<ranked.json>'
+memory retrieval-receipt --request '<request.json>' --ranked '<ranked.json>' --candidates '<candidates.json>' --output '<delivery_receipt路径>'
+# 宿主确认已实际收到最终内容后，登记该回执。
 memory delivery --input '<delivery_receipt路径>'
 ```
 
-可选 `context` 为 JSON。程序原子记录最终交付，重试保留相同 delivery_id，空 items 不推进事件；search/read/rank、内部日志及错误均不算交付。只强化实见版本，不向父级、依据、邻居或新版传播；无交付事件时闲置不变。即使上游阶段失败，实际收到且可定位的最终部分材料仍可据实登记；未收到最终内容时不登记。程序不要求使用者逐条调权。
+context 必须保留锚点及其 `alpha`／`base_quality`、逐版本 `knowledge_cutoff`、query、episode、实际 candidates、budget、policy 与 model；观察时间不是全库不可变快照。程序把各次实际访问提示存入 `access_observations`，`context.model` 表示行为候选发现时的模型；并发切换后补检索可以带不同模型／游标。每个首次接受的 delivery（含空清单）推进事实 J，只有非空交付推进机会钟 C 并刷新实见精确版本；同 ID 同内容重试均不推进，改内容报错。search/read/rank、内部日志及错误不算交付，奖励不传播到父级、依据、邻居或新版；无真实非空交付时闲置不变。最终部分材料只有在实际收到后才据实减少 items，保留固定 context。程序不要求使用者逐条调权。
 
 需要继续核实时使用以下接口；`--knowledge-revision` 省略时读当前知识，指定时读已保留版本，`history` 如实列可用历史。原证的版本与位置独立指定，图片实际打开 `original.image_path`；存量未保存的前像或来源定位保留缺口。
 
@@ -215,6 +215,21 @@ memory search --text 'memory-example.md' --mode hybrid --literal
 
 brief、search、knowledge 和 read 只读已发布知识及所存依据；来源已登记不等于知识已更新。`changes --scope` 显式发现原件变化，维护负责后续接受；查询不会等待维护或默认审计。预算外材料保留补读入口，实际问题用 [反馈](#使用反馈与手动审计) 留待单一维护 owner 处理。
 
+## 行为模型与访问提示
+
+行为模型只从真实共同交付的稳定逻辑 ID 篮子学习标准 KL-NMF，不读取正文、query、排名或访问分数，不建立用途类别。普通修订和移动保留逻辑 ID；拆分、合并或职责断裂由知识维护建立新 ID。没有可靠共用伙伴或模型时保持 unknown，基础检索继续可用。精确版本仍决定命中、回源与适用性，stale/retired 不因行为邻域恢复现行身份。
+
+训练需要可选 `behavior` extra；仅检索的轻量客户端可不安装训练依赖。依赖实现版本由 [包元数据](../pyproject.toml) 与锁文件固定，当前 scikit-learn 为 1.9.1：
+
+```powershell
+memory behavior-train --rank 8 --epsilon 0.001 --beta 0.2 --strength 8
+memory behavior-compile
+```
+
+这些是本次工程初值，不是效果最优参数；训练参数随模型冻结。训练用频率忠实的 `n_b/d_b` 共交付矩阵，模型文件在 `memory.data_dir/behavior/<sha>.json`。重训在新坐标中全史重放原始事实后切换，不能直接换算旧权重。`behavior-compile` 是显式增量追账，brief/search/read/access-hints 均保持只读。
+
+Gaussian 对各独立锚点逐项计算核后按原份额平均；unknown 份额不重归一，产生访问区间。程序增量维护稀疏 H、未知质量 R 和每精确版本标量基准，首次接受固定事实头而不增加 hits；迁移中无法证明的旧接受时间保留未知，并显式标记新规则的观察起点。一次命中刷新整份精确版本的访问状态，无日历衰减。长期不用可降至很低权重，仍保留正文、版本、图、索引与训练 ID，并可由基础检索找回、再实际交付刷新；低权重不触发删除、退出或 GC。
+
 ## 私有资料与分享边界
 
 `private` 表示按项目约定限制分发，涵盖隐私、机密及版权/许可受限资料；公开可获取的论文原文也可归入，不要求含个人隐私。它不记录具体限制理由，也不自动判断再分发许可；公开书目、链接和自主分析沿项目公开口径处理。
@@ -233,7 +248,7 @@ freeze 固定私有规则及其 revision，apply 核对当前规则；冻结后�
 
 旧记录补标或原位来源迁移另按已确认映射和固定版本依据限定范围，保留原件、历史路径和恢复材料；不以当前规则悄悄覆写历史分类。未覆盖或无法确认的旧记录保留缺口。配置分类不代替全文隐私判断，升级不默认补标、迁移来源或进行全库语义审计。升级边界见 [配置维护](project-config-maintenance.md#按变化边界准备恢复集合)。
 
-现有原生导出和普通备份保留全部公私内容；数据库导出本身不包含全部外部文件。需要公开时另建筛选后的分享副本，公开导出工具尚未提供。除当前知识外，来源快照、图片 assets、旧知识版本、change.previous、聊天/反馈/交付 context 也可能含机密；不能只删除当前私有 member 就宣称可公开。
+现有原生导出和普通备份保留全部公私内容；数据库导出本身不包含全部外部文件。需要公开时另建筛选后的分享副本，公开导出工具尚未提供。除当前知识外，来源快照、图片 assets、旧知识版本、change.previous、聊天/反馈/交付 context 和行为模型也可能受限；数字、逻辑 ID 或坐标本身不构成公开许可。
 
 ## 备份与恢复
 
@@ -256,6 +271,6 @@ try {
 
 恢复时先为新的物理目录/端口启动认证服务，保留原 project_id；从该目标配置读取用户名及同一密码文件，再以原生 `import` 替换上述 `export`。缺失凭据先恢复正确文件，不给已有库重新生成密码。恢复后核快照、图关系和检索。
 
-恢复集合包括 export、配置、原凭据、公私业务原件、private 独立 Git 及其忽略但仍需保留的附件、受管 Codex 导出、codex-attachments 原件与定位回执、`memory.data_dir` 下的 assets 图片快照。数据库内的知识版本、演变关系、依据、private 标记、更正、旧快照、已阅/延期细化处置、反馈、访问状态及 delivery_id 去重记录随 export 恢复；旧版备份不会凭空补齐后来新增的状态或缺失历史。新目录保留 project_id，使用独立目录/端口，再验证原文定位、知识版本、关系、检索、反馈及同 delivery_id 重试。兼容向量可随 export 恢复，或从接受表示与原图重新 embed；访问记账不要求重建向量。运行中的库使用原生 export；复制物理目录先停写、停止服务。长期备份由明确恢复需求决定目的地与保留周期，不默认叠加完整备份；这些是完整私有恢复材料，按实际公开范围另做分享副本。凭据不随源码发行；清理前核原件/旧依据引用及活跃控制/未明发布。
+恢复集合包括 export、配置、原凭据、公私业务原件、private 独立 Git 及其忽略但仍需保留的附件、受管 Codex 导出、codex-attachments 原件与定位回执，以及 `memory.data_dir` 下的 assets 图片快照和数据库引用的 `behavior/<sha>.json` 模型文件。知识版本、关系、依据、private、更正、旧快照、已阅/延期处置、反馈、原始交付事实、访问投影及 delivery_id 去重随 export 恢复；旧备份不能补齐后来状态或缺失历史。新目录保留 project_id，使用独立目录/端口，再验证原文、精确版本、关系、检索、反馈、模型 hash 和交付重试。兼容向量随 export 恢复，或从接受表示与原图重新 embed；访问记账不要求重建向量。运行库使用原生 export；复制物理目录先停写、停止服务。长期备份按明确恢复需求决定目的地与保留周期，不默认叠加完整备份；完整恢复材料按私有边界保管。凭据不随源码发行；清理前核原件／旧依据引用及活跃控制／未明发布。
 
 `memory freshness [--codex-registry <json>] [--thread <id>]` 只读项目归属、分页、采集回执与原文比较，不取得 owner、不写原件、不生成向量或发布知识。按相关候选及用户点名聊天补读；跨项目引用使用宿主读取。回执时间不是全局截止，端点和 `updatedAt` 不是正文证明；报告未摄入、待语义快照、实际补读和未知。预检 pending 是历史快照，不代表当前语义状态。

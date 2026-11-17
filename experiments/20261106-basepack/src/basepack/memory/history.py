@@ -12,13 +12,15 @@ def history(memory, record_id):
     if target.table not in {"member", "node", "semantic"}:
         raise ValueError("Knowledge requires a member, node, or semantic ID")
     ref = _sql(target)
-    current, retained, changes, deliveries, delivery_count = memory._execute(
+    current, retained, changes, deliveries, legacy_deliveries, delivery_count = memory._execute(
         f"SELECT * OMIT embedding FROM ONLY {ref}; "
         f"SELECT VALUE record FROM knowledge_version WHERE target={ref}; "
         f"SELECT previous FROM change WHERE target={ref} OR "
         f"previous.members.*.id CONTAINS {ref} OR previous.nodes.*.id CONTAINS {ref} OR previous.edges.*.id CONTAINS {ref}; "
-        f"SELECT delivery_id,event,context,items FROM delivery WHERE items.*.id CONTAINS <string>{ref} "
-        "ORDER BY event DESC, delivery_id ASC LIMIT 20; "
+        f"SELECT delivery_id,j,context,items FROM delivery WHERE j >= 1 AND items.*.id CONTAINS <string>{ref} "
+        "ORDER BY j DESC LIMIT 20; "
+        f"SELECT delivery_id,legacy_event,legacy_context,items FROM delivery WHERE legacy=true AND items.*.id CONTAINS <string>{ref} "
+        "ORDER BY legacy_event DESC LIMIT 20; "
         f"SELECT count() AS count FROM delivery WHERE items.*.id CONTAINS <string>{ref} GROUP ALL;")
     records = []
     for change in changes:
@@ -36,7 +38,8 @@ def history(memory, record_id):
     return {"id": current["id"] if current else record_id,
             "current_knowledge_revision": current["knowledge_revision"] if current else None,
             "versions": list(versions.values()),
-            "deliveries": deliveries, "delivery_count": delivery_count[0]["count"] if delivery_count else 0,
+            "deliveries": (deliveries + legacy_deliveries)[:20], "legacy_order": "event_only_ties_unknown",
+            "delivery_count": delivery_count[0]["count"] if delivery_count else 0,
             "delivery_limit": 20,
             "coverage": {"complete": False,
                          "note": "Retained versions only; pre-installation gaps may remain."}}

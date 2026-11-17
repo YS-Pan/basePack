@@ -161,6 +161,21 @@ def test_git_failure_is_not_treated_as_non_git(tmp_path, monkeypatch):
         discover_sources(config(tmp_path))
 
 
+def test_directory_scan_failure_is_not_reported_as_complete(tmp_path, monkeypatch):
+    monkeypatch.setattr("basepack.memory.discovery._git_repository", lambda root: False)
+    (tmp_path / "docs").mkdir()
+    failure = PermissionError("cannot scan docs")
+
+    def fail_walk(path, *, followlinks, onerror):
+        onerror(failure)
+        yield  # os.walk is an iterator
+
+    monkeypatch.setattr("basepack.memory.discovery.os.walk", fail_walk)
+    with pytest.raises(PermissionError) as error:
+        discover_sources(config(tmp_path, ["docs"]))
+    assert error.value is failure
+
+
 def codex_config(root):
     return SimpleNamespace(root=root, memory_dir=root / ".basepack" / "memory")
 

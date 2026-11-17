@@ -21,7 +21,7 @@ if ($$LASTEXITCODE -ne 0) { throw "memory brief failed ($$LASTEXITCODE)" }
 
 同一任务后续读写文件、反馈、stop/release 沿用已获 brief；任务目标或上下文实质变化时按需补取。后续命令复用本进程的参数，新进程只重新初始化。搬迁后核实际路径，再以新配置运行 `memory init` 刷新托管块；块外旧路径另核。
 
-brief 直接读取已发布 mandatory、已有文件／章节摘要和已知缺口，不做 embedding、任务搜索或原件扫描。直接保留 mandatory；stale=true 按业务需要回源确认。已知少量文件直接同批阅读；判断项目现状、剩余工作、待决策或历史要求时，先用一次完整检索核既有决定，再形成选项；已点名聊天直接读并沿引用核后续发布。此类跨历史依据的发现统一交 [检索 worker](<$skill#retrieve-in-one-delegation>)，同一委托完成多轮搜索、回源、综合评分与 rank。[客户端与凭据](<$skill#start-and-stop>)。
+brief 只读已发布 mandatory、概况入口和已知缺口，不做 embedding、任务搜索或原件扫描。直接保留 mandatory；stale=true 按业务需要回源确认。已知少量文件直接同批阅读；判断项目现状、剩余工作、待决策或历史要求时，先用一次完整检索核既有决定，再形成选项；已点名聊天直接读并沿引用核后续发布。此类跨历史依据统一交 [检索 worker](<$skill#retrieve-in-one-delegation>)，先固定基础锚点，再完成多轮搜索、回源、一次综合评分与 rank；主任务实收后确认交付。[客户端与凭据](<$skill#start-and-stop>)。
 
 brief、检索和回读返回 `private=true` 的内容按项目限制分发约定处理，涵盖隐私、机密及版权/许可边界；公开写入仅提炼本项目允许公开的内容与结论。交接保留所见标记，旧记录缺标不代表已核公开。[私有来源与公开边界](<$skill#private-sources-and-publication>)。
 
@@ -32,16 +32,16 @@ brief、检索和回读返回 `private=true` 的内容按项目限制分发约�
 
 主任务直觉预计不超过十分钟时，仅保留 brief，跳过整个自动 maintain；明显更长时，在宿主支持开始/完成事件与可取消子任务的条件下并行业务维护。范围明显扩大时重新判断，可首次启动；子任务遵循委托，不递归开维护。用户明确要求维护时直接按显式维护执行，不受时长门槛限制。
 
-启动时分配全新且稳定的 control（本项目 `$memory_dir/maintenance/` 内），以本 thread 身份运行 `memory maintain --mode automatic --holder <thread> --control <control>`；宿主已有本轮可用 subagent 额度时传 `--available-subagents <A>`，包含检索等占用后的额度，不提前扣脚本预留。程序在预检前原子取得项目所有权；`acquired=false` 时报告已有 owner 并继续业务。默认全项目发现，不用当前业务文件缩小范围。缺少生命周期能力时说明自动维护不可用，使用显式维护任务。[所有权、来源与采集详情](<$skill#maintain-sources>)。
+Codex 原件先独立运行 `memory collect --output <采集回执.json>`，请求采集时刷新完整项目注册清单；采集无维护 owner，失败保留原错与回执。绑定 Codex 的项目随后明确用 `--collection <采集回执.json>` 或 `--retained` 维护已有原件；retained 不证明当前聊天 freshness。未绑定的纯文件项目无需该选择。采集回执是逐聊天观察，加载时核原件 hash；prepare 再固定实际版本。[来源选择](<$skill#maintain-sources>)。
 
-需要本轮只跳新聊天发现／采集时，明确添加 `--skip-codex-collection`；适用于 automatic／manual，回执记 `codex.status=not_requested`。已有聊天来源、历史快照和依赖仍沿原维护链处理；默认采集失败仍失败。请求采集时刷新项目注册清单，跳过时披露覆盖缺口。[选择与失败收尾](<$skill#maintain-sources>)。
+启动时分配全新且稳定的 control（本项目 `$memory_dir/maintenance/` 内），以本 thread 身份运行 `memory maintain --mode automatic --holder <thread> --control <control>` 并附上述来源选择；宿主已有本轮可用 subagent 额度时传 `--available-subagents <A>`，包含检索等占用后的额度，不提前扣脚本预留。程序在预检前原子取得项目所有权；`acquired=false` 时报告已有 owner 并继续业务。默认全项目工作集；显式 `--scope` 实际限制新增、已登记、缺失及待处理来源，范围外余项保留。缺少生命周期能力时说明自动维护不可用，使用显式维护任务。[所有权与失败收尾](<$skill#maintain-sources>)。
 
 <a id="dispatch"></a>
 ## 维护派工
 
 仅 `acquired=true` 且 `needs_semantic=true` 并返回 worker 时，按 `worker.task_name`/`worker.model`/`worker.reasoning_effort` 实际派协调者；只给英文启动句和 `worker.render_command`，由其运行并遵循 JSON `prompt`。按回执固定的 `layout` 派工，自动维护仅第 0 队；零 reader 时协调者亲自阅读，仅第 0 队协调者发布。名额不足保留原错与未派项。协调者负责有限来源组的派工、依赖与正常修复，主任务接收阶段结果；[固定交付与分支通信](<$skill#source-group-delivery>)按统一合同执行。[派工与批次详情](<$skill#maintain-sources>)。
 
-长维护在来源组完成、旧团队结束且发布终态明确后，用 `memory stage --receipt <原receipt> --control <原control> --handoff <固定交接.json> --workers-ended --output <新stage.json>` 建立接续描述；宿主仍须实际按返回参数及 `fork_turns="none"` 创建新身份并保留父 stop 句柄。阶段完成仅结束本组，余项留在同轮。[阶段交接、schema与恢复](<$skill#stage-continuation>)。
+长维护在来源组完成、旧团队结束且发布终态明确后，用 `memory stage --receipt <原receipt> --control <原control> --handoff <固定交接.json> --workers-ended --available-subagents <当前可用额度> --output <新stage.json>` 建立接续描述；宿主仍须实际按返回参数及 `fork_turns="none"` 创建新身份并保留父 stop 句柄。下一组按剩余工作和容量定人数，阶段完成仅结束本组，余项留在同轮。[阶段交接、schema与恢复](<$skill#stage-continuation>)。
 
 <a id="stop"></a>
 ## 维护收尾
@@ -51,7 +51,7 @@ brief、检索和回读返回 `private=true` 的内容按项目限制分发约�
 <a id="explicit-maintenance"></a>
 ## 显式维护
 
-用户明确要求维护时，使用 `memory maintain --mode manual`，维护本身属于交付：按授权范围报告实际处置、阻塞和余项。已有 owner 时报告持有者，不能将跳过或少量优先批次当作完成。按脚本布局启用满队；低并发由单协调者亲读并发布。固定候选内先处理用户约定、当前阶段及稳定成果入口，再补历史；披露实际接受版本、后续未接受成果的原件入口与有限后续范围。业务收尾按父任务停止边界执行。[完成口径](<$skill#maintain-sources>)。
+用户明确要求维护时，使用 `memory maintain --mode manual` 并附来源选择，维护本身属于交付：按授权范围报告实际处置、阻塞和余项。已有 owner 时报告持有者，不能将跳过或少量优先批次当作完成。按脚本根据实际工作量和容量保存的布局启用人数；零 reader 由协调者亲读并发布。固定候选内先处理用户约定、当前阶段及稳定成果入口，再补历史；披露实际接受版本、后续未接受成果的原件入口与有限后续范围。业务收尾按父任务停止边界执行。[完成口径](<$skill#maintain-sources>)。
 
 <a id="feedback"></a>
 ## 使用反馈

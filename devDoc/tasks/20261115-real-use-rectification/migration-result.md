@@ -1,0 +1,30 @@
+# 新行为架构迁移演练
+
+2026-11-17。本页记录预备演练，**正式数据库尚未切换**。该次原生导出时生产库仍可写，因此不能作正式切换点；正式切换须先停止维护与全部写入、处理旧批次并重新导出。
+
+## 数据合同
+
+物理迁移保留全部记录、UUID、内容向量和精确版本；不猜历史拆合、不重读全部内容。旧delivery保留原`event`与`items`，原`context`另存`legacy_context`，标`legacy=true`、`j=null`、`context=null`；旧非空event仅表达其已知先后，旧空事件无可证明的严格次序。旧`access_state`和`meta:access`原样保留作历史，不供新模型解释为新权重；新`meta:delivery.j=0`。旧知识版本`j_enter=null`，`observed_j=0`和`age_origin=legacy_cutover`只表示新规则的观察起点，不能表示真实接受时间或命中。旧实交付可训练共用，缺失锚点的质量为unknown；旧从未命中者真实hits仍为0，从此观察起点随新事件变冷。真实旧年龄无法恢复。
+
+## 实际预备演练
+
+生产库只读的预备导出为459,907,312字节，隔离源库原生重导出SHA-256相同。分别恢复到本机独立端口18171、18172及不同物理store。数据桥转换后全部旧表逐记录逐字段相等，除合同中的明确新增字段和新增新游标外无差异：meta 1419、source 1585、source_version 2165、member 8192、node 166、semantic 262、change 16690、knowledge_version 9264、access_state 134、delivery 23、feedback 8。七条旧delivery含非空旧context，已按合同保留。在独立配置与目录上安装当时源码schema并训练，23次旧非空交付重放为C=23、22个共用篮进入训练；brief含3条mandatory，literal search、文本/图片read、history与neighbors均可读取，新空交付J=1、重试不增、非空交付J=2。旧未命中版本hits保持0，一次新非空交付后其权重区间上界由0.999875降至0.999750，观察起点标为legacy_cutover。首次图片回读因隔离目录缺assets失败，复制原assets后成功；恢复集合必须带上这些文件。以上是预备快照与当时源码的隔离检查，不代替最终集成版本的验收。演练和报告在忽略的`tmp/20261117-implementation/migration/`；原生备份与上下文可能含私有资料，不公开。
+
+## 正式恢复和切换门
+
+1. 等待新版本集成门通过。停止自有维护和所有写入、确认无在途发布；保存旧客户端wheel及执行环境、项目配置和凭据、launcher、托管入口、原生新鲜导出、必要原件/图片/assets及回执；切换后恢复集合还须包含`memory_dir/behavior/`模型工件及对应数据库投影。保留整个旧物理库。恢复集合和哈希清单放项目既有`.basepack/memory/backups/`，按私有资料管理。
+2. 用同一份新鲜export依次导入两个不同的隔离物理store，源库保持只读；原生重新导出源库并对SHA-256与输入逐字节比较。端点必须与配置中的生产端点不同，源、目标端点也不同。
+3. 使用保存的旧0.16客户端运行一次性数据桥（下例为演练端口；配置及数据路径按实际替换）：
+
+```powershell
+$oldPython = 'D:/AgentTools/envs/basepack-client-0.10/Scripts/python.exe'
+$bridge = 'experiments/20261106-basepack/src/basepack/memory/migration.py'
+& $oldPython -X utf8 $bridge migrate '.basepack/config.toml' 'http://127.0.0.1:18171' 'http://127.0.0.1:18172'
+if ($LASTEXITCODE -ne 0) { throw 'migration failed; leave target closed' }
+& $oldPython -X utf8 $bridge finalize '.basepack/config.toml' 'http://127.0.0.1:18171' 'http://127.0.0.1:18172' --report '<new-private-report.json>'
+if ($LASTEXITCODE -ne 0) { throw 'handoff failed; inspect target and leave it closed' }
+```
+
+finalize先比较数据库定义、各表索引及事件、所有旧记录和明示转换，再于事务内核J=0及旧身份标记并写`memory_schema_version=3`；结果报告记录handoff marker。只读的`verify`动作可供演练单独使用。未知表、旧字段已有新迁移标记、目标游标已存在或端点不隔离时停止。数据桥只适用于本次已核的member identity 2及十一表schema，不是长期兼容接口。
+4. 数据对照通过后，在已设置marker的目标安装集成通过的新schema，再用独立配置与独立`memory_dir`显式训练模型并重放投影；不能让隔离演练向生产模型目录写入工件或锁。检查旧缺锚点和旧入场未知提示、真实旧命中、从切换起降权及低权重仍可检索。分别验证brief、search、原文及图片read、history、neighbors、空和非空delivery、重复请求及重训切换。实际结果与截点记录后，才同步切换客户端与本项目服务入口并恢复写入。
+5. 失败或检查未完成时保持新目标关闭，不改旧库；按保留的旧wheel、旧配置/凭据、launcher和原库恢复旧入口。新库开始接收写入后回退须先导出其新事实并妥善保留，再决定如何处置，不能把旧备份当成包含新事实的恢复点。

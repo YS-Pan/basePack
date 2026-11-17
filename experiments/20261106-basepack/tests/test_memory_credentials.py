@@ -1,11 +1,8 @@
 from base64 import b64encode
-import csv
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-import io
 import json
 import os
 from pathlib import Path
-import subprocess
 from threading import Thread
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -38,22 +35,22 @@ def test_missing_credential_file_keeps_file_error_and_does_not_use_environment(c
     assert not config.memory_dir.exists()
 
 
-@pytest.mark.skipif(os.name != "nt", reason="Windows ACL regression")
-def test_unreadable_credential_file_keeps_permission_error(config):
-    _write_password(config, "private-acl-test")
-    output = subprocess.check_output(["whoami", "/user", "/fo", "csv", "/nh"], text=True)
-    sid = next(csv.reader(io.StringIO(output)))[1]
-    denied = False
-    try:
-        subprocess.run(["icacls", str(config.memory_password_file), "/deny", f"*{sid}:(RD)"],
-                       check=True, capture_output=True)
-        denied = True
-        with pytest.raises(PermissionError):
-            Memory(config)
-    finally:
-        if denied:
-            config.memory_password_file.unlink()
-    assert not config.memory_password_file.exists()
+def test_unreadable_credential_file_keeps_permission_error(config, monkeypatch):
+    _write_password(config, "private-read-test")
+    original_read = Path.read_bytes
+    error = PermissionError(13, "credential read denied", str(config.memory_password_file))
+    reads = []
+    def read_bytes(path):
+        if path == config.memory_password_file:
+            reads.append(path)
+            raise error
+        return original_read(path)
+    monkeypatch.setattr(Path, "read_bytes", read_bytes)
+    with pytest.raises(PermissionError) as failure:
+        Memory(config)
+    assert failure.value is error
+    assert reads == [config.memory_password_file]
+    assert original_read(config.memory_password_file) == b"private-read-test"
 
 
 @pytest.mark.parametrize("password, encoding", [

@@ -41,6 +41,14 @@ uv pip install --python $python '<basepack-wheel>'
 & $python -s -c "import basepack; print(basepack.__file__)"
 ```
 
+执行 `memory behavior-train` 的客户端安装可选训练依赖；仅检索、回读及维护语义知识的客户端可继续使用轻量包：
+
+```powershell
+uv pip install --python $python "$repo/experiments/20261106-basepack[behavior]"
+```
+
+`behavior` extra 锁定 NumPy、SciPy 和本次 KL-NMF 的 scikit-learn 1.9.1，权威版本见 [包元数据](../pyproject.toml)／[锁文件](../uv.lock)。它与 embedding 服务依赖分开；客户端增加训练依赖不要求更新共享服务。模型文件位于项目 `memory.data_dir/behavior/<sha>.json`，与引用它的数据库一起按 [恢复集合](memory.md#备份与恢复) 保管，数值工件仍遵循项目分发边界。
+
 记忆的 vector 与 hybrid 检索都需要共享模型服务。服务使用独立、稳定的纯净环境，选择一个依赖分支，按工程锁安装，再安装普通包：
 
 | 后端 | embeddingExtra | 机器 device |
@@ -153,7 +161,7 @@ Start-Service -Name $memoryService
 
 停止手动进程时确认所属进程树与监听端口退出；SCM 使用 Stop-Service 并等待 Stopped。项目搬迁后更新 cwd/launcher 与日志，保留 project_id。原生 export、配置、业务原件、受管聊天与附件、必要 assets 共同构成恢复集合，步骤见 [备份恢复](memory.md#备份与恢复)。
 
-既有认证项目按 [版本升级](setup-project.md#版本升级) 保留原密码文件、数据库、UUID 与服务；主要更新客户端和 instructions/自有包装，通常无需重启或迁库。缺凭据或认证失败按原错恢复，不生成替代密钥。
+既有认证项目按 [版本升级](setup-project.md#版本升级) 保留原密码文件、UUID 与恢复集合；0.17 的 memory schema 3 先完成旧库离线桥接与隔离比对，再同步切换客户端／库。`memory init` 不自动迁移旧数据。缺凭据或认证失败按原错恢复，不生成替代密钥。
 
 ## 首次准备图文模型
 
@@ -320,7 +328,7 @@ Shawl 的 log-dir 保存包装器和服务输出。`status` 使用 `/health` 和
 
 ## 升级与回滚
 
-保留旧 wheel、机器配置和各项目 [恢复集合](memory.md#备份与恢复)，待共用客户端的调用结束后普通安装新包，核实际 Python 和导入位置。0.7.1 → 0.8.1 保留认证与原数据库，客户端及入口更新顺序见 [项目升级](setup-project.md#版本升级)。共享 embedding 的 HTTP 协议与语义身份保持兼容，已有服务可继续运行；客户端升级不要求重启模型或 Condor。
+保留旧 wheel、机器配置和各项目 [恢复集合](memory.md#备份与恢复)，待共用客户端调用结束并确认维护发布终态后升级。按 [项目升级](setup-project.md#版本升级) 区分客户端入口更新与 schema 迁移；0.17 需先桥接并验证独立旧库副本，切换后核实际 Python、导入位置与目标库。共享 embedding 的协议与语义身份保持兼容，已有服务可继续运行；该客户端升级不要求重启模型或 Condor。
 
 更新共享模型服务时先暂停请求，经 SCM 停止并确认进程树回收，再更新独立环境和配置，启动后执行所选后端的一次编码冒烟。模型、精度或前处理合同改变时按新 identity 补建项目向量；设备或路径变化可复用同身份索引。改变 Condor 容量按上节排空和重启 startd，修改提交规则按影响重载 schedd。
 

@@ -339,6 +339,8 @@ def test_real_wrong_project_init_preserves_existing_database_schema(memory):
     memory._execute("REMOVE TABLE semantic; REMOVE TABLE node; REMOVE TABLE member; "
                     "REMOVE TABLE source_version; REMOVE TABLE source; REMOVE TABLE change; REMOVE TABLE feedback; "
                     "REMOVE TABLE knowledge_version; REMOVE TABLE access_state; REMOVE TABLE delivery; "
+                    "REMOVE TABLE behavior_model; REMOVE TABLE behavior_projection; "
+                    "REMOVE TABLE behavior_mass; REMOVE TABLE behavior_version; "
                     "REMOVE ANALYZER memory_zh;")
     before = memory._execute("INFO FOR DB;")[0]
     assert set(before["tables"]) == {"meta"}
