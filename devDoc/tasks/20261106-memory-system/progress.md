@@ -1,5 +1,9 @@
 # 记忆系统进度
 
+2026-11-17最新决定：Gaussian模糊降权、很低权重仍持续保留，撤销上一版线性默认、低效用退出/GC及训练库存过滤。[当前方案与完整系统前后图](../20261115-real-use-rectification/forgetting-options.md)、数值合同及实际检查统一沿整改任务维护；仅改计划与图，0.16未切换。
+
+以下记录保留形成时点，已被最新用户决定替代的方案不再执行。
+
 2026-11-17用户后续明确允许长期未用方向逐渐退出记忆；[选项与框图](../20261115-real-use-rectification/forgetting-options.md)已给出线性/平方/Gaussian连续核，默认推荐线性＋绝对低效用退出。真实进入截点、never-hit先验、依赖回收、防重建与按需新接受已纳入[目标架构](../20261115-real-use-rectification/target-architecture.md)及计划，具体状态沿该任务进度维护；本轮没有实际淘汰或修改0.16。
 
 2026-11-17连续遗忘补研后，[长期计划](../20261115-real-use-rectification/plan.md)与[目标架构](../20261115-real-use-rectification/target-architecture.md)已将旧稀疏门控/局部钟替换为纯行为表示＋连续相似度机会年龄，明确正ε、unknown区间和单状态跨用途边界。研究、实际检查及原文获取缺口沿该任务[进度](../20261115-real-use-rectification/progress.md)唯一维护；当前0.16运行行为不变。以下旧记录保留各自时点。
