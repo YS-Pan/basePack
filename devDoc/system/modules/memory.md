@@ -1,6 +1,6 @@
 # 项目记忆实现
 
-本页描述0.17.0实现：SurrealDB原证与知识图、独立采集、prepare提案编译、单owner发布、严格交付事实及Gaussian行为访问投影。2026-11-17稳定客户端已安装0.17.0[behavior]，当前处于staging、promotion待办，实际部署与维护边界见[部署合同](../deployment.md)和[实施记录](../../tasks/20261115-real-use-rectification/execution.md)。0.16既有验收见[整改结果](../../tasks/20261115-real-use-rectification/result.md)，历史实现见[记忆专项进度](../../tasks/20261106-memory-system/progress.md)。首建和维护由宿主订阅agent阅读生成，程序提交成功即完成普通批次，默认无额外审计。用户流程见[记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
+本页描述0.17.1实现：SurrealDB原证与知识图、独立采集、prepare提案编译、单owner发布、严格交付事实及Gaussian行为访问投影。2026-11-17稳定客户端已安装0.17.1[behavior]，当前处于staging、promotion待办，实际部署与维护边界见[部署合同](../deployment.md)和[实施记录](../../tasks/20261115-real-use-rectification/execution.md)。0.16既有验收见[整改结果](../../tasks/20261115-real-use-rectification/result.md)，历史实现见[记忆专项进度](../../tasks/20261106-memory-system/progress.md)。首建和维护由宿主订阅agent阅读生成，程序提交成功即完成普通批次，默认无额外审计。用户流程见[记忆说明](../../../experiments/20261106-basepack/docs/memory.md)。
 
 ## 职责与数据
 
@@ -18,7 +18,7 @@
 
 ## 已有行为
 
-prepare固定本批实际读取的来源版本、同读新旧原文、相关邻域和expected知识版本；邻域包含以所选成员为依据的node→node关系，并补齐相关成员端点与直接依据。历史端点通过可选`--historical-versions`的`{id, knowledge_revision}`数组显式固定，关联原文仍需read或扩充prepare核实。agent同次决定边界、摘要和有依据关系，apply核来源与知识版本后原子接受；冲突须重新prepare并共读。程序按精确范围和locator取得chunk，显式文字须逐字一致；更正的previous来自实际旧记录，独立增边保留其它边。
+prepare固定本批实际读取的来源版本、同读新旧原文、相关邻域和expected知识版本；邻域包含以所选成员为依据的node→node关系，并补齐相关成员端点与直接依据。已有fresh记录已钉的basis/parent/endpoint历史依赖自动按`(ID, knowledge_revision)`保全，缺失旧版本明确报错，不替换为current；当前expected并发保护独立保留，private沿实际版本传播。作者显式选择旧端点仍通过`--historical-versions`的`{id, knowledge_revision}`数组固定，关联原文仍需read或扩充prepare核实。agent同次决定边界、摘要和有依据关系，apply核来源与知识版本后原子接受；冲突须重新prepare并共读。程序按精确范围和locator取得chunk，显式文字须逐字一致；更正的previous来自实际旧记录，独立增边保留其它边。
 
 变化检查只发现待维护来源，不改已发布状态。apply 核版本并发布本批变更；未被本批替换的内容保留其实际依据快照，显式退役、更正及受影响关系按状态处理。接受删除保留旧快照与更正，不反复报告已处理删除。
 

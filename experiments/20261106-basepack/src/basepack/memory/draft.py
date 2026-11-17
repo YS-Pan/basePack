@@ -224,6 +224,7 @@ def compile_proposals(proposals, *, config=None):
     needed.update(_record(item['target']) for item in batch.get('corrections', []))
     targets = set(needed)
     walk_roots = set()
+    walk_pins = []
     for field in ('members', 'nodes', 'edges'):
         for item in batch.get(field, []):
             evidence_ids = {_record(value) for value in item.get('evidence', [])}
@@ -237,7 +238,12 @@ def compile_proposals(proposals, *, config=None):
                 for endpoint in ('in', 'out'):
                     target = _record(item[endpoint])
                     needed.add(target)
-                    if endpoint not in item.get('endpoint_versions', {}):
+                    pin = item.get('endpoint_versions', {}).get(endpoint)
+                    if pin:
+                        if _record(pin['id']) != target:
+                            raise ValueError(f"Historical endpoint identity mismatch: {item['id']} {endpoint}")
+                        walk_pins.append((target, pin['knowledge_revision']))
+                    else:
                         walk_roots.add(target)
     for source in batch['sources']:
         for item in source.get('dispositions', []):
@@ -248,45 +254,48 @@ def compile_proposals(proposals, *, config=None):
             ids = {_record(ref['member']) for ref in item.get('gaps', [])}
             needed.update(ids)
             walk_roots.update(ids)
-    # Follow already-expressed basis only. It pins concurrent changes without
-    # adding an author evidence edge or selecting material on their behalf.
-    pending = list(walk_roots - new - targets)
-    walked = set()
-    while pending:
-        record = pending.pop()
-        if record in walked:
-            continue
-        walked.add(record)
-        row = records.get(record)
-        if row is None:
-            continue
-        ancestors = list(row.get('basis', []))
-        if row.get('parent_version'):
-            parent = row['parent_version']
-            ancestors.append({'member': parent['id'], 'knowledge_revision': parent['knowledge_revision']})
-        for basis in ancestors:
-            dependency = _record(basis['member'])
-            if dependency not in known:
-                raise ValueError(f'Basis absent from prepare for {identity_text.get(record, record)}: {basis["member"]}')
-            if basis.get('knowledge_revision') != known[dependency]:
-                raise ValueError(f'Basis revision changed for {identity_text.get(record, record)}: {basis["member"]}')
-            if dependency not in needed:
-                needed.add(dependency)
-                pending.append(dependency)
-    batch['dependency_closure'] = [identity_text[record] for record in sorted(
-        needed & set(known), key=lambda record: (record.table, str(record.key)))]
-    missing = needed - set(known) - new
-    if missing:
-        raise ValueError('References absent from prepare: ' + ', '.join(sorted(f'{r.table}:{r.key}' for r in missing)))
     evidence = {_record(value) for field in ('members', 'nodes', 'edges')
                 for item in batch.get(field, []) for value in item.get('evidence', [])}
     retired = {_record(value, table) for table, field in (('member', 'delete_members'),
                ('node', 'delete_nodes'), ('semantic', 'delete_edges')) for value in batch.get(field, [])}
     rewritten = {_record(item['id']) for item in batch.get('members', [])}
     for record in evidence - new - rewritten:
+        if record not in known:
+            raise ValueError(f'References absent from prepare: {record}')
         row = records.get(record)
         if record in retired or row is None or row.get('retired') or row.get('stale'):
             raise ValueError(f'Evidence is unavailable, stale or retired in prepare: {identity_text.get(record, record)}')
+    # Follow each accepted edge at its pinned version, while separately
+    # guarding the current head of every logical identity against races.
+    pending = [(record, known[record]) for record in walk_roots - new - targets if record in known]
+    pending.extend(walk_pins)
+    walked = set()
+    while pending:
+        record, revision = pending.pop()
+        key = (record, revision)
+        if key in walked:
+            continue
+        walked.add(key)
+        row = records.get(record) if known.get(record) == revision else historical.get(key)
+        if row is None or row.get('knowledge_revision') != revision:
+            raise ValueError(f'Pinned knowledge version absent from prepare: {identity_text.get(record, record)}@{revision}')
+        ancestors = [(entry['member'], entry['knowledge_revision']) for entry in row.get('basis', [])]
+        if row.get('parent_version'):
+            parent = row['parent_version']
+            ancestors.append((parent['id'], parent['knowledge_revision']))
+        ancestors.extend((endpoint['id'], endpoint['knowledge_revision'])
+                         for endpoint in row.get('endpoint_versions', {}).values())
+        for identity, pinned_revision in ancestors:
+            dependency = _record(identity)
+            if dependency not in known:
+                raise ValueError(f'Basis absent from prepare for {identity_text.get(record, record)}: {identity}')
+            needed.add(dependency)
+            pending.append((dependency, pinned_revision))
+    batch['dependency_closure'] = [identity_text[record] for record in sorted(
+        needed & set(known), key=lambda record: (record.table, str(record.key)))]
+    missing = needed - set(known) - new
+    if missing:
+        raise ValueError('References absent from prepare: ' + ', '.join(sorted(f'{r.table}:{r.key}' for r in missing)))
     batch['expected'] = {identity_text[record]: known[record] for record in needed if record in known}
 
     # Freeze classification for exactly the author's writes, using only the

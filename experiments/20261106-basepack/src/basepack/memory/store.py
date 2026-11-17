@@ -412,30 +412,75 @@ class Memory:
         selected_members = [member for member in members if member["id"] in selected]
         related.update(basis["member"] for row in selected_members + related_nodes + edges
                        for basis in row.get("basis", []))
-        # Include the complete accepted evidence/parent chain in the fixed reading
-        # package; the author still chooses the semantic evidence independently.
-        members_by_id = {member["id"]: member for member in members}
-        frontier = list(related)
-        while frontier:
-            member = members_by_id.get(frontier.pop())
-            if member is None:
+        # Keep current revisions for optimistic checks, but traverse accepted
+        # provenance by exact version. Rebinding a historical pin to today's
+        # member would change the evidence the author actually selected.
+        from .history import knowledge
+        current = {_record(row["id"]): row for row in [*members, *nodes, *edges]}
+        explicit = [knowledge(self, item["id"], knowledge_revision=item["knowledge_revision"])
+                    for item in historical_versions or []]
+        explicit_keys = {(_record(row["id"]), row["knowledge_revision"]) for row in explicit}
+        historical = {}
+        versions = {(identity, row["knowledge_revision"]): row for identity, row in current.items()}
+        versions.update({(_record(row["id"]), row["knowledge_revision"]): row for row in explicit})
+        eligible = [*selected_members, *related_nodes, *edges,
+                    *(current[_record(identifier)] for identifier in related if _record(identifier) in current)]
+        pending = [row for row in eligible if not row.get("stale") and not row.get("retired")]
+        pending.extend(explicit)
+        seen = set()
+        while pending:
+            row = pending.pop()
+            identity = _record(row["id"])
+            revision = row["knowledge_revision"]
+            key = (identity, revision)
+            if key in seen:
                 continue
-            refs = [entry["member"] for entry in member.get("basis", [])]
-            if member.get("parent"):
-                refs.append(member["parent"])
-            for ref in refs:
-                if ref not in related:
-                    related.add(ref)
-                    frontier.append(ref)
-        neighborhood_members = [member for member in members if member["id"] in related - selected]
+            seen.add(key)
+            if identity not in current:
+                current_row = self._execute(f"SELECT * OMIT embedding FROM ONLY {_sql(identity)};")[0]
+                if current_row is None:
+                    raise ValueError(f"Current dependency not found: {row['id']}")
+                current[identity] = current_row
+            if identity.table == "member":
+                related.add(current[identity]["id"])
+            if current[identity]["knowledge_revision"] != revision or key in explicit_keys:
+                historical[key] = row
+            refs = [(entry["member"], entry["knowledge_revision"]) for entry in row.get("basis", [])]
+            if row.get("parent_version"):
+                parent = row["parent_version"]
+                refs.append((parent["id"], parent["knowledge_revision"]))
+            refs.extend((endpoint["id"], endpoint["knowledge_revision"])
+                        for endpoint in row.get("endpoint_versions", {}).values())
+            for identifier, pinned_revision in refs:
+                dependency = _record(identifier)
+                if dependency not in current:
+                    current_row = self._execute(f"SELECT * OMIT embedding FROM ONLY {_sql(dependency)};")[0]
+                    if current_row is None:
+                        raise ValueError(f"Current dependency not found: {identifier}")
+                    current[dependency] = current_row
+                latest = current[dependency]
+                pinned_key = (dependency, pinned_revision)
+                if pinned_key not in versions:
+                    versions[pinned_key] = (latest if latest["knowledge_revision"] == pinned_revision else
+                                            knowledge(self, identifier, knowledge_revision=pinned_revision))
+                related.add(latest["id"])
+                pending.append(versions[pinned_key])
+        neighborhood_members = [row for identity, row in current.items()
+                                if identity.table == "member" and row["id"] in related - selected]
         expected = {row["id"]: row["knowledge_revision"] for row in
                     [member for item in prepared for member in item["members"]] + neighborhood_members + nodes + edges}
-        from .history import knowledge
-        historical = [knowledge(self, item["id"], knowledge_revision=item["knowledge_revision"])
-                      for item in historical_versions or []]
+        # Explicit graph history can name a current endpoint outside the initial
+        # neighborhood; its current head is still guarded during publication.
+        visited_ids = {identity for identity, _ in seen}
+        expected.update({row["id"]: row["knowledge_revision"] for identity, row in current.items()
+                         if identity in visited_ids})
+        neighborhood_edges = {_record(row["id"]): row for row in edges}
+        neighborhood_edges.update({identity: row for identity, row in current.items()
+                                   if identity.table == "semantic" and identity in visited_ids})
+        historical = list(historical.values())
         return {"sources": prepared, "historical_versions": historical,
                 "privacy_rules": rules, "privacy_rules_revision": rules_hash,
-                "neighborhood": {"members": neighborhood_members, "edges": edges,
+                "neighborhood": {"members": neighborhood_members, "edges": list(neighborhood_edges.values()),
                 "nodes": nodes}, "expected": expected,
                 "instruction": "Read originals together. Choose semantic boundaries, summaries, and evidenced relations in one batch; reading_units are structural hints only."}
 

@@ -264,7 +264,7 @@ def test_history_private_from_exact_prepare_version(memory, tmp_path, publicatio
                            'endpoint_versions': {'in': old_version}, 'evidence': [{'member': 0}]}]}
     missing_ref = completed_file(tmp_path, proposal, name='missing.json', prepared=memory.prepare(['guide.md']))
     missing = json.loads(Path(missing_ref['path']).read_text(encoding='utf-8'))
-    with pytest.raises(ValueError, match='Historical endpoint private classification absent'):
+    with pytest.raises(ValueError, match='Pinned knowledge version absent from prepare'):
         freeze_file([missing], tmp_path / 'missing-frozen.json', config=memory.config)
     prepared = memory.prepare(['guide.md'], historical_versions=[old_version])
     ref = completed_file(tmp_path, proposal, name='with-history.json', prepared=prepared)
@@ -274,3 +274,121 @@ def test_history_private_from_exact_prepare_version(memory, tmp_path, publicatio
     assert batch['compiled_private'][edge] is True
     memory.apply(batch, control=publication_paths['control'])
     assert memory._rows('semantic')[0]['private'] is True
+
+
+@pytest.mark.parametrize('changed,concurrent', [
+    ('parent', False), ('basis', False), ('basis', True),
+])
+def test_prepare_and_publish_preserve_historical_basis_and_parent_pins(
+        memory, tmp_path, publication_paths, changed, concurrent):
+    from basepack.memory.draft import freeze
+    from basepack.memory.store import _record, _sql
+
+    (memory.config.root / 'pin.md').write_bytes(b'unchanged original\n')
+    if changed == 'basis':
+        memory.connection['private_scope'] = ['pin.md']
+    reading = memory.prepare(['pin.md'])
+    source = {'path': 'pin.md', 'revision': reading['sources'][0]['revision']}
+    first = freeze([{'sources': [source], 'members': [
+        {'kind': 'section', 'path': 'pin.md', 'start_line': 1, 'end_line': 1,
+         'title': 'section', 'text': 'original section', 'evidence': [{'member': 1}]},
+        {'kind': 'chunk', 'path': 'pin.md', 'start_line': 1, 'end_line': 1,
+         'title': 'original chunk', 'parent': {'member': 0}},
+    ]}], config=memory.config)
+    memory.apply(first, control=publication_paths['control'])
+    section_id, chunk_id = [row['id'] for row in first['members']]
+    old_section, old_chunk = memory.knowledge(section_id), memory.knowledge(chunk_id)
+    if changed == 'basis':
+        memory.connection['private_scope'] = []
+    reading = memory.prepare(['pin.md'])
+    if changed == 'parent':
+        updated = {'id': section_id, 'kind': 'section', 'path': 'pin.md',
+                   'start_line': 1, 'end_line': 1, 'title': 'section',
+                   'text': 'updated section', 'evidence': [chunk_id]}
+    else:
+        updated = {'id': chunk_id, 'kind': 'chunk', 'path': 'pin.md',
+                   'start_line': 1, 'end_line': 1, 'title': 'updated chunk',
+                   'parent': section_id}
+    memory.apply(freeze([{'sources': [source], 'expected': reading['expected'],
+                          'members': [updated]}], config=memory.config),
+                 control=publication_paths['control'])
+    section, chunk = memory.knowledge(section_id), memory.knowledge(chunk_id)
+    assert not section['stale'] and not chunk['stale']
+    if changed == 'parent':
+        assert chunk['parent_version']['knowledge_revision'] == old_section['knowledge_revision']
+        assert section['knowledge_revision'] != old_section['knowledge_revision']
+        root_id, pinned_id, pinned_revision = chunk_id, section_id, old_section['knowledge_revision']
+    else:
+        assert section['basis'][0]['knowledge_revision'] == old_chunk['knowledge_revision']
+        assert chunk['knowledge_revision'] != old_chunk['knowledge_revision']
+        assert old_chunk['private'] is True and chunk['private'] is False
+        root_id, pinned_id, pinned_revision = section_id, chunk_id, old_chunk['knowledge_revision']
+    reading = memory.prepare(['pin.md'])
+    assert any(row['id'] == pinned_id and row['knowledge_revision'] == pinned_revision
+               for row in reading['historical_versions'])
+    proposal = {'sources': [], 'nodes': [{'kind': 'topic', 'text': 'selected evidence',
+                                           'evidence': [root_id]}]}
+    ref = completed_file(tmp_path, proposal, prepared=reading)
+    proposal = json.loads(Path(ref['path']).read_text(encoding='utf-8'))
+    batch = freeze_file([proposal], tmp_path / 'pin-frozen.json', config=memory.config)
+    assert batch['expected'][section_id] == section['knowledge_revision']
+    assert batch['expected'][chunk_id] == chunk['knowledge_revision']
+    assert {section_id, chunk_id} <= set(batch['dependency_closure'])
+    assert batch['compiled_private'][batch['nodes'][0]['id']] == (changed == 'basis')
+    if concurrent:
+        memory._execute(f"UPDATE {_sql(_record(pinned_id))} SET knowledge_revision='concurrent-update';")
+        with pytest.raises(RuntimeError, match='Knowledge revision changed'):
+            memory.apply(batch, control=publication_paths['control'])
+        assert not memory._rows('node')
+    else:
+        memory.apply(batch, control=publication_paths['control'])
+        node = memory._rows('node')[0]
+        assert node['basis'][0]['member'] == root_id
+        assert node['basis'][0]['knowledge_revision'] == (chunk if changed == 'parent' else section)['knowledge_revision']
+        assert node['private'] == (changed == 'basis')
+        # Existing accepted records retain their original exact pin after publication.
+        if changed == 'parent':
+            assert memory.knowledge(chunk_id)['parent_version']['knowledge_revision'] == pinned_revision
+        else:
+            assert memory.knowledge(section_id)['basis'][0]['knowledge_revision'] == pinned_revision
+
+
+def test_missing_history_pin_in_prepare_is_rejected_before_freeze(memory, tmp_path, publication_paths):
+    from basepack.memory.draft import freeze
+    from basepack.memory.store import _record, _sql
+
+    (memory.config.root / 'pin.md').write_bytes(b'original\n')
+    reading = memory.prepare(['pin.md'])
+    source = {'path': 'pin.md', 'revision': reading['sources'][0]['revision']}
+    first = freeze([{'sources': [source], 'members': [
+        {'kind': 'section', 'path': 'pin.md', 'start_line': 1, 'end_line': 1,
+         'text': 'original', 'evidence': [{'member': 1}]},
+        {'kind': 'chunk', 'path': 'pin.md', 'start_line': 1, 'end_line': 1,
+         'parent': {'member': 0}},
+    ]}], config=memory.config)
+    memory.apply(first, control=publication_paths['control'])
+    section_id, chunk_id = [row['id'] for row in first['members']]
+    reading = memory.prepare(['pin.md'])
+    memory.apply(freeze([{'sources': [source], 'expected': reading['expected'], 'members': [
+        {'id': section_id, 'kind': 'section', 'path': 'pin.md', 'start_line': 1,
+         'end_line': 1, 'text': 'changed', 'evidence': [chunk_id]},
+    ]}], config=memory.config), control=publication_paths['control'])
+    reading = memory.prepare(['pin.md'])
+    old_parent = memory.knowledge(chunk_id)['parent_version']
+    reading['historical_versions'] = [row for row in reading['historical_versions']
+                                      if not (row['id'] == old_parent['id'] and
+                                              row['knowledge_revision'] == old_parent['knowledge_revision'])]
+    ref = completed_file(tmp_path, {'sources': [], 'nodes': [
+        {'kind': 'topic', 'text': 'selected', 'evidence': [chunk_id]}]}, prepared=reading)
+    proposal = json.loads(Path(ref['path']).read_text(encoding='utf-8'))
+    with pytest.raises(ValueError, match='(?i)(missing|absent|not found)'):
+        freeze_file([proposal], tmp_path / 'missing-pin-frozen.json', config=memory.config)
+    assert not (tmp_path / 'missing-pin-frozen.json').exists()
+    # Remove the actual old record and its retained change copy in this
+    # disposable database: prepare must report the missing pinned version.
+    target = _sql(_record(old_parent['id']))
+    revision = _sql(old_parent['knowledge_revision'])
+    memory._execute(f'DELETE knowledge_version WHERE target={target} AND knowledge_revision={revision}; '
+                    f'DELETE change WHERE target={target} AND previous.knowledge_revision={revision};')
+    with pytest.raises(ValueError, match='Knowledge version not found'):
+        memory.prepare(['pin.md'])

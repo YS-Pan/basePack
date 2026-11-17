@@ -112,5 +112,5 @@ def test_historical_endpoint_classification_uses_exact_fixed_version(tmp_path):
     batch = compile_proposals([proposal])
     assert batch['compiled_private'][batch['edges'][0]['id']] is True
     proposal['edges'][0]['endpoint_versions']['in']['knowledge_revision'] = 'missing'
-    with pytest.raises(ValueError, match='Historical endpoint private classification absent'):
+    with pytest.raises(ValueError, match='Pinned knowledge version absent from prepare'):
         compile_proposals([proposal])

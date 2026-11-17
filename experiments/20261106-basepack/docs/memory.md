@@ -35,7 +35,7 @@ memory changes --scope '资料目录'
 
 大来源仍以完整 `source.text` 保存，程序在同一事务内分段传输并组装，保留原文字节、hash、来源版本与原子接受，也支持原生导出恢复。当前回归样例覆盖到 8,943,755 原文字节，该数值不是通用上限。缩小语义 chunk 或抬高传输常数不替代整源快照处理。
 
-prepare 时包括本批所用依据与关系两端的材料；它固定实际读到的原件及知识版本，提供新旧编号原文、已有与关联成员、节点、关系及私有标记，图片返回可打开的原图路径。长单行提供有界片段及 `locator:{start_col,end_col}`，使用 0-based Unicode 字符偏移、右端不含，行号仍为 1-based 闭区间。关联记录的原文仍需 read 或扩充 prepare 核实。将材料交给订阅 agent，在同次阅读中选择语义边界、摘要、节点和图边；结构备读单元只用于定位。批次合同在 `memory guide` 返回的已安装 skill 中，源码维护源为 [SKILL.md](../src/basepack/memory/SKILL.md)。
+prepare 时包括本批所用依据与关系两端的材料；它固定实际读到的原件及知识版本，提供新旧编号原文、已有与关联成员、节点、关系及私有标记，图片返回可打开的原图路径。已有 fresh 记录已钉的 basis／parent／endpoint 历史依赖自动按 `(ID, knowledge_revision)` 保全；缺失旧版本明确报错，不替换为 current。当前 expected 并发保护独立保留，private 沿实际版本传播；作者显式选择旧端点仍用下述 `--historical-versions`。长单行提供有界片段及 `locator:{start_col,end_col}`，使用 0-based Unicode 字符偏移、右端不含，行号仍为 1-based 闭区间。关联记录的原文仍需 read 或扩充 prepare 核实。将材料交给订阅 agent，在同次阅读中选择语义边界、摘要、节点和图边；结构备读单元只用于定位。批次合同在 `memory guide` 返回的已安装 skill 中，源码维护源为 [SKILL.md](../src/basepack/memory/SKILL.md)。
 
 作者 draft 以 `prepare:{path,file_sha256}` 引用固定阅读包，选择 `sources:["项目相对路径"]` 并声明内容、位置、依据与处置。程序编译 source revision、expected 依赖闭包、UUID 与 private，作者不用抄写这些机械字段。新成员省略 ID，已有记录使用 prepare 中的 ID；局部成员／节点引用由编译器解析，跨 draft 保留作用域，重复更新报错。需要关联已观察的历史端点时，prepare 加 `--historical-versions <JSON文件>`，内容为 `{id,knowledge_revision}` 数组，固定其历史分类。冻结稿及映射必须保留，重试复用同一文件，已提交的相同批次返回原回执。旧库升级先按 [版本升级](setup-project.md#版本升级) 完成相应离线迁移。详细合同见[批次接口](../src/basepack/memory/SKILL.md#direct-batch-interface)。
 
