@@ -123,6 +123,8 @@ For an explicit batch, run `prepare --paths <affected-files-and-related-material
 
 Prepare also includes the exact retained basis, parent and endpoint versions already pinned by existing fresh records. Keep these historical pins when a logical ID has a newer head; do not rewrite or rebind valid knowledge merely for compilation. A missing retained version is an explicit error, while current-head concurrency checks remain separate.
 
+Inspect reading packages under the shared [prepare inspection contract](prompts/prepare-inspection.md), also rendered in each maintenance role. The saved package and its hash remain complete; output projection does not change evidence or required reading.
+
 A zero-line text source needs no text member: registering its prepared source revision is sufficient when it has no active knowledge. When an existing source becomes empty, retire its old text members and resolve dependent knowledge through retirements or corrected evidence in the same batch. Text member ranges remain 1-based and inclusive; an empty source has no valid range.
 
 Acquire project ownership as above and write one semantic proposal per author. Each draft contains `prepare:{path,file_sha256}` referencing the exact saved reading-package bytes. Select sources by path and express semantic content, positions, references, dispositions and retirements; the compiler derives source revisions, expected dependency closure, UUIDs and private propagation. An author must choose the evidence: compilation follows expressed dependencies and creates no semantic claims. Follow source-group delivery above; the publisher chooses the ordered grouping. Write the completed draft references as a UTF-8 JSON array:

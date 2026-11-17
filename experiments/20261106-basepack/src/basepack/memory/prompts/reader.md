@@ -10,6 +10,9 @@ Work directory: $work
 Batch artifact: $batch
 Bounded receipt hints: $hints
 Stage context: $stage_context
+
+$prepare_inspection
+
 Receipt cutoff: $semantic_count semantic sources and $relations_count pending relations. Work only on the coordinator's bounded assignment within this receipt and the active stage's remaining scope; original receipt gaps remain pending.
 This receipt and the parent lifecycle define this maintenance assignment. Follow `Source-group delivery` and the batch/evidence contract in the installed memory workflow at $skill; consult its private publication rules for the work at hand. Preserve returned private flags and keep confidential material within its local work and handoff boundary. The coordinator resolves unassigned pending relations; own the selected source group's reading, interpretation, relationships and ordinary repairs. Do not start a new task-level maintain or recapture.
 

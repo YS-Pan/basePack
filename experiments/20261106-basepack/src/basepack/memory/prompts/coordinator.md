@@ -10,6 +10,9 @@ Work directory: $work
 Merged batch: $batch
 Fixed round layout: $layout
 Stage context: $stage_context
+
+$prepare_inspection
+
 This team's reader dispatches: $reader_workers
 Other team coordinator dispatches: $coordinator_workers
 The saved layout is the organization for this round. `organization_ceiling` means live availability is unverified, not currently free seats. Actual creation remains subject to host admission.

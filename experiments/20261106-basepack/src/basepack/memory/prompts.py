@@ -203,6 +203,7 @@ def render_prompt(config, receipt, control, *, role="coordinator", tier=None, pa
     reading, batch = work / "reading.json", work / "batch.json"
     values = {
         "skill": str(Path(__file__).with_name("SKILL.md").resolve()),
+        "prepare_inspection": (Path(__file__).with_name("prompts") / "prepare-inspection.md").read_text(encoding="utf-8").strip(),
         "root": str(config.root),
         "python": str(config.python),
         "config": str(config.path),

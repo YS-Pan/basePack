@@ -12,6 +12,9 @@ Merged batch: $batch
 This team's reader dispatches: $reader_workers
 Fixed round layout: $layout
 Stage context: $stage_context
+
+$prepare_inspection
+
 Receipt cutoff: $semantic_count semantic sources, $relations_count pending relations and $feedback_count reports. Read only receipt slices relevant to your assigned group within the active stage's remaining scope; retain original receipt gaps. Follow `Source-group delivery` and the batch/evidence contract at $skill; the publisher and original host own `Stage continuation`.
 
 When a status snapshot is needed, use your actual full canonical task path: `list_agents({path_prefix: "<your canonical task path>"})`. A real admission/capacity error may require a global snapshot. When no independent work is ready, use `wait_agent({timeout_ms: 60000})`; messages and completion events return early, so 60000 is an upper bound. After an unchanged timeout, continue that wait without a status or file poll. If the host uses different APIs, use its equivalent subtree observation and event wait.

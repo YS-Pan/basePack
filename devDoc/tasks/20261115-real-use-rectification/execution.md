@@ -62,3 +62,15 @@ N0—N4初始实现已提交`9d3e479`。普通wheel首次49项/40步验证使用
 用量[调查](research/terra-usage-20261117.md)区分已实现的C1/C2、仍存在的短轮询/全树输出、实现工作和真实语义作者工作；现场修改后的两协调者157次等待均为60秒且可提前唤醒，不外推净收益。另已在统计工具原仓库提交`dcf6669`并普通user-site安装0.2.1，18文件三方一致，124相关回归及两个原入口的去内容真实计数重放通过；原图/全机缓存没有全量重建。
 
 正式推广已完成并经主任务独立核实：18080数据库PID115116、父隐藏launcher48740，store-0.17；旧18174/18176关闭。切换前、后、普通init后与staging配置改指针后事实摘要相同，J=compiled2/C26、模型不变。两个配置均指正式端点；AGENTS托管块外未变。brief、8250/8250向量兼容、图文原文、history/邻接通过，owner=null。根任务另核/ready=200及精确进程/父子/store身份；恢复集合留存，最终恢复点待完整维护后建立。
+
+## 正式端点全项目维护：首个有限阶段
+
+刷新宿主完整项目注册表后，独立collect得到1198路径、105采集缺口、336归属未决聊天；发现仍有41个non_utf8文件缺口。正常用户上下文collect成功不代表受限shell的freshness已修。全项目预检23机械批次复用317块，固定回执有178语义来源、2关系、3反馈。原100样本之外的全授权范围保持，未按当前业务缩窄。
+
+干净0.17.2团队386b582c实际3Terra/8Luna，未接受宿主等待/子树现场提醒。首有限组13份发布结果完成65来源及2关系，113来源留续；两反馈处置、受限入口主报告仍pending。全部启动句柄已结束，owner仍为原run且publications=[]，未stop/release全轮。host固定交接为tmp/20261117-implementation/full-maintenance/stage0-handoff.json，SHA256 ae1052ca59e32d8143426014e36a64ed75cd4e85bb26c4040700f2392dfff2a9；保存逐项部分范围、原错误及未发布稿。
+
+作者误用退休chunk被freeze拒绝，修稿后9源/28成员接受；另一文档组先因局部引用语法拒绝，修复freeze后apply因9项版本变化拒绝，未发布。实际追踪九项均由直接证据的历史parent/basis闭包进入，直接证据、中间section和目标边仍为旧版本且fresh，九个祖先头则已变且fresh。拒绝符合当前对闭包逻辑ID的保守current-head guard；该案例证明跨组重prepare成本，不能证明直接语义冲突或必须重绑历史，也不足以安全移除更正/退役保护。五源及pyproject/uv.lock等未完留干净下一组，当前不改guard。定点路径和观察留closure-conflict-analysis.md/json；不将正常拒绝称修复后的旧compiler缺陷复发。
+
+用量分支另证同版60行原文先在metadata投影的previous嵌套正文出现，随后作为当前正文再次出现，至少6067原文字符重复；未证167节点目录被整批反复输入。0.17.3源通过单一共享prepare-inspection片段收窄输出：元数据字段白名单、正文与metadata分离、核版本及text hash后同文展示一次，必要关系共读/修复回读保留；canonical prepare及其hash完整不改。构建/普通安装验收进行中，下一干净身份检验实际执行，未据字符量推算token、费用或净收益。
+
+0.17.3普通安装完成：wheel SHA216a75ae2275551f1c40a7018662d87c287a6d9a9c5a40d112abdba162eb3394；66包文件源码/wheel/实际site-packages逐字节一致，pip check通过。既有纯prompt130项及project-entry9项通过；closed pilot2渲染49检查通过，三角色共享段完整原文各一次且一致，旧等待/子树/固定稿合同保持。未写DB/owner/control，无需改变共享模型或端点。实际新身份读取行为待后续stage；相同原文展示一次不禁止必要关系共读/修复回读。
