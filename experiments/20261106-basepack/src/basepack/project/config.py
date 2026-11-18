@@ -5,6 +5,7 @@ from importlib import metadata
 from ipaddress import ip_address
 import json
 from pathlib import Path
+import re
 import sys
 import tomllib
 from urllib.parse import urlsplit
@@ -30,6 +31,29 @@ def _validate_concurrency(max_concurrent_subagents: int, concurrency_source: str
         raise ValueError("ai.max_concurrent_subagents must be a nonnegative integer excluding the main agent")
     if not isinstance(concurrency_source, str) or not concurrency_source.strip():
         raise ValueError("ai.concurrency_source must describe the host capacity source and counting basis")
+
+
+def _level_from_legacy_tier(tier: str) -> int:
+    match = re.fullmatch(r"tier([1-9][0-9]*)", tier)
+    if match is None:
+        raise ValueError(f"Unsupported legacy AI tier: {tier!r}")
+    return int(match[1])
+
+
+def _normalize_ai_levels(raw: dict) -> dict:
+    ai = raw.get("ai", {})
+    if not {"default_tier", "retrieval_tier", "tiers"} & ai.keys():
+        return raw
+    if {"default_level", "retrieval_level", "levels"} & ai.keys():
+        raise ValueError("Use default_level, retrieval_level and levels together in [ai]")
+
+    ai = dict(ai)
+    for old_key, key in (("default_tier", "default_level"), ("retrieval_tier", "retrieval_level")):
+        if old_key in ai:
+            ai[key] = _level_from_legacy_tier(ai.pop(old_key))
+    if "tiers" in ai:
+        ai["levels"] = {str(_level_from_legacy_tier(tier)): settings for tier, settings in ai.pop("tiers").items()}
+    return {**raw, "ai": ai}
 
 
 @dataclass(frozen=True)
@@ -81,12 +105,14 @@ class ProjectConfig:
     def jobs_dir(self) -> Path:
         return self.data_path("jobs", "jobs_dir")
 
-    def resolve_ai(self, *, purpose: str = "task", tier: str | None = None) -> dict:
+    def resolve_ai(self, *, purpose: str = "task", level: int | None = None) -> dict:
         ai = self.raw["ai"]
-        if tier is None:
-            tier = ai[{"task": "default_tier", "retrieval": "retrieval_tier"}[purpose]]
-        settings = ai["tiers"][tier]
-        return {"tier": tier, "model": settings["model"], "reasoning_effort": settings["reasoning_effort"]}
+        if level is None:
+            level = ai[{"task": "default_level", "retrieval": "retrieval_level"}[purpose]]
+        if type(level) is not int or level < 1:
+            raise ValueError(f"AI level must be a positive integer: {level!r}")
+        settings = ai["levels"][str(level)]
+        return {"level": level, "model": settings["model"], "reasoning_effort": settings["reasoning_effort"]}
 
     def resolve_concurrency(self) -> dict:
         ai = self.raw.get("ai", {})
@@ -114,7 +140,7 @@ def load_machine_config(path: str | Path) -> MachineConfig:
 
 def load_project_config(path: str | Path) -> ProjectConfig:
     path = Path(path).resolve()
-    raw = _read(path, 2)
+    raw = _normalize_ai_levels(_read(path, 2))
     python = _absolute(raw["runtime"]["python"], "runtime.python")
     machine_path = _absolute(raw["runtime"]["machine_config"], "runtime.machine_config")
     root = (path.parent / raw["project"]["root"]).resolve()

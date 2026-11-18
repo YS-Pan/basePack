@@ -95,17 +95,19 @@ New-Item -ItemType Junction -Path $entry -Value $original | Out-Null
 
 复制的目录可随项目提交并在新检出后使用。目录联接按项目现有约定作为本机入口忽略，Git 保存其维护原件；新检出后按上述步骤重建联接。移动项目后重新核对联接目标。安装选择与本机入口的约定记在目标项目已有入口或维护记录中。
 
-## Agent 模型等级
+<a id="agent-模型等级"></a>
 
-项目配置 `[ai]` 维护日常与检索默认等级，以及各等级的 `model` 和 `reasoning_effort`。模型映射每次读取项目配置，不在安装时冻结；初始值见 [项目模板](../src/basepack/project/templates/project.toml)，按宿主实际可用模型调整：
+## AI 档位
+
+项目配置 `[ai]` 用正整数选择日常与检索档位，初始值为 `default_level = 3` 和 `retrieval_level = 1`。`[ai.levels.<n>]` 配置该档的 `model` 和 `reasoning_effort`。项目模板含 1 至 4 档，常用分工为 1 档阅读与检索、2 档协调、3 档日常、4 档专项。新调用从项目配置解析映射。初始模型和推理强度见 [项目模板](../src/basepack/project/templates/project.toml)。
 
 ```powershell
 bp --config $config config ai
 bp --config $config config ai --purpose retrieval
-bp --config $config config ai --tier tier2
+bp --config $config config ai --level 3
 ```
 
-`config ai` 默认解析日常用途；`--purpose retrieval` 核检索映射。记忆维护使用 `maintain`/`prompt` 返回的派工元数据，检索使用 `memory retrieve --question '<业务问题>'`；宿主创建时原样传入脚本给定的 `task_name`、`model` 和 `reasoning_effort`，实际接收最终结果后确认交付。0.18维护由Terra规划及唯一发布、固定Luna池自主领取，恢复同一Terra时保留原身份／模型／推理强度；实际档位仍用返回元数据，容量须预留其恢复名额。命令与提示词不能代替宿主派工，basePack 不自行调用理解模型。交接见 [维护](memory.md#自动维护与手动维护) 和 [检索](memory.md#启动与检索)。
+`config ai` 默认解析日常用途，`--purpose retrieval` 解析检索用途，`--level` 指定档位。结果以整数 `level` 报告所选档位。记忆维护使用 `maintain`／`prompt` 返回的派工元数据，检索使用 `memory retrieve --question '<业务问题>'`。宿主按返回的 `task_name`、`model` 和 `reasoning_effort` 实际派工，并在收到最终检索结果后确认交付。维护默认由 2 档协调者规划及发布，固定阅读 worker 使用 1 档。恢复协调者时沿用原身份、模型和推理强度，并预留恢复名额。交接见 [维护](memory.md#自动维护与手动维护) 和 [检索](memory.md#启动与检索)。
 
 `[ai].max_concurrent_subagents` 与 `concurrency_source` 是宿主容量快照。修改宿主上限、切 profile/宿主或升级接入时，重新采集并用 `config set-concurrency --max-concurrent-subagents <C> --concurrency-source '<来源与口径>'` 更新受影响项目，再核 `config show`；不重跑普通 init、不迁移数据库。其它配置变更的联动见 [配置维护要点](project-config-maintenance.md)。
 
@@ -155,6 +157,8 @@ Codex 宿主按项目归属默认接入可取得的聊天，不要求逐 thread 
 已知少量文件直接同批读取；需要发现资料时用 `memory retrieve --question '<业务问题>'`，不传 scope 为全项目，路径限制可用 `--scope 'devDoc/'`，中文及带空格前缀也可。宿主负责实际派工、接收最终结果与 delivery 回执，完整流程见 [检索](memory.md#启动与检索)。
 
 ## 版本升级
+
+已有字符串档位配置的项目按 [AI 档位迁移](project-config-maintenance.md#ai-档位迁移) 更新配置、命令及技能副本，并核对原模型和推理强度。
 
 ### 升级到 0.18：有限任务池
 

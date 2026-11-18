@@ -92,8 +92,7 @@ def register_commands(subparsers):
     actions["prompt"].add_argument("--receipt", required=True, help="Maintenance receipt to render as worker context")
     actions["prompt"].add_argument("--control", required=True, help="The same task control file used by maintain and apply")
     actions["prompt"].add_argument("--role", choices=["coordinator"], default="coordinator")
-    actions["prompt"].add_argument("--tier", choices=["tier1", "tier2", "tier3", "tier4"],
-                               help="Override the role's default AI tier")
+    actions["prompt"].add_argument("--level", type=int, help="Override the role's default AI level")
     actions["prompt"].add_argument("--team", type=int, default=0, help="Fixed team from this receipt's saved layout")
     actions["prompt"].add_argument("--stage", help="Saved stage package for this original receipt/control")
     actions["prompt"].add_argument("--stage-sha256", help="Expected stage package hash from the saved reference")
@@ -101,7 +100,7 @@ def register_commands(subparsers):
         actions[name].add_argument("--request", required=True, help="UTF-8 JSON with question, scope and content_budget")
         actions[name].add_argument("--slot", type=int, default=0, help="Parent-owned retrieval slot")
         actions[name].add_argument("--available-subagents", type=int, help="Host raw free subagent seats")
-        actions[name].add_argument("--tier", choices=["tier1", "tier2", "tier3", "tier4"])
+        actions[name].add_argument("--level", type=int)
     retrieve = actions["retrieve"]
     request = retrieve.add_mutually_exclusive_group()
     request.add_argument("--question", help="Business question; the host runs the returned retrieval assignment")
@@ -110,7 +109,7 @@ def register_commands(subparsers):
     retrieve.add_argument("--budget", type=int, default=6000, help="Returned text character budget (default: 6000)")
     retrieve.add_argument("--slot", type=int, default=0, help="Parent-owned retrieval slot")
     retrieve.add_argument("--available-subagents", type=int, help="Host raw free subagent seats; zero uses the main agent")
-    retrieve.add_argument("--tier", choices=["tier1", "tier2", "tier3", "tier4"])
+    retrieve.add_argument("--level", type=int)
     actions["retrieval-start"].add_argument("--request", required=True)
     actions["retrieval-receipt"].add_argument("--request", required=True)
     actions["retrieval-receipt"].add_argument("--ranked", required=True)
@@ -188,7 +187,7 @@ def dispatch(args, config):
     elif action == "prompt":
         from .prompts import render_prompt
         result = render_prompt(config, args.receipt, args.control,
-                               role=args.role, tier=args.tier, team=args.team,
+                               role=args.role, level=args.level, team=args.team,
                                stage=args.stage, stage_sha256=args.stage_sha256)
     elif action == "stage":
         from .stages import prepare_stage
@@ -201,7 +200,7 @@ def dispatch(args, config):
         from .retrieval import retrieval_dispatch, render_retrieval_prompt
         render = retrieval_dispatch if action == "retrieval-dispatch" else render_retrieval_prompt
         result = render(config, args.request, slot=args.slot,
-                        available_subagents=args.available_subagents, tier=args.tier)
+                        available_subagents=args.available_subagents, level=args.level)
     elif action == "collect":
         from .collection import collect
         result = collect(config, args.codex_registry, output=args.output)
@@ -217,7 +216,7 @@ def dispatch(args, config):
         from .retrieval import prepare_retrieval
         result = prepare_retrieval(config, question=args.question, request_path=args.request,
                                    scope=args.scope, budget=args.budget, slot=args.slot,
-                                   available_subagents=args.available_subagents, tier=args.tier)
+                                   available_subagents=args.available_subagents, level=args.level)
     else:
         from .store import Memory
         memory = Memory(config)

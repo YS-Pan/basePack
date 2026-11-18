@@ -3,13 +3,14 @@ import os
 from pathlib import Path
 import shlex
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 
 from basepack.memory.prompts import (maintenance_layout, memory_command,
                                      prompt_dispatch, render_prompt)
 from basepack.memory import owner, waves
-from basepack.memory.wave_cli import task_prompt, worker_prompt
+from basepack.memory.wave_cli import create as create_wave, task_prompt, worker_prompt
 from basepack.memory.retrieval import retrieval_dispatch, render_retrieval_prompt
 from basepack.project.config import load_project_config
 from basepack.project.init import init_project
@@ -52,18 +53,19 @@ def test_dispatch_is_lazy_and_resolves_role_independently(prompt_project, tmp_pa
     control = tmp_path / "missing dir" / "control"
     result = prompt_dispatch(prompt_project, receipt, control)
     assert result["role"] == "coordinator"
-    assert result["tier"] == "tier2"
-    assert result["model"] == prompt_project.raw["ai"]["tiers"]["tier2"]["model"]
+    assert result["level"] == 2
+    assert result["model"] == prompt_project.raw["ai"]["levels"]["2"]["model"]
     assert "--receipt" in result["render_command"]
     assert str(receipt) in result["render_command"]
     assert not receipt.exists() and not control.parent.exists()
-    override = prompt_dispatch(prompt_project, receipt, control, tier="tier4")
-    assert override["role"] == "coordinator" and override["tier"] == "tier4"
-    assert override["spawn_arguments"]["model"] == prompt_project.resolve_ai(tier="tier4")["model"]
-    assert override["spawn_arguments"]["reasoning_effort"] == prompt_project.resolve_ai(tier="tier4")["reasoning_effort"]
+    override = prompt_dispatch(prompt_project, receipt, control, level=4)
+    assert override["role"] == "coordinator" and override["level"] == 4
+    assert override["spawn_arguments"]["model"] == prompt_project.resolve_ai(level=4)["model"]
+    assert override["spawn_arguments"]["reasoning_effort"] == prompt_project.resolve_ai(level=4)["reasoning_effort"]
     assert override["spawn_arguments"]["fork_turns"] == "none"
+    assert shlex.split(override["render_command"])[-2:] == ["--level", "4"]
     with pytest.raises(ValueError, match="one coordinator"):
-        prompt_dispatch(prompt_project, receipt, control, role="unexpected", tier="tier1")
+        prompt_dispatch(prompt_project, receipt, control, role="unexpected", level=1)
 
 
 @pytest.mark.parametrize("role, paths", [("reader", None), ("reader", []),
@@ -94,7 +96,7 @@ def test_coordinator_is_lazy_and_claimed_task_contains_bounded_hints(prompt_proj
                                                          {"id": "unknown", "basis": [{"member": "member:missing"}]}]})
     control = tmp_path / "new" / "control"
     coordinator = render_prompt(prompt_project, receipt, control)
-    assert coordinator["role"] == "coordinator" and coordinator["tier"] == "tier2"
+    assert coordinator["role"] == "coordinator" and coordinator["level"] == 2
     assert "1 semantic sources, 2 pending relations, 0 reports" in coordinator["prompt"]
     assert "secret-body" not in coordinator["prompt"]
     assert "single maintenance wave coordinator and publisher" in coordinator["prompt"]
@@ -231,8 +233,8 @@ def test_layout_sizes_roster_from_work_with_capacity_as_ceiling(prompt_project, 
         names.extend([assigned["task_name"], *assigned["reader_task_names"]])
         assert assigned["parent_task_name"] == (layout["teams"][0]["task_name"] if team else None)
         assert assigned["publisher"] is (team == 0)
-        assert assigned["coordinator_ai"] == prompt_project.resolve_ai(tier="tier2")
-        assert assigned["reader_ai"] == prompt_project.resolve_ai(tier="tier1")
+        assert assigned["coordinator_ai"] == prompt_project.resolve_ai(level=2)
+        assert assigned["reader_ai"] == prompt_project.resolve_ai(level=1)
     assert len(names) == len(set(names))
     assert not prompt_project.memory_dir.exists()
 
@@ -273,6 +275,33 @@ def test_layout_run_identity_is_stable_when_saved_and_distinct_for_new_runs(prom
     assert first["task_name"] == again["task_name"] == layout["teams"][0]["task_name"]
     assert first["reader_task_names"] == again["reader_task_names"] == layout["teams"][0]["reader_task_names"]
     assert maintenance_layout(prompt_project)["run_id"] != maintenance_layout(prompt_project)["run_id"]
+
+
+def test_legacy_receipt_keeps_pinned_coordinator_and_reader_assignments(prompt_project, tmp_path):
+    receipt, control = tmp_path / "receipt.json", tmp_path / "control"
+    run = owner.acquire(prompt_project.memory_dir, prompt_project.raw["memory"]["project_id"],
+                        "test-parent", control)["owner"]["run_id"]
+    layout = maintenance_layout(prompt_project, run_id=run)
+    team = layout["teams"][0]
+    coordinator_ai = {"model": "pinned-coordinator", "reasoning_effort": "high"}
+    reader_ai = {"model": "pinned-reader", "reasoning_effort": "low"}
+    team.update(coordinator_ai={"tier": "tier2", **coordinator_ai}, reader_ai={"tier": "tier1", **reader_ai})
+    write_receipt(prompt_project, receipt, {"owner_run_id": run, "semantic": [], "pending_relations": []},
+                  layout=layout)
+    saved = receipt.read_bytes()
+
+    coordinator = render_prompt(prompt_project, receipt, control)
+    assert coordinator["level"] == 2 and "tier" not in coordinator
+    assert "level 2 / pinned-coordinator / high" in coordinator["prompt"]
+    assert {key: coordinator["spawn_arguments"][key] for key in coordinator_ai} == coordinator_ai
+
+    args = SimpleNamespace(receipt=receipt, control=control, run_id=run, stage=None, stage_sha256=None,
+                           coordinator=f"/root/{team['task_name']}", readers=1)
+    task = {"id": "review", "goal": "Review a pending relation", "paths": [],
+            "write_targets": ["relation"], "outputs": ["draft"]}
+    reader = create_wave(prompt_project, args, [task])["workers"][0]["spawn_arguments"]
+    assert {key: reader[key] for key in reader_ai} == reader_ai
+    assert receipt.read_bytes() == saved
 
 
 @pytest.mark.parametrize("available", [-1, True, 1.5, "2"])
@@ -321,7 +350,7 @@ def test_render_uses_saved_layout_models_names_and_permissions(prompt_project, t
     receipt, control = tmp_path / "receipt.json", tmp_path / "missing" / "control"
     write_receipt(prompt_project, receipt, {"semantic": [], "pending_relations": []}, layout=layout)
     prompt_project.raw["ai"]["max_concurrent_subagents"] = 0
-    prompt_project.raw["ai"]["tiers"]["tier2"]["model"] = "changed-after-start"
+    prompt_project.raw["ai"]["levels"]["2"]["model"] = "changed-after-start"
     monkeypatch.setattr(type(prompt_project), "max_concurrent_subagents", property(forbidden))
     monkeypatch.setattr(type(prompt_project), "memory_password_file", property(forbidden))
     monkeypatch.setattr(store, "Memory", forbidden)
@@ -370,11 +399,12 @@ def test_retrieval_dispatch_is_independent_and_lazy(prompt_project, tmp_path, mo
     result = retrieval_dispatch(prompt_project, request)
     assert result["task_name"].startswith("bp_mem_search_") and result["task_name"].endswith("_0")
     assert result["executor"] == "worker"
-    assert result["tier"] == prompt_project.resolve_ai(purpose="retrieval")["tier"]
+    assert result["level"] == prompt_project.resolve_ai(purpose="retrieval")["level"]
     assert result["capacity_status"] == "organization_ceiling"
     assert "--receipt" not in result["render_command"] and "--control" not in result["render_command"]
-    other = retrieval_dispatch(prompt_project, request, slot=2, tier="tier4", available_subagents=1)
-    assert other["task_name"].startswith("bp_mem_search_") and other["task_name"].endswith("_2") and other["tier"] == "tier4"
+    other = retrieval_dispatch(prompt_project, request, slot=2, level=4, available_subagents=1)
+    assert other["task_name"].startswith("bp_mem_search_") and other["task_name"].endswith("_2") and other["level"] == 4
+    assert shlex.split(other["render_command"])[-2:] == ["--level", "4"]
     assert not request.exists() and not prompt_project.memory_dir.exists()
     for slot in (-1, True, "1"):
         with pytest.raises(ValueError, match="slot"):
@@ -400,7 +430,7 @@ def test_retrieval_render_has_complete_flow_without_store_or_ownership(prompt_pr
     assert "--control" not in result["prompt"] and "--receipt" not in result["prompt"]
     if available == 0:
         assert result["executor"] == "main"
-        assert result["task_name"] is None and result["tier"] is None
+        assert result["task_name"] is None and result["level"] is None
         assert result["model"] is None and result["reasoning_effort"] is None
         assert "main agent performing retrieval directly" in result["prompt"]
     else:

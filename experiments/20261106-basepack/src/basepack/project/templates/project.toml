@@ -11,22 +11,22 @@ root = $root
 # Host snapshot: excludes the main agent and includes all descendant agents.
 max_concurrent_subagents = $max_concurrent_subagents
 concurrency_source = $concurrency_source
-default_tier = 'tier3'
-retrieval_tier = 'tier1'
+default_level = 3
+retrieval_level = 1
 
-[ai.tiers.tier1]
+[ai.levels.1]
 model = 'gpt-6-luna'
 reasoning_effort = 'max'
 
-[ai.tiers.tier2]
+[ai.levels.2]
 model = 'gpt-6.1-terra'
 reasoning_effort = 'ultra'
 
-[ai.tiers.tier3]
+[ai.levels.3]
 model = 'gpt-6.2-sol'
 reasoning_effort = 'ultra'
 
-[ai.tiers.tier4]
+[ai.levels.4]
 model = 'gpt-6.2-astra'
 reasoning_effort = 'ultra'
 

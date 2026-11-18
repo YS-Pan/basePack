@@ -26,6 +26,8 @@
 
 当前唯一 active 路线位于 `experiments/20261106-basepack/`；安装、构建与测试目标均为该实验工程，具体命令见 [路线 README](../../experiments/20261106-basepack/README.md)。从仓库根运行 pytest 时，显式指定实验的 pyproject、tests 和根 `tmp/<task>/pytest` 作为 basetemp。pytest 不保留持久缓存；构建 TEMP/TMP 和隔离验证环境也进入根 tmp。目录寿命见 [文档维护约定](../documentation.md)。
 
+核对新版客户端的 AI 档位时，从源码目录外用项目接入的 Python 和显式配置执行 `config ai --level 3` 与 `config ai --purpose retrieval`，确认返回的整数 `level`、模型及推理强度匹配项目配置。已有项目按 [AI 档位迁移](../../experiments/20261106-basepack/docs/project-config-maintenance.md#ai-档位迁移) 更新入口。
+
 2026-11-09 先前布局迁移只改变开发维护位置；当时系统安装为 0.4.0。其后 R9 形成下节的 0.5.0 共享资源基线，此后在独立稳定环境安装客户端并运行项目局部数据库。历史快照按各自条件阅读。
 
 选留证据现统一位于根 `artifacts/runs/`。前次临时材料整理的映射为 `artifacts/runs/tmp-reorganization-20261108/moves.json`，本次位置映射为 `artifacts/runs/20261109-project-layout/moves.json`；原始回执及下文历史路径保留当时含义，结合两轮映射回查长期副本，tmp 内容按可清除处理。

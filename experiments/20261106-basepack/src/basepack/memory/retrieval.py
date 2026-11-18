@@ -10,17 +10,17 @@ from uuid import uuid4
 from .prompts import _capacity, _nonnegative, memory_command
 
 
-def retrieval_dispatch(config, request_path, slot=0, available_subagents=None, tier=None):
+def retrieval_dispatch(config, request_path, slot=0, available_subagents=None, level=None):
     """Describe one complete retrieval delegation, independently of maintenance ownership."""
     slot = _nonnegative(slot, "slot")
     configured, limit = _capacity(config, available_subagents)
-    worker = config.resolve_ai(purpose="retrieval", tier=tier) if limit else {
-        "tier": None, "model": None, "reasoning_effort": None}
+    ai = config.resolve_ai(purpose="retrieval", level=level) if limit or level is not None else None
+    worker = ai if limit else {"level": None, "model": None, "reasoning_effort": None}
     args = ["retrieval-prompt", "--request", Path(request_path).resolve(), "--slot", slot]
     if available_subagents is not None:
         args.extend(["--available-subagents", available_subagents])
-    if tier:
-        args.extend(["--tier", tier])
+    if level is not None:
+        args.extend(["--level", level])
     path = Path(request_path).resolve()
     identity = str(path).encode("utf-8")
     if path.is_file():
@@ -54,7 +54,7 @@ def _retrieval_request(request_path):
 
 
 def prepare_retrieval(config, *, question=None, request_path=None, scope="", budget=6000,
-                      slot=0, available_subagents=None, tier=None):
+                      slot=0, available_subagents=None, level=None):
     """Prepare sensible defaults; the host owns actual execution and final receipt."""
     from .query import normalize_scope
 
@@ -68,7 +68,7 @@ def prepare_retrieval(config, *, question=None, request_path=None, scope="", bud
         if not _nonnegative(budget, "content_budget"):
             raise ValueError("content_budget must be positive")
         # Resolve capacity/model and reject invalid host parameters before creating a request.
-        retrieval_dispatch(config, config.root / "tmp/request.json", slot, available_subagents, tier)
+        retrieval_dispatch(config, config.root / "tmp/request.json", slot, available_subagents, level)
         work = config.root / "tmp" / "basepack-retrieval" / uuid4().hex
         request_path = work / "request.json"
         work.mkdir(parents=True)
@@ -76,7 +76,7 @@ def prepare_retrieval(config, *, question=None, request_path=None, scope="", bud
                                            "delivery_id": "retrieval-" + uuid4().hex},
                                           ensure_ascii=False, indent=2), encoding="utf-8")
     request = _retrieval_request(request_path)
-    dispatch = retrieval_dispatch(config, request_path, slot, available_subagents, tier)
+    dispatch = retrieval_dispatch(config, request_path, slot, available_subagents, level)
     return {**dispatch, "request": str(Path(request_path).resolve()),
             "delivery_id": request["delivery_id"], "scope": request["scope"],
             "content_budget": request["content_budget"],
@@ -94,13 +94,13 @@ def _retrieval_work(config, request_path, request):
     return config.root / "tmp" / "basepack-retrieval" / sha256(identity.encode("utf-8")).hexdigest()[:32]
 
 
-def render_retrieval_prompt(config, request_path, slot=0, available_subagents=None, tier=None):
+def render_retrieval_prompt(config, request_path, slot=0, available_subagents=None, level=None):
     """Read the retrieval request and template only; never claim or inspect maintenance state."""
-    dispatch = retrieval_dispatch(config, request_path, slot, available_subagents, tier)
+    dispatch = retrieval_dispatch(config, request_path, slot, available_subagents, level)
     request = _retrieval_request(request_path)
     work = _retrieval_work(config, request_path, request)
     template = Template((Path(__file__).with_name("prompts") / "retrieval.md").read_text(encoding="utf-8"))
-    assignment = (f"retrieval worker {dispatch['task_name']}, assigned {dispatch['tier']} / "
+    assignment = (f"retrieval worker {dispatch['task_name']}, assigned level {dispatch['level']} / "
                   f"{dispatch['model']} / {dispatch['reasoning_effort']}" if dispatch["executor"] == "worker"
                   else "main agent performing retrieval directly because no subagent seat is available")
     search = ["search", "--text", "<terms>"]

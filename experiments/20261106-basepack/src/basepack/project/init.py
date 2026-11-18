@@ -10,7 +10,7 @@ import sys
 import tomllib
 from uuid import uuid4
 
-from .config import ProjectConfig, _validate_concurrency
+from .config import ProjectConfig, _normalize_ai_levels, _validate_concurrency
 
 
 def template(name: str) -> str:
@@ -80,7 +80,7 @@ def set_project_concurrency(config: ProjectConfig, *, max_concurrent_subagents: 
         separator = "" if not original or original.endswith("\n") else newline
         updated = original + separator + newline + "[ai]" + newline + assignments
     expected = {**config.raw, "ai": {**config.raw.get("ai", {}), **settings}}
-    if tomllib.loads(updated) != expected:
+    if _normalize_ai_levels(tomllib.loads(updated)) != expected:
         raise ValueError("Concurrency update changed unrelated project configuration; edit the [ai] snapshot explicitly")
     config.path.write_bytes(updated.encode("utf-8"))
     return settings

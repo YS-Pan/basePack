@@ -29,7 +29,7 @@ def main():
     ai = config_commands.add_parser("ai", help="Resolve project AI settings for host dispatch")
     selection = ai.add_mutually_exclusive_group()
     selection.add_argument("--purpose", choices=["task", "retrieval"], default="task")
-    selection.add_argument("--tier", choices=["tier1", "tier2", "tier3", "tier4"])
+    selection.add_argument("--level", type=int, help="Positive integer in the project AI mapping")
     check = sub.add_parser("doctor", help="Read-only facility checks")
     check.add_argument("--facility", choices=["core", "embedding", "condor", "all"], default="core")
     from .embedding.cli import register_commands as embedding_commands
@@ -66,7 +66,7 @@ def main():
                 result = set_project_concurrency(config, max_concurrent_subagents=args.max_concurrent_subagents,
                                                  concurrency_source=args.concurrency_source)
             else:
-                result = config.resolve_ai(purpose=args.purpose, tier=args.tier)
+                result = config.resolve_ai(purpose=args.purpose, level=args.level)
         elif args.command == "doctor":
             from .project.doctor import doctor
             result = doctor(config, args.facility)

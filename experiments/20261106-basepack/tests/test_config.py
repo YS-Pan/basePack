@@ -34,7 +34,7 @@ def test_two_projects_and_subdirectory_config(tmp_path, monkeypatch):
     assert "memory retrieve --question" in instructions
     assert "`--scope` 仅为项目相对路径前缀" in instructions
     assert "业务限制写入问题" in instructions
-    assert "config ai --tier tier2" in instructions
+    assert "config ai --level 3" in instructions
     assert "gpt-6" not in instructions
     assert (projects[0] / ".gitignore").read_text(encoding="utf-8") == "/.basepack/\n"
     assert not (projects[0] / ".basepack/memory").exists()
@@ -238,11 +238,11 @@ def _config_cli(config, *args):
 def test_init_contains_project_ai_mapping(ai_config):
     assert ai_config.raw["ai"] == {
         "max_concurrent_subagents": 12, "concurrency_source": "test fixture",
-        "default_tier": "tier3", "retrieval_tier": "tier1", "tiers": {
-            "tier1": {"model": "gpt-6-luna", "reasoning_effort": "max"},
-            "tier2": {"model": "gpt-6.1-terra", "reasoning_effort": "ultra"},
-            "tier3": {"model": "gpt-6.2-sol", "reasoning_effort": "ultra"},
-            "tier4": {"model": "gpt-6.2-astra", "reasoning_effort": "ultra"},
+        "default_level": 3, "retrieval_level": 1, "levels": {
+            "1": {"model": "gpt-6-luna", "reasoning_effort": "max"},
+            "2": {"model": "gpt-6.1-terra", "reasoning_effort": "ultra"},
+            "3": {"model": "gpt-6.2-sol", "reasoning_effort": "ultra"},
+            "4": {"model": "gpt-6.2-astra", "reasoning_effort": "ultra"},
         },
     }
     assert describe(ai_config)["ai"] == ai_config.raw["ai"]
@@ -414,33 +414,32 @@ def test_generated_entries_cover_first_setup_and_local_issue_feedback(ai_config)
     assert "Issue 草稿" in instructions and "用户明确授权" in instructions
 
 
-@pytest.mark.parametrize("options, tier", [({}, "tier3"), ({"purpose": "task"}, "tier3"),
-                                          ({"purpose": "retrieval"}, "tier1"), ({"tier": "tier2"}, "tier2")])
-def test_ai_resolves_project_defaults_and_explicit_tier(ai_config, options, tier):
-    assert ai_config.resolve_ai(**options) == {"tier": tier, **ai_config.raw["ai"]["tiers"][tier]}
+@pytest.mark.parametrize("options, level", [({}, 3), ({"purpose": "task"}, 3),
+                                           ({"purpose": "retrieval"}, 1), ({"level": 2}, 2)])
+def test_ai_resolves_project_defaults_and_explicit_level(ai_config, options, level):
+    assert ai_config.resolve_ai(**options) == {"level": level, **ai_config.raw["ai"]["levels"][str(level)]}
 
 
 def test_ai_mapping_edits_are_used_on_next_resolution(ai_config):
     text = ai_config.path.read_text(encoding="utf-8")
-    text = text.replace("default_tier = 'tier3'", "default_tier = 'tier2'")
-    text = text.replace("retrieval_tier = 'tier1'", "retrieval_tier = 'tier4'")
-    text = text.replace("model = 'gpt-6.1-terra'\nreasoning_effort = 'ultra'",
-                        "model = 'project-model'\nreasoning_effort = 'high'")
+    text = text.replace("default_level = 3", "default_level = 5")
+    text = text.replace("retrieval_level = 1", "retrieval_level = 4")
+    text = text.replace("[memory]", "[ai.levels.5]\nmodel = 'project-model'\nreasoning_effort = 'high'\n\n[memory]")
     ai_config.path.write_text(text, encoding="utf-8")
     config = load_project_config(ai_config.path)
-    expected = {"tier": "tier2", "model": "project-model", "reasoning_effort": "high"}
+    expected = {"level": 5, "model": "project-model", "reasoning_effort": "high"}
     assert config.resolve_ai() == expected
-    assert config.resolve_ai(purpose="retrieval")["tier"] == "tier4"
-    result = _config_cli(config, "ai")
+    assert config.resolve_ai(purpose="retrieval")["level"] == 4
+    result = _config_cli(config, "ai", "--level", "5")
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == expected
 
 
-@pytest.mark.parametrize("path, options", [(["ai"], {}), (["ai", "default_tier"], {}),
-                                         (["ai", "retrieval_tier"], {"purpose": "retrieval"}),
-                                         (["ai", "tiers"], {}), (["ai", "tiers", "tier3"], {}),
-                                         (["ai", "tiers", "tier3", "model"], {}),
-                                         (["ai", "tiers", "tier3", "reasoning_effort"], {})])
+@pytest.mark.parametrize("path, options", [(["ai"], {}), (["ai", "default_level"], {}),
+                                         (["ai", "retrieval_level"], {"purpose": "retrieval"}),
+                                         (["ai", "levels"], {}), (["ai", "levels", "3"], {}),
+                                         (["ai", "levels", "3", "model"], {}),
+                                         (["ai", "levels", "3", "reasoning_effort"], {})])
 def test_ai_missing_configuration_raises_original_key_error(ai_config, path, options):
     table = ai_config.raw
     for key in path[:-1]:
@@ -452,24 +451,33 @@ def test_ai_missing_configuration_raises_original_key_error(ai_config, path, opt
     describe(ai_config)
 
 
-def test_explicit_ai_tier_does_not_require_purpose_defaults(ai_config):
-    del ai_config.raw["ai"]["default_tier"]
-    del ai_config.raw["ai"]["retrieval_tier"]
-    assert ai_config.resolve_ai(tier="tier2") == {"tier": "tier2", **ai_config.raw["ai"]["tiers"]["tier2"]}
+def test_explicit_ai_level_does_not_require_purpose_defaults(ai_config):
+    del ai_config.raw["ai"]["default_level"]
+    del ai_config.raw["ai"]["retrieval_level"]
+    assert ai_config.resolve_ai(level=2) == {"level": 2, **ai_config.raw["ai"]["levels"]["2"]}
 
 
-@pytest.mark.parametrize("args, tier", [([], "tier3"), (["--purpose", "task"], "tier3"),
-                                       (["--purpose", "retrieval"], "tier1"), (["--tier", "tier2"], "tier2")])
-def test_config_ai_cli(ai_config, args, tier):
+@pytest.mark.parametrize("args, level", [([], 3), (["--purpose", "task"], 3),
+                                        (["--purpose", "retrieval"], 1), (["--level", "2"], 2)])
+def test_config_ai_cli(ai_config, args, level):
     result = _config_cli(ai_config, "ai", *args)
     assert result.returncode == 0, result.stderr
-    assert json.loads(result.stdout) == {"tier": tier, **ai_config.raw["ai"]["tiers"][tier]}
+    assert json.loads(result.stdout) == {"level": level, **ai_config.raw["ai"]["levels"][str(level)]}
 
 
-def test_config_ai_cli_purpose_and_tier_are_mutually_exclusive(ai_config):
-    result = _config_cli(ai_config, "ai", "--purpose", "retrieval", "--tier", "tier2")
+def test_config_ai_cli_purpose_and_level_are_mutually_exclusive(ai_config):
+    result = _config_cli(ai_config, "ai", "--purpose", "retrieval", "--level", "2")
     assert result.returncode == 2
     assert "not allowed with argument" in result.stderr
+
+
+@pytest.mark.parametrize("level", [0, -1, True, 1.0, "1"])
+def test_config_ai_rejects_invalid_levels(ai_config, level):
+    with pytest.raises(ValueError, match="AI level must be a positive integer"):
+        ai_config.resolve_ai(level=level)
+    ai_config.raw["ai"]["default_level"] = level
+    with pytest.raises(ValueError, match="AI level must be a positive integer"):
+        ai_config.resolve_ai()
 
 
 def test_config_show_cli_includes_project_ai_mapping(ai_config):
@@ -528,6 +536,12 @@ def test_existing_project_cli_supplements_and_refreshes_only_capacity(ai_config)
     original_text = ai_config.path.read_text(encoding="utf-8")
     legacy_text = original_text.replace('max_concurrent_subagents = 12\n', '').replace(
         'concurrency_source = "test fixture"\n', '')
+    legacy_text = legacy_text.replace("default_level = 3", "default_tier = 'tier2'").replace(
+        "retrieval_level = 1", "retrieval_tier = 'tier4'")
+    for level in range(1, 5):
+        legacy_text = legacy_text.replace(f"[ai.levels.{level}]", f"[ai.tiers.tier{level}]")
+    legacy_text = legacy_text.replace("model = 'gpt-6.1-terra'\nreasoning_effort = 'ultra'",
+                                      "model = 'project-model'\nreasoning_effort = 'high'")
     ai_config.path.write_bytes(legacy_text.replace("\n", "\r\n").encode("utf-8"))
     config = load_project_config(ai_config.path)
     expected = config.raw
@@ -539,7 +553,9 @@ def test_existing_project_cli_supplements_and_refreshes_only_capacity(ai_config)
     entries = [config.root / "AGENTS.md", config.root / ".basepack/instructions.md"]
     entry_bytes = [path.read_bytes() for path in entries]
     assert json.loads(_config_cli(config, "show").stdout)["ai"] == expected["ai"]
-    assert config.resolve_ai()["tier"] == "tier3"
+    assert json.loads(_config_cli(config, "ai").stdout) == {
+        "level": 2, "model": "project-model", "reasoning_effort": "high"}
+    assert config.resolve_ai(purpose="retrieval")["level"] == 4
     with pytest.raises(ValueError, match="config set-concurrency"):
         config.resolve_concurrency()
     for capacity in [12, 6]:
@@ -555,6 +571,7 @@ def test_existing_project_cli_supplements_and_refreshes_only_capacity(ai_config)
         assert knowledge.read_bytes() == b"existing knowledge"
         assert [path.read_bytes() for path in entries] == entry_bytes
         assert config.path.read_bytes().count(b"[ai]\r\n") == 1
+        assert "[ai.tiers.tier2]\nmodel = 'project-model'\nreasoning_effort = 'high'" in config.path.read_text(encoding="utf-8")
 
 
 def test_set_concurrency_adds_ai_to_resource_only_project(tmp_path):

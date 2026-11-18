@@ -221,11 +221,14 @@ def test_retrieve_has_useful_defaults_stable_reuse_and_no_implied_host_execution
     request = json.loads(Path(result["request"]).read_text(encoding="utf-8"))
     assert request["question"] == "过去要求为何改变？" and request["scope"] == ""
     assert request["delivery_id"] == result["delivery_id"]
-    assert result["executor"] == "worker" and result["tier"] == config.resolve_ai(purpose="retrieval")["tier"]
+    assert result["executor"] == "worker" and result["level"] == config.resolve_ai(purpose="retrieval")["level"]
     assert not Path(result["delivery_receipt"]).exists()
-    again, _ = dispatch(_memory_args("retrieve", "--request", result["request"], "--available-subagents", "0"), config)
+    with pytest.raises(ValueError, match="positive integer"):
+        dispatch(_memory_args("retrieve", "--question", "Question", "--available-subagents", "0", "--level", "0"), config)
+    again, _ = dispatch(_memory_args("retrieve", "--request", result["request"], "--available-subagents", "0",
+                                    "--level", "4"), config)
     assert again["delivery_id"] == result["delivery_id"] and again["delivery_receipt"] == result["delivery_receipt"]
-    assert again["executor"] == "main" and again["model"] is None and not again["started"]
+    assert again["executor"] == "main" and again["level"] is None and again["model"] is None and not again["started"]
     assert not config.memory_dir.exists()
 
 
@@ -314,18 +317,20 @@ def test_independent_retrieval_cli_and_removed_pending_dispatch_never_open_store
     config = load_project_config(init_project(tmp_path / "project", machine,
                                               max_concurrent_subagents=12, concurrency_source="test fixture"))
     request = tmp_path / "question.json"
+    config.raw["ai"]["levels"]["5"] = {"model": "project-model", "reasoning_effort": "high"}
     request.write_text(json.dumps({"question": "如何维护并发上限？", "scope": "docs", "content_budget": 3000}),
                        encoding="utf-8")
     monkeypatch.setattr("basepack.memory.store.Memory", lambda *a:
                         pytest.fail("independent dispatch opened the store"))
     for action in ("retrieval-dispatch", "retrieval-prompt"):
         result, status = dispatch(_memory_args(action, "--request", str(request), "--slot", "1",
-                                              "--available-subagents", str(available)), config)
+                                              "--available-subagents", str(available), "--level", "5"), config)
         assert status == 0 and result["executor"] == executor
         if available:
             assert result["task_name"].startswith("bp_mem_search_") and result["task_name"].endswith("_1")
+            assert result["level"] == 5 and result["model"] == "project-model"
         else:
-            assert result["task_name"] is None
+            assert result["task_name"] is None and result["level"] is None
         if action == "retrieval-prompt":
             assert result["prompt"]
     with pytest.raises(SystemExit):
@@ -359,8 +364,11 @@ def test_prompt_cli_never_constructs_memory_or_creates_state(tmp_path, monkeypat
                         lambda *args: pytest.fail("rendering opened the memory store"))
     result, status = dispatch(_memory_args("prompt", "--receipt", str(receipt),
                                           "--control", str(control)), config)
-    assert status == 0 and result["tier"] == "tier2"
+    assert status == 0 and result["level"] == 2
     assert result["role"] == "coordinator" and result["prompt"]
+    override, status = dispatch(_memory_args("prompt", "--receipt", str(receipt), "--control", str(control),
+                                             "--level", "4"), config)
+    assert status == 0 and override["level"] == 4
     assert not config.memory_dir.exists()
     assert not config.memory_password_file.exists()
     with pytest.raises(SystemExit):
@@ -435,9 +443,9 @@ def test_maintain_discovers_git_project_and_emits_complete_worker_command(tmp_pa
     assert result["discovery"]["mode"] == "git"
     assert result["discovery"]["gaps"] == [{"path": "unsupported.bin", "reason": "binary"}]
     worker = result["worker"]
-    assert worker["role"] == "coordinator" and worker["tier"] == "tier2"
-    assert worker["model"] == config.resolve_ai(tier="tier2")["model"]
-    assert worker["reasoning_effort"] == config.resolve_ai(tier="tier2")["reasoning_effort"]
+    assert worker["role"] == "coordinator" and worker["level"] == 2
+    assert worker["model"] == config.resolve_ai(level=2)["model"]
+    assert worker["reasoning_effort"] == config.resolve_ai(level=2)["reasoning_effort"]
     assert "prompt" not in worker
     control = Path(result["control"])
     assert control.is_absolute() and control.parent == config.memory_dir / "maintenance"

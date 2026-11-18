@@ -1,6 +1,8 @@
 # 项目配置与部署合同
 
-更新：2026年11月18日。唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)。本页是实际安装版本、wheel与验收状态的唯一维护源：当前普通安装0.18.5[behavior]，新增冻结时原文chunk校验，并澄清缺失事实、粗层覆盖及当前成员授权。0.18.3不可得合同首轮完整回归666通过/6跳过/8项初始化超时，8项限定补验通过；首轮非green。此前真实小批2来源决定已发布，178成员和向量、44历史gap保全。后续82来源波已执行结束，但组合发布因原文chunk不一致在提交前失败；无该批知识写入，固定成果保留供有界恢复。全范围接受、训练和最终恢复继续。正式18080/store-0.17、memory schema 3和共享embedding 0.15保持。业务处置与余项见[进度](../tasks/20261115-real-use-rectification/progress.md)，原证与执行过程见[实施记录](../tasks/20261115-real-use-rectification/execution.md)；0.16既有验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)。操作从路线README、[项目接入](../../experiments/20261106-basepack/docs/setup-project.md)及[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)进入，修改配置按[维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)同步。
+2026-11-18，本项目普通安装 **basePack 0.18.6[behavior]**，正式库仍使用 18080/store-0.17、memory schema 3、共享 embedding 0.15。安装 wheel 的 SHA-256 为 `0c79149a7f7ff01f5a8a09731f855a82d73c7d3738bc3faa0b7cd821b0f0ad71`，69 个包文件与源码和实际安装逐字节一致，`pip check` 通过。已刷新托管入口并核对默认日常 3 档 `gpt-6.2-sol / ultra` 与默认检索 1 档 `gpt-6-luna / max`。两者与迁移前的实际解析一致。代表性 `memory brief` 返回 3 个 mandatory 项，重训后的同一访问模型及 J=4、C=28 经原端点回读确认。
+
+唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)。实际维护、训练与恢复验收见 [整改进度](../tasks/20261115-real-use-rectification/progress.md)，原证与切换过程见 [实施记录](../tasks/20261115-real-use-rectification/execution.md)。操作入口为 [项目接入](../../experiments/20261106-basepack/docs/setup-project.md)、[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)及 [配置维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)。
 
 ## 位置与责任
 
@@ -15,7 +17,9 @@
 | 运行托管与日志 | 共享模型沿用 Shawl/SCM；项目库可由普通用户手动启动，也可选管理员 SCM；日志分别保存 |
 | 普通作业容量与策略 | HTCondor 独立安装并唯一维护 |
 
-本机共享服务沿R9使用`C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe`与`D:/AgentTools/state/basepack/embedding/logs/`；SurrealDB4.0.0 exe为`D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。2026-11-18核对，本项目稳定Python `D:/AgentTools/envs/basepack-client-0.10/Scripts/python.exe`已普通安装0.18.5[behavior]，目录名不表示包版本；当前wheel SHA256为`46c98b794f9ae3a0dc9ea4a7e57163b54c7ba3ceb65101cf0c546a9a3e1d6470`。69个源码／wheel／实际site-packages文件的文件集及字节一致，pip check通过。原23项新原生行为、143项已有prompt/proposal和7项定向检查通过；随后新增2项legacy伪标记/正常接受回归及真实旧portable重放，3项通过23.86秒。普通旧0.18.1实际生成并发布的两份frozen跨版本原样重放保hash/receipt和新记录；全memory首轮666通过、6跳过、8项setup HTTP超时（2646.34秒），新字段25/25通过且无断言失败；fresh同参数8项限定补验全过54.06秒。首轮非green，超时根因未修，自有测试实例已核停；真实样本继续。新字段仅source版本可选元数据，schema和行为算法不变。
+本机共享服务沿R9使用`C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe`与`D:/AgentTools/state/basepack/embedding/logs/`。SurrealDB 4.0.0 为 `D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。本项目稳定 Python 为 `D:/AgentTools/envs/basepack-client-0.10/Scripts/python.exe`，目录名中的数字是环境名称，当前包版本见页首。此前 0.18.5 的回退 wheel SHA-256 为 `46c98b794f9ae3a0dc9ea4a7e57163b54c7ba3ceb65101cf0c546a9a3e1d6470`。
+
+0.18.5 普通安装当时 69 个源码、wheel、site-packages 文件一致，`pip check` 通过。原23项新原生行为、143项已有prompt/proposal和7项定向检查通过。随后新增2项legacy伪标记/正常接受回归及真实旧portable重放，3项通过23.86秒。普通旧0.18.1实际生成并发布的两份frozen跨版本原样重放保hash/receipt和新记录。0.18.3 全memory首轮666通过、6跳过、8项setup HTTP超时（2646.34秒），新字段25/25通过且无断言失败。fresh同参数8项限定补验全过54.06秒，自有测试实例已核停，初始化超时根因仍待查。新字段仅source版本可选元数据，schema和行为算法不变。
 
 0.18.0真实小批已发布2来源／7成员，主任务逐项原文、版本、history及embedding metadata回读通过；8来源、9成员仍有44个未匹配gap。0.18.1新鲜同材料预检已实证8来源重进semantic；执行发现缺失原文和未知结果不能等同细化暂缓，该波由父stop且所有角色实际终态、无发布，固定稿/原错保留。0.18.2将不可得条件独立持久化，原coverage_gaps保持可见；同材料修复复验及随后全范围仍须完成，不能据旧170/178作者计数声明闭合。0.18.1旧wheel SHA256为`cf8f36029941925d0fa22328810bf5c8d96196ebf18f08243c189d90cd2a7047`，提示词修订和136项检查保留为过程证据。
 
@@ -29,7 +33,7 @@
 
 本项目正式`.basepack/config.toml`现连接18080及`.basepack/memory/store-0.17`，launcher PID 48740、数据库PID 115116。旧`.basepack/memory/store-0.13`保留但不运行；旧18174及临时18176端口均已关闭。保留的`.basepack/staging-0.17.toml`仅将endpoint改到18080，data_dir仍为本项目`.basepack/memory`，不再表示独立暂存服务。普通memory init已刷新受管根入口，块外业务正文按迁移结果保留。切换前后、init后及配置指针修改后均为J=compiled J=2、C=26、模型`3c69a1307fa077bfb0860ff26277bb78daec95c92afa2aa699fc673d3e64791f`且owner=null；没有合成交付或重训。独立只读验收通过brief、8250/8250兼容内容向量、文本/图片回读、history与实际图边neighbors。首批100候选实际维护已完成，完整全项目维护及其最终恢复点尚待完成。其它项目共用的`D:/AgentTools/envs/basepack-client/`及其数据库未代迁；公共代码通过配置定位，不写死这些本机位置。
 
-根 file-structure、agent-team、engineering-judgment 独立维护，resources skill 归 active 实验。memory skill 与英文角色提示词随包安装；`memory guide`无需配置，显式配置的`memory prompt`只渲染唯一协调者，`memory wave worker-prompt/task-prompt`按本地wave／固定任务渲染Luna指令。这些只读渲染入口不要求数据库、密码文件或模型在线。独立技能选择完整目录复制到项目 `.agents/skills/`，或联接已有项目原件；同名冲突保留并报告，正确入口复用。`init` 与 core doctor 不安装或验收它们；忽略的本机联接在新检出后重建，核宿主实际发现。开发环境、构建缓存和夹具在根 tmp，交付及回滚 wheel 在实验 dist，选留原证在根 artifacts/runs；寿命见 [文档约定](../documentation.md)。
+根 file-structure、agent-team、engineering-judgment 独立维护，resources skill 归 active 实验。memory skill 与英文角色提示词随包安装；`memory guide`无需配置，显式配置的`memory prompt`只渲染唯一协调者，`memory wave worker-prompt/task-prompt`按本地wave／固定任务渲染reader指令。这些只读渲染入口不要求数据库、密码文件或模型在线。独立技能选择完整目录复制到项目 `.agents/skills/`，或联接已有项目原件；同名冲突保留并报告，正确入口复用。`init` 与 core doctor 不安装或验收它们；忽略的本机联接在新检出后重建，核宿主实际发现。开发环境、构建缓存和夹具在根 tmp，交付及回滚 wheel 在实验 dist，选留原证在根 artifacts/runs；寿命见 [文档约定](../documentation.md)。
 
 ## 业务项目实例
 
@@ -62,7 +66,8 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 | --- | --- |
 | runtime.python、runtime.machine_config | 明确绝对路径 |
 | project.root | 相对项目配置文件 |
-| ai.default_tier、ai.retrieval_tier、ai.tiers | 项目维护用途默认等级及各等级模型和推理强度；宿主读取后派工 |
+| `ai.default_level`、`ai.retrieval_level` | 项目维护日常与检索的正整数默认档位。模板为 `default_level = 3` 和 `retrieval_level = 1` |
+| `[ai.levels.<档位>]` | 项目维护各档 `model` 和 `reasoning_effort`，模板提供 `[ai.levels.1]` 至 `[ai.levels.4]`。宿主读取解析结果后派工 |
 | ai.max_concurrent_subagents、ai.concurrency_source | 安装agent采集的不含主agent、包含后代的容量及依据；config set-concurrency显式刷新，旧项目不猜默认。实时空闲额度另传本轮，配置快照不等于空闲数 |
 | memory.data_dir、jobs.jobs_dir | 相对项目根，受管理数据必须在该项目 .basepack 内 |
 | 机器配置中的相对设施路径 | 相对机器配置文件 |
@@ -74,6 +79,8 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 | memory.private_scope | 额外私有项目相对文件／目录，默认空；`.`为全项目。根private始终私有，分类不增加摄入；规则变化进入来源版本并使未提交旧稿明确冲突 |
 | memory.codex.project_id/other_project_roots/registry_complete | Codex 宿主项目绑定和完整注册根证据，独立于 basePack UUID；未取得时明确聊天缺口 |
 | memory.search_mode | CLI 未显式传 --mode 时采用的 hybrid/vector；新项目默认 vector |
+
+已有项目更新配置和托管入口时，按 [AI 档位迁移](../../experiments/20261106-basepack/docs/project-config-maintenance.md#ai-档位迁移) 保留原模型映射。
 
 `memory guide/rank` 在项目配置解析前分派；stop/owner/release/recover-owner读配置定位状态但不读凭据。memory prompt渲染唯一协调者；memory wave worker-prompt/task-prompt只读本地wave与固定任务，retrieval-dispatch/retrieval-prompt仅读配置和请求，均不连库或模型。机器配置不再维护无消费者的 `[shared].state_dir`；模型日志由 SCM/Shawl 服务定义中的显式路径管理，jobs 材料仍归项目 jobs_dir。
 
@@ -93,7 +100,7 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 
 ## 升级与回退
 
-0.18系列维护采用有限本地wave和两段Terra；实际安装和各批验收以上文为准，发布少量知识不表示所有gap已持久化处置或完整维护完成。该调整不改变memory schema 3、行为算法、项目UUID、知识版本或向量。接入前先在自然边界固定旧轮接受／未发稿及余项，结束旧worker并核发布终态，由原父正确关闭旧轮；新包不把旧receipt自动解释为新组织。安装后刷新托管入口并保留Terra恢复名额，按[产品接入](../../experiments/20261106-basepack/docs/setup-project.md#升级到-018有限任务池)核实际宿主操作；不能以CLI单元成功代替宿主生命周期。活动`maintenance/wave.json`、固定初始化／执行回执、通知宿主证据、publication intent及未发稿与原owner/control一起保留恢复，未明状态不释放。
+0.18系列维护采用有限本地wave，由同一协调者分别规划及发布。实际安装和各批验收以上文为准，gap处置和完整维护各自核验。该调整沿用memory schema 3、行为算法、项目UUID、知识版本和向量。接入前先在自然边界固定旧轮接受／未发稿及余项，结束旧worker并核发布终态，由原父正确关闭旧轮。安装后刷新托管入口并保留协调者恢复名额，按[产品接入](../../experiments/20261106-basepack/docs/setup-project.md#升级到-018有限任务池)核实际宿主生命周期。活动`maintenance/wave.json`、固定初始化／执行回执、通知宿主证据、publication intent及未发稿与原owner/control一起保留恢复，未明状态保留owner。
 
 0.17.0新增严格memory_schema_version=3标记，保持项目配置schema 2、机器schema 1和member identity 2。新库memory init写入3，已绑定且缺失或不符标记的库由新版init及普通读写明确拒绝，须先完成离线桥。独立collect与显式collection/retained替代maintain内采集及skip-codex-collection；scope实际限制来源工作集，作者提案引用固定prepare并由程序编译，检索使用请求专属身份及严格交付context。新J从切换基点开始，首次空/非空确认均推进，非空机会C另计；新版init只在不存在时创建事实头，不重置已有J。读API不隐式写行为投影。客户端升级不要求更新共享embedding服务或重算未变向量。
 

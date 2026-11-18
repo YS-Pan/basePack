@@ -8,6 +8,8 @@ import shlex
 from string import Template
 from uuid import uuid4
 
+from basepack.project.config import _level_from_legacy_tier
+
 
 MAINTENANCE_RESERVE = {"automatic": 1, "manual": 1}
 MAINTENANCE_BOOTSTRAP = "Run the following command and follow the `prompt` field in its JSON output:"
@@ -17,7 +19,18 @@ MAINTENANCE_ORGANIZATION = "finite-wave-v1"
 def _wave_layout(layout):
     if layout.get("organization") != MAINTENANCE_ORGANIZATION:
         raise ValueError("Legacy maintenance receipt: finish the old run and start a fresh wave-based maintenance run")
-    return layout
+    teams = [{**team, "coordinator_ai": _saved_ai(team["coordinator_ai"]),
+              "reader_ai": _saved_ai(team["reader_ai"])} for team in layout["teams"]]
+    return {**layout, "teams": teams}
+
+
+def _saved_ai(assignment):
+    """Read legacy level labels without changing the settings pinned by the receipt."""
+    if "tier" not in assignment:
+        return assignment
+    ai = assignment.copy()
+    ai["level"] = _level_from_legacy_tier(ai.pop("tier"))
+    return ai
 
 
 def _nonnegative(value, name):
@@ -47,8 +60,8 @@ def maintenance_layout(config, mode="manual", available_subagents=None, *, work_
         teams.append({"team": 0, "task_name": f"{prefix}coord_0",
                       "parent_task_name": None, "publisher": True,
                       "reader_task_names": [f"{prefix}read_0_{reader}" for reader in range(readers)],
-                      "coordinator_ai": config.resolve_ai(tier="tier2"),
-                      "reader_ai": config.resolve_ai(tier="tier1")})
+                      "coordinator_ai": config.resolve_ai(level=2),
+                      "reader_ai": config.resolve_ai(level=1)})
     planned = sum(1 + len(team["reader_task_names"]) for team in teams)
     return {"organization": MAINTENANCE_ORGANIZATION, "mode": mode, "run_id": identity, "work_items": work_items,
             "configured_subagents": configured, "concurrency_source": config.concurrency_source,
@@ -67,7 +80,7 @@ def memory_command(config, *args):
     return shlex.join(parts)
 
 
-def prompt_dispatch(config, receipt, control, *, role="coordinator", tier=None, paths=None,
+def prompt_dispatch(config, receipt, control, *, role="coordinator", level=None, paths=None,
                     layout=None, team=0, reader=0, stage=None, stage_sha256=None):
     """Describe a future render without reading the receipt or loading a template."""
     team = _nonnegative(team, "team")
@@ -76,11 +89,11 @@ def prompt_dispatch(config, receipt, control, *, role="coordinator", tier=None, 
     layout = _wave_layout(maintenance_layout(config) if layout is None else layout)
     assigned = layout["teams"][team]
     task_name = assigned["task_name"]
-    resolved = config.resolve_ai(tier=tier) if tier else assigned["coordinator_ai"]
+    resolved = config.resolve_ai(level=level) if level is not None else assigned["coordinator_ai"]
     args = ["prompt", "--receipt", str(Path(receipt).resolve()), "--control",
             str(Path(control).resolve()), "--role", role, "--team", team]
-    if tier:
-        args.extend(["--tier", tier])
+    if level is not None:
+        args.extend(["--level", level])
     if stage:
         args.extend(["--stage", str(Path(stage).resolve())])
     if stage_sha256:
@@ -130,7 +143,7 @@ def _reader_hints(material, paths):
     return hints
 
 
-def render_prompt(config, receipt, control, *, role="coordinator", tier=None, paths=None,
+def render_prompt(config, receipt, control, *, role="coordinator", level=None, paths=None,
                   team=0, reader=0, stage=None, stage_sha256=None):
     """Render one brief from a saved receipt; no store, locks, or writes are used."""
     receipt_path = Path(receipt).resolve()
@@ -141,7 +154,7 @@ def render_prompt(config, receipt, control, *, role="coordinator", tier=None, pa
         from .stages import load_stage
         stage_context = load_stage(receipt, control, stage, file_sha256=stage_sha256)
         layout = _wave_layout(stage_context["layout"])
-    dispatch = prompt_dispatch(config, receipt, control, role=role, tier=tier, paths=paths,
+    dispatch = prompt_dispatch(config, receipt, control, role=role, level=level, paths=paths,
                                layout=layout, team=team, reader=reader, stage=stage, stage_sha256=stage_sha256)
     if stage_context:
         stage_context = {key: stage_context[key] for key in
@@ -207,6 +220,6 @@ def render_prompt(config, receipt, control, *, role="coordinator", tier=None, pa
         "neighbors_command": memory_command(config, "neighbors", "<record-id>", "--include-stale"),
         "model": dispatch["model"],
         "effort": dispatch["reasoning_effort"],
-        "tier": dispatch["tier"],
+        "level": dispatch["level"],
     }
     return {"prompt": template.substitute(values), "stage_context": stage_context, **dispatch}

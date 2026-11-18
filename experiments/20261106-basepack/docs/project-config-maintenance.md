@@ -18,7 +18,7 @@
 & $python -X utf8 -m basepack --config $config config ai
 ```
 
-`config show` 核解析路径、目标项目和容量快照；`config ai --purpose retrieval` 或 `--tier <tier>` 核所用映射。确认只覆盖本次影响：设施变化选择对应 `doctor --facility embedding|condor`，再做一次必要的实际操作。配置解析成功不代替知识可读、宿主派工或设施生效。
+`config show` 核解析路径、目标项目和容量快照。`config ai --purpose retrieval` 或 `config ai --level 3` 核所用映射。设施变化选择对应 `doctor --facility embedding|condor`，再做一次必要的实际操作。
 
 ## 宿主容量、模型与接入变化
 
@@ -41,12 +41,19 @@
 
 | 变更触发 | 同步位置与最小确认 |
 | --- | --- |
-| 模型/推理强度的可用性或用户选择改变 | 修改项目 `[ai]` 的默认用途与 tier 映射；新调用直接读取它，不自动探测宿主可用性或采用新版模板值。用 `config ai` 核所用 purpose/tier，实际派工传入脚本返回的模型和推理强度；见 [Agent 模型等级](setup-project.md#agent-模型等级) |
+| 模型/推理强度的可用性或用户选择改变 | 修改项目 `[ai]` 的用途默认值与 `[ai.levels]` 映射。新调用读取项目值。用 `config ai` 核所用用途或显式档位，实际派工传入返回的模型和推理强度。见 [AI 档位](setup-project.md#ai-档位) |
 | Python、机器配置或项目移动 | 同步 `runtime.python`、`runtime.machine_config`、相对配置文件解析的 `project.root`；核 instructions、包装脚本、launcher 和实际包含旧路径的服务定义。从新入口运行 `config show` 核项目与数据目录；见 [移动与重新检出](setup-project.md#移动与重新检出) |
 | 客户端升级、生命周期接口或入口路径变化 | 按 [版本升级](setup-project.md#版本升级) 安装并执行 `memory init` 刷新托管块，保留配置与业务正文。核实际解释器、版本、配置与已安装 skill 路径，再做受影响操作 |
 | 独立 skill 更新、项目移动或新检出 | 复制安装须更新完整目录；目录联接核目标及相对引用，再核宿主实际技能列表。独立技能不在 wheel 内，init/core doctor 成功不代表已发现；见 [skills 安装与发现](setup-project.md#独立-skills-安装与发现) |
 
 **入口刷新边界：**已有 instructions 只替换 `basepack-memory` 托管块，AGENTS 只替换 `basepack` 托管块。instructions 首段的 Python/配置路径及 `config show` 示例在块外，`memory init` 不保证更新这些旧路径；核对后定点修改相关正文，保留其它块外字节。普通 `init` 遇已有配置报错，用于新接入而非覆盖升级。
+
+### AI 档位迁移
+
+1. 按正常升级流程结清活动维护，保留旧配置和客户端作为恢复点。升级前用旧客户端记录 `config ai`、`config ai --purpose retrieval` 及逐档查询的结果。旧版显式选档用 `config ai --tier tier1` 等命令，逐项记录 `model` 和 `reasoning_effort`。
+2. 在原项目 TOML 中将 `default_tier`、`retrieval_tier` 改为 `default_level`、`retrieval_level`。将原值 `'tier1'` 至 `'tier4'` 分别改为无引号的整数 `1` 至 `4`，并将对应的 `[ai.tiers.tierN]` 节改名为 `[ai.levels.N]`。保留每档原模型与推理强度。新版读取旧格式时在内存中转换，手动迁移时在一次编辑内完成字段和节的改名。
+3. 安装新版后用 `config show` 核项目与配置路径，再运行 `config ai`、`config ai --purpose retrieval` 并用 `config ai --level <n>` 逐档查询已配置的档位。核对整数 `level`，并确认对应模型和推理强度与升级前一致。派工程序改读整数 `level`。将 `config ai`、`memory prompt`、`memory retrieve`、`memory retrieval-dispatch` 和 `memory retrieval-prompt` 的显式覆盖改为 `--level <n>`。
+4. 已启用记忆的项目用实际解释器和配置运行 `memory init` 刷新托管入口，用 `memory guide` 核实随包技能已使用 `--level`。仅使用资源能力的项目按 [入口模板](../src/basepack/project/templates/tools.md#ai-与资源) 更新 `.basepack/instructions.md` 的命令示例。核实实际运行文档和包装脚本。刷新独立 `agent-team` 技能副本或确认联接指向新版原件，并确认宿主发现了该版本。见 [独立 skills 安装与发现](setup-project.md#独立-skills-安装与发现)。
 
 ## 来源、聊天与检索设置变化
 

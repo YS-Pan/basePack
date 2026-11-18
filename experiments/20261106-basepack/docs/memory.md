@@ -182,7 +182,7 @@ memory retrieve --question '文档中的现行约束是什么？' --scope 'devDo
 
 不传 `--scope` 时为 `''`，表示全项目；`scope` 严格表示项目相对路径前缀，支持中文与空格。业务范围写在 `question`。上例 `devDoc/` 是本仓库的实际前缀。默认预算为 6000 字符。入口创建 `tmp/basepack-retrieval/<uuid>/request.json`，返回稳定的 `delivery_id`、request/work/delivery_receipt 路径与派工元数据；同一次问题用 `memory retrieve --request <已返回request>` 接续，不再传 question。未给问题或 request 时只返回所需输入。
 
-CLI 只准备派工。宿主实际按返回的 `task_name`、`model` 和 `reasoning_effort` 创建干净历史 worker，传英文启动句和 `render_command`，并接收其最终结果；`prepared`／`started=false` 不能称为已派工。默认 tier1，显式 `--tier` 可改档；共享可用额度已知时传 `--available-subagents <A>`。同一问题复用自有句柄完成多轮检索；独立并发问题用不同 `--slot`。零容量返回 `executor='main'`，或宿主无派工能力时，由主 agent 执行同一流程并如实说明执行者。检索与维护共享容量，但不取得维护 owner/control；短任务仍可检索。
+CLI 准备派工。宿主按返回的 `task_name`、`model` 和 `reasoning_effort` 实际创建干净历史 worker，传英文启动句和 `render_command`，并接收其最终结果。检索档位初始为 1，可用 `--level 2` 等已配置档位覆盖本次选择。返回的 `level` 为整数。共享可用额度已知时传 `--available-subagents <A>`。同一问题复用自有句柄，独立并发问题用不同 `--slot`。零容量时返回 `executor='main'` 和 `level=null`。零容量或宿主无派工能力时，由主 agent 执行同一流程并说明实际执行者。检索与维护共享容量，检索无需维护 owner/control。短任务仍可检索。
 
 一次实际委托由同一 worker 先运行 `memory retrieval-start --request <request.json>`，固定行为筛选之前的基础锚点、逻辑 ID 份额、基础质量、逐版本观察截点、query/episode、预算与策略，再取得行为候选。后续补充 search → 必要原文与图关系回读 → 一次 0–100 综合评分 → UTF-8 `scored.json` → rank；内部多轮复用同一锚点包。访问区间、行为支持度及模型截点是辅助线索，相关性、适用条件和证据价值为主；低权重关键材料仍可进入，mandatory 独立交付。rank 只按综合分排序、去重和预算选择，不二次调权或记账。保存或 rank 失败时保留原错、已读证据和未完成阶段。
 
