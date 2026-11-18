@@ -23,11 +23,11 @@ model = 'gpt-6.1-terra'
 reasoning_effort = 'ultra'
 
 [ai.tiers.tier3]
-model = 'gpt-6.1-sol'
+model = 'gpt-6.2-sol'
 reasoning_effort = 'ultra'
 
 [ai.tiers.tier4]
-model = 'gpt-6-astra'
+model = 'gpt-6.2-astra'
 reasoning_effort = 'ultra'
 
 [memory]

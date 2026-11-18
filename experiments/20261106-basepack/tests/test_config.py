@@ -241,8 +241,8 @@ def test_init_contains_project_ai_mapping(ai_config):
         "default_tier": "tier3", "retrieval_tier": "tier1", "tiers": {
             "tier1": {"model": "gpt-6-luna", "reasoning_effort": "max"},
             "tier2": {"model": "gpt-6.1-terra", "reasoning_effort": "ultra"},
-            "tier3": {"model": "gpt-6.1-sol", "reasoning_effort": "ultra"},
-            "tier4": {"model": "gpt-6-astra", "reasoning_effort": "ultra"},
+            "tier3": {"model": "gpt-6.2-sol", "reasoning_effort": "ultra"},
+            "tier4": {"model": "gpt-6.2-astra", "reasoning_effort": "ultra"},
         },
     }
     assert describe(ai_config)["ai"] == ai_config.raw["ai"]
