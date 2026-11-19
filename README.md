@@ -10,7 +10,7 @@ basePack gives agents project-local memory, shared compute coordination, and ind
 | file-structure | Organize project files by purpose and lifecycle | A host with skills |
 | engineering-judgment | Judge contracts, responsibilities, compatibility, and the work passed to users | A host with skills |
 
-The latest published release is **[0.16.0](https://github.com/YS-Pan/basePack/releases/tag/v0.16.0)** for Windows and Python 3.13+. The current implementation is in the 0.18 series. The [deployment contract](devDoc/system/deployment.md) owns the actual installed version, wheel and validation status; [task progress](devDoc/tasks/20261115-real-use-rectification/progress.md) records accepted coverage and remaining work. Completed versions use plain numeric versions; `.devN` is reserved for intermediate builds. The host's subscription-based agents understand material, build relations, and score results; basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability.
+The [latest release](https://github.com/YS-Pan/basePack/releases/latest) provides a client wheel for Windows and Python 3.13+. The [deployment contract](devDoc/system/deployment.md) records this project's installation and validation, and [task progress](devDoc/tasks/20261115-real-use-rectification/progress.md) records accepted coverage and remaining work. Completed versions use plain numeric versions. Intermediate builds use `.devN`. The host's subscription-based agents understand material, build relations, and score results. basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability.
 
 **basePack is under development. Real use also serves as testing; record problems so they can inform subsequent fixes.**
 
@@ -29,7 +29,7 @@ $python = (Resolve-Path '.venv/Scripts/python.exe').Path
 
 The Python package lives in `experiments/20261106-basepack`; include that directory when installing from the repository root. These commands install the lightweight client. Project memory connects to a shared model service whose dependencies belong in its service environment. General skills can be used independently. This virtual environment belongs to the current clone; after moving or deleting it, recreate the client and update project instructions.
 
-Release wheels are available from [GitHub Releases](https://github.com/YS-Pan/basePack/releases). To build a normal wheel from the current source, see the [route README](experiments/20261106-basepack/README.md#development-checks-and-builds). Before switching a 0.16 memory project to 0.17, follow the explicit [offline schema migration](experiments/20261106-basepack/docs/setup-project.md#升级到-017) and preserve the old client and recovery set. The optional `behavior` extra installs the frozen KL-NMF training dependencies; basic retrieval can use the lightweight client.
+To build a wheel from source, see the [route README](experiments/20261106-basepack/README.md#development-checks-and-builds). To upgrade a 0.16 memory project to 0.18, preserve the old client and recovery set, complete the [offline schema migration](experiments/20261106-basepack/docs/setup-project.md#升级到-017), then follow the [0.18 maintenance upgrade](experiments/20261106-basepack/docs/setup-project.md#升级到-018有限任务池). The optional `behavior` extra installs the KL-NMF training dependencies. Basic retrieval can use the lightweight client.
 
 ## Enable project memory
 
