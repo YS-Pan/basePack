@@ -430,6 +430,91 @@ def _retained_capture(config):
     return [attachment.relative_to(config.root).as_posix(), capture.relative_to(config.root).as_posix()]
 
 
+@pytest.mark.parametrize("mode", ["automatic", "manual"])
+def test_delegated_start_captures_and_runs_preflight_as_the_same_coordinator(tmp_path, monkeypatch, mode):
+    from basepack.memory import owner
+
+    config, _, calls = _maintenance_setup(tmp_path, monkeypatch)
+    config.raw["memory"]["codex"]["project_id"] = "owned-project"
+    monkeypatch.setattr("basepack.memory.discovery.discover_sources", lambda *a: {"mode": "configured", "paths": [], "gaps": []})
+    launch, code = dispatch(_memory_args("maintain-start", "--mode", mode, "--holder", "parent",
+                                         "--available-subagents", "3"), config)
+    assert code == 0 and launch["status"] == "prepared" and owner.status(config.memory_dir) is None
+    attempt, control = launch["attempt_id"], launch["control"]
+    assert not Path(control).exists()
+    assignment = launch["spawn_arguments"]
+    assert "collect-prompt" in assignment["message"] and "render_command" in assignment["message"]
+    prompt, _ = dispatch(_memory_args("collect-prompt", "--attempt", attempt), config)
+    assert 'sandbox_permissions="require_escalated"' in prompt["prompt"]
+    assert all(part in prompt["command"] for part in (attempt, prompt["registry"], prompt["receipt"]))
+    assert not Path(prompt["registry"]).exists() and not Path(prompt["receipt"]).exists()
+    assert prompt["receipt"] in assignment["message"]
+    assert "'--retained'" not in assignment["message"]
+
+    captured = ".basepack/memory/codex/new-chat.txt"
+    receipt = _collection_receipt(config, [captured])
+    material = json.loads(receipt.read_text(encoding="utf-8"))
+    receipt = Path(prompt["receipt"])
+    material["receipt"] = str(receipt)
+    receipt.write_text(json.dumps(material), encoding="utf-8")
+    result, code = dispatch(_memory_args("maintain", "--attempt", attempt, "--holder", "parent",
+                                          "--control", control, "--mode", mode, "--available-subagents", "3",
+                                          "--collection", str(receipt)), config)
+    assert code == 0 and result["owner"]["holder"] == "parent" and result["owner"]["run_id"] == attempt
+    assert result["worker"]["task_name"] == assignment["task_name"]
+    assert len(result["layout"]["teams"][0]["reader_task_names"]) == 1
+    assert calls[0][0] == [captured]
+    assert calls[0][1]["expected_snapshots"] == {captured: material["snapshots"][0]["sha256"]}
+    stop, _ = dispatch(_memory_args("stop", "--attempt", attempt), config)
+    assert stop["owner"]["stopped"] is True
+    dispatch(_memory_args("release", "--control", control), config)
+    assert owner.status(config.memory_dir) is None
+
+
+def test_delegated_start_has_no_assignment_when_busy_or_capacity_unavailable(tmp_path, monkeypatch):
+    from basepack.memory import owner
+
+    config, _, _ = _maintenance_setup(tmp_path, monkeypatch)
+    args = _memory_args("maintain-start", "--holder", "parent", "--available-subagents", "2")
+    launch, _ = dispatch(args, config)
+    assert launch["status"] == "capacity_unavailable" and "spawn_arguments" not in launch
+    owner.acquire(config.memory_dir, config.raw["memory"]["project_id"], "other", tmp_path / "other.control")
+    launch, _ = dispatch(args, config)
+    assert launch["status"] == "busy" and launch["owner"]["holder"] == "other"
+    assert "spawn_arguments" not in launch
+
+
+def test_retained_fallback_is_explicit_in_the_clean_coordinator_prompt(tmp_path, monkeypatch):
+    config, _, _ = _maintenance_setup(tmp_path, monkeypatch)
+    config.raw["memory"]["codex"]["project_id"] = "owned-project"
+    fallback, _ = dispatch(_memory_args("maintain-start", "--holder", "parent", "--allow-retained"), config)
+    retained, _ = dispatch(_memory_args("maintain-start", "--holder", "parent", "--retained"), config)
+    fallback_prompt = fallback["spawn_arguments"]["message"]
+    retained_prompt = retained["spawn_arguments"]["message"]
+    assert "collect-prompt" in fallback_prompt and "the parent has authorized retained originals" in fallback_prompt
+    assert "collect-prompt" not in retained_prompt and "--retained" in retained_prompt
+
+
+def test_parent_can_stop_delegated_start_before_collection_or_owner(tmp_path, monkeypatch):
+    from basepack.memory import owner
+    from basepack.memory.maintenance import MaintenanceStopped
+
+    config, _, _ = _maintenance_setup(tmp_path, monkeypatch)
+    monkeypatch.setattr("basepack.memory.codex.AppServer", lambda *a: pytest.fail("cancelled attempt opened Codex"))
+    config.raw["memory"]["codex"] = {"project_id": "owned-project", "registry_complete": True,
+                                      "other_project_roots": []}
+    launch, _ = dispatch(_memory_args("maintain-start", "--holder", "parent"), config)
+    attempt, control = launch["attempt_id"], launch["control"]
+    stopped, _ = dispatch(_memory_args("stop", "--attempt", attempt), config)
+    assert stopped["stopped"] and stopped["owner"] is None
+    with pytest.raises(MaintenanceStopped):
+        dispatch(_memory_args("collect", "--attempt", attempt), config)
+    with pytest.raises(MaintenanceStopped):
+        dispatch(_memory_args("maintain", "--attempt", attempt, "--holder", "parent",
+                              "--control", control, "--retained"), config)
+    assert owner.status(config.memory_dir) is None and not Path(control).exists()
+
+
 def test_maintain_discovers_git_project_and_emits_complete_worker_command(tmp_path, monkeypatch):
     config, receipt, calls = _maintenance_setup(tmp_path, monkeypatch)
     subprocess.run(["git", "init", "-q"], cwd=config.root, check=True)

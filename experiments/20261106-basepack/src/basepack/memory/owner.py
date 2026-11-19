@@ -3,9 +3,10 @@
 import json
 import os
 from pathlib import Path
+import re
 from uuid import uuid4
 
-from .maintenance import _locked, begin_commit, stop
+from .maintenance import MaintenanceStopped, _locked, begin_commit, stop
 
 
 def _paths(memory_dir):
@@ -54,14 +55,53 @@ def _public(owner):
     return {key: value for key, value in owner.items() if key != "control"}
 
 
-def acquire(memory_dir, project_id, holder, control):
+def attempt_control(memory_dir, attempt_id: str) -> Path:
+    """Derive the exclusive control path before starting an automatic attempt."""
+    if re.fullmatch(r"[0-9a-f]{32}", attempt_id) is None:
+        raise ValueError("Maintenance attempt ID must be 32 lowercase hex digits")
+    return (Path(memory_dir) / "maintenance").resolve() / f"{attempt_id}.control"
+
+
+def _cancel_marker(control):
+    return control.with_suffix(".cancelled")
+
+
+def check_attempt(memory_dir, attempt_id):
+    """Check durable cancellation without creating a control or taking a lock."""
+    control = attempt_control(memory_dir, attempt_id)
+    if _cancel_marker(control).exists():
+        raise MaintenanceStopped("Maintenance attempt stopped")
+
+
+def cancel_attempt(memory_dir, attempt_id):
+    """Record cancellation and stop the matching owner if it has acquired."""
+    control = attempt_control(memory_dir, attempt_id)
+    marker = _cancel_marker(control)
+    lock, state = _paths(memory_dir)
+    with _locked(lock, timeout=5):
+        if not marker.exists():
+            _write(marker, True)
+        owner = _read(state)
+        if owner is not None and owner["run_id"] == attempt_id and owner["control"] == str(control):
+            if not owner["stopped"]:
+                _stop_owner(state, owner)
+        else:
+            owner = None
+        return {"stopped": True, "attempt_id": attempt_id, "owner": owner}
+
+
+def acquire(memory_dir, project_id, holder, control, *, attempt_id=None):
     """Atomically claim the project before preflight; return the current holder if busy.
 
     A control path is a capability and is created exclusively. Never reuse or
     remove it: old workers must not acquire authority over a later run.
     """
+    if attempt_id is not None and _control(control) != str(attempt_control(memory_dir, attempt_id)):
+        raise ValueError("Maintenance control must match the attempt ID")
     lock, state = _paths(memory_dir)
     with _locked(lock, timeout=5):
+        if attempt_id is not None:
+            check_attempt(memory_dir, attempt_id)
         owner = _read(state)
         if owner is not None:
             return {"acquired": False, "owner": _public(owner)}
@@ -71,7 +111,8 @@ def acquire(memory_dir, project_id, holder, control):
             file.flush()
             os.fsync(file.fileno())
         owner = {"project_id": project_id, "holder": holder, "control": str(control),
-                 "run_id": uuid4().hex, "stopped": False, "publications": []}
+                 "run_id": attempt_id if attempt_id is not None else uuid4().hex,
+                 "stopped": False, "publications": []}
         _write(state, owner)
         return {"acquired": True, "owner": owner}
 
@@ -82,26 +123,33 @@ def status(memory_dir):
         return _public(_read(state))
 
 
+def _begin_owned(memory_dir, owner, message):
+    attempt = attempt_control(memory_dir, owner["run_id"])
+    if owner["stopped"] or (owner["control"] == str(attempt) and _cancel_marker(attempt).exists()):
+        raise MaintenanceStopped(message)
+    begin_commit(owner["control"])
+
+
 def check_owned(memory_dir, control):
     """Require the live owner before starting maintenance preflight."""
     lock, state = _paths(memory_dir)
     with _locked(lock, timeout=5):
         owner = _owned(state, control)
-        if owner["stopped"]:
-            from .maintenance import MaintenanceStopped
-            raise MaintenanceStopped("Maintenance stopped")
-        begin_commit(control)
+        _begin_owned(memory_dir, owner, "Maintenance stopped")
         return owner
+
+
+def _stop_owner(state, owner):
+    stop(owner["control"])
+    owner["stopped"] = True
+    _write(state, owner)
+    return owner
 
 
 def stop_owned(memory_dir, control):
     lock, state = _paths(memory_dir)
     with _locked(lock, timeout=5):
-        owner = _owned(state, control)
-        stop(control)
-        owner["stopped"] = True
-        _write(state, owner)
-        return owner
+        return _stop_owner(state, _owned(state, control))
 
 
 def begin_publication(memory_dir, control, publication=None):
@@ -109,10 +157,7 @@ def begin_publication(memory_dir, control, publication=None):
     lock, state = _paths(memory_dir)
     with _locked(lock, timeout=5):
         owner = _owned(state, control)
-        if owner["stopped"]:
-            from .maintenance import MaintenanceStopped
-            raise MaintenanceStopped("Maintenance stopped before publication")
-        begin_commit(control)
+        _begin_owned(memory_dir, owner, "Maintenance stopped before publication")
         publication = publication or uuid4().hex
         if publication in owner["publications"]:
             raise ValueError("Publication identifier is already in flight")
@@ -166,10 +211,7 @@ def save_stage(memory_dir, control, stage, output):
         owner = _owned(state, control)
         if owner["run_id"] != stage["owner_run_id"]:
             raise PermissionError("Stage receipt does not belong to the current maintenance run")
-        if owner["stopped"]:
-            from .maintenance import MaintenanceStopped
-            raise MaintenanceStopped("Maintenance stopped before stage handoff")
-        begin_commit(control)
+        _begin_owned(memory_dir, owner, "Maintenance stopped before stage handoff")
         if owner["publications"]:
             raise RuntimeError("Publication is in flight or its result is uncertain; resolve the original batch before handoff")
         if owner.get("stage") != stage["previous_stage"]:

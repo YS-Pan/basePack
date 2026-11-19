@@ -3,11 +3,10 @@
 import json
 from hashlib import sha256
 from pathlib import Path
-from string import Template
 from uuid import uuid4
 
 from . import waves
-from .prompts import MAINTENANCE_BOOTSTRAP, _wave_layout, memory_command
+from .prompts import MAINTENANCE_BOOTSTRAP, _wave_layout, memory_command, render_template
 from .stages import _read_reference, load_stage
 
 
@@ -135,9 +134,8 @@ def worker_prompt(config, control, run_id, wave_id, worker):
     commands = {name.replace("-", "_"): _command(config, name, control, run_id, wave_id,
                   "--worker", worker) for name in
                 ("claim", "task-prompt", "submit", "notification-pending", "notification-result")}
-    template = Template((Path(__file__).with_name("prompts") / "wave-worker.md").read_text(encoding="utf-8"))
-    return {"prompt": template.substitute(worker=worker, wave_id=wave_id, coordinator=state["coordinator"],
-                                           skill=str(Path(__file__).with_name("SKILL.md")), **commands)}
+    return {"prompt": render_template("wave-worker", worker=worker, wave_id=wave_id, coordinator=state["coordinator"],
+                                      skill=str(Path(__file__).with_name("SKILL.md")), **commands)}
 
 
 def task_prompt(config, control, run_id, wave_id, worker, task_id):
@@ -148,7 +146,6 @@ def task_prompt(config, control, run_id, wave_id, worker, task_id):
         raise PermissionError("Task is not claimed by this worker")
     material = _read_reference(state["source_receipt"])
     work = config.root / "tmp" / "basepack-waves" / wave_id / sha256(task_id.encode("utf-8")).hexdigest()[:20]
-    template = Template((Path(__file__).with_name("prompts") / "wave-task.md").read_text(encoding="utf-8"))
     paths = list(dict.fromkeys([*task["paths"], *task.get("read_paths", [])]))
     values = {"task": json.dumps(task, ensure_ascii=False), "hints": json.dumps(_reader_hints(material, paths), ensure_ascii=False),
               "work": str(work), "skill": str(Path(__file__).with_name("SKILL.md")),
@@ -158,7 +155,7 @@ def task_prompt(config, control, run_id, wave_id, worker, task_id):
               "search_command": memory_command(config, "search", "--text", "<query>"),
               "neighbors_command": memory_command(config, "neighbors", "<record-id>", "--include-stale"),
               "prepare_inspection": (Path(__file__).with_name("prompts") / "prepare-inspection.md").read_text(encoding="utf-8").strip()}
-    return {"task": task, "work": str(work), "prompt": template.substitute(values)}
+    return {"task": task, "work": str(work), "prompt": render_template("wave-task", **values)}
 
 
 def publish(config, args, completed):

@@ -1,3 +1,4 @@
+from hashlib import sha256
 import json
 import os
 
@@ -17,14 +18,16 @@ def memory(store_memory):
     memory = store_memory
     maintain = memory.maintain
 
-    def owned_maintain(scope, *, include_registered=True, control=None, timeout=600):
+    def owned_maintain(scope, *, include_registered=True, control=None, timeout=600, expected_snapshots=None):
         if control is not None:
-            return maintain(scope, include_registered=include_registered, control=control, timeout=timeout)
+            return maintain(scope, include_registered=include_registered, control=control, timeout=timeout,
+                            expected_snapshots=expected_snapshots)
         control = memory.config.memory_dir / "maintenance" / f"test-{uuid4().hex}.control"
         claim = owner.acquire(memory.config.memory_dir, memory.connection["project_id"], "test", control)
         assert claim["acquired"]
         try:
-            return maintain(scope, include_registered=include_registered, control=str(control), timeout=timeout)
+            return maintain(scope, include_registered=include_registered, control=str(control), timeout=timeout,
+                            expected_snapshots=expected_snapshots)
         finally:
             owner.stop_owned(memory.config.memory_dir, control)
             if not owner.status(memory.config.memory_dir)["publications"]:
@@ -32,6 +35,54 @@ def memory(store_memory):
 
     memory.maintain = owned_maintain
     return memory
+
+
+@pytest.mark.parametrize('stage', ['scan_unchanged', 'scan_missing', 'candidate', 'current'])
+def test_maintenance_rejects_collection_snapshot_changed_after_verification(memory, monkeypatch, stage):
+    path = '.basepack/memory/codex/chat.md'
+    original = memory.config.root / path
+    original.parent.mkdir(parents=True)
+    captured = b'Captured chat.\r\n'
+    original.write_bytes(captured)
+    if stage == 'scan_unchanged':
+        original.write_bytes(b'A different revision.\r\n')
+    if stage in {'scan_unchanged', 'current'}:
+        revision = memory.prepare([path])['sources'][0]['revision']
+        memory.apply(freeze([{'sources': [{'path': path, 'revision': revision}]}], config=memory.config))
+    if stage == 'scan_missing':
+        original.unlink()
+    if stage in {'candidate', 'current'}:
+        check_changes = memory._check_changes
+
+        def replace_after_scan(*args, **kwargs):
+            changes = check_changes(*args, **kwargs)
+            original.write_bytes(b'Invalid UTF-8: \xff')
+            return changes
+
+        monkeypatch.setattr(memory, '_check_changes', replace_after_scan)
+
+    with pytest.raises(ValueError, match='Collection snapshot changed during maintenance preflight: ' + path):
+        memory.maintain([path], expected_snapshots={path: sha256(captured).hexdigest()})
+
+
+def test_maintenance_keeps_collection_observation_separate_from_semantic_acceptance(memory):
+    path = 'chat.md'
+    original = memory.config.root / path
+    accepted = b'Previously accepted.\n'
+    original.write_bytes(accepted)
+    accepted_revision = sha256(accepted).hexdigest()
+    memory.apply(freeze([{'sources': [{'path': path, 'revision': accepted_revision}]}], config=memory.config))
+    accepted_version = memory._rows('source')[0]['version']
+    captured = b'Captured chat.\r\n'
+    original.write_bytes(captured)
+    captured_revision = sha256(captured).hexdigest()
+
+    result = memory.maintain([path], expected_snapshots={path: captured_revision})
+    material = json.loads(open(result['receipt'], encoding='utf-8').read())
+
+    assert material['semantic'][0]['current_revision'] == captured_revision
+    assert material['semantic'][0]['accepted_source_version'] == accepted_version
+    assert material['workset']['accepted'] == []
 
 
 def test_pending_feedback_alone_dispatches_semantic_work(memory):

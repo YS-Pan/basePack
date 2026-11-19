@@ -4,10 +4,9 @@ import json
 from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
-from string import Template
 from uuid import uuid4
 
-from .prompts import _capacity, _nonnegative, memory_command
+from .prompts import _capacity, _nonnegative, memory_command, render_template
 
 
 def retrieval_dispatch(config, request_path, slot=0, available_subagents=None, level=None):
@@ -99,7 +98,6 @@ def render_retrieval_prompt(config, request_path, slot=0, available_subagents=No
     dispatch = retrieval_dispatch(config, request_path, slot, available_subagents, level)
     request = _retrieval_request(request_path)
     work = _retrieval_work(config, request_path, request)
-    template = Template((Path(__file__).with_name("prompts") / "retrieval.md").read_text(encoding="utf-8"))
     assignment = (f"retrieval worker {dispatch['task_name']}, assigned level {dispatch['level']} / "
                   f"{dispatch['model']} / {dispatch['reasoning_effort']}" if dispatch["executor"] == "worker"
                   else "main agent performing retrieval directly because no subagent seat is available")
@@ -123,7 +121,7 @@ def render_retrieval_prompt(config, request_path, slot=0, available_subagents=No
               "receipt_command": memory_command(config, "retrieval-receipt", "--request", Path(request_path).resolve(),
                                                 "--ranked", work / "ranked.json", "--candidates", work / "candidates.json",
                                                 "--output", work / "delivery.json")}
-    return {"prompt": template.substitute(values), "delivery_id": request["delivery_id"],
+    return {"prompt": render_template("retrieval", **values), "delivery_id": request["delivery_id"],
             "search_command": values["search_command"],
             "work": str(work), "scope": request["scope"], **dispatch}
 

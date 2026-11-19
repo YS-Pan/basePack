@@ -7,8 +7,8 @@ from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
 
-from .maintenance import MaintenanceStopped, _locked, begin_commit
-from .owner import _control, _owned, _paths, _read, _write
+from .maintenance import _locked
+from .owner import _begin_owned, _control, _owned, _paths, _read, _write
 from .query import normalize_scope
 from .stages import _read_reference, fixed_reference
 
@@ -26,9 +26,7 @@ def _live(memory_dir, control, run_id):
     owner = _owned(owner_path, control)
     if owner["run_id"] != run_id:
         raise PermissionError("Wave belongs to a different maintenance owner")
-    if owner["stopped"]:
-        raise MaintenanceStopped("Maintenance stopped")
-    begin_commit(control)
+    _begin_owned(memory_dir, owner, "Maintenance stopped")
 
 
 def _load(memory_dir, control, run_id, wave_id):

@@ -14,7 +14,8 @@ from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
 
 from basepack.project.config import ProjectConfig
-from .content import SourceContent, _project_path, detect_changes, numbered_text, read_source, reading_units, original_text, line_slices
+from .content import (SourceContent, _check_collection_revision, _project_path, detect_changes,
+                      numbered_text, read_source, reading_units, original_text, line_slices)
 from .images import IMAGE_SUFFIXES, ImageSource, read_image, retain_image
 from .privacy import derive_private, privacy_rules, rules_revision, source_private
 
@@ -327,10 +328,17 @@ class Memory:
         from .behavior_projection import compile_behavior
         return compile_behavior(self)
 
-    def _load_source(self, path: str, kind: str | None = None) -> SourceContent | ImageSource:
-        if kind == "image" or Path(path).suffix.lower() in IMAGE_SUFFIXES:
-            return read_image(self.config.root, path)
-        return read_source(self.config.root, path)
+    def _load_source(self, path: str, kind: str | None = None, *,
+                     expected_revision: str | None = None) -> SourceContent | ImageSource:
+        try:
+            if kind == "image" or Path(path).suffix.lower() in IMAGE_SUFFIXES:
+                source = read_image(self.config.root, path)
+                _check_collection_revision(path, expected_revision, source.revision)
+                return source
+            return read_source(self.config.root, path, expected_revision=expected_revision)
+        except FileNotFoundError:
+            _check_collection_revision(path, expected_revision, None)
+            raise
 
     def prepare(self, paths: list[str], *, historical_versions: list[dict] | None = None) -> dict:
         """Supply explicit new/old originals and existing knowledge for one reading."""
@@ -1158,17 +1166,22 @@ class Memory:
     def changes(self, scope: list[str], *, deep: bool = False) -> list[dict]:
         return self._check_changes(self.sources(), scope, deep=deep)
 
-    def maintain(self, scope: list[str], *, include_registered: bool = False, control: str | None = None, timeout: float = 600) -> dict:
+    def maintain(self, scope: list[str], *, include_registered: bool = False, control: str | None = None,
+                 timeout: float = 600, expected_snapshots: dict[str, str] | None = None) -> dict:
         """Run deterministic maintenance and retain the semantic handoff."""
         from .maintenance import maintain
         from .owner import check_owned
         if not control:
             raise ValueError("Maintenance requires the project owner's control")
         check_owned(self.config.memory_dir, control)
-        return maintain(self, scope, include_registered=include_registered, control=control, timeout=timeout)
+        return maintain(self, scope, include_registered=include_registered, control=control, timeout=timeout,
+                        expected_snapshots=expected_snapshots)
 
-    def _check_changes(self, known: list[dict], scope: list[str], *, deep: bool) -> list[dict]:
-        changes = detect_changes(self.config.root, [source for source in known if not source.get("deleted")], scope, deep=deep)
+    def _check_changes(self, known: list[dict], scope: list[str], *, deep: bool,
+                       expected_snapshots: dict[str, str] | None = None) -> list[dict]:
+        expected_snapshots = expected_snapshots or {}
+        changes = detect_changes(self.config.root, [source for source in known if not source.get("deleted")], scope,
+                                 deep=deep, expected_snapshots=expected_snapshots)
         changes = {change.path: asdict(change) for change in changes}
         rules = privacy_rules(self.config)
         selected = [_project_path(self.config.root.resolve(), path) for path in scope]
@@ -1180,7 +1193,8 @@ class Memory:
             previous = source.get('private', source_private(source['path']))
             if previous != source_private(source['path'], rules['private_scope']):
                 if source['path'] not in changes:
-                    current = self._load_source(source['path'], source.get('kind'))
+                    current = self._load_source(source['path'], source.get('kind'),
+                                                expected_revision=expected_snapshots.get(source['path']))
                     changes[source['path']] = {'path': current.path, 'kind': 'modified',
                                                'revision': current.revision, 'size': current.size,
                                                'mtime_ns': current.mtime_ns}

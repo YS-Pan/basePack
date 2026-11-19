@@ -57,7 +57,7 @@ bp --config $config doctor
 | resources | `experiments/20261106-basepack/skills/resources/` | 已接入的 embedding 或 HTCondor 工具 |
 | basepack-setup | `experiments/20261106-basepack/skills/basepack-setup/` | 安装或升级所选 basePack 能力 |
 
-这些独立技能不在 wheel 内；仅安装 wheel 的使用者可另取对应版本源码中的所选目录，无需重装客户端。记忆 skill 与协调者/reader 的英文维护提示词随 wheel 安装，通过 `memory guide`、`memory prompt` 与生成的 instructions 使用。
+这些独立技能不在 wheel 内。仅安装 wheel 的使用者可另取对应版本源码中的所选目录。记忆 skill、协调者与 reader 的英文提示以及采集指令随 wheel 安装，由 `memory guide` 和生成的项目入口定位。
 
 1. **选择安装位置。** 新项目优先把所选完整目录复制到 `<project>/.agents/skills/<name>/`。已有 `<project>/skills/<name>/` 维护原件时，保留该维护源，在 `.agents/skills/<name>` 建立指向它的目录联接。其它宿主按其技能安装规则选择发现位置。
 2. **核对已有入口。** 修改前检查同名路径；正确的完整目录或指向预期原件的联接直接复用。同名用户技能、非预期目录或指向其它目标的联接保留原状，报告路径与目标冲突后再决定处理。重复执行时先做此核对，跳过已正确安装项。
@@ -107,7 +107,7 @@ bp --config $config config ai --purpose retrieval
 bp --config $config config ai --level 3
 ```
 
-`config ai` 默认解析日常用途，`--purpose retrieval` 解析检索用途，`--level` 指定档位。结果以整数 `level` 报告所选档位。记忆维护使用 `maintain`／`prompt` 返回的派工元数据，检索使用 `memory retrieve --question '<业务问题>'`。宿主按返回的 `task_name`、`model` 和 `reasoning_effort` 实际派工，并在收到最终检索结果后确认交付。维护默认由 2 档协调者规划及发布，固定阅读 worker 使用 1 档。恢复协调者时沿用原身份、模型和推理强度，并预留恢复名额。交接见 [维护](memory.md#自动维护与手动维护) 和 [检索](memory.md#启动与检索)。
+`config ai` 默认解析日常用途，`--purpose retrieval` 解析检索用途，`--level` 指定档位。结果以整数 `level` 报告所选档位。记忆维护按 `memory maintain-start` 返回的 `spawn_arguments` 实际派协调者，检索使用 `memory retrieve --question '<业务问题>'`，收到最终检索结果后确认交付。维护默认由 2 档协调者规划及发布，固定阅读 worker 使用 1 档。协调者恢复沿用同一宿主身份并占用预留名额。交接见 [维护](memory.md#自动维护与手动维护) 和 [检索](memory.md#启动与检索)。
 
 `[ai].max_concurrent_subagents` 与 `concurrency_source` 是宿主容量快照。修改宿主上限、切 profile/宿主或升级接入时，重新采集并用 `config set-concurrency --max-concurrent-subagents <C> --concurrency-source '<来源与口径>'` 更新受影响项目，再核 `config show`；不重跑普通 init、不迁移数据库。其它配置变更的联动见 [配置维护要点](project-config-maintenance.md)。
 
@@ -134,13 +134,15 @@ bp --config $config memory brief --task '当前任务'
 
 成功时 init 安装 schema、绑定数据库身份，并共用项目 init 的刷新入口更新 instructions 与 AGENTS 托管块；块外原字节保持，重复刷新幂等，损坏标记明确报错。普通 init 生成未启用记忆的指令，不要求连接数据库。guide 返回已安装流程的位置，空库 brief 返回空结果。误连另一 UUID 时修正 endpoint 和目录，保留原 UUID。按 [最小闭环](memory.md#最小闭环示例) 完成一次开发试用，核写入、检索及依据。
 
-brief、search、read 只读上次已发布知识及其依据快照。主任务开始取得一次 brief；同任务接续沿用。直觉预计不超过十分钟时跳过整个自动 maintain；更长任务在宿主生命周期支持下异步运行 `memory maintain --mode automatic`，范围明显扩大时重估，子任务不递归开维护。显式维护使用 `--mode manual`，不受时长门槛限制。维护默认发现整个项目，不用当前业务文件缩小范围；来源、固定布局和派工详情见 [记忆使用](memory.md#自动维护与手动维护)。
+brief、search、read 只读上次已发布知识及其依据快照。主任务开始取得一次 brief，同任务接续沿用。主任务直觉预计不超过十分钟时跳过整个自动维护。更长任务在宿主支持生命周期时用 `memory maintain-start --mode automatic` 异步启动。范围明显扩大时重估，子任务按委托执行。显式维护通过同一入口使用 `--mode manual`，范围服从本次授权。见 [记忆使用](memory.md#自动维护与手动维护)。
 
 ## Codex 项目聊天接入
 
 Codex 宿主按项目归属默认接入可取得的聊天，不要求逐 thread 配置。宿主从当前聊天与完整项目清单取得项目 ID、其它已注册项目根，在 `init` 时自动传 `--codex-project-id`、可重复的 `--codex-other-project-root` 和 `--codex-registry-complete`；已有项目由宿主更新配置的 `[memory.codex]`。这是宿主元数据接法，Codex 项目 ID 与 basePack 的 `memory.project_id` UUID 各自保留。
 
-首次启用或旧项目升级时，instructions 指引 Codex 宿主补齐绑定；请求本轮新聊天采集时刷新完整注册根。独立运行 `memory collect --codex-registry <UTF-8-JSON> --output <collection.json>`，传入本轮 `{project_id, other_project_roots, registry_complete:true}`，覆盖本轮采集绑定但不写回 TOML。注册清单放根 tmp，采集原件与定位回执保留在实际 memory 目录。绑定项目随后明确 `memory maintain --collection <collection.json>` 或 `--retained`；retained 使用已保留原件，当前聊天 freshness 未核。采集不取得维护 owner，失败保留原错与独立回执，不能冒充语义接受。见 [维护入口](memory.md#自动维护与手动维护)。
+首次启用或旧项目升级时，按生成的 instructions 补齐 Codex 绑定。安装、升级或新项目接入完成后，agent 用用户的语言说明适用的采集默认行为、审批条件与受阻处理。已安装英文指令在 `memory guide` 返回的 `SKILL.md` 同目录下的 `prompts/collect.md`，已有尝试也可用 `memory collect-prompt --attempt <id>` 构造该次指令。仅安装客户端时按未来启用并绑定后的条件说明。采集由维护或单独获授权时触发。
+
+需要采集新聊天时，由协调者刷新完整注册根，按生成的指令调用独立 `memory collect`。项目注册以 UTF-8 JSON 传入 `{project_id, other_project_roots, registry_complete:true}`，作用于本轮采集。受影响的 Windows Codex 仅在宿主允许 Auto-review 时对这条采集命令请求一次审批，等待期间不占维护 owner。普通预检和发布使用正常沙箱。已有成功回执或授权使用的保留原件可通过 `--collection <collection.json>` 或 `--retained` 选取。见 [维护入口](memory.md#自动维护与手动维护)。
 
 采集入口通过受支持的 App Server 列出 active 与 archived 聊天并分页读取正文。明确的项目 ID 优先；线程未带项目 ID 时，用项目根、Git worktree/common-dir 与宿主其它注册项目根排除冲突。不能确认的条目留在 unresolved/gaps；标题与关键词不判定归属。受管 UTF-8 导出保存在项目 `memory.data_dir/codex/`，维护显式消费所选回执或 retained；无需把每个 thread 填入 `source_scope`，也不递归扫描数据库、控制文件和维护回执。加载回执核已记录的原件 hash，回执不是全库不可变截点。
 
@@ -165,6 +167,8 @@ Codex 宿主按项目归属默认接入可取得的聊天，不要求逐 thread 
 0.18系列维护采用有限本地任务池和两段式Terra，memory schema、行为算法、项目UUID及原证版本合同保持。实际安装与验收状态见[部署合同](../../../devDoc/system/deployment.md)，接受范围与余项见[进度](../../../devDoc/tasks/20261115-real-use-rectification/progress.md)。升级旧组织时，先固定原轮的接受／未发稿、剩余范围和发布终态，结束旧worker后由原父正确stop/release；0.18拒绝旧组织receipt／stage，不把新协议套给旧worker或用安装解除旧owner。
 
 安装后运行 `memory init` 刷新托管入口，核包版本、实际导入路径及宿主能力：父任务能确认Terra当前turn已结束而身份空闲，能封口后只发一次go，并核早到go留邮箱／晚到go唤醒事件等待，最后Luna能实际followup同一非根Terra，并将待通知与宿主受理结果分开保留。容量必须留下Terra恢复名额。最小实际宿主闭环通过后再维护真实材料；普通安装或队列状态成功不能代替该验收。流程见[有限任务池](memory.md#有限任务池与两段式-terra)，当前授权设计见[维护合同](../../../devDoc/tasks/20261115-real-use-rectification/maintenance-waves.md)。
+
+0.18.7 通过 `maintain-start` 先派协调者，由它处理新采集及预检。升级时先结束旧轮并释放旧 owner，再刷新托管入口，同时核自动与显式维护均指向新入口。向用户说明该环境适用的采集默认行为和 Windows Codex 审批条件。[新入口](memory.md#自动维护与手动维护)。
 
 0.18.2源码增加来源级 `unavailable_gaps`，用于逐项记录当前证据不可得，区别于实际已读后的fine细化延期；记录本身不改member、知识版本、向量或J。旧frozen未含该字段时保持原字节／hash，不补 `[]` 作迁移；新增或清空记录按当前prepare生成新提案。私有转公开的既有非空记录需显式清理／重判，见[来源缺口处置](memory.md#证据不可得与细化延期)。安装与真实验收仍以[部署合同](../../../devDoc/system/deployment.md)为准。
 

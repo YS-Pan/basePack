@@ -8,7 +8,7 @@ def register_commands(subparsers):
     memory = subparsers.add_parser("memory", help="Project-local multilevel memory")
     commands = memory.add_subparsers(dest="memory_action", required=True)
     actions = {name: commands.add_parser(name) for name in
-               ("init", "guide", "collect", "sources", "prepare", "freeze", "publish", "apply", "stop", "owner", "release", "recover-owner", "embed", "search", "read", "knowledge", "history", "neighbors", "brief", "changes", "maintain", "stage", "prompt", "retrieve", "retrieval-start", "retrieval-receipt", "behavior-train", "behavior-compile", "behavior-candidates", "retrieval-dispatch", "retrieval-prompt", "freshness", "rank", "delivery", "access-hints", "feedback-report", "feedback-list", "feedback-resolve")}
+               ("init", "guide", "collect", "collect-prompt", "sources", "prepare", "freeze", "publish", "apply", "stop", "owner", "release", "recover-owner", "embed", "search", "read", "knowledge", "history", "neighbors", "brief", "changes", "maintain", "maintain-start", "stage", "prompt", "retrieve", "retrieval-start", "retrieval-receipt", "behavior-train", "behavior-compile", "behavior-candidates", "retrieval-dispatch", "retrieval-prompt", "freshness", "rank", "delivery", "access-hints", "feedback-report", "feedback-list", "feedback-resolve")}
     from .wave_cli import register as register_waves
     register_waves(commands.add_parser("wave", help="Host-driven finite maintenance wave"))
     actions["feedback-report"].add_argument("--kind", choices=["knowledge", "retrieval"], required=True)
@@ -25,6 +25,8 @@ def register_commands(subparsers):
     actions["feedback-resolve"].add_argument("--control", required=True, help="Current maintenance owner's control file")
     actions["feedback-resolve"].add_argument("--expected-revision", help="Target version confirmed after handling")
     actions["collect"].add_argument("--codex-registry", help="Explicit Codex project registry")
+    actions["collect"].add_argument("--attempt", help="Parent's delegated maintenance attempt ID")
+    actions["collect-prompt"].add_argument("--attempt", required=True, help="Attempt ID returned by maintain-start")
     actions["prepare"].add_argument("--paths", nargs="+", required=True,
                                     help="Project-relative files; enumerate directories first")
     actions["prepare"].add_argument("--historical-versions", help="JSON array of explicitly observed historical {id, knowledge_revision}")
@@ -38,7 +40,9 @@ def register_commands(subparsers):
     actions["apply"].add_argument("--batch", required=True, help="Frozen UTF-8 JSON batch")
     actions["apply"].add_argument("--control", required=True, help="Current owner control file")
     actions["apply"].add_argument("--timeout", type=float, default=600, help="Candidate embedding timeout")
-    actions["stop"].add_argument("--control", required=True, help="The task's unique control file")
+    stopping = actions["stop"].add_mutually_exclusive_group(required=True)
+    stopping.add_argument("--control", help="The task's unique control file")
+    stopping.add_argument("--attempt", help="Cancel a delegated attempt, even before it acquires ownership")
     actions["release"].add_argument("--control", required=True, help="Stopped owner control file")
     actions["recover-owner"].add_argument("--run-id", required=True)
     actions["recover-owner"].add_argument("--owner-ended", action="store_true", required=True, help="Attest that the previous owner and workers have ended")
@@ -70,16 +74,22 @@ def register_commands(subparsers):
     actions["brief"].add_argument("--limit", type=int, default=6)
     actions["changes"].add_argument("--scope", nargs="+", required=True)
     actions["changes"].add_argument("--deep", action="store_true")
-    actions["maintain"].add_argument("--scope", nargs="+", help="Restrict the actual workset to these project-relative paths")
-    captured = actions["maintain"].add_mutually_exclusive_group()
-    captured.add_argument("--collection", help="Verified receipt from independent memory collect")
-    captured.add_argument("--retained", action="store_true", help="Explicitly consume retained chat snapshots; freshness remains unknown")
+    for name in ("maintain", "maintain-start"):
+        maintain = actions[name]
+        maintain.add_argument("--scope", nargs="+", help="Restrict the actual workset to these project-relative paths")
+        captured = maintain.add_mutually_exclusive_group()
+        captured.add_argument("--collection", help="Verified receipt from independent memory collect")
+        captured.add_argument("--retained", action="store_true", help="Explicitly consume retained chat snapshots; freshness remains unknown")
+        if name == "maintain-start":
+            captured.add_argument("--allow-retained", action="store_true",
+                                  help="Permit the coordinator to use retained originals if fresh collection is unavailable")
+        maintain.add_argument("--holder", required=True, help="Original parent's host thread identity")
+        maintain.add_argument("--mode", choices=["automatic", "manual"], default="manual",
+                              help="Both modes reserve one coordinator recovery seat; default is manual")
+        maintain.add_argument("--available-subagents", type=int,
+                              help="Host raw subagent seats before counting the maintenance coordinator and recovery reserve")
     actions["maintain"].add_argument("--control", required=True, help="Fresh, never-used task control file")
-    actions["maintain"].add_argument("--holder", required=True, help="Host thread identity")
-    actions["maintain"].add_argument("--mode", choices=["automatic", "manual"], default="manual",
-                                    help="Both modes reserve one coordinator recovery seat; direct maintenance defaults to manual")
-    actions["maintain"].add_argument("--available-subagents", type=int,
-                                    help="Host raw free subagent seats, excluding the main agent and before business reserve")
+    actions["maintain"].add_argument("--attempt", help="Attempt ID for an already-started coordinator")
     actions["maintain"].add_argument("--timeout", type=float, default=600, help="Candidate embedding timeout")
     actions["stage"].add_argument("--receipt", required=True, help="Original fixed maintenance receipt")
     actions["stage"].add_argument("--control", required=True, help="The original maintenance control file")
@@ -125,7 +135,7 @@ def register_commands(subparsers):
     actions["rank"].add_argument("--input", required=True, help="Read candidates with agent scores")
     actions["rank"].add_argument("--budget", type=int, default=6000, help="Returned text character budget")
     for name, command in actions.items():
-        if name in ("prompt", "retrieval-dispatch", "retrieval-prompt"):
+        if name in ("collect-prompt", "prompt", "retrieval-dispatch", "retrieval-prompt"):
             command.set_defaults(output=None)
         else:
             command.add_argument("--output", help=("New frozen batch path (requires --completed)" if name == "publish"
@@ -141,7 +151,8 @@ def dispatch(args, config):
         return dispatch_wave(config, args), 0
     if action == "maintain":
         from .owner import acquire, release_failed_startup
-        claim = acquire(config.memory_dir, config.raw["memory"]["project_id"], args.holder, args.control)
+        claim = acquire(config.memory_dir, config.raw["memory"]["project_id"], args.holder, args.control,
+                        attempt_id=args.attempt)
         if not claim["acquired"]:
             if args.output:
                 path = Path(args.output).resolve()
@@ -169,8 +180,9 @@ def dispatch(args, config):
     if action == "guide":
         result = {"skill": str(Path(__file__).with_name("SKILL.md"))}
     elif action == "stop":
-        from .owner import stop_owned
-        result = {"stopped": True, "owner": stop_owned(config.memory_dir, args.control)}
+        from .owner import cancel_attempt, stop_owned
+        result = (cancel_attempt(config.memory_dir, args.attempt) if args.attempt is not None else
+                  {"stopped": True, "owner": stop_owned(config.memory_dir, args.control)})
     elif action == "owner":
         from .owner import status
         result = {"owner": status(config.memory_dir)}
@@ -201,9 +213,19 @@ def dispatch(args, config):
         render = retrieval_dispatch if action == "retrieval-dispatch" else render_retrieval_prompt
         result = render(config, args.request, slot=args.slot,
                         available_subagents=args.available_subagents, level=args.level)
+    elif action == "maintain-start":
+        from .prompts import maintenance_start
+        result = maintenance_start(config, holder=args.holder, mode=args.mode,
+                                   available_subagents=args.available_subagents, scope=args.scope,
+                                   collection=args.collection, retained=args.retained,
+                                   allow_retained=args.allow_retained)
+    elif action == "collect-prompt":
+        from .prompts import render_collection_prompt
+        result = render_collection_prompt(config, args.attempt)
     elif action == "collect":
         from .collection import collect
-        result = collect(config, args.codex_registry, output=args.output)
+        options = {"attempt_id": args.attempt} if args.attempt is not None else {}
+        result = collect(config, args.codex_registry, output=args.output, **options)
         return ({"output": result["receipt"], "status": result["status"]} if args.output else result), 0
     elif action == "retrieval-receipt":
         from .retrieval import make_delivery_receipt
@@ -334,8 +356,12 @@ def _maintain(config, args, claim):
                          if any(not prefix or row["path"] == prefix or row["path"].startswith(prefix + "/")
                                 for prefix in prefixes)] if args.scope else [])
     scope = list(dict.fromkeys([*discovered_paths, *captured_paths, *registered_paths]))
+    selected_captures = set(captured_paths)
+    expected_snapshots = {item["path"]: item["sha256"] for item in codex.get("snapshots", ())
+                          if item["path"] in selected_captures}
+    options = {"expected_snapshots": expected_snapshots} if expected_snapshots else {}
     result = memory.maintain(scope, control=control, timeout=args.timeout,
-                             include_registered=args.scope is None)
+                             include_registered=args.scope is None, **options)
     layout = maintenance_layout(config, mode=args.mode, available_subagents=args.available_subagents,
                                 work_items=max(result["semantic_sources"], result["pending_relations"],
                                                result["feedback"]),

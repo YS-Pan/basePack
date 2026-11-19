@@ -82,12 +82,20 @@ def _files(path: Path):
         yield path
 
 
-def read_source(root: str | Path, path: str) -> SourceContent:
+def _check_collection_revision(path: str, expected: str | None, observed: str | None) -> None:
+    if expected is not None and expected != observed:
+        raise ValueError(f"Collection snapshot changed during maintenance preflight: {path} "
+                         f"(expected {expected}, observed {observed or 'missing'})")
+
+
+def read_source(root: str | Path, path: str, *, expected_revision: str | None = None) -> SourceContent:
     """Hash original bytes and decode UTF-8 without converting line endings."""
     root = Path(root).resolve()
     target = _project_path(root, path)
     data, stat = _read_bytes(target)
-    return SourceContent(target.relative_to(root).as_posix(), sha256(data).hexdigest(),
+    revision = sha256(data).hexdigest()
+    _check_collection_revision(path, expected_revision, revision)
+    return SourceContent(target.relative_to(root).as_posix(), revision,
                          stat.st_size, stat.st_mtime_ns, data.decode("utf-8"))
 
 
@@ -244,12 +252,13 @@ def locate_lines(before: str, after: str, start_line: int, end_line: int, *,
 
 
 def detect_changes(root: str | Path, sources: Iterable[Mapping], scope: Iterable[str],
-                   *, deep: bool = False) -> list[SourceChange]:
-    """Inspect explicit files/directories; fast mode reads only directory metadata.
+                   *, deep: bool = False, expected_snapshots: Mapping[str, str] | None = None) -> list[SourceChange]:
+    """Inspect explicit files/directories, checking any scoped collection revisions.
 
     Stored sources have path/revision/size/mtime_ns keys. A modified result means
     metadata or content changed; deep mode supplies its actual revision so a
-    metadata-only change can reuse knowledge. No original or database is written.
+    metadata-only change can reuse knowledge. Fast mode reads only metadata for
+    files without an expected collection revision.
     """
     root = Path(root).resolve()
     scopes = [_project_path(root, path) for path in scope]
@@ -269,16 +278,24 @@ def detect_changes(root: str | Path, sources: Iterable[Mapping], scope: Iterable
         target = _project_path(root, relative)
         if relative not in current and target.is_file():
             current[relative] = target
+    expected_snapshots = expected_snapshots or {}
     changes = []
-    for relative in sorted(known.keys() | current.keys()):
+    for relative in sorted(known.keys() | current.keys() | expected_snapshots.keys()):
+        expected_revision = expected_snapshots.get(relative)
         if relative not in current:
+            _check_collection_revision(relative, expected_revision, None)
             changes.append(SourceChange(relative, "deleted"))
             continue
         path = current[relative]
         revision = None
-        if deep:
-            data, stat = _read_bytes(path)
+        if deep or expected_revision is not None:
+            try:
+                data, stat = _read_bytes(path)
+            except FileNotFoundError:
+                _check_collection_revision(relative, expected_revision, None)
+                raise
             revision = sha256(data).hexdigest()
+            _check_collection_revision(relative, expected_revision, revision)
         else:
             stat = path.stat()
         previous = known.get(relative)

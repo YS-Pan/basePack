@@ -63,7 +63,7 @@ def check(path):
     begin_commit(path)
 
 
-def maintain(memory, scope, *, include_registered=False, control=None, timeout=600):
+def maintain(memory, scope, *, include_registered=False, control=None, timeout=600, expected_snapshots=None):
     """Refresh mechanically equivalent originals and retain a semantic handoff.
 
     This is an explicit maintenance action. Query actions never call it.
@@ -92,11 +92,15 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
         return any(candidate == prefix or candidate.is_relative_to(prefix) for prefix in selected)
     by_path = {path: row for path, row in all_by_path.items() if include_registered or in_scope(path)}
     included = list(dict.fromkeys([*scope, *by_path]))
-    changes = memory._check_changes(list(by_path.values()), included, deep=True)
+    expected_snapshots = expected_snapshots or {}
+    changes = memory._check_changes(list(by_path.values()), included, deep=True, expected_snapshots=expected_snapshots)
     members = memory._rows('member')
     nodes = memory._rows('node')
     edges = memory._rows('semantic')
     snapshots = {}
+
+    def load_source(path, kind):
+        return memory._load_source(path, kind, expected_revision=expected_snapshots.get(path))
 
     def snapshot(version):
         if version not in snapshots:
@@ -135,7 +139,7 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
         if change['kind'] not in {'added', 'modified'}:
             continue
         previous = by_path.get(path)
-        current = memory._load_source(path, previous.get('kind') if previous else None)
+        current = load_source(path, previous.get('kind') if previous else None)
         if (previous and change.get('privacy_changed') and previous['revision'] == current.revision
                 and not source_private(path, privacy_rules(memory.config)['private_scope'])
                 and snapshot(previous['version']).get('private') is not False
@@ -247,7 +251,7 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
                     closed = False
                     continue
                 try:
-                    original = memory._load_source(evidence['path'], evidence['kind'])
+                    original = load_source(evidence['path'], evidence['kind'])
                 except FileNotFoundError:
                     closed = False
                     continue
@@ -282,7 +286,7 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
     def current_source(path, kind):
         if path not in current_sources:
             try:
-                current_sources[path] = memory._load_source(path, kind)
+                current_sources[path] = load_source(path, kind)
             except FileNotFoundError:
                 current_sources[path] = None
         return current_sources[path]

@@ -43,8 +43,17 @@ def test_disabled_enabled_refresh_is_idempotent_and_links_are_reachable(tmp_path
     for _ in range(2):
         refresh(config)
         assert [path.read_bytes() for path in (agents, config.root / ".basepack/instructions.md")] == expected
-    assert "needs_semantic=true" in agents.read_text(encoding="utf-8")
-    assert "memory brief" in agents.read_text(encoding="utf-8")
+    agents_text = agents.read_text(encoding="utf-8")
+    assert "memory brief" in agents_text
+    assert "memory maintain-start --mode automatic" in agents_text
+    details = (config.root / ".basepack/instructions.md").read_text(encoding="utf-8")
+    automatic = details.split('<a id="maintenance"></a>', 1)[1].split('<a id="dispatch"></a>', 1)[0]
+    manual = details.split('<a id="explicit-maintenance"></a>', 1)[1].split('<a id="feedback"></a>', 1)[0]
+    assert "--mode automatic" in automatic
+    assert "--mode manual" in manual and "(#dispatch)" in manual
+    assert "memory maintain-start --holder <thread> --mode automatic|manual" in details
+    assert details.count("memory collect-prompt --attempt <id>") == 1
+    assert "memory stop --attempt <自有attempt_id>" in details
 
 
 def test_refresh_preserves_all_bytes_outside_each_managed_block(tmp_path):

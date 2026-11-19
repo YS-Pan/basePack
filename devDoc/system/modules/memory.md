@@ -50,7 +50,7 @@ maintain默认从项目Git清单加source_scope发现原件，并加入根`priva
 
 协调者第二turn按汇总固定引用、覆盖和异常编译／唯一发布，正常不逐稿全文复读或增加语义审计；固定publication结果后即FINAL，不等通知ack。原父任务核协调者FINAL及最后reader的ack／宿主终态后机械wave close。通知结果未知保留pending与owner；notification-recover仅按通知者已结束及已核宿主证据补记，不重发followup。已确认publisher终态、无提交且无在途publication时，publication-failed固定原错并终止旧intent，未发稿留有限修复波；未知提交保留原intent/frozen/owner核实。
 
-主任务约十分钟以内保留brief并跳过整个自动maintain；长任务在宿主支持生命周期时并行启动，子任务不递归维护，显式维护不受门槛限制。owner在预检前原子取得，冲突报告原持有者；结束stop、取消自有后代，核发布终态后release。领取、通知处理和发布均核owner/control/wave及stop；已在途followup可能迟唤醒，第二turn先核停止并拒绝发布。异常worker、全体消失或残留claimed由原父据宿主事实恢复，不超时抢回。HTTP查询和反馈不要求owner；CLI apply使用自有control，Python apply省略时仅在空闲项目取得短期owner。控制不终止共享服务或已开始推理。语义派工前失败，仅本进程自有且确认无派工／在途／未明发布时才stop/release，清理错误与原错一并保留；独立采集失败与此链分开，他人owner及未明状态保持。
+主任务约十分钟以内保留brief并跳过自动维护，显式维护不受该门槛限制。宿主支持实际派工和停止时，原父运行`maintain-start`生成尝试ID、control及固定协调者身份，再实际派出协调者。协调者首turn按英文生成提示采集、选源和预检，在采集完成后用原父holder/control申领owner，且只在有语义余项及容量时初始化reader。原父用`stop --attempt`登记取消，既可停止自有owner，也可阻断尚未申领的尝试；标记与申领使用同一项目锁。原父随后取消实际调用和后代，核宿主及发布终态后release，保留未明状态。领取、回调和发布核owner/control/wave及停止状态。直接`maintain`、`stop --control`和已有发布恢复沿原合同执行。
 
 固定候选中的来源组由reader负责理解、关系及普通修复，共享图写目标唯一归属；保留mandatory、覆盖、gaps、feedback和实际接受版本。同稿FINAL不重复处理，改稿用新path/hash。接受后新增变化和回执外来源留下一有限范围；执行回执不证明语义接受、全范围完成或最终磁盘fresh。[stages.py](../../../experiments/20261106-basepack/src/basepack/memory/stages.py)只接受finite-wave-v1，在当前wave已closed后核handoff.wave_id、完整scope分割、固定稿／发布结果引用及本run全部实际启动worker（含历史wave）及本阶段publisher的ended句柄，沿原owner/control返回干净新协调者与剩余范围。详见[有限wave设计](../../tasks/20261115-real-use-rectification/maintenance-waves.md)及[产品流程](../../../experiments/20261106-basepack/docs/memory.md#有限任务池与两段式-terra)。
 
@@ -88,6 +88,6 @@ make_delivery_receipt在context.access_observations逐条保留base、behavior�
 
 ## Codex 来源边界
 
-`collect`读取宿主提供的项目ID和完整注册根或配置绑定；缺少绑定明确报告binding_unavailable，文件维护不依赖成功采集。采集通过Codex App Server受支持的线程与消息分页，显式项目ID优先；缺ID时以根目录及Git worktree/common-dir判断归属，其他注册根冲突或无cwd留待核。采集回执及framed原件保存身份和观察边界；maintain明确选择成功collection回执或retained，语义回执/reader提示交接项目ID、采集信息及保留目录。受管UTF-8文件沿同一来源版本维护，采集不等于语义接受；历史来源、附件、继承身份与精确回源按实际能力及验收报告。查询不触发采集。
+`collect`依据完整注册根和宿主项目ID采集，显式清单须与已有项目ID一致。协调者按`collect-prompt`在受影响的Windows Codex和具备Auto-review时仅提请审查单次采集。等待审批时本轮不持有owner或采集锁；命令真正执行后，同项目实际采集与回执写入串行。回执哈希来自本轮导出的原件字节，maintain加载及预检实际读取时核对相应版本。显式保留原件的路径仍用`--retained`，允许采集失败后回退由原父通过`--allow-retained`交接。线程归属、framed原件、附件、逐聊天截点及下游接受沿既有合同。查询不触发采集。
 
 `memory freshness` 只读项目归属、分页、采集回执及原文比较，不取 owner、不写原件或发布；按相关候选和用户点名聊天补读，跨项目引用用宿主读取。最新捕获及可关联预检提供线索，预检 pending 为历史快照，不是当前语义状态；回执时间、端点及 updatedAt 不能单独证明全局正文覆盖。输出保留未摄入、待语义、补读及未知。

@@ -21,6 +21,121 @@ def test_concurrent_claims_keep_real_holder_and_preserve_control(tmp_path):
     assert Path(winner["control"]).exists()
 
 
+def test_cancel_attempt_before_claim_does_not_create_control(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    memory_dir = Path("memory")
+    attempt_id = "a" * 32
+    control = owner.attempt_control(memory_dir, attempt_id)
+    assert control == tmp_path / "memory" / "maintenance" / f"{attempt_id}.control"
+    owner.check_attempt(memory_dir, attempt_id)
+    assert not control.parent.exists()
+
+    result = owner.cancel_attempt(memory_dir, attempt_id)
+    assert result == {"stopped": True, "attempt_id": attempt_id, "owner": None}
+    assert owner.cancel_attempt(memory_dir, attempt_id) == result
+    with pytest.raises(MaintenanceStopped):
+        owner.check_attempt(memory_dir, attempt_id)
+    with pytest.raises(MaintenanceStopped):
+        owner.acquire(memory_dir, "project", "parent", control, attempt_id=attempt_id)
+    assert owner.status(memory_dir) is None
+    assert not control.exists()
+
+
+@pytest.mark.parametrize("attempt_id", ["../owner", "A" * 32, "a" * 31, "a" * 32 + "\n"])
+def test_attempt_control_rejects_invalid_id(tmp_path, attempt_id):
+    with pytest.raises(ValueError, match="32 lowercase hex"):
+        owner.attempt_control(tmp_path, attempt_id)
+
+
+def test_attempt_claim_rejects_wrong_control(tmp_path):
+    with pytest.raises(ValueError, match="control must match"):
+        owner.acquire(tmp_path, "project", "parent", tmp_path / "foreign", attempt_id="a" * 32)
+    assert not (tmp_path / "maintenance").exists()
+
+
+def test_cancel_attempt_after_claim_preserves_inflight_publication(tmp_path):
+    attempt_id = "a" * 32
+    control = owner.attempt_control(tmp_path, attempt_id)
+    claimed = owner.acquire(tmp_path, "project", "parent", control, attempt_id=attempt_id)["owner"]
+    assert claimed["run_id"] == attempt_id
+    assert claimed["control"] == str(control)
+    owner.check_attempt(tmp_path, attempt_id)
+    publication = owner.begin_publication(tmp_path, control)
+
+    result = owner.cancel_attempt(tmp_path, attempt_id)
+    assert result["owner"] == {**claimed, "stopped": True, "publications": [publication]}
+    assert owner.cancel_attempt(tmp_path, attempt_id) == result
+    assert control.read_bytes() == b"S"
+    with pytest.raises(MaintenanceStopped):
+        owner.check_owned(tmp_path, control)
+    with pytest.raises(RuntimeError, match="uncertain"):
+        owner.release(tmp_path, control)
+    owner.finish_publication(tmp_path, control, publication)
+    owner.release(tmp_path, control)
+    assert owner.cancel_attempt(tmp_path, attempt_id)["owner"] is None
+    with pytest.raises(MaintenanceStopped):
+        owner.check_attempt(tmp_path, attempt_id)
+
+
+def test_attempt_cancellation_denies_admission_if_control_stop_fails(tmp_path, monkeypatch):
+    from basepack.memory import waves
+
+    attempt_id = "a" * 32
+    control = owner.attempt_control(tmp_path, attempt_id)
+    owner.acquire(tmp_path, "project", "parent", control, attempt_id=attempt_id)
+
+    def fail_stop(_):
+        raise TimeoutError("Control is busy")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(owner, "stop", fail_stop)
+        with pytest.raises(TimeoutError, match="Control is busy"):
+            owner.cancel_attempt(tmp_path, attempt_id)
+    assert control.read_bytes() == b""
+    assert not owner.status(tmp_path)["stopped"]
+    with pytest.raises(MaintenanceStopped):
+        owner.check_attempt(tmp_path, attempt_id)
+    with pytest.raises(MaintenanceStopped):
+        owner.check_owned(tmp_path, control)
+    with pytest.raises(MaintenanceStopped):
+        owner.begin_publication(tmp_path, control)
+    with pytest.raises(MaintenanceStopped):
+        owner.save_stage(tmp_path, control, {"owner_run_id": attempt_id}, tmp_path / "stage.json")
+    with pytest.raises(MaintenanceStopped):
+        waves.inspect(tmp_path, control, attempt_id, "wave")
+    assert owner.cancel_attempt(tmp_path, attempt_id)["owner"]["stopped"]
+    owner.release(tmp_path, control)
+
+
+def test_competing_attempts_cancel_only_the_requested_attempt(tmp_path):
+    def claim(attempt_id):
+        control = owner.attempt_control(tmp_path, attempt_id)
+        return owner.acquire(tmp_path, "project", attempt_id, control, attempt_id=attempt_id)
+
+    attempt_ids = ("a" * 32, "b" * 32)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = dict(zip(attempt_ids, pool.map(claim, attempt_ids)))
+    assert sum(result["acquired"] for result in results.values()) == 1
+    loser = next(attempt_id for attempt_id in attempt_ids if not results[attempt_id]["acquired"])
+    live_owner = owner.status(tmp_path)
+    assert results[loser]["owner"] == live_owner
+    assert owner.cancel_attempt(tmp_path, loser)["owner"] is None
+    with pytest.raises(MaintenanceStopped):
+        claim(loser)
+    assert owner.status(tmp_path) == live_owner
+    assert not owner.attempt_control(tmp_path, loser).exists()
+    owner.check_owned(tmp_path, owner.attempt_control(tmp_path, live_owner["run_id"]))
+
+
+def test_cancel_attempt_does_not_stop_legacy_owner_using_same_path(tmp_path):
+    attempt_id = "a" * 32
+    control = owner.attempt_control(tmp_path, attempt_id)
+    owner.acquire(tmp_path, "project", "legacy", control)
+    assert owner.cancel_attempt(tmp_path, attempt_id)["owner"] is None
+    assert not owner.status(tmp_path)["stopped"]
+    owner.begin_publication(tmp_path, control)
+
+
 def test_only_owner_stops_and_releases_after_publications_complete(tmp_path):
     control = tmp_path / "control"
     owner.acquire(tmp_path, "project", "thread", control)
@@ -96,7 +211,8 @@ def test_busy_cli_exits_before_store_or_preflight(tmp_path, monkeypatch):
     owner.acquire(tmp_path, "project", "first", tmp_path / "first-control")
     config = SimpleNamespace(memory_dir=tmp_path, raw={"memory": {"project_id": "project"}})
     output = tmp_path / "busy.json"
-    args = SimpleNamespace(memory_action="maintain", holder="second", control=tmp_path / "second-control", output=output)
+    args = SimpleNamespace(memory_action="maintain", holder="second", control=tmp_path / "second-control",
+                           output=output, attempt=None)
     result, code = dispatch(args, config)
     assert code == 0 and result == {"output": str(output)}
     import json
@@ -136,7 +252,7 @@ def test_preflight_failure_releases_undispatched_owner(tmp_path):
 
     config = SimpleNamespace(memory_dir=tmp_path, raw={"memory": {"project_id": "project"}})
     args = SimpleNamespace(memory_action="maintain", holder="thread", control=tmp_path / "control", output=None,
-                           mode="manual", available_subagents=None)
+                           mode="manual", available_subagents=None, attempt=None)
     with pytest.raises((AttributeError, KeyError)):
         dispatch(args, config)
     assert owner.status(tmp_path) is None

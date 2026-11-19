@@ -76,14 +76,17 @@ apply 核对来源版本，以及本批改写、退役、更正目标、实际�
 
 任务开始按生成入口取得一次 brief，同任务接续沿用。直觉预计不超过十分钟时跳过整个自动 maintain，包括预检、采集和取得 owner；明显更长时，在宿主有可取消子任务句柄及开始/完成事件的条件下，与业务并行启动一次全项目维护。范围明显扩大时重新判断，必要时首次启动，不等待计时门槛。子任务遵循委托和渲染提示词，不递归开维护。用户明确要求维护时用 `--mode manual`，不受时长门槛限制；缺少宿主生命周期能力时说明自动维护不可用，采用显式维护任务。
 
-启动时分配稳定且全新的 control。程序预检前原子取得项目所有权；每个 thread 仍可 brief、报告问题及正常业务：
+原父用自己的宿主 thread 身份启动。若已知本轮剩余 subagent 容量，传 `--available-subagents <A>`。此数扣除检索等实际占用，程序再从中预留协调者恢复席位：
 
 ```powershell
-memory collect --output '<project-root>/tmp/<run>/collection.json'
-memory maintain --mode automatic --holder '<本thread身份>' --control '<memory.data_dir>/maintenance/<全新标识>.control' --collection '<project-root>/tmp/<run>/collection.json' --output '<project-root>/tmp/<run>/summary.json'
+memory maintain-start --mode automatic --holder '<原父 thread 身份>'
 ```
 
-`memory collect` 独立保全可取得的 Codex 原件，不取得维护 owner，成功与失败各有回执。绑定 Codex 的项目维护时必须明确消费 `--collection <成功回执>` 或 `--retained`；retained 使用已有原件，当前聊天 freshness 保持未知，可在采集失败后按授权明确选择。没有绑定的纯文件项目无需该选项。加载采集回执核项目归属和原件 hash；逐聊天观察截点不等于全局不可变快照，prepare 固定实际读到的版本。采集失败保留原错，语义维护结果单独报告。
+`prepared` 返回 `attempt_id`、control、`spawn_arguments` 与收尾命令。原父保存这些值，按返回参数实际派一次协调者。遇 `busy` 报告已有 owner。遇 `capacity_unavailable` 保留语义余项，可在授权范围内使用普通 `memory maintain --available-subagents 0` 做机械维护。此时使用原父 holder、新 control 和相应来源选择，沿普通维护收尾。该路径不自动请求采集审批。
+
+绑定 Codex 的项目可传 `--collection <成功回执>` 消费已有采集，或传 `--retained` 使用已保留原件。省略两个选项时，由协调者按 `memory collect-prompt --attempt <id>` 采集新原件。本轮授权允许采集失败后继续使用已有原件时，原父传 `--allow-retained`。受影响的 Windows Codex 在宿主允许 Auto-review 时仅为独立采集命令请求一次审批。采集及等待审批期间，本次尝试不持有维护 owner。协调者随后在普通沙箱中使用原父 holder/control 执行预检。纯文件项目直接进入预检。
+
+已知普通沙箱无法采集且没有合格 Auto-review 路径时，报告采集缺口，常规维护保持非交互。命令启动前拒绝审批时记录宿主结果，启动后失败则保留原错和可取得的回执。显式维护仅在授权范围内改用保留原件，其当前聊天 freshness 保持未知。加载采集回执核项目归属和原件 hash，回执固定逐聊天观察，prepare 固定实际读到的版本。分别报告采集与语义维护结果。
 
 默认面向整个项目的受管来源，不按当前业务任务的文件缩小维护范围。Git 项目枚举项目内已跟踪和未忽略的未跟踪文件，并加入 `memory.source_scope` 显式包含项；非 Git 项目使用声明的 `source_scope`。默认发现还自动加入根 `private/` 独立 Git 的已跟踪及未忽略新文件，尊重内层忽略规则，无需逐项配置 source_scope；它们仍属同一项目 UUID、数据库与维护生命周期。不存在 `private/` 时正常完成默认发现。各范围排除 `.git/`、工具状态、环境与缓存。
 
@@ -91,7 +94,7 @@ memory maintain --mode automatic --holder '<本thread身份>' --control '<memory
 
 零行文字来源且没有活动知识时，只需登记来源，不创建无效行范围的 member。已有正文被清空时，仍须退役旧成员并处理依赖；完成后不反复派发该空来源，重新出现正文会继续发现。
 
-请求采集时先按 [Codex 绑定](setup-project.md#codex-项目聊天接入) 独立取得本次可读的持久化聊天截点；维护随后比较选定来源及旧成员实际接受版本。Git 干净仍可能有尚未接受的原文。发现清单、聊天采集、语义接受和向量覆盖分别检查，不能据其中一项声称全部项目材料已接受。`changes` 显式查看变化，`maintain` 负责机械更新与语义交接；查询不调用两者。
+采集时按 Codex 项目绑定刷新本轮可读的持久化聊天截点。维护随后比较选定来源及旧成员实际接受版本。Git 干净仍可能有尚未接受的原文。分别检查发现清单、聊天采集、语义接受和向量覆盖。`changes` 显式查看变化，`maintain` 负责机械更新与语义交接。[Codex 绑定](setup-project.md#codex-项目聊天接入)。
 
 程序在依据闭合时处理原字节 hash 相同的元数据变化、完整正文仅 CRLF/LF 变化，以及有唯一定位且上下文可确认未变的原文块；相互依赖的机械候选共同发布，无法证明依赖仍有效的范围留给语义共读。完整回执保留机械批次、旧/新行映射、变化片段、受影响成员与关系；换行归一只用于比较，快照仍按真实原字节保存。编码输入及身份未变才复用向量；实际输入变化按现有 apply 合同编码。已有 stale、更正、退役或语义证据不足的范围保留待核，局部文字相同不表示父级摘要或关系均有效。
 
@@ -101,7 +104,7 @@ memory maintain --mode automatic --holder '<本thread身份>' --control '<memory
 
 本节描述0.18系列的有限任务池维护。实际安装与验收状态见[部署合同](../../../devDoc/system/deployment.md)，接受范围与余项见[进度](../../../devDoc/tasks/20261115-real-use-rectification/progress.md)。旧组织仍须按原固定回执收口，不能把任务池协议套给旧worker。详细设计维护源为[有限任务池合同](../../../devDoc/tasks/20261115-real-use-rectification/maintenance-waves.md)；安装后以 `memory guide` 返回的随包流程和CLI生成的命令、prompt与身份执行。新入口为 `memory wave`：create不传wave-id并返回该标识，其余动作均显式传 `--control <同一control> --run-id <owner run_id> --wave-id <wave_id>`。各动作字段以 `memory wave <action> --help` 为准，reader直接执行生成prompt中的命令。
 
-1. `acquired=false` 时报告已有owner并继续业务；显式维护报告该阻塞。`acquired=true` 后保留原receipt/control和父任务stop权限。只有 `needs_semantic=true` 才按返回名称、模型和推理强度实际创建Terra；初始化成功仅表示准备了一波工作。
+1. 原父按 `maintain-start` 的派工参数启动 Terra，保留 stop 权限和实际句柄。Terra 首 turn 处理来源和预检，在预检取得 owner 且 `needs_semantic=true` 时初始化 reader 波次。无语义工作、所有权冲突或预检失败时将实际结果交原父。
 2. Terra第一turn规划有限、可独立阅读写稿的语义任务，将每项的 `id/goal/paths/write_targets/outputs` 写入tasks JSON数组，用 `memory wave create --receipt <固定receipt> --control <control> --run-id <owner run_id> --tasks <tasks.json> --coordinator <实际非根Terra规范路径> --readers <N>` 建波；长组先发，工作量差异明显的任务分组。依赖前一波新发布知识的任务留下一波。N必须在1至min(任务数,固定reader上限)内，由规划者按工作量选择较小固定池，供多轮领取，不以容量满编为目标。程序预登记worker，保留Terra第二turn恢复名额；余量不再默认补无reader协调者。
 3. Terra按create返回的 `workers[].spawn_arguments` 实际启动Luna，逐名运行 `started --worker <name> --handle <实际handle>`，失败则 `worker-failed --worker <name> --error <原错>`；全部登记后运行 `initialized`，交固定初始化回执并结束当前turn。Luna首turn先通过宿主事件等待带wave标识的go。原父任务保留全部实际句柄，确认Terra已空闲且全部成员已启动或明确失败后才运行 `memory wave seal`，并向已启动Luna发送一次go。未封口不得领取或退队，也不得提前产生最后通知；不凭等待时间推测Terra已空闲。
 4. Luna循环 `claim`→`task-prompt --task-id <id>`→原文阅读／分块／摘要／关系及普通修稿→`submit --task-id <id> --drafts <固定稿路径...> --coverage <覆盖JSON> --errors <错误JSON>`，再领取下一项；worker动作同时传 `--worker <name>`，失败提交显式加 `--failed`。作者保持稿件及hash不变，修稿另交新引用。普通Luna无任务即原子更新活动状态并正常退队，不主动唤醒Terra。
@@ -122,7 +125,9 @@ memory maintain --mode automatic --holder '<本thread身份>' --control '<memory
 
 ### 停止与恢复
 
-维护与发布沿用自有 control，独立采集不持有它。业务完成时，以本项目配置 `memory stop --control <control>`，取消协调者及后代；通过 `memory owner` 核发布状态，再 `memory release --control <同一control>`。这些命令独立于 brief，不需要数据库或密码。stop 不撤销已获准提交，release 要求已停止且无未完成/未明发布。control 是协作授权凭证，只给持有者及其 worker，不能复用或按清理习惯删除。失败保留原错与 owner，业务答复报告余项。异常遗留先独立核旧持有者/后代已结束及事务结果已解决，再显式 `memory recover-owner --run-id <id> --owner-ended --publication-resolved`；不按文件年龄抢占。此机制用于协作互斥，不隔离有文件系统访问权的对手。任务池领取、回调处理和发布还须核当前owner/control/wave及stop。停止后不得新取得回调资格；已在途宿主调用可能迟到唤醒Terra，第二turn须先核状态并拒绝发布，不能因唤醒重开维护。未启动／失败worker、残留claimed、全体异常消失和未受理通知都保留原错及owner，由原父任务据真实宿主终态恢复；不盲重试、超时抢回或只依赖最后正常退出路径。
+业务结束时，原父先运行 `memory stop --attempt <attempt_id>`，再取消自己的协调者及实际后代。普通 `maintain` 轮次改用 `memory stop --control <control>`。核实迟到的宿主调用、后代终态和发布状态，并用 `memory owner` 确认本轮取得对应 owner 后，执行 `memory release --control <同一control>`。这些命令只需项目配置。stop 阻止新的预检与发布，已获准的提交仍可继续。失败或结果未明时保留原错与 owner，业务答复报告余项。control 是协作授权凭证，只给持有者及其 worker，每轮用新路径。
+
+异常遗留先独立核旧持有者及后代已结束、事务结果已解决，再显式运行 `memory recover-owner --run-id <id> --owner-ended --publication-resolved`。任务池领取、回调处理和发布均核当前 owner/control/wave 与停止状态。若已在途的宿主调用在停止后唤醒 Terra，其第二 turn 按停止状态退出。未启动或失败的 worker、残留 claimed、全体异常消失和未受理通知保留原错及 owner，由原父据实际宿主终态恢复。
 
 通知者已实际结束且宿主结果已核实时，原父任务可用 `memory wave notification-recover --accepted --evidence <实际宿主证据> --worker-ended --host-verified` 补记结果（失败则用 `--failed`）。该动作不发送或重试followup；仍为eligible、从未尝试的通知只能记failed。未核宿主事实时继续保留pending与owner。
 

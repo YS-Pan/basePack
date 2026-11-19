@@ -61,14 +61,20 @@ class AppServer:
         self.errors.close()
 
 
-def list_threads(client, *, control=None):
+def _check_capture(control, checkpoint):
+    if checkpoint is not None:
+        checkpoint()
+    if control:
+        check(control)
+
+
+def list_threads(client, *, control=None, checkpoint=None):
     """List active and archived metadata without the server's repair scan."""
     threads = []
     for archived in (False, True):
         cursor = None
         while True:
-            if control:
-                check(control)
+            _check_capture(control, checkpoint)
             page = client.call('thread/list', {'archived': archived, 'cursor': cursor, 'limit': 100,
                                                'sourceKinds': SOURCE_KINDS, 'modelProviders': [],
                                                'useStateDbOnly': True})
@@ -79,9 +85,10 @@ def list_threads(client, *, control=None):
     return threads
 
 
-def _items(client, thread_id, control):
+def _items(client, thread_id, control, checkpoint=None):
     # Capture a persisted endpoint first, so an active conversation cannot keep
     # extending this maintenance run indefinitely.
+    _check_capture(control, checkpoint)
     last = client.call('thread/items/list', {'threadId': thread_id, 'limit': 1, 'sortDirection': 'desc'})['data']
     if not last:
         return []
@@ -90,8 +97,7 @@ def _items(client, thread_id, control):
     items = []
     seen = {}
     while True:
-        if control:
-            check(control)
+        _check_capture(control, checkpoint)
         page = client.call('thread/items/list', {'threadId': thread_id, 'cursor': cursor,
                                                  'limit': 100, 'sortDirection': 'asc'})
         for item in page['data']:
@@ -108,11 +114,12 @@ def _items(client, thread_id, control):
             raise RuntimeError(f'Codex thread {thread_id}: captured endpoint disappeared during pagination')
 
 
-def _local_image(part, memory_dir, control):
+def _local_image(part, memory_dir, control, checkpoint):
     path = Path(part['path'])
     suffix = path.suffix.lower()
     if suffix not in IMAGE_SUFFIXES:
         return None, 'unsupported_local_image_type'
+    _check_capture(control, checkpoint)
     try:
         before = path.stat()
         data = path.read_bytes()
@@ -123,27 +130,25 @@ def _local_image(part, memory_dir, control):
         raise RuntimeError(f'Codex local image changed while reading: {path}')
     digest = sha256(data).hexdigest()
     target = memory_dir / 'codex-attachments' / (digest + suffix)
+    _check_capture(control, checkpoint)
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists():
         if sha256(target.read_bytes()).hexdigest() != digest:
             raise ValueError(f'Codex attachment snapshot revision mismatch: {target}')
     else:
-        if control:
-            check(control)
         with tempfile.NamedTemporaryFile(dir=target.parent, delete=False) as temp:
             temp_path = Path(temp.name)
             try:
                 temp.write(data)
                 temp.close()
-                if control:
-                    check(control)
+                _check_capture(control, checkpoint)
                 os.replace(temp_path, target)
             finally:
                 temp_path.unlink(missing_ok=True)
     return target, None
 
 
-def _render(project_id, thread, items, memory_dir, control):
+def _render(project_id, thread, items, memory_dir, control, checkpoint=None):
     output = bytearray()
     locations, gaps, attachments = [], [], []
     referenced = set()
@@ -170,7 +175,7 @@ def _render(project_id, thread, items, memory_dir, control):
                 body = part['text'].encode('utf-8')
             elif part['type'] == 'localImage':
                 body = b''
-                target, reason = _local_image(part, memory_dir, control)
+                target, reason = _local_image(part, memory_dir, control, checkpoint)
                 if target is None:
                     meta['unavailable_part'] = part
                     gaps.append({**meta, 'reason': reason})
@@ -192,21 +197,24 @@ def _render(project_id, thread, items, memory_dir, control):
 
 
 def collect_codex(project_id, thread_ids, output_dir, *, control=None, executable='codex', client=None,
-                  project_binding=None):
+                  project_binding=None, checkpoint=None):
     """Export an explicit project-assigned thread manifest; never infer ownership.
 
-    Returns source paths, byte locations and unavailable parts. The caller owns
-    discovery, authorization of the manifest and semantic publication.
+    Returns source paths and their captured hashes, byte locations and unavailable parts.
+    The caller owns discovery, authorization of the manifest and semantic publication.
     """
     if not project_id:
         raise ValueError('A Codex project ID is required')
     ids = list(dict.fromkeys(str(UUID(thread_id)) for thread_id in thread_ids))
     output_dir = Path(output_dir).resolve()
+    _check_capture(control, checkpoint)
     output_dir.mkdir(parents=True, exist_ok=True)
     owned_client = client is None
     if owned_client:
+        _check_capture(control, checkpoint)
         client = AppServer(executable)
     results = []
+    snapshot_hashes = {}
     by_id = {}
     pending = deque((thread_id, None) for thread_id in ids)
     attempted = set()
@@ -216,8 +224,7 @@ def collect_codex(project_id, thread_ids, output_dir, *, control=None, executabl
             if thread_id in by_id or (thread_id, referrer) in attempted:
                 continue
             attempted.add((thread_id, referrer))
-            if control:
-                check(control)
+            _check_capture(control, checkpoint)
             thread = client.call('thread/read', {'threadId': thread_id, 'includeTurns': False})['thread']
             if thread['id'] != thread_id:
                 raise ValueError(f'Codex returned a different thread for {thread_id}')
@@ -242,12 +249,13 @@ def collect_codex(project_id, thread_ids, output_dir, *, control=None, executabl
                 continue
             if thread.get('projectId') not in (None, project_id):
                 raise ValueError(f'Codex thread {thread_id} belongs to another project')
-            items = _items(client, thread_id, control)
+            items = _items(client, thread_id, control, checkpoint)
             content, locations, gaps, referenced, attachments = _render(project_id, thread, items,
-                                                                         output_dir.parent, control)
+                                                                         output_dir.parent, control, checkpoint)
             for child in referenced:
                 pending.append((str(UUID(child)), thread_id))
             path = output_dir / f'{thread_id}.txt'
+            _check_capture(control, checkpoint)
             if not content and path.exists() and path.stat().st_size:
                 raise RuntimeError(f'Codex thread {thread_id}: message history became empty; existing export retained')
             if not content:
@@ -263,16 +271,17 @@ def collect_codex(project_id, thread_ids, output_dir, *, control=None, executabl
                 continue
             changed = not path.exists() or path.read_bytes() != content
             if changed:
-                if control:
-                    check(control)
                 with tempfile.NamedTemporaryFile(dir=output_dir, delete=False) as temp:
                     temp_path = Path(temp.name)
                     try:
                         temp.write(content)
                         temp.close()
+                        _check_capture(control, checkpoint)
                         os.replace(temp_path, path)
                     finally:
                         temp_path.unlink(missing_ok=True)
+            snapshot_hashes[str(path)] = sha256(content).hexdigest()
+            snapshot_hashes.update((name, Path(name).stem) for name in attachments)
             result = {'thread_id': thread_id, 'path': str(path), 'changed': changed,
                       'parent_thread_id': thread.get('parentThreadId'),
                       'forked_from_id': thread.get('forkedFromId'),
@@ -284,7 +293,5 @@ def collect_codex(project_id, thread_ids, output_dir, *, control=None, executabl
         if owned_client:
             client.close()
     return {'project_id': project_id, 'threads': results,
-            'paths': list(dict.fromkeys(path for item in results
-                                       for path in ([item['path']] if item['path'] is not None else [])
-                                       + item['attachments'])),
+            'paths': list(snapshot_hashes), 'snapshot_hashes': snapshot_hashes,
             'gaps': [gap for item in results for gap in item['gaps']]}

@@ -1,4 +1,4 @@
-"""Plan host workers and render their briefs without opening the memory store."""
+"""Plan host work and render prompts without opening the memory store."""
 
 import json
 import os
@@ -78,6 +78,84 @@ def memory_command(config, *args):
     if os.name == "nt":
         return "& " + " ".join("'" + part.replace("'", "''") + "'" for part in parts)
     return shlex.join(parts)
+
+
+def render_template(name, **values):
+    template = Path(__file__).with_name("prompts") / f"{name}.md"
+    return Template(template.read_text(encoding="utf-8")).substitute(values)
+
+
+def _collection_paths(config, attempt_id):
+    from .owner import attempt_control
+
+    control = attempt_control(config.memory_dir, attempt_id)
+    registry = config.root / "tmp" / "basepack-collection" / attempt_id / "registry.json"
+    return registry, control.with_name(f"collection-{attempt_id}.json")
+
+
+def render_collection_prompt(config, attempt_id):
+    """Render a single project collection request without executing it."""
+    registry, receipt = _collection_paths(config, attempt_id)
+    values = {
+        "root": str(config.root),
+        "registry": str(registry),
+        "receipt": str(receipt),
+        "command": memory_command(config, "collect", "--attempt", attempt_id,
+                                  "--codex-registry", registry, "--output", receipt),
+        "approval_reason": f"Run one basePack chat collection for {config.root} in the normal Windows user context. "
+                           "The Codex App Server needs to open its user state database. "
+                           "Project chat snapshots and the collection receipt stay in this project.",
+    }
+    return {"prompt": render_template("collect", **values), **values}
+
+
+def maintenance_start(config, *, holder, mode, available_subagents=None, scope=None, collection=None,
+                      retained=False, allow_retained=False):
+    """Prepare one early coordinator and a stop handle; ownership starts at preflight."""
+    from .owner import attempt_control, status
+
+    current_owner = status(config.memory_dir)
+    if current_owner is not None:
+        return {"status": "busy", "owner": current_owner}
+    attempt_id = uuid4().hex
+    layout = maintenance_layout(config, mode=mode, available_subagents=available_subagents,
+                                work_items=1, run_id=attempt_id)
+    if not layout["teams"]:
+        return {"status": "capacity_unavailable",
+                "reason": "A coordinator, a reader and a recovery seat are needed to launch delegated maintenance."}
+    team = layout["teams"][0]
+    control = attempt_control(config.memory_dir, attempt_id)
+    preflight = ["maintain", "--attempt", attempt_id, "--holder", holder, "--control", control, "--mode", mode]
+    if scope:
+        preflight.extend(["--scope", *scope])
+    if available_subagents is not None:
+        preflight.extend(["--available-subagents", available_subagents])
+    capture = not collection and not retained and bool(config.raw["memory"].get("codex", {}).get("project_id"))
+    if collection:
+        preflight.extend(["--collection", Path(collection).resolve()])
+    elif retained:
+        preflight.append("--retained")
+    if capture:
+        _, receipt = _collection_paths(config, attempt_id)
+        fallback = "If fresh capture is unavailable, report the gap and leave maintenance pending."
+        if allow_retained:
+            retained_command = memory_command(config, *preflight, "--retained")
+            fallback = ("If fresh capture is unavailable, the parent has authorized retained originals. Report current chat "
+                        f"freshness as unknown and run this in the normal project sandbox:\n\n```text\n{retained_command}\n```")
+        source_step = render_template("maintenance-collection",
+            collect_prompt=memory_command(config, "collect-prompt", "--attempt", attempt_id),
+            captured_command=memory_command(config, *preflight, "--collection", receipt),
+            fallback=fallback)
+    else:
+        source_step = f"Run this preflight command in the normal project sandbox:\n\n```text\n{memory_command(config, *preflight)}\n```"
+    ai = team["coordinator_ai"]
+    message = render_template("maintenance-start", root=str(config.root), holder=holder,
+                              attempt_id=attempt_id, task_name=team["task_name"], source_step=source_step)
+    return {"status": "prepared", "attempt_id": attempt_id, "control": str(control),
+            "spawn_arguments": {"task_name": team["task_name"], "fork_turns": "none", "model": ai["model"],
+                                "reasoning_effort": ai["reasoning_effort"], "message": message},
+            "stop_command": memory_command(config, "stop", "--attempt", attempt_id),
+            "release_command": memory_command(config, "release", "--control", control)}
 
 
 def prompt_dispatch(config, receipt, control, *, role="coordinator", level=None, paths=None,
@@ -162,8 +240,6 @@ def render_prompt(config, receipt, control, *, role="coordinator", level=None, p
         if not dispatch["publisher"]:
             stage_context.pop("remaining")
             stage_context["assigned_paths"] = paths
-    template_role = role
-    template = Template((Path(__file__).with_name("prompts") / f"{template_role}.md").read_text(encoding="utf-8"))
     work = config.root / "tmp" / "basepack-maintenance" / receipt_path.stem / uuid4().hex
     reading, batch = work / "reading.json", work / "batch.json"
     wave_create = ["wave", "create", "--receipt", str(receipt_path), "--control", str(Path(control).resolve()),
@@ -222,4 +298,4 @@ def render_prompt(config, receipt, control, *, role="coordinator", level=None, p
         "effort": dispatch["reasoning_effort"],
         "level": dispatch["level"],
     }
-    return {"prompt": template.substitute(values), "stage_context": stage_context, **dispatch}
+    return {"prompt": render_template(role, **values), "stage_context": stage_context, **dispatch}

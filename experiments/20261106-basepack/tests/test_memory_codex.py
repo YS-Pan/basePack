@@ -65,6 +65,7 @@ def test_export_pages_and_round_trip_without_text_deduplication(tmp_path):
     assert data[2][0]['unavailable_part']['fileId'] == 'unavailable'
     assert len(thread['gaps']) == 1
     raw = Path(thread['path']).read_bytes()
+    assert result['snapshot_hashes'] == {thread['path']: sha256(raw).hexdigest()}
     assert all(raw[loc['byte_start']:loc['byte_end']].decode('utf-8') == body
                for loc, (_, body) in zip(thread['locations'], data))
     assert not collect_codex('project', [THREAD], tmp_path, client=client)['threads'][0]['changed']
@@ -80,6 +81,22 @@ def test_wrong_project_and_stop_do_not_replace_source(tmp_path):
     with pytest.raises(MaintenanceStopped):
         collect_codex('project', [THREAD], tmp_path, client=client, control=control)
     assert not list(tmp_path.glob('*.txt'))
+
+
+def test_stop_between_thread_read_and_endpoint_read_preserves_source(tmp_path):
+    control = tmp_path / 'control'
+    path = tmp_path / f'{THREAD}.txt'
+    path.write_bytes(b'previous')
+
+    class StopAfterThreadRead:
+        def call(self, method, params):
+            assert method == 'thread/read'
+            stop(control)
+            return {'thread': {'id': THREAD}}
+
+    with pytest.raises(MaintenanceStopped):
+        collect_codex('project', [THREAD], tmp_path, client=StopAfterThreadRead(), control=control)
+    assert path.read_bytes() == b'previous'
 
 
 def test_missing_captured_endpoint_is_error(tmp_path):
@@ -178,6 +195,7 @@ def test_local_image_is_content_addressed_and_old_version_is_retained(tmp_path):
     assert len(first['paths']) == 2 and not first['gaps']
     old = Path(first['threads'][0]['attachments'][0])
     assert old.name == sha256(old_bytes).hexdigest() + '.png'
+    assert first['snapshot_hashes'][str(old)] == sha256(old_bytes).hexdigest()
     assert old.read_bytes() == old_bytes
     header, _ = records(first['threads'][0]['path'])[0]
     assert header['managed_attachment'] == f'codex-attachments/{old.name}'
@@ -185,6 +203,7 @@ def test_local_image_is_content_addressed_and_old_version_is_retained(tmp_path):
     second = collect_codex('project', [THREAD], output, client=client)
     new = Path(second['threads'][0]['attachments'][0])
     assert new.name == sha256(new_bytes).hexdigest() + '.png'
+    assert second['snapshot_hashes'][str(new)] == sha256(new_bytes).hexdigest()
     assert old.read_bytes() == old_bytes and new.read_bytes() == new_bytes
     image.unlink()
     missing = collect_codex('project', [THREAD], output, client=client)

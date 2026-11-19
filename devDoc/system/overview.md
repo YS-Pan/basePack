@@ -14,7 +14,7 @@
 
 `memory publish` CLI与Python helper共用完成稿hash核对、freeze/validate、固定稿保存和原apply这一条组合链；数据库batch receipt仍是权威，本地result为详细投影。固定稿接续保持原batch_id与UUID，真实修稿才生成新path/hash后重新freeze。其余准备和条件组合沿既有原子工具／普通Python，合组、拆组、共读与返工仍由agent判断，宿主负责实际派工及生命周期；见[发布合同](../../experiments/20261106-basepack/docs/memory.md#最小闭环示例)。
 
-memory init绑定原UUID并刷新AGENTS关键动作与本机详细入口，固定Python、显式配置和原凭据文件。独立`memory collect`保全聊天并给出采集截点、hash及缺口；已绑定Codex的maintain明确消费`--collection`回执或`--retained`已有原件，采集失败不替代语义维护结果。回执加载核hash，prepare固定本批实际版本，不声明全项目不可变快照。默认全项目接续，显式scope实际限制新发现、已登记及删除来源。主任务预计约十分钟以内保留brief并跳过整个自动维护；长任务maintain取得单owner并行业务。有限wave中，协调者首turn规划独立语义任务，固定reader池原子领取和提交，父任务确认协调者空闲后封口并发送一次go。最后正常退队者按唯一回执实际恢复同一协调者，第二turn编译并唯一发布。容量只作上限，须保留协调者恢复名额；正常不逐稿全文重读或追加审计。任务池执行、发布接受和维护完成分开，父任务核真实宿主通知结果后机械关闭wave。发布仍用原生WebSocket事务分消息保留整源。结束stop、取消后代，确认发布结束才release；未知结果保留owner。详见[记忆模块](modules/memory.md)。
+memory init绑定原UUID并刷新AGENTS和本机入口。主任务预计约十分钟以内保留brief并跳过自动维护；长任务经`maintain-start`实际派出唯一协调者并继续业务。协调者首turn独立采集或选择现有来源，再用原父holder/control申领owner并预检。有语义任务时，同一协调者初始化有限reader池，原父核协调者空闲后封口并发送go。最后正常退队者恢复同一协调者，第二turn编译并唯一发布。容量保留协调者恢复席。父任务可在采集和审批期间取消尝试，结束时核宿主及发布终态后释放自有owner。默认全项目接续，显式scope限制维护工作集。详见[记忆模块](modules/memory.md)。
 
 CLI检索默认读memory.search_mode，新项目为vector；hybrid/vector按相同语义身份查询，缺模型或兼容向量明确失败。CLI和Python返回`{matches, vector_coverage}`；采集、语义接受与向量覆盖分别报告，结果保留观察knowledge_revision供反馈。独立检索由[retrieval.py](../../experiments/20261106-basepack/src/basepack/memory/retrieval.py)统一请求、工作目录与派工身份，每个请求加slot区分worker；零席位由主agent执行完整流程，不要求维护owner。guide/rank不需配置；owner/stop/release/recover-owner不连库；memory prompt渲染唯一协调者；memory wave worker-prompt/task-prompt只读本地wave与固定任务，检索渲染只读配置和请求，均不连库或模型。doctor默认core，模型及Condor显式选查。
 
