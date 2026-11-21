@@ -108,6 +108,7 @@ def test_ambiguous_resolution_retains_publication(memory, monkeypatch, error_typ
 
 def test_feedback_cli_dispatch(monkeypatch):
     import argparse
+    from types import SimpleNamespace
     from basepack.memory.cli import dispatch, register_commands
     parser = argparse.ArgumentParser()
     register_commands(parser.add_subparsers(dest="command"))
@@ -117,7 +118,7 @@ def test_feedback_cli_dispatch(monkeypatch):
     monkeypatch.setattr(feedback, "report", lambda memory, **kw: calls.append((memory, kw)) or {"ok": True})
     args = parser.parse_args(["memory", "feedback-report", "--kind", "retrieval", "--issue", "miss",
                               "--query", "example"])
-    assert dispatch(args, None) == ({"ok": True}, 0)
+    assert dispatch(args, SimpleNamespace(raw={})) == ({"ok": True}, 0)
     assert calls[0][0] is sentinel and calls[0][1]["query"] == "example"
     with pytest.raises(SystemExit):
         parser.parse_args(["memory", "feedback-resolve", "feedback:1", "--outcome", "fixed", "--result", "done"])

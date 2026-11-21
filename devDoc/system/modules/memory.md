@@ -90,4 +90,4 @@ make_delivery_receipt在context.access_observations逐条保留base、behavior�
 
 `collect`依据完整注册根和宿主项目ID采集，显式清单须与已有项目ID一致。协调者按`collect-prompt`在受影响的Windows Codex和具备Auto-review时仅提请审查单次采集。等待审批时本轮不持有owner或采集锁；命令真正执行后，同项目实际采集与回执写入串行。回执哈希来自本轮导出的原件字节，maintain加载及预检实际读取时核对相应版本。显式保留原件的路径仍用`--retained`，允许采集失败后回退由原父通过`--allow-retained`交接。线程归属、framed原件、附件、逐聊天截点及下游接受沿既有合同。查询不触发采集。
 
-`memory freshness` 只读项目归属、分页、采集回执及原文比较，不取 owner、不写原件或发布；按相关候选和用户点名聊天补读，跨项目引用用宿主读取。最新捕获及可关联预检提供线索，预检 pending 为历史快照，不是当前语义状态；回执时间、端点及 updatedAt 不能单独证明全局正文覆盖。输出保留未摄入、待语义、补读及未知。
+`memory check-codex-capture` 对照归属本项目的 Codex 聊天、采集回执及原文。按相关候选和用户点名聊天补读，跨项目引用用宿主读取。输出保留未摄入、待语义、补读及未知。预检 pending 是历史快照，指定聊天分页核对正文提供更细的覆盖依据。`memory check-file-changes --scope <路径...>` 对照磁盘与已登记的来源版本，`--deep` 校验哈希。知识发布与向量覆盖各有状态输出。

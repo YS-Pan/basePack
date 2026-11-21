@@ -25,7 +25,7 @@ Brief reads mandatory information, bounded cross-source overview entries and exp
 | Ordinary heavy jobs | HTCondor single-machine pool and site capacity configuration; [administrator guide](docs/administrator.md) → [job guide](docs/resources.md) |
 | Independent skills | [Installation and discovery](docs/setup-project.md#独立-skills-安装与发现); general skills need no Python, database, or model |
 
-Text/image embedding reuses a persistent Qwen3-VL-Embedding-2B service. Its automatic device choice prefers available CUDA, otherwise CPU. CUDA explicitly uses cuDNN attention; the per-item limit is 32768 actual tokens including templates, instructions and image tokens, with no truncation or separate text-byte ceiling. `gpu_memory_mib` is an adjustable soft target (template example: 9216 MiB); text starts at batch 4 and requests containing images use batch 1. Legal inputs may still fail with the original resource error. See the [resource contract](docs/resources.md#共享-embedding).
+Text/image embedding reuses a shared Qwen3-VL-Embedding-2B service. Automatic device selection prefers CUDA, which uses cuDNN attention, and falls back to CPU when CUDA is unavailable. The per-item limit is 32768 actual tokens including templates, instructions and image tokens. Inputs exceeding the token limit are rejected before inference. `gpu_memory_mib` is an adjustable soft target, with 9216 MiB in the template. Text starts at batch 4 and requests containing images use batch 1. CUDA clears unused allocator cache after 60 seconds idle. The Windows user task stops the service after 30 minutes idle and can reload the same model on demand. See the [resource contract](docs/resources.md#共享-embedding).
 
 HTCondor queues ordinary jobs. Prepare facilities with the [administrator guide](docs/administrator.md). The setup agent obtains the effective host limit, normalized to subagents excluding the main agent and including all descendants; replace `<C>` and its source below. `$python` is the installed client's interpreter; after setup, use the actual path recorded in project instructions:
 
@@ -35,7 +35,7 @@ HTCondor queues ordinary jobs. Prepare facilities with the [administrator guide]
 & $python -m basepack --config '<absolute-project>/.basepack/config.toml' doctor
 ```
 
-Follow the [database procedure](docs/administrator.md#项目-surrealdb) to prepare one password file and start an authenticated server bound to the project's loopback IP/port. Check `/ready` in the next call. The client reads that same file automatically. Then run:
+Follow the [database procedure](docs/administrator.md#项目-surrealdb) to prepare one password file and start an authenticated server bound to loopback. Windows user tasks support a fixed port or `http://127.0.0.1:0`, with optional idle shutdown. For a managed task, `runtime start memory` waits for readiness and reports the actual address. The client reads the same password file automatically. Then run:
 
 ```powershell
 & $python -m basepack --config '<absolute-project>/.basepack/config.toml' memory init

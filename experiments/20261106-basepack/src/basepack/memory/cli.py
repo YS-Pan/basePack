@@ -1,16 +1,91 @@
 """Project memory actions; SurrealDB's own tools handle server and backup work."""
 
+import argparse
 import json
 from pathlib import Path
 
 
+_LOCAL_ACTIONS = frozenset({
+    "guide", "rank", "freeze", "stop", "owner", "release", "recover-owner",
+    "prompt", "stage", "maintain-start", "collect-prompt", "collect", "check-codex-capture",
+    "retrieve", "retrieval-dispatch", "retrieval-prompt", "retrieval-receipt",
+})
+
+_COMMAND_GROUPS = (
+    ("Everyday queries", (
+        ("brief", "Read published startup knowledge and known gaps."),
+        ("search", "Search published knowledge."),
+        ("retrieve", "Prepare a retrieval assignment for the host to launch."),
+        ("read", "Read a member and its evidence."),
+        ("knowledge", "Inspect an accepted knowledge record."),
+        ("history", "List retained knowledge versions."),
+        ("neighbors", "Follow evidence and relationships."),
+        ("guide", "Locate the installed memory guide."),
+    )),
+    ("Sources", (
+        ("check-codex-capture", "Compare active and archived project Codex chats with capture records."),
+        ("check-file-changes", "Compare selected files with registered source versions."),
+        ("sources", "List registered project sources."),
+        ("collect", "Capture Codex originals."),
+        ("prepare", "Prepare fixed source evidence and observed knowledge versions."),
+    )),
+    ("Maintenance and publication", (
+        ("maintain-start", "Prepare a coordinator assignment for the host to launch."),
+        ("maintain", "Run maintenance preflight and prepare work for the coordinator."),
+        ("publish", "Publish completed drafts or resume the same frozen batch."),
+        ("freeze", "Compile drafts into a fixed batch."),
+        ("apply", "Apply a frozen batch."),
+        ("embed", "Index current knowledge representations."),
+        ("feedback-report", "Record a knowledge or retrieval issue."),
+        ("feedback-list", "List memory feedback."),
+        ("feedback-resolve", "Record the owner's result for a feedback report."),
+    )),
+    ("Host protocol", (
+        ("wave", "Manage a host-driven finite maintenance wave."),
+        ("stage", "Prepare a maintenance handoff."),
+        ("prompt", "Render the maintenance coordinator prompt."),
+        ("collect-prompt", "Render the delegated collection prompt."),
+        ("retrieval-dispatch", "Plan execution of a prepared retrieval request."),
+        ("retrieval-prompt", "Render the retrieval worker prompt."),
+        ("retrieval-start", "Fix the base retrieval results for a request."),
+        ("retrieval-receipt", "Prepare a delivery receipt."),
+        ("rank", "Select scored results within a content budget."),
+        ("delivery", "Record host-confirmed delivery."),
+        ("access-hints", "Read access hints for observed knowledge versions."),
+        ("behavior-train", "Train the retrieval behavior model."),
+        ("behavior-compile", "Compile retrieval behavior state."),
+        ("behavior-candidates", "Expand candidates from fixed retrieval anchors."),
+    )),
+    ("Setup and recovery", (
+        ("init", "Initialize or verify project memory."),
+        ("owner", "Inspect the current maintenance owner."),
+        ("stop", "Stop a maintenance attempt or owner."),
+        ("release", "Release a stopped maintenance owner."),
+        ("recover-owner", "Recover ownership after verifying host and publication outcomes."),
+    )),
+)
+
+_ALIASES = {"check-codex-capture": ("freshness",), "check-file-changes": ("changes",)}
+
+
 def register_commands(subparsers):
-    memory = subparsers.add_parser("memory", help="Project-local multilevel memory")
-    commands = memory.add_subparsers(dest="memory_action", required=True)
-    actions = {name: commands.add_parser(name) for name in
-               ("init", "guide", "collect", "collect-prompt", "sources", "prepare", "freeze", "publish", "apply", "stop", "owner", "release", "recover-owner", "embed", "search", "read", "knowledge", "history", "neighbors", "brief", "changes", "maintain", "maintain-start", "stage", "prompt", "retrieve", "retrieval-start", "retrieval-receipt", "behavior-train", "behavior-compile", "behavior-candidates", "retrieval-dispatch", "retrieval-prompt", "freshness", "rank", "delivery", "access-hints", "feedback-report", "feedback-list", "feedback-resolve")}
+    overview = "\n\n".join(
+        f"{heading}:\n" + "\n".join(f"  {name:<21} {summary}" for name, summary in group)
+        for heading, group in _COMMAND_GROUPS
+    )
+    memory = subparsers.add_parser("memory", help="Project-local multilevel memory",
+                                  formatter_class=argparse.RawDescriptionHelpFormatter,
+                                  epilog=overview)
+    commands = memory.add_subparsers(dest="memory_action", metavar="COMMAND", required=True)
+    actions = {}
+    for _, group in _COMMAND_GROUPS:
+        for name, summary in group:
+            command = commands.add_parser(name, aliases=_ALIASES.get(name, ()), description=summary)
+            if name in _ALIASES:
+                command.set_defaults(memory_action=name)
+            actions[name] = command
     from .wave_cli import register as register_waves
-    register_waves(commands.add_parser("wave", help="Host-driven finite maintenance wave"))
+    register_waves(actions.pop("wave"))
     actions["feedback-report"].add_argument("--kind", choices=["knowledge", "retrieval"], required=True)
     actions["feedback-report"].add_argument("--issue", required=True)
     actions["feedback-report"].add_argument("--target", help="Member, node or semantic edge ID")
@@ -72,8 +147,9 @@ def register_commands(subparsers):
     actions["access-hints"].add_argument("--input", required=True, help="UTF-8 JSON array of observed {id, knowledge_revision} records")
     actions["brief"].add_argument("--task", default="", help="Task label only; brief directly reads published startup knowledge without search or embedding")
     actions["brief"].add_argument("--limit", type=int, default=6)
-    actions["changes"].add_argument("--scope", nargs="+", required=True)
-    actions["changes"].add_argument("--deep", action="store_true")
+    file_check = actions["check-file-changes"]
+    file_check.add_argument("--scope", nargs="+", required=True, help="Project-relative files or directories")
+    file_check.add_argument("--deep", action="store_true", help="Verify file content hashes")
     for name in ("maintain", "maintain-start"):
         maintain = actions[name]
         maintain.add_argument("--scope", nargs="+", help="Restrict the actual workset to these project-relative paths")
@@ -130,8 +206,9 @@ def register_commands(subparsers):
     actions["behavior-candidates"].add_argument("--input", required=True, help="Fixed original anchors and weights as JSON")
     actions["behavior-candidates"].add_argument("--limit", type=int, default=20)
     actions["behavior-candidates"].add_argument("--scope", default="")
-    actions["freshness"].add_argument("--codex-registry", help="Host project binding and complete registered roots as UTF-8 JSON")
-    actions["freshness"].add_argument("--thread", help="Read and compare one project-owned chat by ID")
+    capture_check = actions["check-codex-capture"]
+    capture_check.add_argument("--codex-registry", help="Host project binding and complete registered roots as UTF-8 JSON")
+    capture_check.add_argument("--thread", help="Read and compare the text of one project-owned chat by ID")
     actions["rank"].add_argument("--input", required=True, help="Read candidates with agent scores")
     actions["rank"].add_argument("--budget", type=int, default=6000, help="Returned text character budget")
     for name, command in actions.items():
@@ -143,25 +220,44 @@ def register_commands(subparsers):
 
 
 def dispatch(args, config):
-    from .query import load_json_file
-
     action = args.memory_action
-    if action == "wave":
-        from .wave_cli import dispatch as dispatch_wave
-        return dispatch_wave(config, args), 0
     if action == "maintain":
-        from .owner import acquire, release_failed_startup
+        return _dispatch_maintain(args, config)
+    if action in _LOCAL_ACTIONS or (action == "wave" and args.wave_action != "publish"):
+        return _dispatch(args, config)
+    from ..runtime.activity import memory_operation
+
+    with memory_operation(config):
+        return _dispatch(args, config)
+
+
+def _dispatch_maintain(args, config):
+    from ..runtime.activity import memory_operation
+    from ..runtime.recovery import managed
+    from .owner import acquire, check_attempt, release_failed_startup, status
+
+    is_managed = managed(config, "memory")
+    if is_managed:
+        if args.attempt is not None:
+            check_attempt(config.memory_dir, args.attempt)
+        current = status(config.memory_dir)
+        if current is not None:
+            return _output({"acquired": False, "owner": current}, args.output), 0
+
+    with memory_operation(config):
+        memory = None
+        if is_managed:
+            from .store import Memory
+
+            memory = Memory(config)
+            memory.verify_project()
+
         claim = acquire(config.memory_dir, config.raw["memory"]["project_id"], args.holder, args.control,
                         attempt_id=args.attempt)
         if not claim["acquired"]:
-            if args.output:
-                path = Path(args.output).resolve()
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(json.dumps(claim, ensure_ascii=False, indent=2), encoding="utf-8")
-                return {"output": str(path)}, 0
-            return claim, 0
+            return _output(claim, args.output), 0
         try:
-            result = _maintain(config, args, claim)
+            result = _maintain(config, args, claim, memory=memory)
             return _output(result, args.output), 0
         except Exception as error:
             try:
@@ -170,6 +266,15 @@ def dispatch(args, config):
                 raise ExceptionGroup("Maintenance startup and ownership cleanup failed",
                                      [error, cleanup_error]) from error
             raise
+
+
+def _dispatch(args, config):
+    from .query import load_json_file
+
+    action = args.memory_action
+    if action == "wave":
+        from .wave_cli import dispatch as dispatch_wave
+        return dispatch_wave(config, args), 0
     if action == "freeze":
         from .draft import freeze_file
         if not args.output:
@@ -231,7 +336,7 @@ def dispatch(args, config):
         from .retrieval import make_delivery_receipt
         result = make_delivery_receipt(config, args.request, load_json_file(args.ranked),
                                        load_json_file(args.candidates))
-    elif action == "freshness":
+    elif action == "check-codex-capture":
         from .freshness import inspect_codex
         result = inspect_codex(config, registry_path=args.codex_registry, thread_id=args.thread)
     elif action == "retrieve":
@@ -309,7 +414,7 @@ def dispatch(args, config):
             result = memory.record_delivery(receipt["delivery_id"], receipt["items"], context=receipt.get("context"))
         elif action == "brief":
             result = memory.brief(task=args.task, limit=args.limit)
-        elif action == "changes":
+        elif action == "check-file-changes":
             result = memory.changes(args.scope, deep=args.deep)
     return _output(result, args.output), 0
 
@@ -323,7 +428,7 @@ def _output(result, output):
     return result
 
 
-def _maintain(config, args, claim):
+def _maintain(config, args, claim, *, memory=None):
     """Consume selected originals; collection has its own outcome and no owner."""
     from .collection import load_collection, retained_snapshots
     from .discovery import discover_sources
@@ -351,7 +456,8 @@ def _maintain(config, args, claim):
                           if any(not prefix or path == prefix or path.startswith(prefix + "/") for prefix in prefixes)]
     else:
         captured_paths = codex["paths"]
-    memory = Memory(config)
+    if memory is None:
+        memory = Memory(config)
     registered_paths = ([row["path"] for row in memory.sources()
                          if any(not prefix or row["path"] == prefix or row["path"].startswith(prefix + "/")
                                 for prefix in prefixes)] if args.scope else [])
@@ -385,5 +491,8 @@ def _maintain(config, args, claim):
 
 def _activate(config):
     from basepack.project.init import refresh_project_entry
+    from basepack.runtime.recovery import managed
+
     refresh_project_entry(config.root, config.path, config.python,
-                          memory_enabled=True, memory_dir=config.memory_dir)
+                          memory_enabled=True, memory_dir=config.memory_dir,
+                          memory_managed=managed(config, "memory"))

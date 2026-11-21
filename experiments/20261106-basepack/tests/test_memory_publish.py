@@ -187,6 +187,7 @@ def test_cli_uses_the_python_helper_and_returns_compact_summary(tmp_path, monkey
     manifest = tmp_path / 'completed.json'
     manifest.write_text(json.dumps(completed), encoding='utf-8')
     memory = object()
+    config = SimpleNamespace(raw={})
     monkeypatch.setattr('basepack.memory.store.Memory', lambda config: memory)
     calls = []
     monkeypatch.setattr(publication, 'publish', lambda *args, **kwargs:
@@ -195,12 +196,12 @@ def test_cli_uses_the_python_helper_and_returns_compact_summary(tmp_path, monkey
     register_commands(parser.add_subparsers(dest='command'))
     args = parser.parse_args(['memory', 'publish', '--completed', str(manifest), '--output', 'frozen.json',
                               '--control', 'owner.control', '--result', 'result.json', '--timeout', '17'])
-    assert dispatch(args, None) == ({'batch_id': 'summary'}, 0)
+    assert dispatch(args, config) == ({'batch_id': 'summary'}, 0)
     assert calls == [((memory,), {'completed': completed, 'output': 'frozen.json', 'frozen': None,
                                  'control': 'owner.control', 'result': 'result.json', 'timeout': 17})]
     args = parser.parse_args(['memory', 'publish', '--frozen', 'frozen.json', '--control', 'owner.control',
                               '--result', 'result.json'])
-    assert dispatch(args, None) == ({'batch_id': 'summary'}, 0)
+    assert dispatch(args, config) == ({'batch_id': 'summary'}, 0)
     assert calls[-1][1]['completed'] is None and calls[-1][1]['output'] is None
 
 

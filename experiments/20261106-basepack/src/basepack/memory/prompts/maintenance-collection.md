@@ -1,4 +1,4 @@
-Run the following renderer and follow its JSON `prompt` for chat collection. Only the emitted collection command can be submitted for sandbox escalation.
+Run the following renderer and follow its JSON `prompt` for chat collection. Any approval for collection covers that emitted command only.
 
 ```text
 $collect_prompt

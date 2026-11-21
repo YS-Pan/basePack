@@ -7,7 +7,7 @@
 - 用户的新指令优先；项目战略以项目纲领为准。执行计划中的接口、目录和数字预算是工程建议。
 - 涉及目标与取舍时读 [项目纲领](devDoc/project-charter.md)；纲领仅记录用户明确表达的意图，修改正文前须获得用户同意。[原始快照](devDoc/tasks/20261106-rebuild/research/user-plan.original.md) 保留原文。
 - 了解系统实现时读 [实现概览](devDoc/system/overview.md)；跨工具建设顺序与公共交付见 [重建总览](devDoc/tasks/20261106-rebuild/plan.md) 和 [总进度](devDoc/tasks/20261106-rebuild/progress.md)。
-- 实施记忆系统时读 [计划](devDoc/tasks/20261106-memory-system/plan.md) 与 [进度](devDoc/tasks/20261106-memory-system/progress.md)；修改资源工具时读 [当前实现](devDoc/system/modules/resources.md) 与 [部署合同](devDoc/system/deployment.md)，历史交付见 [R9 结果](devDoc/archive/20261107-resource-coordination/r9-result.md)。
+- 实施记忆系统时读 [现行计划](devDoc/tasks/20261115-real-use-rectification/plan.md) 与 [进度](devDoc/tasks/20261115-real-use-rectification/progress.md)；修改资源工具时读 [当前实现](devDoc/system/modules/resources.md) 与 [部署合同](devDoc/system/deployment.md)，历史交付见 [R9 结果](devDoc/archive/20261107-resource-coordination/r9-result.md)。
 - 核实旧项目或共享设施时按主题读 [调研依据](devDoc/tasks/20261106-rebuild/research/sources.md) 和 [近期历史](devDoc/tasks/20261106-rebuild/legacy-history.md)，按需深入原证。
 - 目标仓库为 [YS-Pan/basePack](https://github.com/YS-Pan/basePack)；发布前按产品状态编写面向使用者的 README 和使用文档。
 - basePack 仍在开发，实际使用同时作为测试样本。发现使用问题时，在所属任务进度记录现象、版本、必要复现条件与处理状态，修复后补验证；无所属任务的问题先记入 [总进度](devDoc/tasks/20261106-rebuild/progress.md)。外部项目沿使用者已有记录约定，并按 [反馈格式](experiments/20261106-basepack/docs/setup-project.md#问题记录与反馈) 形成 Issue 草稿，由用户提交或明确授权 agent 提交。
@@ -43,9 +43,9 @@
 
 - 判断项目现状、剩余工作、待决策或历史要求时先完成一次跨历史检索；点名聊天直接读并沿引用核后续发布：[检索](.basepack/instructions.md#startup)。
 - 主任务开始时运行一次 `memory brief`；同任务接续沿用已有 brief，新 shell 仅初始化参数与 UTF-8。保留 mandatory，待核内容按需回源：[启动](.basepack/instructions.md#startup)。
-- 主任务直觉预计不超过十分钟时跳过整个自动维护；更长任务在宿主支持生命周期时异步运行全项目 `memory maintain --mode automatic`。范围明显扩大时重估，子任务不递归启动维护：[自动维护](.basepack/instructions.md#maintenance)。
-- 仅持有维护且 `needs_semantic=true` 时，按返回的 `spawn_arguments` 实际派唯一协调者；原父确认其初始化结束后封口并向 reader 发 go，保留恢复席位：[派工](.basepack/instructions.md#dispatch)。
-- 业务结束时独立于 brief 执行 stop 自有 control，取消自有协调者及后代，确认发布结束后释放所有权；未明状态保留待处理：[收尾](.basepack/instructions.md#stop)。
+- 主任务直觉预计不超过十分钟时跳过整个自动维护；更长任务在宿主支持生命周期时用 `memory maintain-start --mode automatic` 异步启动。范围明显扩大时重估，子任务按委托执行。[自动维护](.basepack/instructions.md#maintenance)。
+- 按启动返回的 `spawn_arguments` 派唯一协调者。协调者负责预检及 reader 初始化，原父确认其 turn 结束后封口并发 go。[启动与派工](.basepack/instructions.md#dispatch)。
+- 业务结束时先 stop 自有尝试，再取消自有协调者及后代，核实终态后释放本次取得的所有权。[收尾](.basepack/instructions.md#stop)。
 - 用户明确要求维护时，将授权范围内的处置、实际阻塞和余项纳入交付：[显式维护](.basepack/instructions.md#explicit-maintenance)。
 - 检索 worker 或调用 agent 使用中发现问题时，轻量报告疑点和观察版本，交维护处理：[使用反馈](.basepack/instructions.md#feedback)。
 - 建立与普通维护在作者生成及程序提交后结束；仅用户明确要求记忆系统审计时按其范围审计：[手动审计](.basepack/instructions.md#audit)。

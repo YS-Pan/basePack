@@ -11,6 +11,9 @@ import tomllib
 from urllib.parse import urlsplit
 
 
+DYNAMIC_MEMORY_ENDPOINT = "http://127.0.0.1:0"
+
+
 def _read(path: Path, schema_version: int) -> dict:
     with path.open("rb") as stream:
         raw = tomllib.load(stream)
@@ -145,7 +148,8 @@ def load_project_config(path: str | Path) -> ProjectConfig:
     machine_path = _absolute(raw["runtime"]["machine_config"], "runtime.machine_config")
     root = (path.parent / raw["project"]["root"]).resolve()
     if "memory" in raw:
-        endpoint = urlsplit(raw["memory"]["endpoint"])
+        memory = raw["memory"]
+        endpoint = urlsplit(memory["endpoint"])
         try:
             loopback = ip_address(endpoint.hostname or "").is_loopback
         except ValueError as error:
@@ -155,7 +159,9 @@ def load_project_config(path: str | Path) -> ProjectConfig:
                 or endpoint.query or endpoint.fragment
                 or not loopback):
             raise ValueError("memory.endpoint must be an HTTP(S) URL with an explicit loopback IP address")
-        endpoint.port  # Validate the optional port at the configuration boundary.
+        if endpoint.port == 0 and (memory.get("windows_task") is not True
+                                   or memory["endpoint"].rstrip("/") != DYNAMIC_MEMORY_ENDPOINT):
+            raise ValueError(f"The dynamic memory endpoint requires memory.windows_task=true and {DYNAMIC_MEMORY_ENDPOINT}")
     config = ProjectConfig(path, python, root, raw, load_machine_config(machine_path))
     if "memory" in raw:
         from basepack.memory.privacy import privacy_rules

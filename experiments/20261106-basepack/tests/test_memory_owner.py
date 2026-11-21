@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
@@ -260,6 +261,39 @@ def test_preflight_failure_releases_undispatched_owner(tmp_path):
     assert owner.acquire(tmp_path, "project", "other", tmp_path / "other")["acquired"]
 
 
+def test_managed_preflight_can_resume_with_original_control_after_cold_start(tmp_path, monkeypatch):
+    from contextlib import nullcontext
+    from types import SimpleNamespace
+
+    from basepack.memory import cli, store
+    from basepack.runtime import activity
+    from basepack.runtime.recovery import RuntimeStartRequired
+
+    config = SimpleNamespace(memory_dir=tmp_path, raw={"memory": {"project_id": "project", "windows_task": True}})
+    attempt = "a" * 32
+    control = owner.attempt_control(tmp_path, attempt)
+    args = SimpleNamespace(memory_action="maintain", holder="thread", control=control,
+                           output=None, mode="automatic", available_subagents=None, attempt=attempt)
+    demand = RuntimeStartRequired({"status": "runtime_start_required", "component": "memory", "error": "stopped"})
+    memory = SimpleNamespace(verify_project=Mock(side_effect=[demand, None]))
+    preflight = Mock(return_value={"acquired": True})
+    monkeypatch.setattr(activity, "memory_operation", lambda config: nullcontext())
+    monkeypatch.setattr(store, "Memory", lambda config: memory)
+    monkeypatch.setattr(cli, "_maintain", preflight)
+
+    with pytest.raises(RuntimeStartRequired) as caught:
+        cli.dispatch(args, config)
+    assert caught.value is demand
+    assert owner.status(tmp_path) is None
+    assert not control.exists()
+    preflight.assert_not_called()
+
+    result, exit_code = cli.dispatch(args, config)
+    assert result == {"acquired": True} and exit_code == 0
+    assert owner.status(tmp_path)["run_id"] == attempt
+    assert preflight.call_args.kwargs["memory"] is memory
+
+
 def test_failed_startup_keeps_uncertain_publication_and_other_owner(tmp_path):
     control = tmp_path / "control"
     claimed = owner.acquire(tmp_path, "project", "thread", control)["owner"]
@@ -274,7 +308,7 @@ def test_failed_startup_keeps_uncertain_publication_and_other_owner(tmp_path):
     assert owner.status(tmp_path)["publications"] == [publication]
 
 
-def test_stop_cli_loads_config_without_credentials_or_database(tmp_path):
+def test_stop_and_release_cli_work_without_credentials_or_database(tmp_path):
     import json
     import os
     import subprocess
@@ -290,12 +324,15 @@ def test_stop_cli_loads_config_without_credentials_or_database(tmp_path):
     owner.acquire(config.memory_dir, config.raw["memory"]["project_id"], "thread", control)
     env = dict(os.environ)
     env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1] / "src")
-    process = subprocess.run([sys.executable, "-X", "utf8", "-m", "basepack", "--config", str(config.path),
-                              "memory", "stop", "--control", str(control)],
-                             env=env, capture_output=True, text=True, encoding="utf-8", timeout=15)
-    assert process.returncode == 0, process.stderr
-    assert json.loads(process.stdout)["stopped"]
-    assert owner.status(config.memory_dir)["stopped"]
+    prefix = [sys.executable, "-X", "utf8", "-m", "basepack", "--config", str(config.path), "memory"]
+    for action, result in (("stop", "stopped"), ("release", "released")):
+        process = subprocess.run([*prefix, action, "--control", str(control)], env=env,
+                                 capture_output=True, text=True, encoding="utf-8", timeout=15)
+        assert process.returncode == 0, process.stderr
+        assert json.loads(process.stdout)[result]
+        if action == "stop":
+            assert owner.status(config.memory_dir)["stopped"]
+    assert owner.status(config.memory_dir) is None
     assert not config.memory_password_file.exists()
 
 

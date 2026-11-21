@@ -1,0 +1,1 @@
+手动进程或 SCM 部署的 launcher 为 `$memory_dir/serve.ps1`，cwd 为 `$memory_dir`，日志为其中 `logs/surreal.stdout.log` 与 `logs/surreal.stderr.log`。先检查 endpoint 的 `/ready`。不可用时查日志，由维护者启动所用设施。多聊天共用数据库，业务结束保持运行。新增状态按本机 skill 的恢复说明保留。

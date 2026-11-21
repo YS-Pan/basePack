@@ -28,7 +28,7 @@ memory prepare --paths '说明.md' '决定.md' --output '<project-root>/tmp/<run
 memory publish --completed '<completed.json>' --output '<新batch.json>' --control '<同一control>' --result '<result.json>'
 memory stop --control '<同一control>'
 memory release --control '<同一control>'
-memory changes --scope '资料目录'
+memory check-file-changes --scope '资料目录'
 ```
 
 `prepare --paths` 接受文件而非目录。需要处理目录时先枚举文件，再传项目相对路径，例如：`Get-ChildItem -File 资料目录 | ForEach-Object { Resolve-Path -Relative $_.FullName }`。文字来源的 `snapshot_transport` 提前给出原文字节数、封装字节数、语句数和消息上限；错误保留路径及原始诊断，调用 agent 不承担例行 SQL 大小审核或拆包。
@@ -94,7 +94,7 @@ memory maintain-start --mode automatic --holder '<原父 thread 身份>'
 
 零行文字来源且没有活动知识时，只需登记来源，不创建无效行范围的 member。已有正文被清空时，仍须退役旧成员并处理依赖；完成后不反复派发该空来源，重新出现正文会继续发现。
 
-采集时按 Codex 项目绑定刷新本轮可读的持久化聊天截点。维护随后比较选定来源及旧成员实际接受版本。Git 干净仍可能有尚未接受的原文。分别检查发现清单、聊天采集、语义接受和向量覆盖。`changes` 显式查看变化，`maintain` 负责机械更新与语义交接。[Codex 绑定](setup-project.md#codex-项目聊天接入)。
+采集时按 Codex 项目绑定刷新本轮可读的持久化聊天截点。维护随后比较选定来源及旧成员实际接受版本。Git 干净仍可能有尚未接受的原文。`maintain` 负责机械更新与语义交接。[来源检查](#来源检查) · [Codex 绑定](setup-project.md#codex-项目聊天接入)
 
 程序在依据闭合时处理原字节 hash 相同的元数据变化、完整正文仅 CRLF/LF 变化，以及有唯一定位且上下文可确认未变的原文块；相互依赖的机械候选共同发布，无法证明依赖仍有效的范围留给语义共读。完整回执保留机械批次、旧/新行映射、变化片段、受影响成员与关系；换行归一只用于比较，快照仍按真实原字节保存。编码输入及身份未变才复用向量；实际输入变化按现有 apply 合同编码。已有 stale、更正、退役或语义证据不足的范围保留待核，局部文字相同不表示父级摘要或关系均有效。
 
@@ -140,6 +140,15 @@ memory maintain-start --mode automatic --holder '<原父 thread 身份>'
 报告无需维护 owner；`memory feedback-list` 默认返回未决（`--all` 含结果）。单一 owner 按当前版本及原件处理，沿 apply/corrections 修复后运行 `feedback-resolve <id> --control <同一control> --outcome fixed|invalid|duplicate|obsolete --result '<说明>'`；有目标需 `--expected-revision <当前版本>`。旧报告冲突不能覆盖新版，失败/未决保持可见。反馈是数据库运行状态，纳入导出恢复，不自摄入为业务知识。
 
 仅用户明确表达记忆系统审计意图时，按该次范围启动手动审计；讨论该词、普通维护、实际问题均不自动触发。只读审计/记录可与维护并行，写入修复仍取得项目 owner。普通建立及修复的完成口径保持作者生成和程序提交。
+
+## 来源检查
+
+- `memory check-codex-capture [--codex-registry <json>] [--thread <id>]` 默认对照本项目的活跃和归档 Codex 聊天与采集记录，返回新增、可能变化、已覆盖和未知。对相关候选及用户点名的项目聊天加 `--thread`，逐段核对正文。跨项目引用通过宿主读取。按各聊天的采集位置报告未采集、已变化、实际补读和未知项。端点和 `updatedAt` 用于筛选候选，正文覆盖以逐段比较为准。返回的预检 pending 是当时的快照。
+- `memory check-file-changes --scope <文件或目录> ... [--deep]` 按指定的项目相对路径对照磁盘与项目库登记的来源版本。加 `--deep` 同时校验内容哈希。Codex 状态库受限时，仍可连接项目库单独检查文件。通过维护工作集发现待重核摘要，并分别检查已发布知识的向量覆盖。
+
+Windows Codex 沙箱已知会拦截 Codex 状态库访问，或检查实际遇到此类拦截时，如果宿主支持 Auto Review，agent 主动仅为本次 `memory check-codex-capture` 调用申请一次审批。获准后按原参数执行。审批不可用或被拒时，报告原因和未核对范围。
+
+两条检查均为只读。旧名称 `freshness` 和 `changes` 分别是这两条命令的别名。
 
 ## 聊天来源与精确回读
 
@@ -263,7 +272,19 @@ freeze 固定私有规则及其 revision，apply 核对当前规则；冻结后�
 
 ## 备份与恢复
 
-basePack 客户端自动读凭据；原生 SurrealDB CLI 使用自己的 SURREAL_USER/PASS。下面只为该次原生导出临时设置它们，不把这段加入新 shell 的记忆入口：
+Windows 用户任务使用受管导出。客户端读取原密码文件，并在整个导出期间保留该次运行实例。动态端口随实例变化，项目配置继续保留 `:0`。
+
+```powershell
+& $python -I -m basepack --config $config runtime export memory '<backup.surql>'
+```
+
+Windows 恢复时，另建独立的恢复配置、任务和空 store，保留原 `memory.project_id`，恢复原密码文件。原任务若使用同一 UUID，先按原配置收尾、停止并注销；恢复任务使用独立目录和自己的实际地址。注册时使用 `--create-store`，启动后先导入，再运行 `memory init` 验证身份并生成入口。
+
+```powershell
+& $restorePython -I -m basepack --config $restoreConfig runtime import memory '<backup.surql>'
+```
+
+导入要求注册动态端口或空闲停机的空库。失败时保留退出信息和部分目标，用新的空目标重新恢复。随后核实原文、快照、图关系和检索。固定端口常驻或手动服务可继续按以下原生流程恢复。原生 SurrealDB CLI 使用自己的 SURREAL_USER/PASS，本例仅为这次调用临时设置：
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -283,5 +304,3 @@ try {
 恢复时先为新的物理目录/端口启动认证服务，保留原 project_id；从该目标配置读取用户名及同一密码文件，再以原生 `import` 替换上述 `export`。缺失凭据先恢复正确文件，不给已有库重新生成密码。恢复后核快照、图关系和检索。
 
 恢复集合包括 export、配置、原凭据、公私业务原件、private 独立 Git 及其忽略但仍需保留的附件、受管 Codex 导出、codex-attachments 原件与定位回执，以及 `memory.data_dir` 下的 assets 图片快照和数据库引用的 `behavior/<sha>.json` 模型文件。知识版本、关系、依据、private、更正、旧快照、来源处置（含unavailable_gaps）、反馈、原始交付事实、访问投影及 delivery_id 去重随 export 恢复；旧备份不能补齐后来状态或缺失历史。新目录保留 project_id，使用独立目录/端口，再验证原文、精确版本、关系、检索、反馈、模型 hash 和交付重试。兼容向量随 export 恢复，或从接受表示与原图重新 embed；访问记账不要求重建向量。运行库使用原生 export；复制物理目录先停写、停止服务。长期备份按明确恢复需求决定目的地与保留周期，不默认叠加完整备份；完整恢复材料按私有边界保管。凭据不随源码发行；清理前核原件／旧依据引用及活跃控制／未明发布。
-
-`memory freshness [--codex-registry <json>] [--thread <id>]` 只读项目归属、分页、采集回执与原文比较，不取得 owner、不写原件、不生成向量或发布知识。按相关候选及用户点名聊天补读；跨项目引用使用宿主读取。回执时间不是全局截止，端点和 `updatedAt` 不是正文证明；报告未摄入、待语义快照、实际补读和未知。预检 pending 是历史快照，不代表当前语义状态。

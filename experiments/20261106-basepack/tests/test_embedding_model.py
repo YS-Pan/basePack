@@ -102,7 +102,7 @@ def test_cuda_info_reports_backend_context_and_soft_target(options, monkeypatch)
     configured = options | {"device": "cuda:0", "endpoint": "http://127.0.0.1:8765",
                             "queue_timeout": 60, "gpu_memory_mib": 9216}
     factory = Mock()
-    monkeypatch.setattr(service, "LitServer", factory)
+    monkeypatch.setattr(service, "EmbeddingServer", factory)
     service.serve(SimpleNamespace(raw={"embedding": configured},
                                   path_value=lambda section, key: options["model_root"]))
     metadata = factory.call_args.kwargs["model_metadata"]
@@ -242,8 +242,23 @@ def test_cuda_releases_only_unused_cache_above_soft_target(monkeypatch, reserved
     monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: allocated * 1024**2)
     empty = Mock()
     monkeypatch.setattr(torch.cuda, "empty_cache", empty)
-    model._release_unused_cache()
+    model.release_unused_cache()
     assert empty.call_count == expected
+
+
+@pytest.mark.parametrize("target", [0, 9216])
+def test_idle_cuda_releases_cache_below_or_without_soft_target(monkeypatch, target):
+    import torch
+
+    model = Qwen3VLEmbedder.__new__(Qwen3VLEmbedder)
+    model.device = "cuda:0"
+    model.options = {"gpu_memory_mib": target}
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 10 * 1024**2)
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: 4 * 1024**2)
+    empty = Mock()
+    monkeypatch.setattr(torch.cuda, "empty_cache", empty)
+    model.release_unused_cache(idle=True)
+    empty.assert_called_once_with()
 
 
 def test_cpu_encode_preserves_model_error_without_cuda_access(monkeypatch):

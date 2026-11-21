@@ -2,6 +2,8 @@
 
 2026-11-15，跨项目交接版。编制时尚未实施；用户已选择 CLI 方案 A，并要求启动器维护源保留在项目根目录。本文供用户交给 **Codex usage 对应项目的新 thread 执行**，无需继承编制聊天；下文包含执行所需目标、边界、步骤和验收。
 
+目标项目已完成交接实施，实际验收与缓存决定见[结案记录](progress.md#结案)。以下保留当时的执行基线。
+
 ## 新 thread 接收说明
 
 1. 在 `D:/project/trifles/20260829 codex usage` 开展工作，先读该仓 `AGENTS.md`、`CONTRIBUTING.md`、`dev_doc/README.md` 及本次涉及的专题；按目标项目自己的工具、技能和记录约定执行。下文的版本、体积和媒体状态是 2026-11-15 只读观察，开始实施时核当前 HEAD、工作树、解释器与有效路径，不将旧快照当现状。
@@ -154,7 +156,7 @@ set "CODEX_USAGE_REPORT_DIR=%~dp0reports"
 - 数据必须等价；性能不得出现稳定可复现的退化。若候选仍有未解决的性能回退，保留现用格式并记录缓存优化未完成，不用删事件、缩短历史或取消必要索引换取体积数字。
 - 切换后实际区分“活动数据库变小”和“总磁盘占用减少”；恢复旧库及先前 invalid 备份应单独列出，验证完成前不删当前有效原库。
 
-以上是实施设计和隔离实验，**实验 SQLite 文件不能直接替换生产库**。更细的可选背景见 [缓存调查](<D:/project/20261106 memsys/devDoc/tasks/20261115-codex-usage-launcher/research/cache-size.md>)；本节已给出接收 thread 所需结论与限制，不要求读取 memsys 临时数据库。
+以上是实施设计和隔离实验，**实验 SQLite 文件不能直接替换生产库**。更细的可选背景见 [缓存调查](<D:/project/20261106 memsys/devDoc/archive/20261115-codex-usage-launcher/research/cache-size.md>)；本节已给出接收 thread 所需结论与限制，不要求读取 memsys 临时数据库。
 
 ## 实施顺序与验收
 
@@ -174,4 +176,4 @@ set "CODEX_USAGE_REPORT_DIR=%~dp0reports"
 以下均属于 `D:/project/20261106 memsys`，不属于目标仓，也不是执行前置；转贴本文时即使没有这些文件，仍可按正文和目标项目现状实施：
 
 - [原迁移计划](<D:/project/20261106 memsys/devDoc/archive/20261113-agenttools-migration/plan.md>)、[原迁移结果](<D:/project/20261106 memsys/devDoc/archive/20261113-agenttools-migration/result.md>)。
-- [本计划编制与调查记录](<D:/project/20261106 memsys/devDoc/tasks/20261115-codex-usage-launcher/progress.md>)。旧方案及修订提交 `1d63cb3`、`603f6aa` 都是 memsys 仓库中的历史标识，不在 codex usage 仓库查找它们。
+- [本计划编制与调查记录](<D:/project/20261106 memsys/devDoc/archive/20261115-codex-usage-launcher/progress.md>)。旧方案及修订提交 `1d63cb3`、`603f6aa` 都是 memsys 仓库中的历史标识，不在 codex usage 仓库查找它们。

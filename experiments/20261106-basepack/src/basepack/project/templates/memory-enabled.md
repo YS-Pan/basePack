@@ -16,7 +16,7 @@ $$basepackConfig = '$config'
 
 ```powershell
 & $$basepackPython -X utf8 -m basepack --config $$basepackConfig memory brief --task '<当前任务>'
-if ($$LASTEXITCODE -ne 0) { throw "memory brief failed ($$LASTEXITCODE)" }
+if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }
 ```
 
 同一任务后续读写文件、反馈、stop/release 沿用已获 brief；任务目标或上下文实质变化时按需补取。后续命令复用本进程的参数，新进程只重新初始化。搬迁后核实际路径，再以新配置运行 `memory init` 刷新托管块；块外旧路径另核。
@@ -25,7 +25,9 @@ brief 只读已发布 mandatory、概况入口和已知缺口，不做 embedding
 
 brief、检索和回读返回 `private=true` 的内容按项目限制分发约定处理，涵盖隐私、机密及版权/许可边界；公开写入仅提炼本项目允许公开的内容与结论。交接保留所见标记，旧记录缺标不代表已核公开。[私有来源与公开边界](<$skill#private-sources-and-publication>)。
 
-本项目数据库的 launcher 为 `$memory_dir/serve.ps1`，cwd 为 `$memory_dir`，日志为其中 `logs/surreal.stdout.log` 与 `logs/surreal.stderr.log`。先检查 endpoint 的 `/ready`；不可用时查日志，由维护者显式启动 launcher。多聊天共用该进程，业务结束保持数据库运行。[首次部署](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/administrator.md#项目-surrealdb)、[恢复集合](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/memory.md#备份与恢复)；新增状态按本机 skill 的恢复说明保留。
+brief 返回退出码 3 时，按 [按需启动](#runtime-start) 处理已注册 Windows 用户任务。启动成功后独立执行 brief，取得本项目已发布结果。
+
+$runtime_details [首次部署](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/administrator.md#项目-surrealdb) · [恢复集合](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/memory.md#备份与恢复)
 
 <a id="maintenance"></a>
 ## 自动维护

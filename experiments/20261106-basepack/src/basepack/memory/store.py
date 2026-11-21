@@ -14,6 +14,9 @@ from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
 
 from basepack.project.config import ProjectConfig
+from basepack.runtime.activity import memory_operation
+from basepack.runtime.http import managed_opener
+from basepack.runtime.recovery import managed, raise_if_managed_refusal
 from .content import (SourceContent, _check_collection_revision, _project_path, detect_changes,
                       numbered_text, read_source, reading_units, original_text, line_slices)
 from .images import IMAGE_SUFFIXES, ImageSource, read_image, retain_image
@@ -134,6 +137,7 @@ class Memory:
     def __init__(self, config: ProjectConfig):
         self.config = config
         self.connection = config.raw["memory"]
+        self._database_contact_attempted = False
         self._password = config.memory_password_file.read_bytes().decode("utf-8-sig")
         credential = f"{self.connection['username']}:{self._password}"
         self._authorization = "Basic " + b64encode(credential.encode("utf-8")).decode("ascii")
@@ -146,26 +150,42 @@ class Memory:
                 "IF meta:project.memory_schema_version = NONE OR meta:project.memory_schema_version != 3 "
                 "{ THROW 'Memory schema 3 offline migration required'; };")
 
+    def verify_project(self) -> None:
+        """Confirm the connected project and current schema before a protected operation."""
+        # SurrealDB executes later statements after a failed IF, so finish the gate separately.
+        self._execute(self._project_guard(), check_project=False)
+
     def _execute(self, sql: str, *, check_project: bool = True) -> list:
+        with memory_operation(self.config) as lease:
+            if check_project:
+                self.verify_project()
+            endpoint = self.connection["endpoint"] if lease is None else lease.endpoint
+            return self._execute_admitted(sql, endpoint, recover_start=lease is None)
+
+    def _execute_admitted(self, sql: str, endpoint: str, *, recover_start: bool) -> list:
         connection = self.connection
-        if check_project:
-            # SurrealDB executes later statements after a failed IF. Complete
-            # the gate separately so a rejected request cannot still write.
-            self._execute(self._project_guard(), check_project=False)
         body = sql.encode("utf-8")
-        request = Request(connection["endpoint"].rstrip("/") + "/sql", body, {
+        request = Request(endpoint.rstrip("/") + "/sql", body, {
             "Authorization": self._authorization,
             "surreal-ns": connection["namespace"], "surreal-db": connection["database"],
             "Accept": "application/json", "Content-Type": "text/plain; charset=utf-8",
         })
+        first_request = not self._database_contact_attempted
+        self._database_contact_attempted = True
+        open_sql = managed_opener().open if managed(self.config, "memory") else urlopen
         try:
-            with urlopen(request, timeout=30) as response:
-                statements = json.load(response)
+            response = open_sql(request, timeout=30)
         except HTTPError as error:
             error.add_note(error.read().decode("utf-8"))
             if error.code == 413:
                 error.add_note(f"SQL request body: {len(body)} bytes; server capacity is unknown.")
             raise
+        except OSError as error:
+            if first_request and recover_start:
+                raise_if_managed_refusal(error, "memory", self.config)
+            raise
+        with response as stream:
+            statements = json.load(stream)
         errors = [statement["result"] for statement in statements if statement["status"] != "OK"]
         if errors:
             raise SqlResponseError("\n".join(str(error) for error in errors))
@@ -173,6 +193,10 @@ class Memory:
 
     def _publish(self, statements: list[str], *, control: str | None = None) -> None:
         """Send complete SQL statements in bounded messages in one native transaction."""
+        with memory_operation(self.config) as lease:
+            self._publish_admitted(statements, control, lease)
+
+    def _publish_admitted(self, statements, control, lease) -> None:
         from websocket import create_connection
 
         limit = _MESSAGE_LIMIT
@@ -203,14 +227,19 @@ class Memory:
             from .owner import begin_publication, finish_publication
             publication = begin_publication(self.config.memory_dir, control, marker.key.removeprefix("publication_"))
         finished = False
+        held = False
         ws = None
         transaction = None
         committing = False
         try:
-            endpoint = urlsplit(self.connection["endpoint"].rstrip("/"))
+            url_base = self.connection["endpoint"] if lease is None else lease.endpoint
+            endpoint = urlsplit(url_base.rstrip("/"))
             url = urlunsplit(("wss" if endpoint.scheme == "https" else "ws", endpoint.netloc,
                               endpoint.path + "/rpc", "", ""))
-            ws = create_connection(url, subprotocols=["json"], timeout=30)
+            self._database_contact_attempted = True
+            options = {} if lease is None else {"origin": lease.origin, "http_no_proxy": [endpoint.hostname],
+                                                "redirect_limit": 0}
+            ws = create_connection(url, subprotocols=["json"], timeout=30, **options)
             sequence = 0
             def rpc(method, params=None, txn=None):
                 nonlocal sequence
@@ -233,6 +262,10 @@ class Memory:
                 errors = [result["result"] for result in results if result["status"] != "OK"]
                 if errors:
                     raise RuntimeError("\n".join(map(str, errors)))
+            if lease is not None and publication is None:
+                # A disconnected client can leave an unconfirmed commit even without a maintenance owner.
+                lease.hold(marker.key)
+                held = True
             committing = True
             try:
                 rpc("commit", [transaction])
@@ -270,9 +303,23 @@ class Memory:
                 ws.close()
             if publication is not None and finished:
                 finish_publication(self.config.memory_dir, control, publication)
+            elif held and finished:
+                publication_error = sys.exception()
+                try:
+                    lease.clear(marker.key)
+                except (ConnectionError, TimeoutError) as error:
+                    note = f"Publication {marker.key} has a confirmed outcome; idle guard release failed: {error}"
+                    if publication_error is None:
+                        error.add_note(note)
+                        raise
+                    publication_error.add_note(note)
 
     def install_schema(self) -> dict:
         # Install the schema and bind its project in one native transaction.
+        with memory_operation(self.config):
+            return self._install_schema()
+
+    def _install_schema(self) -> dict:
         namespace = "`" + self.connection["namespace"].replace("`", "\\`") + "`"
         database = "`" + self.connection["database"].replace("`", "\\`") + "`"
         self._execute(f"DEFINE NAMESPACE IF NOT EXISTS {namespace}; USE NS {namespace}; "
@@ -563,6 +610,10 @@ class Memory:
 
     def apply(self, batch: dict, *, control: str | None = None, timeout: float = 600) -> dict:
         self.config.memory_search_mode
+        with memory_operation(self.config):
+            return self._apply_with_control(batch, control=control, timeout=timeout)
+
+    def _apply_with_control(self, batch: dict, *, control: str | None, timeout: float) -> dict:
         if control:
             return self._apply(batch, control=control, timeout=timeout)
         from .owner import acquire, release, stop_owned
@@ -1157,7 +1208,7 @@ class Memory:
                 "vector_coverage": {"status": "not_checked"},
                 "codex_collection": codex_collection,
                 "discovery_scope": self.connection.get("source_scope", []),
-                "change_check": "not checked by brief; use memory changes for maintenance"}
+                "change_check": "not checked by brief. Use memory check-file-changes to compare files."}
 
     def sources(self) -> list[dict]:
         """List source metadata for explicit inventory or deep-maintenance sampling."""

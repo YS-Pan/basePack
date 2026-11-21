@@ -113,7 +113,7 @@ bp --config $config config ai --level 3
 
 ## 启用记忆
 
-在 `memory init` 前核项目配置的 `[memory]`，选定本项目独立的 `data_dir`、显式回环 IP 的 `endpoint`，保留 init 生成的 `project_id`。endpoint 仅支持 HTTP(S) 的 127/8 或 `::1`，不使用 localhost、域名、通配或远端地址。新项目默认 `search_mode = 'vector'`，也可选 `hybrid`；search 使用项目检索模式并需要共享编码服务，`search --mode` 只覆盖本次查询。brief 直接读取已发布 mandatory、已有文件／章节摘要和已知缺口，不做任务搜索或 embedding。
+在 `memory init` 前核项目配置的 `[memory]`，选定本项目独立的 `data_dir` 和显式回环 IP 的 `endpoint`，保留 init 生成的 `project_id`。固定 endpoint 支持 HTTP(S) 的 127/8 或 `::1`。Windows 用户任务也可用 `windows_task = true` 和 `endpoint = 'http://127.0.0.1:0'`，由系统分配端口。新项目默认 `search_mode = 'vector'`，也可选 `hybrid`；search 使用项目检索模式并需要共享编码服务，`search --mode` 只覆盖本次查询。brief 直接读取已发布 mandatory、已有文件／章节摘要和已知缺口，不做任务搜索或 embedding。
 
 `private_scope` 默认空列表，根 private 始终私有；已有业务文件需要原位保存时，可在 `[memory]` 声明额外私有路径，分类不会扩大来源发现。匹配、版本与公开边界见 [私有资料](memory.md#私有资料与分享边界)。
 
@@ -124,7 +124,7 @@ bp --config $config config ai --level 3
 | A | `<project-A>/.basepack/memory` | `http://127.0.0.1:18080` | A 的 init 生成的 UUID |
 | B | `<project-B>/.basepack/memory` | `http://127.0.0.1:18081` | B 的 init 生成的另一 UUID |
 
-按 [项目 SurrealDB](administrator.md#项目-surrealdb) 为全新库准备一次随机密码文件，创建认证、仅回环监听的 launcher 与日志。已有库沿用原用户名和密码文件。启动后在下一次独立调用检查 `/ready`，客户端自动读取凭据，再执行：
+按 [项目 SurrealDB](administrator.md#项目-surrealdb) 为全新库准备一次随机密码文件。已有库沿用原用户名和密码文件。选定手动进程、SCM 或 [Windows 用户任务](administrator.md#windows-用户任务) 启动本项目认证数据库。动态端口用 `runtime start memory` 等待就绪并取得实际地址，固定端口也可直接检查 `/ready`。客户端自动读取凭据，再执行：
 
 ```powershell
 bp --config $config memory init
@@ -154,9 +154,17 @@ Codex 宿主按项目归属默认接入可取得的聊天，不要求逐 thread 
 
 沿项目 `AGENTS.md → .basepack/instructions.md#startup` 执行本机入口；[生成模板](../src/basepack/project/templates/memory-enabled.md) 是 shell 初始化与任务启动步骤的维护源。新 PowerShell 进程只初始化本次所需 Python／配置参数与 UTF-8；主任务开始执行一次 brief，同任务继续读文件、写文档、反馈、stop/release 均沿用已获 brief。任务目标或上下文实质变化时才按需补取。stop/owner/release/recover-owner 只需配置，不依赖 brief、数据库或密码。
 
-缺文件、权限错误和错误密码直接保留原始失败。恢复正确文件或修正配置后重试，不自动生成替代密码，也不回退免认证。连接失败时按生成入口检查本项目 `serve.ps1`、cwd 与日志，由项目维护者显式启动数据库。同项目多聊天共用数据库，聊天结束后保持运行。项目搬迁后核实际 Python/配置及包装/服务路径，再运行 `memory init` 刷新托管块；instructions 块外旧路径另行核对。
+缺文件、权限错误和错误密码直接保留原始失败。恢复正确文件或修正配置后重试。手动进程或 SCM 连接失败时按生成入口检查本项目 `serve.ps1`、cwd 与日志，由设施维护者启动。已注册 Windows 用户任务时按下节处理。项目内聊天共用数据库，聊天结束后数据库继续运行。项目搬迁后核实际 Python、配置和托管路径，再运行 `memory init` 刷新托管块，另核块外旧路径。
 
 已知少量文件直接同批读取；需要发现资料时用 `memory retrieve --question '<业务问题>'`，不传 scope 为全项目，路径限制可用 `--scope 'devDoc/'`，中文及带空格前缀也可。宿主负责实际派工、接收最终结果与 delivery 回执，完整流程见 [检索](memory.md#启动与检索)。
+
+<a id="runtime-start"></a>
+
+### 按需启动已注册设施
+
+启用 Windows 用户任务后，项目库尚未运行时，CLI 可返回退出码 3 和 JSON。收到 `runtime_start_required` 时，按原顺序执行返回的 `argv` 一次，保留参数边界。若宿主需要沙箱外执行且支持 Auto-review，仅提交这条启动命令审查一次。启动成功后发起独立调用，重新执行 brief 或原读取。动态端口的实际地址随启动变化，保留项目配置中的 `:0`，客户端会解析当次实例。编码超时、断开或写入结果未明时，先据原错误和日志核实结果，再决定后续操作。
+
+收到 `runtime_unavailable` 时保留原始 `error` 和 `binding_error`。自动审查不可用、宿主拒绝或启动失败时报告具体阻塞。注册、解绑和配置变更由设施维护者按部署流程显式执行。brief 仅读取项目数据库，embedding 在实际编码或向量检索时才需要。 [Windows 用户任务部署](administrator.md#windows-用户任务)
 
 ## 版本升级
 
@@ -242,7 +250,7 @@ bp --config $config memory search --mode vector --text '<代表性主题>'
 
 ## 移动与重新检出
 
-移动启用记忆的项目时，先收尾维护和未明发布，再停止该项目数据库并确认进程退出，保留配置、业务原件和完整记忆数据；按新目录调整服务 cwd、日志与 endpoint，保留 project_id 后再启动并核 read/search。也可按 [原生备份恢复](memory.md#备份与恢复) 搬迁。Python 和机器配置绑定仍须有效；已保存作业材料中的绝对路径需按新位置修复，Condor 历史不会随目录移动。按 [配置维护要点](project-config-maintenance.md) 核入口块外路径、宿主容量及受影响设施。新检出通过 init 重建被忽略的配置和 instructions，AGENTS 与业务源码可正常提交；知识通过对应项目备份恢复。
+移动启用记忆的项目时，先收尾维护和未明发布，再停止该项目数据库并确认进程退出。使用 Windows 用户任务时用原配置注销，迁移后重新注册。保留配置、业务原件和完整记忆数据，按新目录调整托管路径、日志与 endpoint，保留 project_id 后再启动并核 read/search。也可按 [原生备份恢复](memory.md#备份与恢复) 搬迁。Python 和机器配置绑定仍须有效；已保存作业材料中的绝对路径需按新位置修复，Condor 历史不会随目录移动。按 [配置维护要点](project-config-maintenance.md) 核入口块外路径、宿主容量及受影响设施。新检出通过 init 重建被忽略的配置和 instructions，AGENTS 与业务源码可正常提交；知识通过对应项目备份恢复。
 
 开发安装、构建和产品回归见 [路线 README](../README.md)。
 

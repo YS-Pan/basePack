@@ -112,7 +112,8 @@ def replace_managed_block(existing: bytes, section: str, *, name: str, path: str
 
 
 def refresh_project_entry(root: Path, config: Path, python: Path, *,
-                          memory_enabled: bool = False, memory_dir: Path | None = None) -> None:
+                          memory_enabled: bool = False, memory_dir: Path | None = None,
+                          memory_managed: bool = False) -> None:
     """Refresh the same managed entries during project init and memory init."""
     root, config, python = Path(root).resolve(), Path(config).resolve(), Path(python)
     agents = root / "AGENTS.md"
@@ -129,11 +130,17 @@ def refresh_project_entry(root: Path, config: Path, python: Path, *,
     skill = Path(memory_module).with_name("SKILL.md").resolve().as_posix()
     section = template(f"memory-{state}.md").replace(
         "<!-- basepack-memory:end -->", template("tools.md") + "\n<!-- basepack-memory:end -->")
+    memory_path = (memory_dir or root / ".basepack/memory").as_posix()
+    runtime_details = ""
+    if memory_enabled:
+        mode = "windows" if memory_managed else "manual"
+        runtime_details = Template(template(f"memory-runtime-{mode}.md")).substitute(memory_dir=memory_path).strip()
     section = Template(section).substitute(
         python=str(python).replace("'", "''"),
         config=str(config).replace("'", "''"),
         skill=skill,
-        memory_dir=(memory_dir or root / ".basepack/memory").as_posix(),
+        memory_dir=memory_path,
+        runtime_details=runtime_details,
     )
     details = replace_managed_block(existing, section, name="basepack-memory", path="instructions.md")
     # Validate both boundaries before either file changes.

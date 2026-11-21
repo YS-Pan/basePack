@@ -12,7 +12,7 @@ python -m basepack --config '<project-config>' embed --image '<absolute-image>' 
 python -m basepack embedding --machine-config '<machine-config>' status
 ```
 
-成功时 `--output` 命令返回 count、embedding_identity、worker pid 和输出位置，文件保存 vectors；单条文字冒烟应得到 count 为 1、2048 维向量。未指定 `--output` 时直接返回向量。连接失败请管理员检查服务日志与状态，模型或 CUDA 错误保留原始信息后修正对应配置。
+成功时 `--output` 命令返回 count、embedding_identity、worker pid 和输出位置，文件保存 vectors；单条文字冒烟应得到 count 为 1、2048 维向量。未指定 `--output` 时直接返回向量。模型或 CUDA 错误保留原始信息后修正对应配置。
 
 多条输入可重复 `--text`，或用 `--inputs inputs.json` 传 UTF-8 JSON 数组，元素为字符串或 `{"text":"...","image":"<absolute-local-image>"}`。建库批量输入与单条查询共用一份模型。
 
@@ -24,7 +24,11 @@ CUDA 显式选择 cuDNN attention，不支持的输入或运行环境保留原�
 
 `--timeout` 是客户端连接和读取的等待期限；到期报错，服务端排队或已开始的推理仍可继续。机器配置 `queue_timeout` 是 LitServe 的排队期限，出队时检查；超过期限的请求可能要等前一项推理结束才收到 504。它不限制已经开始的推理。超时或断开不自动重投，也不停止另一项目共用的模型。
 
-模型随 Windows 服务启动而加载并常驻。客户端只连接机器配置的 endpoint；服务未运行时请管理员启动。Python 使用同一入口：
+模型就绪或最后一项编码请求结束后开始计算空闲时间。空闲 1 分钟后，CUDA 推理进程释放一次可回收的分配器缓存，模型继续供图文请求使用。Windows 用户任务空闲 30 分钟后关闭监听并退出整个模型服务。排队和推理计入活动，客户端超时后服务端仍在处理的请求也计入。健康和状态探测不延长时限。
+
+已注册 Windows 用户任务的客户端在连接被拒绝或服务明确拒绝接收新请求时返回固定启动命令。宿主单独执行该命令，等模型就绪后重试原调用。跨项目的并发唤醒使用同一任务，原有客户端和同身份的项目向量可以继续使用。推理超时或发送后连接中断时，按原错误和服务日志核实处理结果。SCM 服务由管理员启停。[按需启动已注册设施](setup-project.md#runtime-start)
+
+Python 使用同一入口：
 
 ```python
 from basepack.project.config import load_project_config
@@ -34,7 +38,7 @@ client = EmbeddingClient(load_project_config("<absolute-project-config>").machin
 result = client.embed(["text"], timeout=120)
 ```
 
-服务使用原生 `POST /predict`（JSON `{"inputs":[...]}`）、`GET /health` 和 `GET /info`。`status` 返回健康与模型信息，新服务的 model 字段还报告实际 device 和 dtype；兼容旧服务仍可使用。模型身份变化时补建兼容向量，步骤见 [记忆使用](memory.md)。服务停止、升级和日志入口见 [管理员说明](administrator.md#共享服务与身份)。
+服务使用原生 `POST /predict`（JSON `{"inputs":[...]}`）、`GET /health` 和 `GET /info`。`embedding status` 返回健康与模型信息，新服务的 model 字段还报告实际 device 和 dtype；兼容旧服务仍可使用。模型身份变化时补建兼容向量，步骤见 [记忆使用](memory.md)。托管状态、启停与日志见 [Windows 用户任务](administrator.md#windows-用户任务) 和 [SCM 托管](administrator.md#共享服务与身份)。
 
 ## 普通重任务
 

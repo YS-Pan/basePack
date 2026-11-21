@@ -2,9 +2,11 @@ import argparse
 import json
 from pathlib import Path
 import subprocess
+import sys
 
 import pytest
 
+from basepack.__main__ import main
 from basepack.memory.cli import _activate, dispatch, register_commands
 from basepack.project.config import load_project_config
 from basepack.project.init import init_project
@@ -42,6 +44,19 @@ def test_memory_activation_preserves_business_text_and_updates_one_local_entry(t
     assert "memory brief" not in bootstrap
     assert startup.count("--config $basepackConfig memory brief") == 1
     assert "新进程只重新初始化" in startup
+
+
+def test_managed_memory_activation_uses_the_task_entry(tmp_path):
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    project = tmp_path / "project"
+    config = load_project_config(init_project(project, machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
+    config.raw["memory"].update(windows_task=True, endpoint="http://127.0.0.1:0")
+    _activate(config)
+    updated = (project / ".basepack/instructions.md").read_text(encoding="utf-8")
+    assert "runtime status memory" in updated
+    assert "实际地址" in updated
+    assert "serve.ps1" not in updated
 
 
 @pytest.mark.parametrize("markers", ["<!-- basepack-memory:start -->", "<!-- basepack-memory:end -->",
@@ -206,6 +221,52 @@ def _memory_args(*options):
     return parser.parse_args(["memory", *options])
 
 
+def test_memory_help_groups_entry_points_and_explains_host_launch(capsys):
+    with pytest.raises(SystemExit) as error:
+        _memory_args("--help")
+    assert error.value.code == 0
+    help_text = capsys.readouterr().out
+    queries, sources, maintenance, protocol, recovery = [
+        help_text.index(heading) for heading in (
+            "Everyday queries:", "Sources:", "Maintenance and publication:", "Host protocol:", "Setup and recovery:"
+        )
+    ]
+    assert queries < sources < maintenance < protocol < recovery
+    assert "brief" in help_text[queries:sources] and "search" in help_text[queries:sources]
+    assert "Prepare a retrieval assignment for the host to launch" in help_text[queries:sources]
+    assert "check-codex-capture" in help_text[sources:maintenance]
+    assert "check-file-changes" in help_text[sources:maintenance]
+    assert "publish" in help_text[maintenance:protocol]
+    assert "Prepare a coordinator assignment for the host to launch" in help_text[maintenance:protocol]
+
+
+def test_file_check_alias_preserves_required_scope_and_idle_runtime_json(tmp_path, monkeypatch, capsys):
+    from basepack.runtime import control
+
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    path = init_project(tmp_path / "project", machine, max_concurrent_subagents=2, concurrency_source="test")
+    path.write_text(path.read_text(encoding="utf-8").replace("[memory]\n", "[memory]\nwindows_task=true\n"),
+                    encoding="utf-8")
+    monkeypatch.setattr(control, "_load", lambda _: (tmp_path / "binding.json", {"idle_seconds": 30}))
+    recovery_command = ["basepack", "--config", str(path), "runtime", "start", "memory"]
+    monkeypatch.setattr(control, "start_command", lambda *_: {"argv": recovery_command})
+    monkeypatch.setattr("basepack.memory.store.Memory", lambda *_: pytest.fail("idle runtime opened the store"))
+
+    results = []
+    for command in ("check-file-changes", "changes"):
+        with pytest.raises(SystemExit) as error:
+            _memory_args(command)
+        assert error.value.code == 2
+        assert "--scope" in capsys.readouterr().err
+        monkeypatch.setattr(sys, "argv", ["basepack", "--config", str(path), "memory", command, "--scope", "docs"])
+        assert main() == 3
+        results.append(json.loads(capsys.readouterr().out))
+    assert results[0] == results[1]
+    assert results[0]["status"] == "runtime_start_required"
+    assert results[0]["argv"] == recovery_command
+
+
 def test_retrieve_has_useful_defaults_stable_reuse_and_no_implied_host_execution(tmp_path, monkeypatch):
     machine = tmp_path / "machine.toml"
     machine.write_text("schema_version=1\n", encoding="utf-8")
@@ -240,18 +301,19 @@ def test_observed_version_cli_and_final_delivery_pass_exact_identity(tmp_path, m
                                       calls.append((_name, args, kwargs)) or {"ok": True})
                                for name in ("knowledge", "history", "read", "neighbors", "access_hints", "record_delivery")})
     monkeypatch.setattr("basepack.memory.store.Memory", lambda config: memory)
+    config = SimpleNamespace(raw={})
     actions = [("knowledge", "member:m", "--knowledge-revision", "old"), ("history", "member:m"),
                ("read", "member:m", "--knowledge-revision", "old"),
                ("neighbors", "node:n", "--knowledge-revision", "node-old", "--include-stale")]
     for options in actions:
-        assert dispatch(_memory_args(*options), None) == ({"ok": True}, 0)
+        assert dispatch(_memory_args(*options), config) == ({"ok": True}, 0)
     manifest = [{"id": "member:m", "knowledge_revision": "old"}]
     receipt = tmp_path / "delivered 中文.json"
     receipt.write_text(json.dumps({"delivery_id": "stable-id", "items": manifest, "context": {"task": "检索"}}), encoding="utf-8")
-    dispatch(_memory_args("delivery", "--input", str(receipt)), None)
+    dispatch(_memory_args("delivery", "--input", str(receipt)), config)
     hints = tmp_path / "hints.json"
     hints.write_text(json.dumps(manifest), encoding="utf-8")
-    dispatch(_memory_args("access-hints", "--input", str(hints)), None)
+    dispatch(_memory_args("access-hints", "--input", str(hints)), config)
     assert calls == [("knowledge", ("member:m",), {"knowledge_revision": "old"}),
                      ("history", ("member:m",), {}),
                      ("read", ("member:m",), {"knowledge_revision": "old", "source_version": None,

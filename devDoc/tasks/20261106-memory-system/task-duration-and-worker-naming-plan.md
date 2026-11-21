@@ -1,5 +1,7 @@
 # 记忆维护入口、并发与 worker 派工计划
 
+本文保留历史方案。当前维护队伍数量与命名使用[现行波次组织](../20261115-real-use-rectification/maintenance-waves.md#组织与边界)及已安装版 `spawn_arguments`。
+
 2026-11-12（北京时间）。用户已授权执行 **T2 + N2 + S2**。S2 为安装保存宿主并发上限、运行时由纯函数计算组织并生成 prompt；本文件保留已定设计合同，[评估](research/capacity-driven-prompts-20261112.md)保留选型依据。0.11.0.dev1的实际交付、验证和边界见[派工实施结果](dispatch-implementation-result.md)；此前0.10生命周期交付见[实施结果](maintenance-implementation-result.md)。
 
 2026-11-12 后续接续：用户要求结合当前讨论及[“比较相关记忆系统”](codex://threads/01a1cee9-f91b-7cf0-82d0-2e8c8a570a1e)更新维护计划，新增[知识演变与访问规划](#六后续知识维护与检索闭环)。后续评估已移除独立当前理解层，保留现有摘要及按问题整合。T2/N2/S2 已交付；新知识功能尚未实施，不重新打开已完成的入口／并发建设。

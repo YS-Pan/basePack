@@ -12,7 +12,7 @@ MAX_IMAGE_BYTES = 32 * 1024 * 1024
 MAX_SOURCE_PIXELS = 40_000_000
 MAX_REQUEST_INPUTS = 8
 SUPPORTED_CONTEXT_TOKENS = 32768
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("litserve.basepack.embedding")
 
 
 class EmbeddingInputError(ValueError):
@@ -82,22 +82,26 @@ class Qwen3VLEmbedder:
                 "no forward performed for this inference batch. Shorten summaries or split source chunks at semantic boundaries; "
                 "inputs are never truncated.")
 
-    def _release_unused_cache(self):
+    def release_unused_cache(self, *, idle=False):
         import torch
 
         if not self.device.startswith("cuda"):
             return
-        target = self.options["gpu_memory_mib"] * 1024**2
-        if target > 0:
-            reserved = torch.cuda.memory_reserved(self.device)
-            allocated = torch.cuda.memory_allocated(self.device)
-            if reserved > target and reserved > allocated:
-                torch.cuda.empty_cache()
-                logger.info("embedding CUDA cache released: allocated_mib=%.2f reserved_mib=%.2f "
-                            "reserved_after_mib=%.2f soft_target_mib=%s",
-                            allocated / 1024**2, reserved / 1024**2,
-                            torch.cuda.memory_reserved(self.device) / 1024**2,
-                            self.options["gpu_memory_mib"])
+        mib = 1024**2
+        target = self.options["gpu_memory_mib"] * mib
+        if not idle and target <= 0:
+            return
+        reserved = torch.cuda.memory_reserved(self.device)
+        allocated = torch.cuda.memory_allocated(self.device)
+        if not idle and (reserved <= target or reserved <= allocated):
+            return
+        if reserved > allocated:
+            torch.cuda.empty_cache()
+        logger.info("embedding CUDA %s: allocated_mib=%.2f reserved_mib=%.2f "
+                    "allocated_after_mib=%.2f reserved_after_mib=%.2f soft_target_mib=%s",
+                    "idle cache" if idle else "cache released", allocated / mib, reserved / mib,
+                    torch.cuda.memory_allocated(self.device) / mib, torch.cuda.memory_reserved(self.device) / mib,
+                    self.options["gpu_memory_mib"])
 
     def embed(self, values):
         import torch
@@ -131,5 +135,5 @@ class Qwen3VLEmbedder:
                 f"{error} Request input indices exceeding the limit (0-based): {oversized}; "
                 f"request token counts: {counts}.") from error
         finally:
-            self._release_unused_cache()
+            self.release_unused_cache()
         return {"pid": os.getpid(), "embedding_identity": self.identity, "vectors": vectors.tolist()}

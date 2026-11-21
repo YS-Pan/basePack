@@ -1,6 +1,12 @@
 # 项目配置与部署合同
 
-2026-11-18，本项目普通安装 **basePack 0.18.6[behavior]**，正式库仍使用 18080/store-0.17、memory schema 3、共享 embedding 0.15。安装 wheel 的 SHA-256 为 `0c79149a7f7ff01f5a8a09731f855a82d73c7d3738bc3faa0b7cd821b0f0ad71`，69 个包文件与源码和实际安装逐字节一致，`pip check` 通过。已刷新托管入口并核对默认日常 3 档 `gpt-6.2-sol / ultra` 与默认检索 1 档 `gpt-6-luna / max`。两者与迁移前的实际解析一致。代表性 `memory brief` 返回 3 个 mandatory 项，重训后的同一访问模型及 J=4、C=28 经原端点回读确认。
+2026-11-21，本开发仓使用 **basePack 0.18.9[behavior]**，稳定解释器为 `%LOCALAPPDATA%/basePack/runtime/memory-0.18.9/env/Scripts/python.exe`。项目库由 Windows 用户任务按需启动，配置地址为 `http://127.0.0.1:0`，空闲 30 分钟正常关闭。沿用 `.basepack/memory/store-current`、原 UUID、凭据和 schema 3。正式共享 embedding 同步升级至 0.18.9。[实际升级与验收](../tasks/20261120-follow-up/progress.md#正式部署)
+
+同日，其余四个已接入项目切换至同一 0.18.9 客户端环境，各自保留独立物理库、UUID 和恢复入口。四个项目的共享服务启动均指向正式机器配置。[推广验收](../tasks/20261120-follow-up/progress.md#四个既有项目推广)
+
+2026-11-20，0.18.8 已将五个在用项目的库切换至动态端口和按需唤醒，各项目本地保留原生备份与旧入口。[推广与回退记录](../tasks/20261119-windows-user-runtime/progress.md#2026-11-20-推广到其余项目)
+
+2026-11-18，上一版 **basePack 0.18.6[behavior]** 使用 18080/store-0.17、memory schema 3，当时共享 embedding 为 0.15。安装 wheel 的 SHA-256 为 `0c79149a7f7ff01f5a8a09731f855a82d73c7d3738bc3faa0b7cd821b0f0ad71`，69 个包文件与源码和实际安装逐字节一致，`pip check` 通过。实际默认日常 3 档为 `gpt-6.2-sol / ultra`，默认检索 1 档为 `gpt-6-luna / max`。代表性 `memory brief` 返回 3 个 mandatory 项，重训后的同一访问模型及 J=4、C=28 经当时的端点回读确认。
 
 唯一 active 路线为 [20261106-basepack](../../experiments/20261106-basepack/README.md)。实际维护、训练与恢复验收见 [整改进度](../tasks/20261115-real-use-rectification/progress.md)，原证与切换过程见 [实施记录](../tasks/20261115-real-use-rectification/execution.md)。操作入口为 [项目接入](../../experiments/20261106-basepack/docs/setup-project.md)、[管理员说明](../../experiments/20261106-basepack/docs/administrator.md)及 [配置维护要点](../../experiments/20261106-basepack/docs/project-config-maintenance.md)。
 
@@ -14,10 +20,10 @@
 | 机器配置 | 一份 schema 1 TOML，保存显式模型路径、服务地址与资源设施位置 |
 | embedding 服务环境 | 独立共享 Python 3.13 环境，使用兼容 wheel 与锁定依赖，运行时不依赖源码或 tmp；新服务行为须部署对应包并重启后生效 |
 | SurrealDB 程序与项目库 | 官方发行 exe 可共用；每项目独立进程、端口与项目内物理目录，多聊天共用该项目进程 |
-| 运行托管与日志 | 共享模型沿用 Shawl/SCM；项目库可由普通用户手动启动，也可选管理员 SCM；日志分别保存 |
+| 运行托管与日志 | 本机共享模型和已推广的项目库使用 Windows 用户任务。各任务的日志由对应 `runtime status` 返回 |
 | 普通作业容量与策略 | HTCondor 独立安装并唯一维护 |
 
-本机共享服务沿R9使用`C:/ProgramData/basepack/envs/service/`、`D:/AgentTools/bin/shawl-1.9.0/shawl.exe`与`D:/AgentTools/state/basepack/embedding/logs/`。SurrealDB 4.0.0 为 `D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。本项目稳定 Python 为 `D:/AgentTools/envs/basepack-client-0.10/Scripts/python.exe`，目录名中的数字是环境名称，当前包版本见页首。此前 0.18.5 的回退 wheel SHA-256 为 `46c98b794f9ae3a0dc9ea4a7e57163b54c7ba3ceb65101cf0c546a9a3e1d6470`。
+SurrealDB 4.0.0 为 `D:/AgentTools/bin/surrealdb-4.0.0/surreal.exe`。本项目上一版 Python 环境 `D:/AgentTools/envs/basepack-client-0.10/Scripts/python.exe` 随原配置及启动器保留用于回退。此前 0.18.5 的回退 wheel SHA-256 为 `46c98b794f9ae3a0dc9ea4a7e57163b54c7ba3ceb65101cf0c546a9a3e1d6470`。
 
 0.18.5 普通安装当时 69 个源码、wheel、site-packages 文件一致，`pip check` 通过。原23项新原生行为、143项已有prompt/proposal和7项定向检查通过。随后新增2项legacy伪标记/正常接受回归及真实旧portable重放，3项通过23.86秒。普通旧0.18.1实际生成并发布的两份frozen跨版本原样重放保hash/receipt和新记录。0.18.3 全memory首轮666通过、6跳过、8项setup HTTP超时（2646.34秒），新字段25/25通过且无断言失败。fresh同参数8项限定补验全过54.06秒，自有测试实例已核停，初始化超时根因仍待查。新字段仅source版本可选元数据，schema和行为算法不变。
 
@@ -31,7 +37,7 @@
 
 此前0.17.4 wheel的SHA256为`49e9884a11f7be85c78d3a41f2c9945144497376ce423cf1ecc7d57dcc9c50a9`，当时66个包文件逐字节一致、pip check通过。0.17.2同步等待、固定稿、范围和dispositions提示词合同；0.17.3新增共享prepare输出读取合同，139项相关测试及49项安装/渲染检查通过，实际读取效果沿后续阶段观察。0.17.4因实际reader误派新增完整spawn_arguments，最终139相关测试及142安装/渲染静态检查通过；后续干净小批4reader的requested与actual均为Luna/max，4批发布完成9来源，uv.lock部分留续；该样本不保证所有未来host调用。0.17.1修复历史pin闭包，其wheel SHA256为`cd9c12b9b590c8b95f95eada65319b56e4344e9a84db0b96fbdc9142bb80d4bb`，当时65文件逐字节一致、pip check及原失败语义稿freeze通过。0.17.0首次wheel SHA256为`902aaec7f5e426f35636b063fac2939d23fc714a67eadee360cdfd744aea216f`，源码提交`9d3e479`及此前记录提交`73613d7`保留为历史样本。实际修复与维护进展见[实施记录](../tasks/20261115-real-use-rectification/execution.md)，推广事实见[迁移结果](../tasks/20261115-real-use-rectification/migration-result.md)。共享embedding仍为0.15.0/PID31000，未重启或更换模型，原identity、依赖版本和Shawl定义沿用。
 
-本项目正式`.basepack/config.toml`现连接18080及`.basepack/memory/store-0.17`，launcher PID 48740、数据库PID 115116。旧`.basepack/memory/store-0.13`保留但不运行；旧18174及临时18176端口均已关闭。保留的`.basepack/staging-0.17.toml`仅将endpoint改到18080，data_dir仍为本项目`.basepack/memory`，不再表示独立暂存服务。普通memory init已刷新受管根入口，块外业务正文按迁移结果保留。切换前后、init后及配置指针修改后均为J=compiled J=2、C=26、模型`3c69a1307fa077bfb0860ff26277bb78daec95c92afa2aa699fc673d3e64791f`且owner=null；没有合成交付或重训。独立只读验收通过brief、8250/8250兼容内容向量、文本/图片回读、history与实际图边neighbors。首批100候选实际维护已完成，完整全项目维护及其最终恢复点尚待完成。其它项目共用的`D:/AgentTools/envs/basepack-client/`及其数据库未代迁；公共代码通过配置定位，不写死这些本机位置。
+该批切换时，本项目正式`.basepack/config.toml`连接18080及`.basepack/memory/store-0.17`，launcher PID 48740、数据库PID 115116。旧`.basepack/memory/store-0.13`保留但不运行；旧18174及临时18176端口均已关闭。保留的`.basepack/staging-0.17.toml`仅将endpoint改到18080，data_dir仍为本项目`.basepack/memory`，不再表示独立暂存服务。普通memory init已刷新受管根入口，块外业务正文按迁移结果保留。切换前后、init后及配置指针修改后均为J=compiled J=2、C=26、模型`3c69a1307fa077bfb0860ff26277bb78daec95c92afa2aa699fc673d3e64791f`且owner=null；没有合成交付或重训。独立只读验收通过brief、8250/8250兼容内容向量、文本/图片回读、history与实际图边neighbors。首批100候选当时已完成，完整全项目维护及其最终恢复点在该批留续。其它项目当时继续使用各自部署，后续推广见页首。公共代码通过配置定位，不写死这些本机位置。
 
 根 file-structure、agent-team、engineering-judgment 独立维护，resources skill 归 active 实验。memory skill 与英文角色提示词随包安装；`memory guide`无需配置，显式配置的`memory prompt`只渲染唯一协调者，`memory wave worker-prompt/task-prompt`按本地wave／固定任务渲染reader指令。这些只读渲染入口不要求数据库、密码文件或模型在线。独立技能选择完整目录复制到项目 `.agents/skills/`，或联接已有项目原件；同名冲突保留并报告，正确入口复用。`init` 与 core doctor 不安装或验收它们；忽略的本机联接在新检出后重建，核宿主实际发现。开发环境、构建缓存和夹具在根 tmp，交付及回滚 wheel 在实验 dist，选留原证在根 artifacts/runs；寿命见 [文档约定](../documentation.md)。
 
@@ -73,6 +79,7 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 | 机器配置中的相对设施路径 | 相对机器配置文件 |
 | embedding.endpoint | 显式共享 HTTP 地址，本机为 loopback 8765 |
 | embedding.gpu_memory_mib | 可按机器调整的软目标；模板9216 MiB，0关闭按目标释放空闲缓存，不设置分配器硬上限或作为CUDA启动正预算门槛 |
+| embedding.idle_cache_seconds、embedding.idle_stop_seconds | CUDA 空闲缓存回收默认 60 秒，Windows 用户任务空闲退出默认 1,800 秒。可在隔离联验缩短阈值，退出时限大于回收时限 |
 | memory.endpoint/namespace/database | HTTP(S) 显式回环 IP（127/8 或 ::1），拒绝域名/通配/远端及额外 URL 成分；逻辑库不代替物理隔离 |
 | memory.username/password_file | 用户名及唯一 UTF-8 密码文件；路径相对项目根或绝对，省略时为 memory_dir/password.txt |
 | memory.project_id/source_scope | 随项目保留的 UUID；source_scope 在 Git 项目中增加显式包含项，在非 Git 项目中声明新文件发现范围 |
@@ -92,7 +99,13 @@ init 从安装包模板生成配置和 instructions，保留业务内容并合�
 
 依赖由[pyproject.toml](../../experiments/20261106-basepack/pyproject.toml)与uv.lock维护，CUDA来源明确。0.17的behavior extra提供numpy、scipy及锁定的scikit-learn 1.9.1，仅实际训练KL-NMF需要；基础采集、发布、检索及既有模型回读不要求安装训练依赖。系统环境不做清理式同步，共享服务环境不安装无关MCP集成。源码与wheel验证分别核导入位置；普通安装从源码外运行。
 
-共享 embedding 沿用 Shawl/SCM，Manual、LocalSystem、no-restart/kill-process-tree；LitServe 单 worker 常驻，客户端超时只结束等待。项目 SurrealDB 可沿用已有普通用户隐藏手动认证进程。cwd、原生 store、日志与启动材料在项目 memory 目录；serve.ps1 从同一配置取得显式回环地址、username 和密码文件，设置原生认证入口后调用稳定 exe，不启用 unauthenticated。新库一次安全随机生成文件，已有库缺文件时恢复原凭据；launcher 不生成密码。SCM 是管理员可选方式，本轮未配置。basepack 只连接，停止项目库不停止共享模型。
+本机共享 embedding 由 Windows 用户任务 `BasePack.User.Embedding` 托管，使用 `D:/AgentTools/basepack.toml` 和回环端口 `8765`。0.18.9 任务使用 `%LOCALAPPDATA%/basePack/runtime/embedding-0.18.9/env/Scripts/pythonw.exe` 按需启动，沿用原 CUDA 模型和向量身份。空闲 60 秒清 CUDA 缓存，空闲 30 分钟正常退出。客户端超时只结束等待。旧环境及回退范围见[正式部署记录](../tasks/20261120-follow-up/progress.md#正式部署)。共享启动入口为本机 `D:/AgentTools/basepack-embedding-runtime.md`。
+
+项目 SurrealDB 可沿用已有普通用户隐藏手动认证进程。cwd、原生 store、日志与启动材料在项目 memory 目录；serve.ps1 从同一配置取得显式回环地址、username 和密码文件，设置原生认证入口后调用稳定 exe，不启用 unauthenticated。新库一次安全随机生成文件，已有库缺文件时恢复原凭据；launcher 不生成密码。SCM 是管理员可选方式，停止项目库不停止共享模型。
+
+源码提供显式启用的 [Windows 用户任务部署](../../experiments/20261106-basepack/docs/administrator.md#windows-用户任务)。隔离测试经整机重启后，项目库和 CPU embedding 均经真实 Auto Review 按需启动，停止时由 Windows Job Object 回收整棵进程树。[验收进度](../tasks/20261119-windows-user-runtime/progress.md)记录隔离与正式共享设施的实测结果。
+
+0.18.8 的 Windows 项目库可登记固定端口或 `http://127.0.0.1:0`。动态地址由任务在进程、监听和就绪匹配后发布，本次运行的连接信息可由 `runtime status memory` 核对。HTTP、WebSocket 和受管导出恢复沿同一实例准入。启用空闲停机后，任务等待在途操作结束并通知 SurrealDB 正常关闭。保存现有库的 UUID、原 store 和凭据时可切换托管方式。[项目接入](../../experiments/20261106-basepack/docs/administrator.md#windows-用户任务) · [实际部署](../tasks/20261119-windows-user-runtime/progress.md#2026-11-20-动态端口产品接入与单库试点)
 
 改写密码文件不会轮换数据库内的存储账户；轮换由管理员显式更新账户并同步同一文件。访问和认证失败保留原错，客户端不回退无认证。操作见 [管理员部署](../../experiments/20261106-basepack/docs/administrator.md#项目-surrealdb)。
 

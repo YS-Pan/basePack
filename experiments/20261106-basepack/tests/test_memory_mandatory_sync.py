@@ -154,7 +154,7 @@ def test_brief_keeps_original_changes_unknown_without_reading_files(memory, monk
     assert brief["mandatory_known_unsynced_count"] == 0
     assert brief["mandatory"][0]["sync_evidence"]["note"] == (
         "Registered source metadata only; originals not checked.")
-    assert brief["change_check"] == "not checked by brief; use memory changes for maintenance"
+    assert brief["change_check"] == "not checked by brief. Use memory check-file-changes to compare files."
 
 
 def test_brief_checks_the_accepted_basis_version_after_evidence_reacceptance(memory):

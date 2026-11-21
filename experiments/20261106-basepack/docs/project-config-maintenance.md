@@ -72,7 +72,7 @@
 
 | 变更触发 | 同步位置与最小确认 |
 | --- | --- |
-| 数据库 endpoint、namespace/database、`data_dir` 迁移或恢复 | 先收尾活动维护及未明发布，再按 [项目 SurrealDB](administrator.md#项目-surrealdb) / [备份与恢复](memory.md#备份与恢复) 迁移。改配置不移动 store 或迁库，也不绕过旧 owner。同项目保留 UUID；新项目独立目录/端口/身份。核 launcher 配置路径/cwd及旧路径服务定义，跨调用核 `/ready`、目标 UUID 和原知识依据 |
+| 数据库 endpoint、namespace/database、`data_dir` 迁移或恢复 | 先收尾活动维护及未明发布，再按 [项目 SurrealDB](administrator.md#项目-surrealdb) / [备份与恢复](memory.md#备份与恢复) 迁移。同项目保留 UUID 和实际 store。固定／动态模式切换前按原入口停服并注销原任务，再按新配置注册。动态配置保留 `:0`，用 `runtime status memory` 核当次地址，再跨调用核目标 UUID 和原知识依据 |
 | `username`/`password_file` 恢复、迁址或账户轮换 | 客户端与 launcher 使用同一凭据文件。已有库缺文件先恢复原凭据；改写文件不轮换数据库已存账户。确需轮换时按 [数据库管理](administrator.md#项目-surrealdb) 同步账户和文件，只记录路径与结果，用新调用核认证及原知识读取 |
 | 重启系统、修改 launcher、运行账户或托管方式 | 配置正确不代表进程已运行；手动进程按本项目入口重开，同一 store 只启动一次。启动调用结束后另一次调用核 `/ready`，PID 不代替就绪；见 [数据库管理](administrator.md#项目-surrealdb) |
 | embedding endpoint、service_name、model_root、环境或 device 改变 | 同步客户端目标与实际服务启动设置；运行服务不会自动采用新包或启动参数，需要时按 [升级与回滚](administrator.md#升级与回滚) 处理。核 status、identity、实际 device/dtype、attention_backend、supported_context_tokens及gpu_memory_semantics，再做必要的一次编码；仅改客户端包不当然重启共享服务 |

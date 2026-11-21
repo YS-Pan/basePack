@@ -9,7 +9,7 @@
 | 客户端 | [Python](https://www.python.org/downloads/windows/) | 安装 64-bit Python；版本范围以 [包元数据](../pyproject.toml) 为准，记录解释器绝对路径 |
 | 环境与锁定依赖 | [uv](https://docs.astral.sh/uv/getting-started/installation/) | 安装后重新打开终端，运行 `uv --version` |
 | 项目记忆 | [SurrealDB 4.0.0](https://github.com/surrealdb/surrealdb/releases/tag/v4.0.0) | 下载原生 Windows amd64 EXE 到稳定目录并命名为 `surreal.exe`；下文使用此 EXE 的 `start` 命令 |
-| 共享 embedding 托管 | [Shawl](https://github.com/mtkennerly/shawl/releases) | 解压 Windows x64 版到稳定目录 |
+| SCM 托管 | [Shawl](https://github.com/mtkennerly/shawl/releases) | 使用 SCM 时将 Windows x64 版解压到稳定目录 |
 | 普通重任务 | [HTCondor Windows 安装包](https://htcss-downloads.chtc.wisc.edu/tarball/25.x/25.4.0/release/) | 管理员安装单机池，步骤见下文 |
 | CUDA 编码与 GPU 作业 | [NVIDIA 驱动](https://www.nvidia.com/en-us/drivers/) | 安装适合 GPU 和 PyTorch CUDA wheel 的驱动，并完成下文 CUDA 编码冒烟 |
 
@@ -93,6 +93,8 @@ if (-not (Test-Path -LiteralPath $settings.memory_password_file)) {
 }
 ```
 
+若选用 [Windows 用户任务](#windows-用户任务)，准备好凭据后直接注册。以下步骤适用于手动进程或 SCM。
+
 将下面的 `serve.ps1` 保存到配置的 memory.data_dir（默认 `.basepack/memory/`），先创建该目录及 `logs/`。执行账户须能读凭据、读写 store 与日志。替换三个绝对路径；Windows PowerShell 5.1 的 `.ps1` 保存为带 BOM 的 UTF-8。脚本不生成或替换密码，只把同一文件交给 SurrealDB 原生认证入口：
 
 以下示例仅创建 HTTP 服务，endpoint 使用 `http://...`；HTTPS 须按 `surreal start --help` 另配原生 `--web-crt` 和 `--web-key` 证书与密钥参数。
@@ -162,6 +164,36 @@ Start-Service -Name $memoryService
 停止手动进程时确认所属进程树与监听端口退出；SCM 使用 Stop-Service 并等待 Stopped。项目搬迁后更新 cwd/launcher 与日志，保留 project_id。原生 export、配置、业务原件、受管聊天与附件、必要 assets 共同构成恢复集合，步骤见 [备份恢复](memory.md#备份与恢复)。
 
 既有认证项目按 [版本升级](setup-project.md#版本升级) 保留原密码文件、UUID 与恢复集合；0.17 的 memory schema 3 先完成旧库离线桥接与隔离比对，再同步切换客户端／库。`memory init` 不自动迁移旧数据。缺凭据或认证失败按原错恢复，不生成替代密钥。
+
+## Windows 用户任务
+
+手动启动和 SCM 仍可按原方式部署。选用计划任务时，用日常运行该设施的 Windows 用户注册。任务以该用户的普通权限在登录会话中运行，默认按需启动。显式加 `--at-logon` 可在该用户登录时启动。共享 embedding 使用固定的回环 HTTP 端口。项目记忆可使用固定端口，或由 Windows 在每次启动时分配端口。
+
+新登记的任务使用同一服务环境的 `pythonw.exe` 在后台运行。推理 worker 的输出写入任务日志。若已有任务仍用控制台解释器，沿原绑定停止并注销，再登记即可换用后台入口。
+
+- 项目记忆在项目配置的 `[memory]` 设 `windows_task = true`。`[runtime].python` 指向项目目录外独立安装可信 basePack wheel 的绝对解释器路径。准备原凭据和项目独立 store，指定项目目录外已安装的 SurrealDB EXE。
+- 动态端口将 `[memory].endpoint` 设为 `'http://127.0.0.1:0'`。配置保存监听方式，`runtime start memory` 和在线的 `runtime status memory` 返回本次实际地址。使用 basePack 客户端执行读写和[备份恢复](memory.md#备份与恢复)，每次操作使用同一实例。依赖固定 URL 或旧版客户端的项目继续使用固定端口。
+- 共享 embedding 在机器配置的 `[embedding]` 设 `windows_task = true` 和 `windows_task_python = '<absolute-service-python.exe>'`。用项目目录外的服务环境安装可信 wheel 和所选 CPU/CUDA 依赖，准备好锁定模型。一个用户任务供使用同一机器配置的项目共用。
+
+在切换既有设施前，先停止原进程或 SCM 服务并确认端口已释放。记忆还须确认原 store 已关闭。使用与配置绑定的两个解释器从正常 PowerShell 显式注册。
+
+```powershell
+& $python -I -m basepack --config $config runtime register memory --surreal-exe '<absolute-surreal.exe>' --store '<absolute-memory_dir-child-store>'
+& $servicePython -I -m basepack --config $config runtime register embedding
+```
+
+仅为新库在记忆注册命令末尾加 `--create-store`。接手已有库时选择实际的 SurrealKV 子目录，并沿用 UUID、账户和密码文件。注册返回任务名、配置的 endpoint 和日志路径。
+
+共享 embedding 从模型就绪或最后一项编码结束起计时。默认空闲 60 秒后 CUDA worker 释放一次可回收缓存，1800 秒后 Windows 用户任务停止接收推理。HTTP 监听再保留 1 秒，向同期请求返回带回收标记的 503，随后模型和服务进程正常退出。健康、状态探测不续期。隔离验证可在测试机器配置的 `[embedding]` 设置 `idle_cache_seconds` 和 `idle_stop_seconds`，两项均为正秒数，停机时限须大于清缓存时限。用独立端口、服务环境和绑定运行；改变已登记的 embedding 设置时按下述流程重新注册。
+
+项目库注册时可加 `--idle-seconds 1800`，按项目在最后一项受管数据库操作结束后计时。查询、事务和发布期间保留实例。空闲后由任务正常关闭数据库，下一次调用沿已登记的任务启动原库。省略 `--idle-seconds` 时数据库启动后常驻，固定端口可供现有直连工具使用。调用 Python API 时，可用 `basepack.runtime.activity.memory_operation(config)` 包住横跨多次数据库访问的整个操作。`runtime status memory` 可查看实际地址、受管操作和关库状态。
+
+```powershell
+& $python -I -m basepack --config $config runtime start memory
+& $servicePython -I -m basepack runtime --machine-config $machineConfig start embedding
+```
+
+记忆启动等待 `/ready`，再按 [项目接入](setup-project.md#启用记忆) 核 schema、UUID 与 brief。embedding 启动等模型健康和身份校验，再做一次 [编码冒烟](#共享服务与身份)。用同一配置运行 `runtime status|stop|unregister <memory|embedding>`。embedding 也支持上例的 `runtime --machine-config`。状态回显的 `log` 和 `last_task_result` 用于定位启动失败。修改绑定或登录触发前，先用原配置停止任务，确认任务、进程和监听端口已退出，再注销、修改配置并重新注册。
 
 ## 首次准备图文模型
 
@@ -280,7 +312,7 @@ service_name = 'BasepackEmbedding'
 queue_timeout = 600
 ```
 
-endpoint 是同机客户端共享的 loopback 地址。模型加载后常驻，使用一个推理 worker；客户端等待期限与 queue_timeout 的区别见 [资源使用](resources.md#共享-embedding)。
+endpoint 是同机客户端共享的 loopback 地址。单个推理 worker 负责模型和 CUDA 空闲缓存回收。SCM 与前台服务保留模型直至显式停机；Windows 用户任务具有空闲停机和按需唤醒能力。客户端等待期限与 queue_timeout 的区别见 [资源使用](resources.md#共享-embedding)。使用用户会话托管时按 [Windows 用户任务](#windows-用户任务) 注册和启动，再执行下方编码冒烟。以下 Shawl 步骤用于 SCM 托管。
 
 安装 [Shawl 1.9.0](https://github.com/mtkennerly/shawl/releases/tag/v1.9.0) 到稳定目录。在管理员 PowerShell 用原生命令定义服务，替换下面路径：
 
@@ -330,8 +362,8 @@ Shawl 的 log-dir 保存包装器和服务输出。`status` 使用 `/health` 和
 
 保留旧 wheel、机器配置和各项目 [恢复集合](memory.md#备份与恢复)，待共用客户端调用结束并确认维护发布终态后升级。按 [项目升级](setup-project.md#版本升级) 区分客户端入口更新与 schema 迁移；0.17 需先桥接并验证独立旧库副本，切换后核实际 Python、导入位置与目标库。共享 embedding 的协议与语义身份保持兼容，已有服务可继续运行；该客户端升级不要求重启模型或 Condor。
 
-更新共享模型服务时先暂停请求，经 SCM 停止并确认进程树回收，再更新独立环境和配置，启动后执行所选后端的一次编码冒烟。模型、精度或前处理合同改变时按新 identity 补建项目向量；设备或路径变化可复用同身份索引。改变 Condor 容量按上节排空和重启 startd，修改提交规则按影响重载 schedd。
+更新共享模型服务时先暂停请求，经原托管入口停止并确认进程退出，再更新独立环境和配置。使用 Windows 用户任务时，涉及绑定或模型身份的更改在更新前注销任务，再按新设置注册。启动后执行所选后端的一次编码冒烟。模型、精度或前处理合同改变时按新 identity 补建项目向量；设备或路径变化可复用同身份索引。改变 Condor 容量按上节排空和重启 startd，修改提交规则按影响重载 schedd。
 
 回退服务先暂停请求和提交、排空作业，停止并确认整树回收后恢复保留的配置与环境。客户端回退保留项目数据；数据库格式或 schema 回退按对应版本从原生备份恢复。更早接口迁移见 [R9 结果](../../../devDoc/archive/20261107-resource-coordination/r9-result.md)。
 
-卸载时先停止并删除 Windows 服务，再在各目标解释器运行 `python -m pip uninstall basepack`。专用服务环境及共享软件按环境管理器和保留要求清理；模型、项目数据和运行证据由各自维护者决定保留，不随客户端卸载删除。
+卸载时先停止并注销 Windows 用户任务或删除 SCM 服务，再在各目标解释器运行 `python -m pip uninstall basepack`。专用服务环境及共享软件按环境管理器和保留要求清理；模型、项目数据和运行证据由各自维护者决定保留，不随客户端卸载删除。

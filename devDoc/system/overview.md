@@ -22,11 +22,11 @@ brief每任务读取mandatory、跨来源摘要/图节点地图、未映射或�
 
 行为表示只从共同交付逻辑ID学习无正则KL-NMF；默认rank=8、epsilon=0.001、beta=0.2、strength=8是工程初值。固定模型文件位于memory_dir/behavior/<sha256>.json。访问年龄逐原始锚点求Gaussian后加权，以H/R和精确版本标量基准增量编译；未知锚点份额保留为区间，重训重放原始事实后原子切换。读API不补写投影，返回事实/编译截点及未知状态。低权重不删除或排除原文、图、向量和训练ID，mandatory独立保留；数值工件仍属项目受限材料。数值训练使用可选behavior extra，基础采集、发布和检索不依赖训练成功。关系和条件仍由维护作者接受，没有独立当前理解同步层。
 
-项目现状、余项与历史要求触发同一worker完整检索；`memory freshness`脚本只读比较当前Codex清单、采集回执和端点，必要时分页读取指定聊天逐正文核对，返回新增/可能变化/已覆盖/未知。worker补读相关新原证并说明采集截止、待语义范围及未核状态；探查不写记忆、不生成向量，触发仍依赖agent指令。安装升级由独立[basepack-setup](../../experiments/20261106-basepack/skills/basepack-setup/SKILL.md)指向既有操作文档，日常使用和维护仍用随包memory skill。
+项目现状、余项与历史要求触发同一 worker 完整检索。`memory check-codex-capture` 核对聊天采集覆盖，`memory check-file-changes` 核对已登记来源的文件差异。检索 worker 补读相关新原证并说明采集截止、待语义范围及未核状态。安装升级由独立 [basepack-setup](../../experiments/20261106-basepack/skills/basepack-setup/SKILL.md) 指向操作文档，日常使用和维护沿随包 memory skill。
 
 Codex 宿主自动提供项目绑定和完整注册根，线程明确 projectId 优先，字段缺失时按 root/worktree/common-dir 与其它注册项目根排除冲突；无法取证留覆盖缺口，非 Codex 保持文件功能。每聊天导出留在项目 memory 目录并沿原生 source_version 保存，精确回读提供消息身份与正文字节范围。宿主字段、附件及完整分叉/继承范围的实际验收边界见 [本轮进度](../archive/20261110-onboarding-simplification/progress.md)。
 
-机器级 embedding 由 Sentence Transformers 编码、LitServe 管理请求与单推理 worker、Shawl 托管 Windows 服务进程树。设备默认 auto，优先可用 CUDA，否则 CPU；CUDA显式选cuDNN attention，CPU沿原有SDPA路径。每项按含模板／指令／图片的实际token核32768上限，超限forward前422且不截断，文本无独立字节硬限。机器 `gpu_memory_mib` 为软目标，模板9216 MiB，纯文本初始batch4、含图batch1；允许偶发超标／OOM，按需释放超过正目标的空闲缓存。`/info`报告后端、上限和软目标语义。后端、上限及目标不改向量身份，同模型、前处理和FP16的CPU/CUDA向量及未变旧输入继续复用；实际分块／输入变化才重新编码。模型常驻，EmbeddingClient经HTTP调用，客户端等待结束不会中断共享推理。接口与生命周期边界见 [资源模块](modules/resources.md)，实际服务部署状态见[部署合同](deployment.md)。
+机器级 embedding 由 Sentence Transformers 编码，LitServe 管理请求与单个推理 worker。设备默认优先 CUDA，否则 CPU。每项输入按含模板、指令及图片的实际 token 核对 32768 上限。CUDA 服务空闲 60 秒时释放可回收的缓存，Windows 用户任务空闲 30 分钟时正常退出。后续请求按需启动同一模型，继续使用兼容索引。客户端等待结束后，服务端继续处理已接收的预测。配置与生命周期见 [资源模块](modules/resources.md)，实际服务部署状态见 [部署合同](deployment.md)。
 
 普通CPU/GPU作业由CondorClient提交至HTCondor；容量、队列、限时策略、终态和GPU站点策略由Condor维护。basePack保留JSON参数传递、退出码与不确定提交查询恢复，删除额外PID确认和客户端重复作业计时；等待到期只返回observation_expired，不自动取消。共享模型服务位于Condor作业树之外，通过管理员固定背景预留与普通作业并存。项目知识、来源和工具产物属于各自项目，通用模型和机器环境可显式共用。配置、安装和运行目录见[部署合同](deployment.md)。
 

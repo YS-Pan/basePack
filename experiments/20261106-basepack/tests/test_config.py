@@ -305,6 +305,26 @@ def test_memory_endpoint_accepts_explicit_loopback_only(ai_config, endpoint):
     assert load_project_config(ai_config.path).raw["memory"]["endpoint"] == endpoint
 
 
+@pytest.mark.parametrize("endpoint", ["http://127.0.0.1:0", "http://127.0.0.1:0/"])
+def test_memory_endpoint_port_zero_accepts_managed_ipv4_http(ai_config, endpoint):
+    text = ai_config.path.read_text(encoding="utf-8").replace("[memory]\n", "[memory]\nwindows_task=true\n")
+    ai_config.path.write_text(text.replace("http://127.0.0.1:18080", endpoint), encoding="utf-8")
+    config = load_project_config(ai_config.path)
+    assert describe(config)["memory"]["endpoint"] == endpoint
+
+
+@pytest.mark.parametrize("endpoint, managed", [("http://127.0.0.1:0", ""), ("http://127.0.0.1:0", "false"),
+                                               ("http://127.0.0.1:0", "1"), ("https://127.0.0.1:0", "true"),
+                                               ("http://127.0.0.2:0", "true"), ("http://[::1]:0", "true")])
+def test_memory_endpoint_port_zero_rejects_other_address_modes(ai_config, endpoint, managed):
+    text = ai_config.path.read_text(encoding="utf-8").replace("http://127.0.0.1:18080", endpoint)
+    if managed:
+        text = text.replace("[memory]\n", f"[memory]\nwindows_task={managed}\n")
+    ai_config.path.write_text(text, encoding="utf-8")
+    with pytest.raises(ValueError, match=r"dynamic memory endpoint requires memory\.windows_task=true"):
+        load_project_config(ai_config.path)
+
+
 @pytest.mark.parametrize("endpoint", ["http://0.0.0.0:18080", "http://192.168.1.2:18080",
                                       "http://[::]:18080", "http://[2001:db8::1]:18080",
                                       "http://localhost:18080", "http://example.com",

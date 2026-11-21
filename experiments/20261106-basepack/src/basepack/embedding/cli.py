@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 
+from basepack.runtime.recovery import managed
+
 from .client import EmbeddingClient
 
 
@@ -19,7 +21,7 @@ def register_commands(subparsers):
     actions = service.add_subparsers(dest="embedding_action", required=True)
     actions.add_parser("status")
     actions.add_parser("stop")
-    actions.add_parser("serve", help="run LitServe in the foreground; production is hosted by Shawl")
+    actions.add_parser("serve", help="run LitServe in the foreground for a Windows task or Shawl service")
 
 
 def dispatch(args, config=None):
@@ -30,6 +32,9 @@ def dispatch(args, config=None):
         if args.embedding_action == "status":
             return status(machine), 0
         if args.embedding_action == "stop":
+            if managed(machine, "embedding"):
+                from basepack.runtime.control import manage_embedding
+                return manage_embedding(machine, "stop"), 0
             return stop(machine), 0
         from .service import serve
         serve(machine)
