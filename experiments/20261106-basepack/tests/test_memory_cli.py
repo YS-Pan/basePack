@@ -59,6 +59,28 @@ def test_managed_memory_activation_uses_the_task_entry(tmp_path):
     assert "serve.ps1" not in updated
 
 
+def test_memory_init_can_leave_project_instructions_unchanged(tmp_path, monkeypatch):
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    project = tmp_path / "project"
+    config = load_project_config(init_project(project, machine, max_concurrent_subagents=12, concurrency_source="test fixture"))
+    config.raw["memory"]["data_dir"] = ".basepack/candidate"
+    tracked = [project / "AGENTS.md", project / ".basepack/instructions.md"]
+    expected = [path.read_bytes() for path in tracked]
+
+    class Memory:
+        def __init__(self, actual_config):
+            assert actual_config.memory_dir == project / ".basepack/candidate"
+
+        def install_schema(self):
+            return {"installed": True}
+
+    monkeypatch.setattr("basepack.memory.store.Memory", Memory)
+    result, code = dispatch(_memory_args("init", "--no-project-entry"), config)
+    assert (result, code) == ({"installed": True}, 0)
+    assert [path.read_bytes() for path in tracked] == expected
+
+
 @pytest.mark.parametrize("markers", ["<!-- basepack-memory:start -->", "<!-- basepack-memory:end -->",
                                     "<!-- basepack-memory:end -->\n<!-- basepack-memory:start -->",
                                     "<!-- basepack-memory:start -->\n<!-- basepack-memory:start -->\n<!-- basepack-memory:end -->",
@@ -209,7 +231,8 @@ def test_maintain_defaults_to_project_scope_and_passes_control(tmp_path, monkeyp
     assert status == 0 and result["needs_semantic"] == 0
     assert result["codex"]["status"] == "not_configured"
     control = str(Path("task.control").resolve())
-    assert calls == [(["docs/new.md"], {"control": control, "timeout": 600, "include_registered": True})]
+    assert calls == [(["docs/new.md"], {"control": control, "timeout": 600, "include_registered": True,
+                                      "discover_graph": True})]
     assert result["control"] == control
     assert result["discovery"] == {"mode": "configured", "sources": 1, "gaps": []}
     assert "worker" not in result
@@ -318,7 +341,9 @@ def test_observed_version_cli_and_final_delivery_pass_exact_identity(tmp_path, m
                      ("history", ("member:m",), {}),
                      ("read", ("member:m",), {"knowledge_revision": "old", "source_version": None,
                                                "start_line": None, "end_line": None, "locator": None}),
-                     ("neighbors", ("node:n",), {"knowledge_revision": "node-old", "include_stale": True}),
+                     ("neighbors", ("node:n",), {"knowledge_revision": "node-old", "include_stale": True,
+                                                  "direction": "both", "types": [], "scope": "",
+                                                  "allow_private": False, "conditions": None}),
                      ("record_delivery", ("stable-id", manifest), {"context": {"task": "检索"}}),
                      ("access_hints", (manifest,), {})]
 
@@ -505,13 +530,25 @@ def test_delegated_start_captures_and_runs_preflight_as_the_same_coordinator(tmp
     attempt, control = launch["attempt_id"], launch["control"]
     assert not Path(control).exists()
     assignment = launch["spawn_arguments"]
-    assert "collect-prompt" in assignment["message"] and "render_command" in assignment["message"]
+    message = assignment["message"]
+    assert "collect-prompt" in message and "render_command" in message
+    assert "Run the supplied preflight command first in the normal project sandbox" in message
+    assert ("Only if the host confirms that Windows failed to launch the process before preflight executed "
+            "and this session routes shell escalation to Auto-review, request at most one review "
+            "for that exact invocation using the host's per-command escalation option.") in message
+    assert "Keep the command, working directory, parent `--holder`, `--control`, and scope unchanged." in message
+    assert "Give the actual launch error and the original preflight purpose as the reason." in message
+    assert ("If review is denied or unavailable, report the launch error and the review outcome to the parent "
+            "and leave preflight pending.") in message
+    assert ("If the command may have run or its result is unknown, stop and report to the parent for reconciliation "
+            "without repeating preflight.") in message
+    assert "its emitted `argv`" in message and "separately from any collection or preflight approval." in message
     prompt, _ = dispatch(_memory_args("collect-prompt", "--attempt", attempt), config)
     assert 'sandbox_permissions="require_escalated"' in prompt["prompt"]
     assert all(part in prompt["command"] for part in (attempt, prompt["registry"], prompt["receipt"]))
     assert not Path(prompt["registry"]).exists() and not Path(prompt["receipt"]).exists()
-    assert prompt["receipt"] in assignment["message"]
-    assert "'--retained'" not in assignment["message"]
+    assert prompt["receipt"] in message
+    assert "'--retained'" not in message
 
     captured = ".basepack/memory/codex/new-chat.txt"
     receipt = _collection_receipt(config, [captured])
@@ -597,7 +634,12 @@ def test_maintain_discovers_git_project_and_emits_complete_worker_command(tmp_pa
     control = Path(result["control"])
     assert control.is_absolute() and control.parent == config.memory_dir / "maintenance"
     assert str(control) in worker["render_command"] and str(receipt) in worker["render_command"]
-    assert calls[0][1] == {"control": str(control), "timeout": 600, "include_registered": True}
+    bootstrap, command = worker["spawn_arguments"]["message"].rsplit("\n", 1)
+    assert "normal project sandbox" in bootstrap and "Auto-review" in bootstrap
+    assert "`Rejected` wrapper" in bootstrap and '`sandbox_permissions="require_escalated"`' in bootstrap
+    assert command == worker["render_command"]
+    assert calls[0][1] == {"control": str(control), "timeout": 600, "include_registered": True,
+                           "discover_graph": True}
     material = json.loads(receipt.read_text(encoding="utf-8"))
     assert material["layout"] == result["layout"]
     assert worker["task_name"] == f"bp_mem_{result['owner']['run_id'][:8]}_coord_0"
@@ -693,7 +735,11 @@ def test_collect_cli_is_independent_of_store_and_maintenance_owner(tmp_path, mon
     monkeypatch.setattr("basepack.memory.collection.collect", lambda *a, **kw: calls.append((a, kw)) or result)
     assert dispatch(_memory_args("collect", "--codex-registry", "registry.json", "--output", str(output)), config) == (
         {"status": "captured", "output": str(output)}, 0)
-    assert calls == [((config, "registry.json"), {"output": str(output)})]
+    assert dispatch(_memory_args("collect", "--thread", "first", "--thread", "second"), config) == (result, 0)
+    assert calls == [
+        ((config, "registry.json"), {"output": str(output)}),
+        ((config, None), {"output": None, "thread_ids": ["first", "second"]}),
+    ]
     assert owner.status(config.memory_dir) is None
 
 

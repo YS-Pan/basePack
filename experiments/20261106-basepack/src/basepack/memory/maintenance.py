@@ -63,7 +63,8 @@ def check(path):
     begin_commit(path)
 
 
-def maintain(memory, scope, *, include_registered=False, control=None, timeout=600, expected_snapshots=None):
+def maintain(memory, scope, *, include_registered=False, control=None, timeout=600,
+             expected_snapshots=None, discover_graph=False):
     """Refresh mechanically equivalent originals and retain a semantic handoff.
 
     This is an explicit maintenance action. Query actions never call it.
@@ -261,9 +262,11 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
             mechanical_dependency_pending.update(accepted_ids)
             continue
         from .draft import freeze
-        receipts.append(memory.apply(freeze([{'sources': [candidates[path]['source'] for path in sorted(group)],
-                                      'expected': {row['id']: row['knowledge_revision'] for row in members},
-                                      'members': accepted}], config=memory.config), control=control, timeout=timeout))
+        batch = freeze([{'sources': [candidates[path]['source'] for path in sorted(group)],
+                         'expected': {row['id']: row['knowledge_revision'] for row in members},
+                         'members': accepted}], config=memory.config)
+        batch['expected_status'] = {row['id']: not (row['stale'] or row['retired']) for row in members}
+        receipts.append(memory.apply(batch, control=control, timeout=timeout))
         accepted_scope.extend({'path': path, 'revision': candidates[path]['source']['revision']} for path in sorted(group))
         refreshed_privacy.update(group)
         reused_chunks.extend(member for path in sorted(group) for member in candidates[path]['reused'])
@@ -272,6 +275,8 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
                    and (include_registered or in_scope(row['path']))}
         members = memory._rows('member')
 
+    if receipts:
+        nodes, edges = memory._rows('node'), memory._rows('semantic')
     semantic = {}
     for change in changes:
         if change['kind'] in {'added', 'deleted'} and change['path'] not in completed_empty:
@@ -503,14 +508,16 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
         item['related_nodes'] = related_nodes
         item['related_edges'] = [row for row in edges if not row['retired'] and (
             row['in'] in ids | node_ids or row['out'] in ids | node_ids or
+            item['path'] in row.get('scope_paths', ()) or
             any(basis['member'] in ids for basis in row.get('basis', [])))]
     selected_ids = {row['id'] for row in members if row['path'] in by_path}
     relevant_graph = {row['id'] for row in nodes if any(
         basis['member'] in selected_ids for basis in row.get('basis', []))}
     relevant_graph.update(row['id'] for row in edges if (
         row['in'] in selected_ids | relevant_graph or row['out'] in selected_ids | relevant_graph or
+        any(path in by_path for path in row.get('scope_paths', ())) or
         any(basis['member'] in selected_ids for basis in row.get('basis', []))))
-    pending_relations = [{'id': row['id'], 'basis': row.get('basis', [])}
+    pending_relations = [{'id': row['id'], 'basis': row.get('basis', []), 'scope_paths': row.get('scope_paths', [])}
                          for row in [*nodes, *edges] if row['stale'] and not row['retired']
                          and (include_registered or row['id'] in relevant_graph)]
     reports = feedback.pending(memory)
@@ -526,11 +533,26 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
                                      'current_revision': 'discovery_observation',
                                      'candidate_versions': 'prepare_current_and_report_accepted_revision',
                                      'new_candidates': 'outside_this_receipt'}}
+    graph_candidates = []
+    if discover_graph:
+        from .graph_maintenance import nominate
+        from .graph_review import reviewed_pairs
+
+        if control:
+            check(control)
+        eligible = {path: row for path, row in by_path.items()
+                    if path not in change_by_path and path not in semantic}
+        graph_candidates = nominate(memory, members=members, eligible_sources=eligible,
+                                    reviewed=reviewed_pairs(memory.config.memory_dir))
+        material['graph_candidates'] = graph_candidates
     destination = memory.config.memory_dir / 'maintenance'
     destination.mkdir(parents=True, exist_ok=True)
     receipt = destination / f'{uuid4().hex}.json'
     receipt.write_text(json.dumps(material, ensure_ascii=False, indent=2), encoding='utf-8')
-    return {'mechanical_batches': len(receipts), 'reused_chunks': len(reused_chunks), 'semantic_sources': len(semantic),
-            'pending_relations': len(pending_relations), 'feedback': len(pending_feedback),
-            'needs_semantic': bool(semantic or pending_relations or pending_feedback),
-            'receipt': str(receipt)}
+    result = {'mechanical_batches': len(receipts), 'reused_chunks': len(reused_chunks), 'semantic_sources': len(semantic),
+              'pending_relations': len(pending_relations), 'feedback': len(pending_feedback),
+              'needs_semantic': bool(semantic or pending_relations or pending_feedback or graph_candidates),
+              'receipt': str(receipt)}
+    if discover_graph:
+        result['graph_candidates'] = len(graph_candidates)
+    return result

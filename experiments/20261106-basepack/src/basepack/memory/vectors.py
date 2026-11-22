@@ -64,8 +64,13 @@ def embed_members(memory, ids=None, *, timeout=600) -> dict:
                          f"OR embedding_identity!={_sql(identity)} OR embedded_revision!=input_revision OR embedding=NONE);")[0]}
 
 
-def vector_coverage(memory, identity, *, scope="") -> dict:
-    scope_filter = f"stale=false AND retired!=true AND string::starts_with(path, {_sql(scope)})"
+def _scope_filter(scope, allow_private):
+    privacy = "" if allow_private else " AND private=false"
+    return f"stale=false AND retired!=true AND string::starts_with(path, {_sql(scope)}){privacy}"
+
+
+def vector_coverage(memory, identity, *, scope="", allow_private=True) -> dict:
+    scope_filter = _scope_filter(scope, allow_private)
     total, compatible = memory._execute(
         f"SELECT id,path FROM member WHERE {scope_filter}; "
         f"SELECT VALUE id FROM member WHERE {scope_filter} AND embedding_identity={_sql(identity)} "
@@ -76,15 +81,15 @@ def vector_coverage(memory, identity, *, scope="") -> dict:
             "pending": len(missing), "pending_members": missing}
 
 
-def vector_search(memory, text, *, scope="", limit=12, timeout=600):
-    scope_filter = f"stale=false AND retired!=true AND string::starts_with(path, {_sql(scope)})"
+def vector_search(memory, text, *, scope="", limit=12, timeout=600, allow_private=True):
+    scope_filter = _scope_filter(scope, allow_private)
     if not memory._execute(f"SELECT VALUE id FROM member WHERE {scope_filter} LIMIT 1;")[0]:
         result = {"matches": [], "vector_coverage": {"identity": None, "total": 0, "compatible": 0, "pending": 0, "pending_members": []}}
         return result
     result = EmbeddingClient(memory.config.machine).embed([text], timeout=timeout)
     identity = result["embedding_identity"]
     vector = _sql(result["vectors"][0])
-    coverage = vector_coverage(memory, identity, scope=scope)
+    coverage = vector_coverage(memory, identity, scope=scope, allow_private=allow_private)
     if not coverage["compatible"]:
         raise ValueError("No compatible memory vectors in scope: not indexed, embedding_identity changed, "
                          "or embedded_revision differs from input_revision. Run memory embed to rebuild them. "
@@ -99,9 +104,9 @@ def vector_search(memory, text, *, scope="", limit=12, timeout=600):
     return result
 
 
-def hybrid_search(memory, text, *, scope="", limit=12, timeout=600, literal=False):
-    lexical = memory.search(text, scope=scope, limit=limit, literal=literal)
-    result = vector_search(memory, text, scope=scope, limit=limit, timeout=timeout)
+def hybrid_search(memory, text, *, scope="", limit=12, timeout=600, literal=False, allow_private=True):
+    lexical = memory.search(text, scope=scope, limit=limit, literal=literal, allow_private=allow_private, access=False)
+    result = vector_search(memory, text, scope=scope, limit=limit, timeout=timeout, allow_private=allow_private)
     combined = {}
     for name, candidates in [("lexical_rank", lexical), ("vector_rank", result["matches"])]:
         for rank, candidate in enumerate(candidates, 1):

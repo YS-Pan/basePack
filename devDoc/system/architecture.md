@@ -2,6 +2,8 @@
 
 当前唯一active路线为[20261106-basepack](../../experiments/20261106-basepack/README.md)。本页描述0.18系列结构与边界；实际安装版本、wheel及验收状态以[部署说明](deployment.md)为唯一维护源，维护范围与余项沿[进度](../tasks/20261115-real-use-rectification/progress.md)。0.16既有验收见[整改结果](../tasks/20261115-real-use-rectification/result.md)和[维护实测](../tasks/20261115-real-use-rectification/maintenance-20261116-result.md)。[逻辑图](diagrams.md)标明各图版本；技术合同及尚待验证的目标见[目标架构](../tasks/20261115-real-use-rectification/target-architecture.md)。
 
+0.19 的现行记忆库为 schema 4。统一图、精确历史和旧库迁移见[0.19 公开说明](../tasks/20261122-memory-graph-redesign/progress.md)。
+
 ## 当前组成
 
 ```text

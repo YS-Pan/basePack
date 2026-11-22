@@ -7,7 +7,7 @@ from pathlib import Path
 
 _LOCAL_ACTIONS = frozenset({
     "guide", "rank", "freeze", "stop", "owner", "release", "recover-owner",
-    "prompt", "stage", "maintain-start", "collect-prompt", "collect", "check-codex-capture",
+    "prompt", "stage", "maintain-start", "collect-prompt", "collect", "check-codex-capture", "codex-trial",
     "retrieve", "retrieval-dispatch", "retrieval-prompt", "retrieval-receipt",
 })
 
@@ -16,17 +16,23 @@ _COMMAND_GROUPS = (
         ("brief", "Read published startup knowledge and known gaps."),
         ("search", "Search published knowledge."),
         ("retrieve", "Prepare a retrieval assignment for the host to launch."),
+        ("graph-query", "Find versioned evidence and relationships in a bounded graph round."),
         ("read", "Read a member and its evidence."),
+        ("read-source", "Read a retained original snapshot at its exact location."),
         ("knowledge", "Inspect an accepted knowledge record."),
         ("history", "List retained knowledge versions."),
         ("neighbors", "Follow evidence and relationships."),
+        ("graph-coverage", "Count fresh knowledge vertices touched by business relationships."),
+        ("basis-dependents", "Find current knowledge that cites exact member versions."),
         ("guide", "Locate the installed memory guide."),
     )),
     ("Sources", (
         ("check-codex-capture", "Compare active and archived project Codex chats with capture records."),
         ("check-file-changes", "Compare selected files with registered source versions."),
+        ("inventory", "Inspect project originals and suggest source groups without starting maintenance."),
         ("sources", "List registered project sources."),
         ("collect", "Capture Codex originals."),
+        ("codex-trial", "Reserve trial creation and exclude registered trial chats from collection."),
         ("prepare", "Prepare fixed source evidence and observed knowledge versions."),
     )),
     ("Maintenance and publication", (
@@ -100,11 +106,24 @@ def register_commands(subparsers):
     actions["feedback-resolve"].add_argument("--control", required=True, help="Current maintenance owner's control file")
     actions["feedback-resolve"].add_argument("--expected-revision", help="Target version confirmed after handling")
     actions["collect"].add_argument("--codex-registry", help="Explicit Codex project registry")
+    actions["collect"].add_argument("--thread", action="append",
+                                    help="Collect this project-owned chat and its verified descendants; repeat as needed")
     actions["collect"].add_argument("--attempt", help="Parent's delegated maintenance attempt ID")
+    trials = actions["codex-trial"].add_subparsers(dest="trial_action", required=True)
+    trials.add_parser("status", help="Inspect the formal collection trial registry")
+    trials.add_parser("begin", help="Pause fresh formal collection before creating a trial chat")
+    registered = trials.add_parser("register", help="Exclude the created trial root and resume formal collection")
+    registered.add_argument("--reservation", required=True, help="Pending token returned by begin")
+    registered.add_argument("--thread", required=True, help="Confirmed Codex trial chat UUID")
+    cancelled = trials.add_parser("cancel", help="Resume formal collection after verifying no chat was created")
+    cancelled.add_argument("--reservation", required=True, help="Pending token returned by begin")
+    actions["init"].add_argument("--no-project-entry", action="store_true",
+                                 help="Install the schema without refreshing project instructions")
     actions["collect-prompt"].add_argument("--attempt", required=True, help="Attempt ID returned by maintain-start")
     actions["prepare"].add_argument("--paths", nargs="+", required=True,
                                     help="Project-relative files; enumerate directories first")
     actions["prepare"].add_argument("--historical-versions", help="JSON array of explicitly observed historical {id, knowledge_revision}")
+    actions["prepare"].add_argument("--expected-revisions", help="JSON object of fixed project paths and raw revisions, or null for a missing original")
     actions["freeze"].add_argument("--drafts", nargs="+", required=True, help="Reader-scoped UTF-8 JSON drafts")
     publication = actions["publish"].add_mutually_exclusive_group(required=True)
     publication.add_argument("--completed", help="Ordered JSON list of completed {path, file_sha256, assignment} drafts")
@@ -126,6 +145,7 @@ def register_commands(subparsers):
     actions["search"].add_argument("--scope", default="", help="Project-relative path prefix; empty searches the whole project. Put business constraints in --text")
     actions["search"].add_argument("--limit", type=int, default=12)
     actions["search"].add_argument("--literal", action="store_true", help="With hybrid: prioritize case-insensitive path/title/text substring matches")
+    actions["search"].add_argument("--public-only", action="store_true", help="Search and report only explicitly public material")
     actions["search"].add_argument("--mode", choices=["hybrid", "vector"],
                                  help="Override memory.search_mode from the project config")
     actions["search"].add_argument("--timeout", type=float, default=600)
@@ -137,11 +157,41 @@ def register_commands(subparsers):
     actions["read"].add_argument("--start-line", type=int, help="Evidence start line (inclusive)")
     actions["read"].add_argument("--end-line", type=int, help="Evidence end line (inclusive)")
     actions["read"].add_argument("--locator", help="Text-column or image evidence locator as a JSON object")
+    graph = actions["graph-query"]
+    graph.add_argument("--request", help="Reuse a prepared retrieval request and record this round's observations")
+    graph.add_argument("--text", help="This round's question or search terms")
+    graph.add_argument("--seed", action="append", default=[], help="Named logical or exact record ID; repeat as needed")
+    graph.add_argument("--seed-versions", help="UTF-8 JSON array of {id, knowledge_revision} for explicitly observed versions")
+    graph.add_argument("--branch", action="append", default=[], help="Follow in:TYPE or out:TYPE; repeat as needed")
+    graph.add_argument("--conditions", help="Known conditions as a JSON object to exclude conflicting structured values")
+    graph.add_argument("--scope", help="Graph round's project-relative path prefix")
+    graph.add_argument("--include-private", action="store_true", help="Include private evidence when authorized")
+    graph.add_argument("--include-stale", action="store_true", help="Follow non-current edges for historical inspection")
+    graph.add_argument("--literal", action="store_true", help="Prioritize literal matches when selecting hybrid-search seeds")
+    original = actions["read-source"]
+    original.add_argument("id", help="Exact source_version ID")
+    original.add_argument("--start-line", type=int, help="Evidence start line (inclusive)")
+    original.add_argument("--end-line", type=int, help="Evidence end line (inclusive)")
+    original.add_argument("--locator", help="Text-column or image evidence locator as a JSON object")
+    original.add_argument("--scope", default="", help="Project-relative path prefix")
+    original.add_argument("--include-private", action="store_true", help="Include private evidence when authorized")
     actions["neighbors"].add_argument("id")
     actions["neighbors"].add_argument("--knowledge-revision", help="Expand the observed knowledge version")
     actions["neighbors"].add_argument("--include-stale", action="store_true", help="Explicit historical inspection")
+    actions["neighbors"].add_argument("--direction", choices=["in", "out", "both"], default="both")
+    actions["neighbors"].add_argument("--type", action="append", default=[], help="Published edge type; repeat as needed")
+    actions["neighbors"].add_argument("--conditions", help="Known conditions as a JSON object to exclude conflicting structured values")
+    actions["neighbors"].add_argument("--scope", default="", help="Project-relative path prefix")
+    actions["neighbors"].add_argument("--include-private", action="store_true", help="Include private evidence when authorized")
+    actions["basis-dependents"].add_argument("--anchors", required=True,
+                                             help="UTF-8 JSON array of observed {id, knowledge_revision, source_version} member records")
+    actions["basis-dependents"].add_argument("--scope", default="", help="Scope anchors, dependents and evidence to this project-relative path prefix")
+    actions["basis-dependents"].add_argument("--public-only", action="store_true", help="Require explicitly public anchors, dependents and evidence")
     actions["knowledge"].add_argument("id", help="Member, node or semantic relation ID")
     actions["knowledge"].add_argument("--knowledge-revision", help="Observed knowledge version; default is current")
+    for name in ("read", "knowledge"):
+        actions[name].add_argument("--scope", default="", help="Require the exact version to match this project-relative path prefix")
+        actions[name].add_argument("--public-only", action="store_true", help="Require the exact version to be explicitly public")
     actions["history"].add_argument("id", help="List retained knowledge versions and actual history coverage")
     actions["delivery"].add_argument("--input", required=True, help="Host-confirmed final receipt: delivery_id, items [{id, knowledge_revision}], optional context")
     actions["access-hints"].add_argument("--input", required=True, help="UTF-8 JSON array of observed {id, knowledge_revision} records")
@@ -150,6 +200,8 @@ def register_commands(subparsers):
     file_check = actions["check-file-changes"]
     file_check.add_argument("--scope", nargs="+", required=True, help="Project-relative files or directories")
     file_check.add_argument("--deep", action="store_true", help="Verify file content hashes")
+    actions["inventory"].add_argument("--collection", help="Existing verified collection receipt; otherwise inspect retained originals")
+    actions["inventory"].add_argument("--group-map", help="Project-relative source grouping manifest")
     for name in ("maintain", "maintain-start"):
         maintain = actions[name]
         maintain.add_argument("--scope", nargs="+", help="Restrict the actual workset to these project-relative paths")
@@ -192,6 +244,7 @@ def register_commands(subparsers):
     request.add_argument("--question", help="Business question; the host runs the returned retrieval assignment")
     request.add_argument("--request", help="Reuse a prepared request and its stable delivery ID")
     retrieve.add_argument("--scope", default="", help="Project-relative path prefix; empty means the whole project")
+    retrieve.add_argument("--include-private", action="store_true", help="Authorize private evidence within this retrieval")
     retrieve.add_argument("--budget", type=int, default=6000, help="Returned text character budget (default: 6000)")
     retrieve.add_argument("--slot", type=int, default=0, help="Parent-owned retrieval slot")
     retrieve.add_argument("--available-subagents", type=int, help="Host raw free subagent seats; zero uses the main agent")
@@ -330,8 +383,14 @@ def _dispatch(args, config):
     elif action == "collect":
         from .collection import collect
         options = {"attempt_id": args.attempt} if args.attempt is not None else {}
+        if args.thread is not None:
+            options["thread_ids"] = args.thread
         result = collect(config, args.codex_registry, output=args.output, **options)
         return ({"output": result["receipt"], "status": result["status"]} if args.output else result), 0
+    elif action == "codex-trial":
+        from .collection import codex_trial
+        return codex_trial(config, args.trial_action, reservation=getattr(args, "reservation", None),
+                           thread_id=getattr(args, "thread", None)), 0
     elif action == "retrieval-receipt":
         from .retrieval import make_delivery_receipt
         result = make_delivery_receipt(config, args.request, load_json_file(args.ranked),
@@ -343,13 +402,25 @@ def _dispatch(args, config):
         from .retrieval import prepare_retrieval
         result = prepare_retrieval(config, question=args.question, request_path=args.request,
                                    scope=args.scope, budget=args.budget, slot=args.slot,
-                                   available_subagents=args.available_subagents, level=args.level)
+                                   available_subagents=args.available_subagents, level=args.level,
+                                   allow_private=args.include_private)
     else:
         from .store import Memory
         memory = Memory(config)
         if action == "retrieval-start":
             from .retrieval import start_retrieval
             result = start_retrieval(memory, args.request)
+        elif action == "graph-query":
+            from .graph_retrieval import graph_query
+            from .retrieval import retrieval_graph_round
+            versions = load_json_file(args.seed_versions) if args.seed_versions else []
+            if not isinstance(versions, list):
+                raise ValueError("--seed-versions must contain a JSON array")
+            options = {"seeds": [*args.seed, *versions], "branches": args.branch, "literal": args.literal,
+                       "include_stale": args.include_stale, "allow_private": args.include_private,
+                       "conditions": json.loads(args.conditions) if args.conditions is not None else None}
+            result = (retrieval_graph_round(memory, args.request, text=args.text, scope=args.scope, **options)
+                      if args.request else graph_query(memory, args.text or "", scope=args.scope or "", **options))
         elif action == "behavior-train":
             options = {key: getattr(args, key) for key in ("epsilon", "beta", "strength")
                        if getattr(args, key) is not None}
@@ -377,12 +448,20 @@ def _dispatch(args, config):
                              expected_revision=args.expected_revision, control=args.control)
         elif action == "init":
             result = memory.install_schema()
-            _activate(config)
+            if not args.no_project_entry:
+                _activate(config)
         elif action == "sources":
             result = memory.sources()
+        elif action == "inventory":
+            from .inventory_work import inventory_report
+            result = inventory_report(config, memory, collection=args.collection, group_map_path=args.group_map)
         elif action == "prepare":
+            options = {}
+            if args.expected_revisions is not None:
+                options["expected_revisions"] = json.loads(args.expected_revisions)
             result = memory.prepare(args.paths, historical_versions=(load_json_file(args.historical_versions)
-                                                                    if args.historical_versions else None))
+                                                                    if args.historical_versions else None),
+                                    **options)
         elif action == "apply":
             result = memory.apply(json.loads(Path(args.batch).read_text(encoding="utf-8")),
                                   control=args.control, timeout=args.timeout)
@@ -390,21 +469,61 @@ def _dispatch(args, config):
             result = memory.embed_members(args.ids, timeout=args.timeout)
         elif action == "search":
             mode = args.mode if args.mode is not None else config.memory_search_mode
+            visibility = {"allow_private": False} if args.public_only else {}
             if mode == "vector":
                 if args.literal:
                     raise ValueError("--literal requires --mode hybrid; vector mode does not support literal matching.")
-                result = memory.vector_search(args.text, scope=args.scope, limit=args.limit, timeout=args.timeout)
+                result = memory.vector_search(args.text, scope=args.scope, limit=args.limit, timeout=args.timeout,
+                                              **visibility)
             else:
                 result = memory.hybrid_search(args.text, scope=args.scope, limit=args.limit,
-                                              timeout=args.timeout, literal=args.literal)
+                                              timeout=args.timeout, literal=args.literal, **visibility)
         elif action == "read":
-            result = memory.read(args.id, knowledge_revision=args.knowledge_revision, source_version=args.source_version,
+            revision = args.knowledge_revision
+            record_id = args.id
+            if args.scope or args.public_only:
+                row = _visible_record(memory, args.id, revision, scope=args.scope, public_only=args.public_only)
+                if row["record_type"] != "member":
+                    raise ValueError("read requires a member ID")
+                record_id, revision = row["id"], row["knowledge_revision"]
+                _visible_record(memory, args.source_version or row["source_version"], None,
+                                scope=args.scope, public_only=args.public_only)
+            result = memory.read(record_id, knowledge_revision=revision, source_version=args.source_version,
                                  start_line=args.start_line, end_line=args.end_line,
                                  locator=json.loads(args.locator) if args.locator else None)
+            if args.scope or args.public_only:
+                from .graph_query_store import filter_record_details
+                result["member"] = filter_record_details(memory, result["member"], scope=args.scope,
+                                                         allow_private=not args.public_only)
+        elif action == "read-source":
+            from .graph_query_store import read_source_version
+            result = read_source_version(memory, args.id, scope=args.scope, allow_private=args.include_private,
+                                         start_line=args.start_line, end_line=args.end_line,
+                                         locator=json.loads(args.locator) if args.locator else None)
         elif action == "neighbors":
-            result = memory.neighbors(args.id, knowledge_revision=args.knowledge_revision, include_stale=args.include_stale)
+            result = memory.neighbors(args.id, knowledge_revision=args.knowledge_revision, include_stale=args.include_stale,
+                                      direction=args.direction, types=args.type, scope=args.scope,
+                                      allow_private=args.include_private,
+                                      conditions=json.loads(args.conditions) if args.conditions is not None else None)
+        elif action == "graph-coverage":
+            from .graph_coverage import coverage
+            result = coverage(memory)
+        elif action == "basis-dependents":
+            result = memory.basis_dependents(load_json_file(args.anchors), scope=args.scope,
+                                             allow_private=not args.public_only)
         elif action == "knowledge":
-            result = memory.knowledge(args.id, knowledge_revision=args.knowledge_revision)
+            revision = args.knowledge_revision
+            record_id = args.id
+            if args.scope or args.public_only:
+                row = _visible_record(memory, args.id, revision, scope=args.scope, public_only=args.public_only)
+                if args.id.startswith(("member:", "node:", "semantic:")):
+                    revision = row["knowledge_revision"]
+                else:
+                    record_id = row["exact_id"]
+            result = memory.knowledge(record_id, knowledge_revision=revision)
+            if args.scope or args.public_only:
+                from .graph_query_store import filter_record_details
+                result = filter_record_details(memory, result, scope=args.scope, allow_private=not args.public_only)
         elif action == "history":
             result = memory.history(args.id)
         elif action == "access-hints":
@@ -417,6 +536,18 @@ def _dispatch(args, config):
         elif action == "check-file-changes":
             result = memory.changes(args.scope, deep=args.deep)
     return _output(result, args.output), 0
+
+
+def _visible_record(memory, identifier, revision, *, scope, public_only):
+    from .graph_query_store import get_vertex, resolve_seed
+    from .query import normalize_scope
+
+    scope = normalize_scope(scope)
+    exact = resolve_seed(memory, identifier, knowledge_revision=revision)
+    row = get_vertex(memory, exact, scope=scope, allow_private=not public_only) if exact is not None else None
+    if row is None:
+        raise ValueError("Exact record unavailable within the requested scope and visibility")
+    return row
 
 
 def _output(result, output):
@@ -466,10 +597,13 @@ def _maintain(config, args, claim, *, memory=None):
     expected_snapshots = {item["path"]: item["sha256"] for item in codex.get("snapshots", ())
                           if item["path"] in selected_captures}
     options = {"expected_snapshots": expected_snapshots} if expected_snapshots else {}
+    if args.scope is None and args.mode == "manual":
+        options["discover_graph"] = True
     result = memory.maintain(scope, control=control, timeout=args.timeout,
                              include_registered=args.scope is None, **options)
     layout = maintenance_layout(config, mode=args.mode, available_subagents=args.available_subagents,
-                                work_items=max(result["semantic_sources"], result["pending_relations"],
+                                work_items=max(result["semantic_sources"],
+                                               result["pending_relations"] + result.get("graph_candidates", 0),
                                                result["feedback"]),
                                 run_id=claim["owner"]["run_id"])
     codex_info = {key: value for key, value in codex.items() if key not in ("paths", "snapshots", "capture")}

@@ -284,7 +284,7 @@ def access_hints(memory, items):
     return result
 
 
-def behavior_candidates(memory, anchors, limit=20, scope=""):
+def behavior_candidates(memory, anchors, limit=20, scope="", *, allow_private=True):
     active, _, projections, _, _, _, _ = _snapshot(memory, read_facts=False)
     if not active or not active.get("active"):
         return {"model": None, "candidates": []}
@@ -299,7 +299,12 @@ def behavior_candidates(memory, anchors, limit=20, scope=""):
     scored = [(influence_bounds(model, logical, shares, model["beta"]), logical)
               for logical in model["vectors"]]
     scored.sort(key=lambda pair: (-pair[0][0], pair[1]))
-    rows = memory._execute("SELECT id,knowledge_revision,stale,retired,path FROM member,node,semantic;")[0]
+    visible = "" if allow_private else " WHERE private=false"
+    visible_edges = "" if allow_private else " WHERE head.private=false"
+    objects, relations = memory._execute(
+        f"SELECT id,knowledge_revision,stale,retired,path FROM member,node{visible}; "
+        f"SELECT id,knowledge_revision,stale,retired FROM semantic{visible_edges};")
+    rows = objects + relations
     current = {_key(row)[0]: row for row in rows if row.get("knowledge_revision")}
     candidates = []
     for interval, logical in scored:

@@ -69,10 +69,11 @@ def test_history_preserves_exact_summary_original_and_invalidated_relation(memor
     updated = batch_for(memory, "# 数据库\n数据库离线运行并隔离项目。\n\n# 保留\n资料必须保留。\n", previous=batch)
     updated["members"][0]["text"] = "数据库必须离线运行并保留资料。"
     updated["members"][1]["text"] = "数据库必须离线运行并隔离项目。"
-    # Replacing a node invalidates the old edge without accepting a new edge.
+    # Explicitly correcting an endpoint invalidates the old relation.
     updated["nodes"][0]["text"] = "离线使用本地数据库"
     updated["edges"] = []
-    updated["corrections"] = [{"id": "fix_guide", "target": guide, "reason": "增加离线条件"}]
+    updated["corrections"] = [{"id": "fix_guide", "target": guide, "reason": "增加离线条件"},
+                              {"id": "fix_local", "target": "node:local", "reason": "增加离线条件"}]
     memory.apply(freeze([updated]))
 
     current = memory.knowledge(guide)
@@ -93,8 +94,8 @@ def test_history_preserves_exact_summary_original_and_invalidated_relation(memor
     assert old_edge["knowledge_revision"] in {row["knowledge_revision"] for row in history["versions"]}
     edge = memory.knowledge("semantic:requires")
     assert edge["stale"] is True
-    assert edge["knowledge_revision"] != old_edge["knowledge_revision"]
-    assert memory.knowledge("semantic:requires", knowledge_revision=old_edge["knowledge_revision"])["stale"] is False
+    assert edge["knowledge_revision"] == old_edge["knowledge_revision"]
+    assert edge["exact_id"] == old_edge["exact_id"]
     with pytest.raises(ValueError, match="Knowledge version not found"):
         memory.knowledge(guide, knowledge_revision="never-observed")
     old_graph = memory.neighbors("node:local", knowledge_revision=old_node["knowledge_revision"], include_stale=True)
@@ -113,10 +114,12 @@ def test_retirement_keeps_prior_member_and_dependent_edge_versions(memory):
     memory.apply(freeze([{"sources": [], "expected": expected, "delete_members": [storage]}]))
     retired = memory.knowledge(storage)
     assert retired["retired"] is True
-    assert retired["knowledge_revision"] != old["knowledge_revision"]
-    assert memory.knowledge(storage, knowledge_revision=old["knowledge_revision"])["retired"] is False
+    assert retired["knowledge_revision"] == old["knowledge_revision"]
+    exact = memory.prepare(["guide.md"])["sources"][0]["members"]
+    exact_id = next(row["exact_id"] for row in exact if row["id"] == storage)
+    assert memory.knowledge(exact_id)["retired"] is False
     assert memory.knowledge("semantic:requires")["stale"] is True
-    assert memory.knowledge("semantic:requires", knowledge_revision=edge["knowledge_revision"])["stale"] is False
+    assert memory.knowledge("semantic:requires", knowledge_revision=edge["knowledge_revision"])["exact_id"] == edge["exact_id"]
     assert memory.read(storage, knowledge_revision=old["knowledge_revision"])["original"]["text"] == old["text"]
 
 
@@ -130,8 +133,8 @@ def test_legacy_change_requires_an_actual_recorded_preimage(memory):
     updated["nodes"][0]["text"] = "离线使用本地数据库"
     updated["edges"] = []
     memory.apply(freeze([updated]))
-    # Recreate a pre-history-installation gap: change has the member's exact
-    # previous record, but the old implicit edge invalidation had no preimage.
+    # The audit contains the member's preimage, and the relation remains
+    # addressable through the native graph independent of its head archive.
     memory._execute("DELETE knowledge_version WHERE "
                     f"(target={_sql(_record(guide))} AND knowledge_revision='{old_member['knowledge_revision']}') OR "
                     f"(target=semantic:requires AND knowledge_revision='{old_edge['knowledge_revision']}');")
@@ -139,11 +142,10 @@ def test_legacy_change_requires_an_actual_recorded_preimage(memory):
     assert restored["text"] == old_member["text"]
     assert memory.read(guide, knowledge_revision=old_member["knowledge_revision"])["member"]["text"] == old_member["text"]
     assert memory.history(guide)["coverage"]["complete"] is False
-    with pytest.raises(ValueError, match="Knowledge version not found"):
-        memory.knowledge("semantic:requires", knowledge_revision=old_edge["knowledge_revision"])
+    assert memory.knowledge("semantic:requires", knowledge_revision=old_edge["knowledge_revision"])["exact_id"] == old_edge["exact_id"]
 
 
-def test_intermediate_stale_and_retired_versions_are_addressable(memory):
+def test_correction_and_retirement_preserve_one_exact_content_version(memory):
     batch = freeze([batch_for(memory, TEXT)])
     memory.apply(batch)
     storage = batch["members"][2]["id"]
@@ -160,13 +162,10 @@ def test_intermediate_stale_and_retired_versions_are_addressable(memory):
     retired = {target: memory.knowledge(target) for target in targets}
     assert all(row["retired"] is True for row in retired.values())
     for target in targets:
-        assert len({original[target]["knowledge_revision"], stale[target]["knowledge_revision"],
-                    retired[target]["knowledge_revision"]}) == 3
-        versions = {row["knowledge_revision"]: row for row in memory.history(target)["versions"]}
-        assert versions[original[target]["knowledge_revision"]]["stale"] is False
-        assert versions[stale[target]["knowledge_revision"]]["stale"] is True
-        assert versions[stale[target]["knowledge_revision"]]["retired"] is False
-        assert versions[retired[target]["knowledge_revision"]]["retired"] is True
+        assert original[target]["knowledge_revision"] == stale[target]["knowledge_revision"] == retired[target]["knowledge_revision"]
+        versions = memory.history(target)["versions"]
+        assert len(versions) == 1
+        assert versions[0]["retired"] is True
 
 
 def test_failed_native_transaction_does_not_leave_history_or_partial_changes(memory):

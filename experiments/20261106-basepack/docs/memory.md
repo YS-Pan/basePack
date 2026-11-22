@@ -37,7 +37,7 @@ memory check-file-changes --scope '资料目录'
 
 prepare 时包括本批所用依据与关系两端的材料；它固定实际读到的原件及知识版本，提供新旧编号原文、已有与关联成员、节点、关系及私有标记，图片返回可打开的原图路径。已有 fresh 记录已钉的 basis／parent／endpoint 历史依赖自动按 `(ID, knowledge_revision)` 保全；缺失旧版本明确报错，不替换为 current。当前 expected 并发保护独立保留，private 沿实际版本传播；作者显式选择旧端点仍用下述 `--historical-versions`。长单行提供有界片段及 `locator:{start_col,end_col}`，使用 0-based Unicode 字符偏移、右端不含，行号仍为 1-based 闭区间。关联记录的原文仍需 read 或扩充 prepare 核实。将材料交给订阅 agent，在同次阅读中选择语义边界、摘要、节点和图边；结构备读单元只用于定位。批次合同在 `memory guide` 返回的已安装 skill 中，源码维护源为 [SKILL.md](../src/basepack/memory/SKILL.md)。
 
-作者 draft 以 `prepare:{path,file_sha256}` 引用固定阅读包，选择 `sources:["项目相对路径"]` 并声明内容、位置、依据与处置。程序编译 source revision、expected 依赖闭包、UUID 与 private，作者不用抄写这些机械字段。新成员省略 ID，已有记录使用 prepare 中的 ID；局部成员／节点引用由编译器解析，跨 draft 保留作用域，重复更新报错。需要关联已观察的历史端点时，prepare 加 `--historical-versions <JSON文件>`，内容为 `{id,knowledge_revision}` 数组，固定其历史分类。冻结稿及映射必须保留，重试复用同一文件，已提交的相同批次返回原回执。旧库升级先按 [版本升级](setup-project.md#版本升级) 完成相应离线迁移。详细合同见[批次接口](../src/basepack/memory/SKILL.md#direct-batch-interface)。
+作者 draft 以 `prepare:{path,file_sha256}` 引用固定阅读包，选择 `sources:["项目相对路径"]` 并声明内容、位置、依据与处置。程序编译 source revision、expected 依赖闭包、UUID 与 private，作者不用抄写这些机械字段。新成员、节点和边省略 `id`，由冻结分配。修改已有记录时使用固定 prepare 中的 ID。离线检索试验的影子图 ID 仅用于对应试验。局部成员／节点引用由编译器解析，跨 draft 保留作用域，重复更新报错。需要关联已观察的历史端点时，prepare 加 `--historical-versions <JSON文件>`，内容为 `{id,knowledge_revision}` 数组，固定其历史分类。冻结稿及映射必须保留，重试复用同一文件，已提交的相同批次返回原回执。旧库升级先按 [版本升级](setup-project.md#版本升级) 完成相应离线迁移。详细合同见[批次接口](../src/basepack/memory/SKILL.md#direct-batch-interface)。
 
 `publish` 将核稿、freeze/validate、独占保存 frozen 和原 apply 顺序组合；CLI 与 Python 共用 `basepack.memory.publish` helper。`completed.json` 是有序 JSON 数组，每项为 `{"path":"<draft.json>","file_sha256":"<文件字节SHA256>","assignment":"<具体交付引用>"}`；相对路径按调用进程 cwd 解析。数组顺序即 draft 作用域顺序。一个完成稿可直接发布，多稿合组或拆组由 publisher 判断；各次发布各自原子。作者须针对该 assignment 显式交付，publisher 根据已有自有句柄声明完成；文件出现或整个聊天结束都不能代替它。
 
@@ -76,6 +76,8 @@ apply 核对来源版本，以及本批改写、退役、更正目标、实际�
 
 任务开始按生成入口取得一次 brief，同任务接续沿用。直觉预计不超过十分钟时跳过整个自动 maintain，包括预检、采集和取得 owner；明显更长时，在宿主有可取消子任务句柄及开始/完成事件的条件下，与业务并行启动一次全项目维护。范围明显扩大时重新判断，必要时首次启动，不等待计时门槛。子任务遵循委托和渲染提示词，不递归开维护。用户明确要求维护时用 `--mode manual`，不受时长门槛限制；缺少宿主生命周期能力时说明自动维护不可用，采用显式维护任务。
 
+作者在日常阅读、分块和摘要时推理并核证关系。未限域的手动维护也可补查未变来源。程序用实际共同交付和少量有界共读提名精确版本，读者按实际原证判断方向、条件和用途。`has_basis` 已保存实际引用，建立其它类型需要独立证据。关闭回执的 `graph_reviews` 记录实际接受、核无边和待核结果。用 `memory graph-coverage` 观察当前图覆盖，选择下一批应核的材料。 [边类型和作者约定](../src/basepack/memory/SKILL.md#select-a-graph-edge-type)
+
 原父用自己的宿主 thread 身份启动。若已知本轮剩余 subagent 容量，传 `--available-subagents <A>`。此数扣除检索等实际占用，程序再从中预留协调者恢复席位：
 
 ```powershell
@@ -84,7 +86,11 @@ memory maintain-start --mode automatic --holder '<原父 thread 身份>'
 
 `prepared` 返回 `attempt_id`、control、`spawn_arguments` 与收尾命令。原父保存这些值，按返回参数实际派一次协调者。遇 `busy` 报告已有 owner。遇 `capacity_unavailable` 保留语义余项，可在授权范围内使用普通 `memory maintain --available-subagents 0` 做机械维护。此时使用原父 holder、新 control 和相应来源选择，沿普通维护收尾。该路径不自动请求采集审批。
 
-绑定 Codex 的项目可传 `--collection <成功回执>` 消费已有采集，或传 `--retained` 使用已保留原件。省略两个选项时，由协调者按 `memory collect-prompt --attempt <id>` 采集新原件。本轮授权允许采集失败后继续使用已有原件时，原父传 `--allow-retained`。受影响的 Windows Codex 在宿主允许 Auto-review 时仅为独立采集命令请求一次审批。采集及等待审批期间，本次尝试不持有维护 owner。协调者随后在普通沙箱中使用原父 holder/control 执行预检。纯文件项目直接进入预检。
+绑定 Codex 的项目可传 `--collection <成功回执>` 消费已有采集，或传 `--retained` 使用已保留原件。省略两个选项时，由协调者按 `memory collect-prompt --attempt <id>` 采集新原件。本轮授权允许采集失败后继续使用已有原件时，原父传 `--allow-retained`。受影响的 Windows Codex 在宿主允许 Auto-review 时为独立采集命令请求一次审批。采集及等待审批期间，本次尝试不持有维护 owner。纯文件项目直接进入预检。
+
+协调者先在普通沙箱中使用原父 holder/control 执行生成的预检。当 Windows 宿主明确确认进程启动失败且命令未执行时，支持 Auto-review 的会话可为同一命令和工作目录请求一次审查。结果未明时交原父对账，保留实际错误与已取得的回执。
+
+协调者和读者启动时会先读取各自的只读角色提示。初始派工消息说明如何从工具正文识别未执行的 Windows 启动失败，并使用 `sandbox_permissions="require_escalated"` 或宿主的等价选项请求一次原命令自动审查。读者取得提示后按原波次封口和 `go` 流程领取。
 
 已知普通沙箱无法采集且没有合格 Auto-review 路径时，报告采集缺口，常规维护保持非交互。命令启动前拒绝审批时记录宿主结果，启动后失败则保留原错和可取得的回执。显式维护仅在授权范围内改用保留原件，其当前聊天 freshness 保持未知。加载采集回执核项目归属和原件 hash，回执固定逐聊天观察，prepare 固定实际读到的版本。分别报告采集与语义维护结果。
 
@@ -112,6 +118,8 @@ memory maintain-start --mode automatic --holder '<原父 thread 身份>'
 6. Terra第二turn用 `finish` 核固定引用和执行边界，按汇总覆盖与异常沿现有编译器唯一发布：`memory wave publish --completed <有序固定引用JSON> --frozen <稳定新frozen路径> --result <稳定结果路径>`。该调用固定publication intent，重入沿原frozen／结果接续，固定publication结果后即FINAL；正常成功不逐稿全文重读或加语义审计。followup受理后Terra可能先于通知ack完成，因此Terra不等ack、不做wave close，也不为此增加第三turn。原父任务观察Terra FINAL与最后Luna的通知ack／宿主终态后机械执行 `memory wave close`；pending结果未知时按宿主事实恢复，不重发通知。必要共读及普通修稿交相应作者，形成有限修复波。初始化、执行终态、发布接受及维护完成分别报告，任何一个回执都不代替其余结果。
 
 已确认publisher终态、无提交且owner.publications为空时，原父任务可用 `memory wave publication-failed --error <原错> --publisher-ended --no-commit` 固定错误并终止旧intent，未发稿保留给有限修复波。未知提交仍保留原intent与owner，不能标失败或重发；先沿原固定frozen及数据库回执核结果。
+
+波次回执记录协调者、任务作者、固定稿路径和哈希。作者稿省略 `context`。新冻结的波次批次省略缺少宿主实证的发布者 `context`，旧稿中的值保留在其原文件中。
 
 任务的 `paths` 仅列当前stage的remaining.paths内拟处置来源；无stage时限原receipt的 `workset.included`，包含本轮已授权纳入的stable来源。它授权这些来源及其成员的必要修改；`write_targets` 协调共享节点／关系的写归属，空列表不让已授权路径的成员变成只读。可选 `read_paths` 只为额外共读，prepare可读两者，但draft.sources与member.path必须属于paths。图／feedback-only任务可用 `paths=[]`，必要时先检索；新发现来源不自动纳入本波接受；后续wave仍须满足当时的固定授权范围。
 
@@ -143,6 +151,14 @@ memory maintain-start --mode automatic --holder '<原父 thread 身份>'
 
 ## 来源检查
 
+`memory inventory [--collection <已验证回执>] [--group-map <项目相对 JSON 路径>] [--output <报告>]` 只读盘点全项目。来源为默认发现、库中登记和本项目保留聊天的并集。报告分别给出原件版本、原路径、登记状态、缺口和建议分组。默认使用现存聊天原件，覆盖现行性未知。无需维护 owner。
+
+可选分组清单形状为 `{"schema_version":1,"groups":[{"id":"paper-1","members":[{"path":"article.tex","revision":"<原字节 SHA-256>","role":"body"}]}]}`。每个成员按版本核验。组内可附 `shared_ranges`，每项包括 `path`、`representative`、`evidence` 和两端行范围：`ranges:[{start_line,end_line,representative_start_line,representative_end_line}]`。清单声明已核范围，派工保留其余原件和独有内容。分组报告和清单遵循项目私有资料边界。
+
+协调者可给现有 `memory wave create` 传 `--inventory <报告> --groups <组 ID...>`，替代手写 `--tasks`。先用明确的来源路径做维护预检。程序取选中组和实际语义工作集的交集，每组生成一个任务。`--read-paths` 给选中组补充指定的只读依据，适合只写大型阅读包中的少量文件。组内已有身份依据的未登记同字节副本可以共享阅读，现有来源的独立维护义务保留。建波和读者准备包分别核验所用版本。
+
+读者在原任务范围内补读和修稿。发现需要改组或新增写入范围时，将证据、受影响位置、已完成范围和建议改动写入回执。原父核定发布结果、关闭本波后，协调者据此安排下一波。盘点和共享阅读均不计为语义接受。
+
 - `memory check-codex-capture [--codex-registry <json>] [--thread <id>]` 默认对照本项目的活跃和归档 Codex 聊天与采集记录，返回新增、可能变化、已覆盖和未知。对相关候选及用户点名的项目聊天加 `--thread`，逐段核对正文。跨项目引用通过宿主读取。按各聊天的采集位置报告未采集、已变化、实际补读和未知项。端点和 `updatedAt` 用于筛选候选，正文覆盖以逐段比较为准。返回的预检 pending 是当时的快照。
 - `memory check-file-changes --scope <文件或目录> ... [--deep]` 按指定的项目相对路径对照磁盘与项目库登记的来源版本。加 `--deep` 同时校验内容哈希。Codex 状态库受限时，仍可连接项目库单独检查文件。通过维护工作集发现待重核摘要，并分别检查已发布知识的向量覆盖。
 
@@ -157,6 +173,12 @@ Windows Codex 沙箱已知会拦截 Codex 状态库访问，或检查实际遇�
 受管聊天原文保存在 `memory.data_dir/codex/<thread>.txt`，版本 hash 属于该导出的真实 UTF-8 字节。接受后沿现有 source_version 保存快照；`read` 的 `original.chat_locations` 从所选已核快照返回聊天链接、thread/turn/item/part、UTF-8 字节范围及本次读取的正文交集，生成头与分隔符不当作人类原文。旧已发布版本可在原聊天续写或修订后继续核实。
 
 可读取且格式受支持的 `localImage` 按内容 hash 复制到 `memory.data_dir/codex-attachments/`，作为独立图片原件进入同一维护范围。语义回执的 `codex` 及 reader 提示提供项目 ID、本轮采集回执（如有）和保留聊天/附件目录；worker 按随包 skill 从采集记录或历史 framed 原件核对同项目及同附件的 chat part 身份，实际打开图片，再将原记录身份作为 locator 接受。附件缺失、身份不可核或格式不支持时留 gap；真实聊天附件仍未验，不能据模拟 PNG 回归宣称全部附件可用。
+
+固定聊天样本可运行 `memory collect --thread <聊天 UUID>`，多项重复传 `--thread`。程序先核对所有指定聊天的项目归属，再读取它们及可证的引用后代，回执记录 `selected_root_thread_ids` 及实际快照。随后将成功回执交给 `memory maintain --collection`。省略 `--thread` 时，采集仍使用整个绑定项目的匹配范围。
+
+在同一 Codex 项目创建隔离试验聊天时，先确认正式采集及派工入口都已使用支持试验登记的客户端。用正式配置执行 `memory codex-trial begin`，持久暂停正式采集。创建成功后执行 `memory codex-trial register --reservation <返回的令牌> --thread <实收聊天 UUID>`，恢复正式采集并排除该根及可证后代。用 `memory codex-trial status` 核对预留和已登记根。宿主确证没有创建聊天后可用 `cancel --reservation <令牌>` 解除预留。创建结果未明时保留预留并核宿主回执。将 `codex-trials.json` 随正式记忆目录备份。
+
+试验配置使用独立的记忆目录、物理库、UUID 和凭据，沿用实际 Codex 项目绑定。用 `memory init --no-project-entry` 初始化，随后只采本批固定聊天并使用该配置的采集回执。
 
 当前宿主列表中的部分项目/父子字段缺失时依项目根与 worktree 证据归属；显式 subagent 引用须以直接 thread/read 返回的父级身份核对且无项目冲突，才递归采集。无法确认的范围明确留 gap。附件不可取时、引用的 subagent 未能列出或读取时也保留缺口，不按不存在退役旧知识。完整分叉/继承身份、附件原件及全部聊天覆盖仍未完成真实验收；采集回执、语义待核与向量覆盖分别检查，`pending=0` 不等于全部聊天已接受。
 
@@ -187,7 +209,9 @@ if ($LASTEXITCODE -ne 0) { throw "memory example failed ($LASTEXITCODE)" }
 
 任务开始执行一次 brief；同任务跨 shell 读写、反馈及维护收尾沿用已获内容，目标或上下文实质变化时按需补取。shell 初始化与任务启动的维护源是 [生成模板](../src/basepack/project/templates/memory-enabled.md)，实际 Python／配置见本项目 `.basepack/instructions.md#startup`。
 
-brief 只读已发布 mandatory、概况入口与已知缺口，不做 embedding、任务搜索或原件扫描。mandatory 无条件保留；stale 条目保留为待核义务。概况从跨来源摘要／节点取得有界候选，默认展示 6 条时最多精算 48 条候选、总上限 96；候选按 UTC 日轮换展示采样，无持久状态，也不改变 J/C、hits 或年龄。候选组内按 Gaussian 访问区间上／下界保守排序，跨结构组交错，低权重始终保留检索资格；选中项披露实际模型、游标和区间。它仍须读取现有摘要／投影，并披露未映射来源、未读范围和遗漏，不承诺常数成本或完整语义覆盖，也不建立“当前理解”缓存。已知少量文件直接同批阅读；需要发现项目概况、任务前提、过去要求或跨材料依据时，用统一入口：
+brief 只读已发布 mandatory、概况入口与已知缺口，不做 embedding、任务搜索或原件扫描。mandatory 无条件保留；stale 条目保留为待核义务。概况从跨来源摘要／节点取得有界候选，默认展示 6 条时最多精算 48 条候选、总上限 96；候选按 UTC 日轮换展示采样，无持久状态，也不改变 J/C、hits 或年龄。候选组内按 Gaussian 访问区间上／下界保守排序，跨结构组交错，低权重始终保留检索资格；选中项披露实际模型、游标和区间。它仍须读取现有摘要／投影，并披露未映射来源、未读范围和遗漏，不承诺常数成本或完整语义覆盖，也不建立“当前理解”缓存。
+
+按项目根 `AGENTS.md` 的[检索规则](../src/basepack/project/templates/agents-enabled.md)决定是否派工。读点名聊天时沿引用核对后续发布。使用 `memory retrieve` 准备检索请求。
 
 ```powershell
 memory retrieve --question '历史要求如何演变？'
@@ -200,7 +224,11 @@ CLI 准备派工。宿主按返回的 `task_name`、`model` 和 `reasoning_effor
 
 一次实际委托由同一 worker 先运行 `memory retrieval-start --request <request.json>`，固定行为筛选之前的基础锚点、逻辑 ID 份额、基础质量、逐版本观察截点、query/episode、预算与策略，再取得行为候选。后续补充 search → 必要原文与图关系回读 → 一次 0–100 综合评分 → UTF-8 `scored.json` → rank；内部多轮复用同一锚点包。访问区间、行为支持度及模型截点是辅助线索，相关性、适用条件和证据价值为主；低权重关键材料仍可进入，mandatory 独立交付。rank 只按综合分排序、去重和预算选择，不二次调权或记账。保存或 rank 失败时保留原错、已读证据和未完成阶段。
 
-候选、read/knowledge、scored、rank 与最终清单一路保留实际观察的 `id`／`knowledge_revision` 及已有 `private` 标记，原证的 `source_version`／`revision`、范围或图片 locator 另记。`record_type:'node'|'semantic'` 的独立知识节点／语义关系可无路径和行号，保留实际 basis、endpoint_versions；不能伪造来源来套成员格式。关系与条件用于判断本次适用性，区分用户要求、助手假设、代码事实和实验观察；旧要求热度不使其恢复现行身份，仍有效的旧实验可继续影响当前回答。完整评分形状与宿主步骤见 [随包 skill](../src/basepack/memory/SKILL.md#retrieve-in-one-delegation)。
+评分前按题意、原证版本和适用条件选择摘录。重要主张和必要限定使用最小一组相容原证，最终排名后核对整组是否齐全。缺必要支持时收窄主张并报告缺口。需要的历史比较与反证明确标明用途，混合段按精确行列回读适用范围。所有观察过的候选版本都保留在候选清单。`rank` 按原文行列判定范围覆盖，保留同一长行的互不覆盖列区间。
+
+按需检索每轮使用 `graph-query` 查有界多跳邻域，默认最多四个起点、两跳、单点十二条邻边、整轮九十六条邻边及十二个短候选。结果带实际路径、关系条件和预算截断。程序按本轮问题、路径和同一访问快照的提示初排。worker 回读原证，按缺口改写下一轮的子问题、换起点或限定方向和类型，再独立评分。首轮基础锚点供请求内各轮行为记账使用。
+
+候选、精确回读、综合评分和最终清单保留实际观察的 `id`、`knowledge_revision` 和已标记的 `private`。知识版本、边的精确 ID、原件的 `source_version` 及行范围或图片 locator 分别保留。通过 `has_basis` 和 `from_snapshot` 回读原件，按 `supersedes` 和 `contradicts` 检查现行适用范围与反证。完整评分和宿主步骤见 [随包 skill](../src/basepack/memory/SKILL.md#retrieve-in-one-delegation)。
 
 worker 把实际观察的候选版本保存为 `candidates.json` 数组（含基础、行为、补检索和选中项），保留当时返回的 `access_model`、`access_compiled_j`、`access_fact_j` 和 `access_interval`。同版本有不同模型／游标观察时分别保留；不事后查新版覆盖。保存 rank 输出后生成固定 context 的交付回执：
 
@@ -219,11 +247,17 @@ context 必须保留锚点及其 `alpha`／`base_quality`、逐版本 `knowledge
 memory knowledge '<id>' --knowledge-revision '<实见版本>'
 memory history '<id>'
 memory neighbors '<id>' --knowledge-revision '<实见版本>'
+memory neighbors '<id>' --direction in --type contradicts
+memory graph-query --request '<request.json>' --text '<本轮子问题>' --branch in:supersedes
+memory read-source '<source_version>' --start-line 10 --end-line 14
+memory basis-dependents --anchors '<anchors.json>'
 memory read '<basis.member>' --knowledge-revision '<该成员实见版本>' --source-version '<basis.source_version>' --start-line <basis.start_line> --end-line <basis.end_line>
 memory access-hints --input '<items.json>'
 ```
 
-neighbors 的 `unpinned_children`／`unpinned_edges` 是存量端点版本未知的线索，按 basis 回源核实并保留缺口，不能当作精确历史链接。access-hints 输入为 `[{"id":"<id>","knowledge_revision":"<实见版本>"}]`。Python 对应 `Memory.knowledge/history/read/neighbors/access_hints/record_delivery`；复用返回的 canonical ID 和版本值，不在交付时回查当前记录补旧版身份。成员 ID 是程序分配的 UUID；直接使用返回的完整身份。
+`neighbors` 的普通邻域、按类型筛选和双向查询返回同一条边的精确 ID。给明确观察到的历史版本时保留该版本，`--include-stale` 扩大查询状态。收到 `source_version` 和定位后，用 `read-source` 读保存的精确原件。access-hints 输入为 `[{"id":"<id>","knowledge_revision":"<实见版本>"}]`。使用返回的完整 ID 和版本，交付旧版时沿用当时观察的身份。
+
+查哪些现行记录引用了已观察的成员原证时，使用 `basis-dependents --anchors` 或 `Memory.basis_dependents(anchors)`。锚点文件为包含 `id`、`knowledge_revision` 和 `source_version` 的 JSON 数组。每项返回轻量 `record` 与 `matched_anchors`，覆盖成员、节点和图关系。可用 `--scope <路径前缀>` 和 `--public-only` 限定锚点、结果和结果中的依据。按返回版本用 `knowledge` 读取引用该原证的记录，也可沿 `has_basis` 回读原证。
 
 ```powershell
 memory search --text '主题'

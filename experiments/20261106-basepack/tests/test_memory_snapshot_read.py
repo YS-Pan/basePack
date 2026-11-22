@@ -92,10 +92,44 @@ def test_retired_records_are_not_returned_even_without_stale_flag(memory):
     memory.apply(batch)
     storage = batch["members"][2]["id"]
     memory._execute(f"UPDATE {_sql(_record(storage))} SET retired=true, stale=false; "
-                    "UPDATE semantic:requires SET retired=true, stale=false;")
+                    "UPDATE (semantic:requires.head.state) SET status='retired';")
     assert storage not in {row["id"] for row in memory.search("数据库")}
     assert memory.neighbors("node:local")["edges"] == []
     assert memory.neighbors("node:local", include_stale=True)["edges"][0]["id"] == "semantic:requires"
+
+
+def test_scoped_neighbors_keep_native_edge_and_filter_nested_provenance(memory):
+    draft = batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n")
+    outside = memory.config.root / "outside" / "c.md"
+    outside.parent.mkdir()
+    outside.write_bytes(b"Outside evidence.\n")
+    prepared = memory.prepare(["guide.md", "outside/c.md"])
+    draft["sources"] = [{key: source[key] for key in ("path", "revision")} for source in prepared["sources"]]
+    draft["expected"] = prepared["expected"]
+    draft["edges"][0]["basis"] = [
+        {"path": "guide.md", "start_line": 2, "end_line": 2},
+        {"path": "outside/c.md", "start_line": 1, "end_line": 1},
+    ]
+    batch = freeze([draft])
+    receipt = memory.apply(batch)
+    exact = receipt["edge_versions"]["semantic:requires"]
+    unrestricted = memory.neighbors("node:local", types=("requires",))
+    assert len(unrestricted["edges"][0]["direct_basis"]) == 2
+    assert "outside/c.md" in unrestricted["edges"][0]["scope_paths"]
+
+    scoped = memory.neighbors("node:local", types=("requires",), scope="guide.md", allow_private=False)
+    assert [row["id"] for row in scoped["adjacency"]] == [exact]
+    edge, = scoped["edges"]
+    assert edge["exact_id"] == exact
+    assert edge["endpoint_versions"] == unrestricted["edges"][0]["endpoint_versions"]
+    assert edge["basis"] == unrestricted["edges"][0]["basis"]
+    assert edge["direct_basis"] == [
+        {"source_version": edge["basis"][0]["source_version"], "start_line": 2, "end_line": 2},
+    ]
+    assert edge["scope_paths"] == ["guide.md"]
+    root = memory.neighbors(batch["members"][0]["id"], types=("version_of",), scope="guide.md", allow_private=False)
+    assert root["record"]["id"] == batch["members"][0]["id"]
+    assert root["record"].get("parent_version") is None
 
 
 def test_codex_message_identity_and_text_survive_source_update_in_saved_snapshot(memory):

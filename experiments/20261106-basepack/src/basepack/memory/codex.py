@@ -85,6 +85,19 @@ def list_threads(client, *, control=None, checkpoint=None):
     return threads
 
 
+def thread_parent(thread):
+    """Read the direct parent reported by either Codex metadata representation."""
+    source = thread.get('source')
+    subagent = source.get('subAgent') if isinstance(source, dict) else None
+    # Codex can return a null parentThreadId for a persisted thread spawn.
+    spawn = subagent.get('thread_spawn') if isinstance(subagent, dict) else None
+    spawned_by = spawn.get('parent_thread_id') if spawn else None
+    parent = thread.get('parentThreadId')
+    if parent and spawned_by and parent != spawned_by:
+        raise ValueError(f"Codex thread {thread['id']} has conflicting parents")
+    return parent or spawned_by
+
+
 def _items(client, thread_id, control, checkpoint=None):
     # Capture a persisted endpoint first, so an active conversation cannot keep
     # extending this maintenance run indefinitely.
@@ -153,6 +166,7 @@ def _render(project_id, thread, items, memory_dir, control, checkpoint=None):
     locations, gaps, attachments = [], [], []
     referenced = set()
     thread_id = thread['id']
+    parent = thread_parent(thread)
     for row in items:
         item = row['item']
         if item['type'] == 'subAgentActivity':
@@ -169,7 +183,7 @@ def _render(project_id, thread, items, memory_dir, control, checkpoint=None):
             meta = {'project_id': project_id, 'thread_id': thread_id, 'turn_id': row['turnId'],
                     'item_id': item['id'], 'part': index, 'role': role, 'part_type': part['type'],
                     'chat_url': f'codex://threads/{thread_id}',
-                    'parent_thread_id': thread.get('parentThreadId'),
+                    'parent_thread_id': parent,
                     'forked_from_id': thread.get('forkedFromId')}
             if part['type'] == 'text':
                 body = part['text'].encode('utf-8')
@@ -197,7 +211,7 @@ def _render(project_id, thread, items, memory_dir, control, checkpoint=None):
 
 
 def collect_codex(project_id, thread_ids, output_dir, *, control=None, executable='codex', client=None,
-                  project_binding=None, checkpoint=None):
+                  project_binding=None, checkpoint=None, exclusion_reason=None):
     """Export an explicit project-assigned thread manifest; never infer ownership.
 
     Returns source paths and their captured hashes, byte locations and unavailable parts.
@@ -228,13 +242,23 @@ def collect_codex(project_id, thread_ids, output_dir, *, control=None, executabl
             thread = client.call('thread/read', {'threadId': thread_id, 'includeTurns': False})['thread']
             if thread['id'] != thread_id:
                 raise ValueError(f'Codex returned a different thread for {thread_id}')
+            parent = thread_parent(thread)
+            excluded = exclusion_reason(thread) if exclusion_reason else None
+            if excluded:
+                result = {'thread_id': thread_id, 'path': None, 'changed': False,
+                          'parent_thread_id': parent, 'forked_from_id': thread.get('forkedFromId'),
+                          'locations': [], 'referenced_threads': [], 'attachments': [],
+                          'gaps': [{'thread_id': thread_id, 'reason': excluded}]}
+                results.append(result)
+                by_id[thread_id] = result
+                continue
             if referrer is None and project_binding is not None:
                 from .codex_binding import classify_threads
                 classification = classify_threads(project_binding, [thread])
                 if not classification['matched']:
                     category = 'unresolved' if classification['unresolved'] else 'excluded'
                     result = {'thread_id': thread_id, 'path': None, 'changed': False,
-                              'parent_thread_id': thread.get('parentThreadId'),
+                              'parent_thread_id': parent,
                               'forked_from_id': thread.get('forkedFromId'), 'locations': [],
                               'referenced_threads': [], 'attachments': [],
                               'gaps': [{'thread_id': thread_id, 'reason': 'binding_changed',
@@ -243,7 +267,7 @@ def collect_codex(project_id, thread_ids, output_dir, *, control=None, executabl
                     results.append(result)
                     by_id[thread_id] = result
                     continue
-            if referrer is not None and thread.get('parentThreadId') != referrer:
+            if referrer is not None and parent != referrer:
                 by_id[referrer]['gaps'].append({'thread_id': referrer, 'referenced_thread_id': thread_id,
                                                  'reason': 'referenced_subagent_parent_mismatch'})
                 continue
@@ -260,7 +284,7 @@ def collect_codex(project_id, thread_ids, output_dir, *, control=None, executabl
                 raise RuntimeError(f'Codex thread {thread_id}: message history became empty; existing export retained')
             if not content:
                 result = {'thread_id': thread_id, 'path': None, 'changed': False,
-                          'parent_thread_id': thread.get('parentThreadId'),
+                          'parent_thread_id': parent,
                           'forked_from_id': thread.get('forkedFromId'), 'locations': [],
                           'referenced_threads': referenced,
                           'attachments': attachments,
@@ -283,7 +307,7 @@ def collect_codex(project_id, thread_ids, output_dir, *, control=None, executabl
             snapshot_hashes[str(path)] = sha256(content).hexdigest()
             snapshot_hashes.update((name, Path(name).stem) for name in attachments)
             result = {'thread_id': thread_id, 'path': str(path), 'changed': changed,
-                      'parent_thread_id': thread.get('parentThreadId'),
+                      'parent_thread_id': parent,
                       'forked_from_id': thread.get('forkedFromId'),
                       'locations': locations, 'referenced_threads': referenced,
                       'attachments': attachments, 'gaps': gaps}

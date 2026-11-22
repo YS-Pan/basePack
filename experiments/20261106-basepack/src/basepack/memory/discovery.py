@@ -44,7 +44,7 @@ def _git_repository(root: Path) -> bool:
     return any((directory / ".git").exists() for directory in (root, *root.parents))
 
 
-def _git_files(root: Path, directory: Path, *, git_dir=None):
+def _git_files(root: Path, directory: Path, *, git_dir=None, include_missing=False):
     command = ["git"]
     if git_dir is not None:
         command.extend(["--git-dir", str(git_dir), "--work-tree", str(directory)])
@@ -56,27 +56,26 @@ def _git_files(root: Path, directory: Path, *, git_dir=None):
             relative = directory.relative_to(root) / os.fsdecode(entry)
             if _allowed(relative):
                 target = _project_path(root, relative.as_posix())
-                if target.is_file():
+                if target.is_file() or (include_missing and not target.exists()):
                     yield target
 
 
-def discover_sources(config, scope=None) -> dict:
-    """Return readable files and explicit gaps for this maintenance discovery.
-
-    A Git project's default inventory includes tracked and untracked nonignored
-    files, plus the root private/ repository's own inventory when present.
-    Configured scopes can add local originals; an explicit scope replaces both
-    inventories and configured scopes. Registered history is maintained separately
-    by the caller.
-    """
+def source_candidates(config, scope=None, *, include_missing=False):
+    """Enumerate filesystem candidates and their discovery origins."""
     root = Path(config.root).resolve()
-    candidates = set()
+    candidates = {}
+
+    def add(paths, origin):
+        for target in paths:
+            if _allowed(target.relative_to(root)):
+                candidates.setdefault(target, set()).add(origin)
+
     if scope is not None:
         mode = "explicit"
         scopes = scope
     elif _git_repository(root):
         mode = "git"
-        candidates.update(_git_files(root, root))
+        add(_git_files(root, root, include_missing=include_missing), "git")
         scopes = config.raw["memory"]["source_scope"]
     else:
         mode = "configured"
@@ -84,14 +83,19 @@ def discover_sources(config, scope=None) -> dict:
     if scope is None:
         private = _project_path(root, "private")
         if private.exists():
-            candidates.update(_git_files(root, private, git_dir=private / ".git"))
-    candidates.update(_selected_files(root, scopes))
+            add(_git_files(root, private, git_dir=private / ".git", include_missing=include_missing), "private_git")
+    add(_selected_files(root, scopes), "configured" if scope is None else "explicit")
+    return candidates, mode
+
+
+def discover_sources(config, scope=None) -> dict:
+    """Return readable files and explicit gaps for this maintenance discovery."""
+    root = Path(config.root).resolve()
+    candidates, mode = source_candidates(config, scope)
 
     paths, gaps = [], []
     for target in sorted(candidates):
         relative = target.relative_to(root).as_posix()
-        if not _allowed(Path(relative)):
-            continue
         if target.suffix.lower() not in IMAGE_SUFFIXES:
             try:
                 source = read_source(root, relative)
@@ -105,17 +109,20 @@ def discover_sources(config, scope=None) -> dict:
     return {"paths": paths, "gaps": gaps, "mode": mode}
 
 
-def retained_codex_paths(config, project_id) -> dict:
+def retained_codex_paths(config, project_id, *, include_threads=False) -> dict:
     """Recover owned captures and their local image snapshots for maintenance."""
     import json
 
     if not project_id:
-        return {"paths": [], "gaps": []}
+        result = {"paths": [], "gaps": []}
+        if include_threads:
+            result["thread_ids"] = {}
+        return result
     root = Path(config.root).resolve()
     memory_dir = Path(config.memory_dir).resolve()
     capture_dir = memory_dir / "codex"
     attachment_dir = (memory_dir / "codex-attachments").resolve()
-    paths, gaps = set(), []
+    paths, gaps, thread_ids = set(), [], {}
     for capture in sorted(capture_dir.glob("*.txt")):
         resolved = capture.resolve()
         if not resolved.is_relative_to(capture_dir.resolve()):
@@ -128,7 +135,10 @@ def retained_codex_paths(config, project_id) -> dict:
             if header["project_id"] != project_id:
                 continue
             thread_id = header["thread_id"]
-            paths.add(resolved.relative_to(root).as_posix())
+            capture_path = resolved.relative_to(root).as_posix()
+            paths.add(capture_path)
+            if include_threads:
+                thread_ids.setdefault(capture_path, set()).add(thread_id)
             while True:
                 if header["project_id"] != project_id or header["thread_id"] != thread_id:
                     raise ValueError(f"Inconsistent Codex capture ownership: {capture}")
@@ -144,6 +154,8 @@ def retained_codex_paths(config, project_id) -> dict:
                     if name.is_absolute() or not attachment.is_relative_to(attachment_dir):
                         raise ValueError(f"Codex attachment leaves attachment directory: {name}")
                     relative = attachment.relative_to(root).as_posix()
+                    if include_threads:
+                        thread_ids.setdefault(relative, set()).add(thread_id)
                     if attachment.is_file():
                         paths.add(relative)
                     else:
@@ -152,4 +164,7 @@ def retained_codex_paths(config, project_id) -> dict:
                 if not line:
                     break
                 header = json.loads(line)
-    return {"paths": sorted(paths), "gaps": gaps}
+    result = {"paths": sorted(paths), "gaps": gaps}
+    if include_threads:
+        result["thread_ids"] = {path: sorted(ids) for path, ids in sorted(thread_ids.items())}
+    return result

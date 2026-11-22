@@ -21,7 +21,9 @@ if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }
 
 同一任务后续读写文件、反馈、stop/release 沿用已获 brief；任务目标或上下文实质变化时按需补取。后续命令复用本进程的参数，新进程只重新初始化。搬迁后核实际路径，再以新配置运行 `memory init` 刷新托管块；块外旧路径另核。
 
-brief 只读已发布 mandatory、概况入口和已知缺口，不做 embedding、任务搜索或原件扫描。直接保留 mandatory；stale=true 按业务需要回源确认。已知少量文件直接同批阅读；判断项目现状、剩余工作、待决策或历史要求时，先用一次完整检索核既有决定，再形成选项；已点名聊天直接读并沿引用核后续发布。此类跨历史依据统一交 [检索 worker](<$skill#retrieve-in-one-delegation>)，先固定基础锚点，再完成多轮搜索、回源、一次综合评分与 rank；主任务实收后确认交付。[客户端与凭据](<$skill#start-and-stop>)。
+brief 只读已发布 mandatory、概况入口和已知缺口，不做 embedding、任务搜索或原件扫描。保留 mandatory，按业务需要回源核实 `stale=true` 的条目。[客户端与凭据](<$skill#start-and-stop>)。
+
+按项目根 [AGENTS.md](../AGENTS.md) 的检索规则决定是否派工。读点名聊天时沿引用核对后续发布。检索按[完整流程](<$skill#retrieve-in-one-delegation>)固定基础锚点、完成多轮搜索、回源、一次综合评分与 rank。主任务实际收到结果后确认交付。
 
 brief、检索和回读返回 `private=true` 的内容按项目限制分发约定处理，涵盖隐私、机密及版权/许可边界；公开写入仅提炼本项目允许公开的内容与结论。交接保留所见标记，旧记录缺标不代表已核公开。[私有来源与公开边界](<$skill#private-sources-and-publication>)。
 
@@ -41,7 +43,11 @@ $runtime_details [首次部署](https://github.com/YS-Pan/basePack/blob/main/exp
 
 遇 `busy` 报告已有 owner。遇 `capacity_unavailable` 保留语义余项，可在授权范围内用普通 `memory maintain --available-subagents 0` 维护项目文件或已保留原件，使用新 control 与相应来源选择，跳过自动采集审批。[来源选择与容量不足](<$skill#maintain-sources>)。
 
-返回 `prepared` 时保留 `attempt_id` 和 control，按原样用 `spawn_arguments` 实际派一次协调者，保留句柄和恢复名额。协调者按生成的提示执行。需采集时读取 `memory collect-prompt --attempt <id>`，在受影响的 Windows Codex 且可用 Auto-review 时仅为采集请求一次审批，等待期间不持有 owner。权限路径受阻时报告采集缺口，按授权选择来源。预检在普通沙箱使用原父 holder/control。协调者如需语义维护则启动有限 reader 池，交固定初始化回执后结束第一 turn。原父确认该 turn 实际结束、协调者 idle 后封口，向实际已启动的 reader 各发一次 go。Reader 在首 turn 通过宿主事件等待。[固定波次与采集回执](<$skill#maintain-sources>)。
+返回 `prepared` 时保留 `attempt_id` 和 control，按原样用 `spawn_arguments` 派一次协调者，保留句柄和恢复名额。协调者按生成的提示执行。需采集时读取 `memory collect-prompt --attempt <id>`。受影响的 Windows Codex 支持 Auto-review 时，为该采集命令请求一次审查，等待期间不持有 owner。权限受阻时报告采集缺口，按授权选择来源。
+
+协调者先在普通沙箱运行生成的预检，沿用原父 holder/control。若 Windows 宿主明确报告进程启动失败且命令没有执行，支持 Auto-review 时，协调者可对同一命令及工作目录请求一次审查。拒绝或提交结果未明时向原父报告，并保留已取得的回执。
+
+协调者如需语义维护则启动有限 reader 池，交固定初始化回执后结束第一 turn。原父确认该 turn 实际结束、协调者 idle 后封口，向实际已启动的 reader 各发一次 go。Reader 在首 turn 通过宿主事件等待。[固定波次与采集回执](<$skill#maintain-sources>)。
 
 reader 自主领取、阅读、写稿、提交并再领取；普通退出不唤醒协调者。最后正常退出者固定回执，先登记通知意图，再实际 followup 同一非根协调者并记录宿主受理结果。协调者第二 turn 核 owner/stop，按固定稿和唯一 publisher 合同发布后即结束，不等待通知确认；原父观察其 FINAL 与最后 reader 的通知结果/宿主终态后关闭波次。pending/未明通知、claimed 失败、在途发布由原父按实际宿主证据恢复，不盲重发或超时抢占。[波次、恢复与阶段边界](<$skill#maintain-sources>)。
 

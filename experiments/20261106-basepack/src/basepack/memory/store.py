@@ -82,6 +82,27 @@ def _query_wire_size(sql: str) -> int:
                            "params": [sql]}, ensure_ascii=False).encode("utf-8"))
 
 
+def _publication_groups(statements: list[str], limit: int) -> list[str]:
+    envelope = _query_wire_size("")
+    separator = _query_wire_size("\n") - envelope
+    groups, group = [], []
+    size = envelope
+    for statement in statements:
+        wire_size = _query_wire_size(statement)
+        if wire_size > limit:
+            raise ValueError(f"One SQL statement exceeds the {limit}-byte WebSocket message limit "
+                             f"({wire_size} encoded bytes)")
+        payload = wire_size - envelope
+        if group and size + separator + payload > limit:
+            groups.append("\n".join(group))
+            group, size = [], envelope
+        size += payload + (separator if group else 0)
+        group.append(statement)
+    if group:
+        groups.append("\n".join(group))
+    return groups
+
+
 def _snapshot_sql(version: _Record, snapshot: dict) -> list[str]:
     """Keep one complete stored original while transporting bounded SQL pieces."""
     statement = f"UPSERT {_sql(version)} CONTENT {_sql(snapshot)} RETURN NONE;"
@@ -109,6 +130,28 @@ def _snapshot_sql(version: _Record, snapshot: dict) -> list[str]:
 
 def _original(source: SourceContent, start: int, end: int, locator=None) -> str:
     return original_text(source, start, end, locator)
+
+
+def _read_original(config, snapshot, path, version, start_line, end_line, locator, *, member_id=None):
+    revision = snapshot["revision"]
+    original = {"path": path, "revision": revision, "private": snapshot.get("private", source_private(path)),
+                "source_version": version, "locator": locator}
+    if snapshot["kind"] == "image":
+        asset = config.memory_dir / snapshot["asset"]
+        if sha256(asset.read_bytes()).hexdigest() != revision:
+            raise ValueError(f"Image snapshot revision mismatch for {member_id or version}")
+        return {**original, "image_path": str(asset)}
+    text = snapshot["text"]
+    if sha256(text.encode("utf-8")).hexdigest() != revision:
+        raise ValueError(f"Text snapshot revision mismatch for {member_id or version}")
+    content = SourceContent(path, revision, len(text.encode("utf-8")), 0, text)
+    original.update(start_line=start_line, end_line=end_line, text=_original(content, start_line, end_line, locator))
+    if member_id is not None:
+        original["member_id"] = member_id
+    if (config.root / path).resolve().parent == (config.memory_dir / "codex").resolve():
+        from .codex_locator import message_locations
+        original["chat_locations"] = message_locations(text, start_line, end_line)
+    return original
 
 
 def _matches_original(source: SourceContent, member: dict) -> bool:
@@ -147,8 +190,8 @@ class Memory:
                 "{ THROW 'Memory database belongs to another project or is not initialized'; };\n"
                 "IF meta:project.member_identity_version = NONE OR meta:project.member_identity_version != 2 "
                 "{ THROW 'Memory member identity migration required'; };\n"
-                "IF meta:project.memory_schema_version = NONE OR meta:project.memory_schema_version != 3 "
-                "{ THROW 'Memory schema 3 offline migration required'; };")
+                "IF meta:project.memory_schema_version = NONE OR meta:project.memory_schema_version != 4 "
+                "{ THROW 'Memory graph schema 4 offline migration required'; };")
 
     def verify_project(self) -> None:
         """Confirm the connected project and current schema before a protected operation."""
@@ -204,23 +247,7 @@ class Memory:
         project_check = self._project_guard()
         statements = [project_check, *statements[1:-1],
                       f"CREATE {_sql(marker)} SET committed=true RETURN NONE;"]
-        # Measure the actual JSON wire message, including escaped SQL and transaction id.
-        groups, group = [], []
-        for statement in statements:
-            candidate = "\n".join([*group, statement])
-            if _query_wire_size(candidate) > limit:
-                if not group:
-                    raise ValueError(f"One SQL statement exceeds the {limit}-byte WebSocket message limit "
-                                     f"({_query_wire_size(statement)} encoded bytes)")
-                groups.append("\n".join(group))
-                group = [statement]
-                if _query_wire_size(statement) > limit:
-                    raise ValueError(f"One SQL statement exceeds the {limit}-byte WebSocket message limit "
-                                     f"({_query_wire_size(statement)} encoded bytes)")
-            else:
-                group.append(statement)
-        if group:
-            groups.append("\n".join(group))
+        groups = _publication_groups(statements, limit)
 
         publication = None
         if control:
@@ -333,21 +360,29 @@ class Memory:
                  "meta:project.member_identity_version != 2) "
                  "{ THROW 'Memory member identity migration required'; }; "
                  "IF meta:project.project_id != NONE AND (meta:project.memory_schema_version = NONE OR "
-                 "meta:project.memory_schema_version != 3) "
-                 "{ THROW 'Memory schema 3 offline migration required'; }; ")
+                 "meta:project.memory_schema_version != 4) "
+                 "{ THROW 'Memory graph schema 4 offline migration required'; }; ")
+        if self._execute("SELECT * FROM ONLY meta:project;", check_project=False)[0] is None:
+            tables = self._execute("INFO FOR DB;", check_project=False)[0]["tables"]
+            if set(tables) - {"meta"}:
+                raise ValueError("Memory graph schema 4 requires an empty database or an offline migration")
         self._execute(gates, check_project=False)
         self._execute("BEGIN;\n" + gates + schema + "\n"
                       "IF meta:delivery.id = NONE { CREATE meta:delivery SET j=0; };\n"
                       f"UPSERT meta:project SET project_id={project_id}, member_identity_version=2, "
-                      "memory_schema_version=3; COMMIT;", check_project=False)
+                      "memory_schema_version=4; COMMIT;", check_project=False)
         return {"namespace": self.connection["namespace"], "database": self.connection["database"]}
 
     def _rows(self, table: str) -> list[dict]:
+        if table == "semantic":
+            from .history import semantic_rows
+            return semantic_rows(self)
         return self._execute(f"SELECT * OMIT embedding FROM {table};")[0]
 
     def knowledge(self, record_id: str, *, knowledge_revision: str | None = None) -> dict:
         from .history import knowledge
-        return self.access_hints([knowledge(self, record_id, knowledge_revision=knowledge_revision)])[0]
+        row = knowledge(self, record_id, knowledge_revision=knowledge_revision)
+        return self.access_hints([row])[0] if _record(row["id"]).table in {"member", "node", "semantic"} else row
 
     def history(self, record_id: str) -> dict:
         from .history import history
@@ -387,7 +422,8 @@ class Memory:
             _check_collection_revision(path, expected_revision, None)
             raise
 
-    def prepare(self, paths: list[str], *, historical_versions: list[dict] | None = None) -> dict:
+    def prepare(self, paths: list[str], *, historical_versions: list[dict] | None = None,
+                expected_revisions: dict[str, str | None] | None = None) -> dict:
         """Supply explicit new/old originals and existing knowledge for one reading."""
         for path in paths:
             if _project_path(self.config.root.resolve(), path).is_dir():
@@ -396,19 +432,27 @@ class Memory:
                                  "pass their project-relative paths to --paths.")
         rules = privacy_rules(self.config)
         rules_hash = rules_revision(rules)
+        if expected_revisions is not None and (
+            not isinstance(expected_revisions, dict) or set(expected_revisions) != set(paths)
+        ):
+            raise ValueError("Expected revisions must cover exactly the paths being prepared")
         known = {source["path"]: source for source in self._rows("source")}
         members = self._rows("member")
         prepared = []
         ids = []
+        snapshot_ids = set()
         for path in paths:
+            expected = expected_revisions[path] if expected_revisions is not None else None
             try:
-                source = self._load_source(path)
+                source = self._load_source(path) if expected is None else self._load_source(path, expected_revision=expected)
             except FileNotFoundError:
                 if Path(path).as_posix() not in known:
                     raise
                 item = {"path": Path(path).as_posix(), "deleted": True}
                 item["private"] = known[item["path"]].get("private", source_private(item["path"]))
             else:
+                if expected_revisions is not None and expected is None:
+                    raise ValueError(f"Expected missing original now exists: {path}")
                 item = {"path": source.path, "revision": source.revision, "size": source.size,
                         "private": source_private(source.path, rules['private_scope']),
                         "mtime_ns": source.mtime_ns}
@@ -438,6 +482,7 @@ class Memory:
             previous = known.get(item["path"])
             if previous:
                 snapshot = self._execute(f"SELECT * FROM ONLY {_sql(_record(previous['version']))};")[0]
+                snapshot_ids.add(_record(snapshot["id"]))
                 item["id"] = previous["id"]
                 if snapshot.get("kind") == "image":
                     item["previous"] = {"revision": previous["revision"], "kind": "image",
@@ -449,14 +494,13 @@ class Memory:
                 item["previous"].update({key: snapshot[key] for key in ("dispositions", "deferred_refinement", "unavailable_gaps")
                                          if key in snapshot})
                 item["previous"]["private"] = snapshot.get("private", source_private(snapshot.get("path", previous["path"])))
+                item["previous"]["source_version"] = snapshot["id"]
             prepared.append(item)
             ids.extend(member["id"] for member in item["members"])
-        edges = self._execute("SELECT * FROM semantic WHERE "
-                              f"in IN {_sql([_record(i) for i in ids])} OR "
-                              f"out IN {_sql([_record(i) for i in ids])} OR "
-                              f"basis.*.member CONTAINSANY {_sql([_record(i) for i in ids])};")[0] if ids else []
-        nodes = self._rows("node")
         selected = set(ids)
+        from .history import knowledge, semantic_rows
+        edges = semantic_rows(self, members=ids) if ids else []
+        nodes = self._rows("node")
         related = set(selected)
         related.update(value for edge in edges for value in (edge["in"], edge["out"])
                        if _record(value).table == "member")
@@ -470,10 +514,11 @@ class Memory:
         # Keep current revisions for optimistic checks, but traverse accepted
         # provenance by exact version. Rebinding a historical pin to today's
         # member would change the evidence the author actually selected.
-        from .history import knowledge
         current = {_record(row["id"]): row for row in [*members, *nodes, *edges]}
         explicit = [knowledge(self, item["id"], knowledge_revision=item["knowledge_revision"])
                     for item in historical_versions or []]
+        if any(row.get("legacy_history_only") for row in explicit):
+            raise ValueError("A history-only relationship cannot be prepared as a graph endpoint")
         explicit_keys = {(_record(row["id"]), row["knowledge_revision"]) for row in explicit}
         historical = {}
         versions = {(identity, row["knowledge_revision"]): row for identity, row in current.items()}
@@ -492,15 +537,14 @@ class Memory:
                 continue
             seen.add(key)
             if identity not in current:
-                current_row = self._execute(f"SELECT * OMIT embedding FROM ONLY {_sql(identity)};")[0]
-                if current_row is None:
-                    raise ValueError(f"Current dependency not found: {row['id']}")
-                current[identity] = current_row
+                current[identity] = knowledge(self, identity)
             if identity.table == "member":
                 related.add(current[identity]["id"])
             if current[identity]["knowledge_revision"] != revision or key in explicit_keys:
                 historical[key] = row
             refs = [(entry["member"], entry["knowledge_revision"]) for entry in row.get("basis", [])]
+            refs.extend((entry["id"], entry["knowledge_revision"])
+                        for entry in row.get("direct_basis", []) if "id" in entry)
             if row.get("parent_version"):
                 parent = row["parent_version"]
                 refs.append((parent["id"], parent["knowledge_revision"]))
@@ -509,10 +553,7 @@ class Memory:
             for identifier, pinned_revision in refs:
                 dependency = _record(identifier)
                 if dependency not in current:
-                    current_row = self._execute(f"SELECT * OMIT embedding FROM ONLY {_sql(dependency)};")[0]
-                    if current_row is None:
-                        raise ValueError(f"Current dependency not found: {identifier}")
-                    current[dependency] = current_row
+                    current[dependency] = knowledge(self, dependency)
                 latest = current[dependency]
                 pinned_key = (dependency, pinned_revision)
                 if pinned_key not in versions:
@@ -533,7 +574,25 @@ class Memory:
         neighborhood_edges.update({identity: row for identity, row in current.items()
                                    if identity.table == "semantic" and identity in visited_ids})
         historical = list(historical.values())
+        from .graph_write import knowledge_ids
+        version_rows = [*selected_members, *neighborhood_members, *nodes, *historical]
+        revisions = {(_record(row["id"]), row["knowledge_revision"]) for row in version_rows
+                     if "exact_id" not in row}
+        exact_ids = knowledge_ids(self, revisions)
+        for row in version_rows:
+            if "exact_id" not in row:
+                exact = exact_ids[(_record(row["id"]), row["knowledge_revision"])]
+                row["exact_id"] = f"{exact.table}:{exact.key}"
+            if row.get("source_version"):
+                snapshot_ids.add(_record(row["source_version"]))
+        for row in neighborhood_edges.values():
+            snapshot_ids.update(_record(entry["source_version"]) for entry in row.get("direct_basis", [])
+                                if "source_version" in entry)
+        snapshots = self._execute(
+            f"SELECT id,private,kind,path,revision FROM source_version WHERE id IN "
+            f"{_sql(sorted(snapshot_ids, key=_sql))};")[0] if snapshot_ids else []
         return {"sources": prepared, "historical_versions": historical,
+                "snapshots": snapshots,
                 "privacy_rules": rules, "privacy_rules_revision": rules_hash,
                 "neighborhood": {"members": neighborhood_members, "edges": list(neighborhood_edges.values()),
                 "nodes": nodes}, "expected": expected,
@@ -598,15 +657,18 @@ class Memory:
         if not affected:
             return []
         refs = _sql([_record(value) for value in sorted(affected)])
-        nodes = f"(SELECT VALUE id FROM node WHERE basis.*.member CONTAINSANY {refs})"
+        from .graph_write import invalidate, knowledge_ids
+        members, nodes = self._execute(
+            f"SELECT id,knowledge_revision FROM member WHERE id IN {refs}; "
+            f"SELECT id,knowledge_revision FROM node WHERE basis.*.member CONTAINSANY {refs};")
+        versions = knowledge_ids(self, ((_record(row["id"]), row["knowledge_revision"]) for row in members + nodes))
         audit = _sql(_Record("change", uuid4().hex))
         return [f"CREATE {audit} SET operation={_sql(operation)}, at=time::now(), context={_sql(context)}, "
                 f"previous={{members:(SELECT * OMIT embedding FROM member WHERE id IN {refs}), "
-                f"nodes:(SELECT * FROM node WHERE basis.*.member CONTAINSANY {refs}), "
-                f"edges:(SELECT * FROM semantic WHERE basis.*.member CONTAINSANY {refs} OR in IN {refs} OR out IN {refs} OR in IN {nodes} OR out IN {nodes})}};",
-                f"UPDATE member SET stale=true, knowledge_revision={_sql(uuid4().hex)} WHERE id IN {refs};",
-                f"UPDATE node SET stale=true, knowledge_revision={_sql(uuid4().hex)} WHERE basis.*.member CONTAINSANY {refs};",
-                f"UPDATE semantic SET stale=true, knowledge_revision={_sql(uuid4().hex)} WHERE basis.*.member CONTAINSANY {refs} OR in IN {refs} OR out IN {refs} OR in IN {nodes} OR out IN {nodes};"]
+                f"nodes:(SELECT * FROM node WHERE basis.*.member CONTAINSANY {refs})}};",
+                f"UPDATE member SET stale=true WHERE id IN {refs};",
+                f"UPDATE node SET stale=true WHERE basis.*.member CONTAINSANY {refs};",
+                *invalidate(self, versions.values(), "needs_review")]
 
     def apply(self, batch: dict, *, control: str | None = None, timeout: float = 600) -> dict:
         self.config.memory_search_mode
@@ -642,6 +704,8 @@ class Memory:
         """
         self.config.memory_search_mode
         from .draft import validate_batch
+        from .graph_write import Publication, invalidate, knowledge_ids, set_state
+        from .history import knowledge as read_knowledge
         validate_batch(batch)
         if control:
             from .maintenance import check
@@ -700,25 +764,32 @@ class Memory:
         targets.update(_record(item["target"]) for item in batch.get("corrections", []))
         dependencies = {_record(value) for key in ("members", "nodes", "edges")
                         for item in batch.get(key, []) for value in item.get("evidence", [])}
-        dependencies.update(_record(item[endpoint]) for item in batch.get("edges", [])
-                            for endpoint in ("in", "out"))
+        dependencies.update(target for item in batch.get("edges", [])
+                            for target in (_record(item["in"]), _record(item["out"]),
+                                           *(_record(ref["id"]) for ref in item.get("basis", []) if "id" in ref))
+                            if target.table in {"member", "node", "semantic"})
         parents = {_record(item["parent"]) for item in batch.get("members", []) if item.get("parent")}
         if any(parent.table != "member" for parent in parents):
             raise ValueError("Parent must reference a member")
         dependencies.update(parents)
         dependencies.update(_record(value) for value in batch.get("dependency_closure", []))
-        expected = {_record(key): value for key, value in batch.get("expected", {}).items()}
+        expected_heads = {_record(key): value for key, value in batch.get("expected", {}).items()}
+        expected_status = {_record(key): active for key, active in batch.get("expected_status", {}).items()}
         from .reviewed import dependencies as review_dependencies
-        dependencies.update(review_dependencies(self, batch, before_members, targets, expected))
-        missing = dependencies - targets - expected.keys()
+        dependencies.update(review_dependencies(self, batch, before_members, targets, expected_heads))
+        missing = dependencies - targets - expected_heads.keys()
         if missing:
             raise ValueError('Existing dependencies require prepare UUID and expected revision: ' +
                              ', '.join(sorted(_sql(value) for value in missing)))
         for target in sorted(targets | dependencies, key=lambda value: (value.table, _sql(value.key))):
             record = _sql(target)
-            if target in expected:
-                statements.append(f"IF {record}.knowledge_revision != {_sql(expected[target])} "
+            if target in expected_heads:
+                statements.append(f"IF {record}.knowledge_revision != {_sql(expected_heads[target])} "
                                   "{ THROW 'Knowledge revision changed; prepare and read again'; };")
+                if target in expected_status or target in dependencies - targets:
+                    active = expected_status.get(target, True)
+                    statements.append(f"IF ({record}.stale = false AND {record}.retired = false) != {_sql(active)} "
+                                      "{ THROW 'Knowledge revision changed; prepare and read again (availability changed)'; };")
             else:
                 statements.append(f"IF {record}.id != NONE "
                                   "{ THROW 'Existing knowledge requires expected revision; prepare and read again'; };")
@@ -739,6 +810,10 @@ class Memory:
                 record = _record(previous["id"])
                 statements.append(f"IF {_sql(record)}.version != {_sql(_record(previous['version']))} {{ THROW 'Concurrent source version changed'; }};")
                 statements.append(f"UPDATE {_sql(record)} SET deleted=true;")
+                retired_versions = self._execute(f"SELECT VALUE id FROM source_version WHERE source={_sql(record)};")[0]
+                refs = [_record(ref) for ref in retired_versions]
+                statements.extend(invalidate(self, refs, "needs_review"))
+                statements.extend(set_state(ref, "retired") for ref in refs)
                 continue
             source = self._load_source(expected["path"], expected.get("kind"))
             if source.revision != expected["revision"]:
@@ -747,9 +822,6 @@ class Memory:
             previous = by_id[expected["id"]] if "id" in expected else by_path.get(source.path)
             record = _record(previous["id"]) if previous else _Record("source", uuid4().hex)
             marker = source_private(source.path) if legacy_rules else expected['private']
-            version = _Record("source_version", _digest(_sql([record, source.revision, source.path,
-                                                              marker, rules_hash])))
-            sources[source.path], versions[source.path] = record, version
             if previous:
                 statements.append(f"IF {_sql(record)}.version != {_sql(_record(previous['version']))} {{ THROW 'Concurrent source version changed'; }};")
             snapshot = {"source": record, "revision": source.revision, "path": source.path,
@@ -769,8 +841,15 @@ class Memory:
                 snapshot.update({"kind": kind, "asset": assets[source.path]})
             else:
                 snapshot.update({"kind": kind, "text": source.text})
+            # The original hash, path and decisions together identify one immutable snapshot.
+            metadata = {key: value for key, value in snapshot.items() if key not in {"source", "text"}}
+            identity = json.dumps({"source": _sql(record), **metadata}, ensure_ascii=False, sort_keys=True,
+                                  separators=(",", ":"))
+            version = _Record("source_version", _digest(identity))
+            sources[source.path], versions[source.path] = record, version
             try:
-                source_statements = _snapshot_sql(version, snapshot)
+                present = self._execute(f"SELECT VALUE id FROM ONLY {_sql(version)};")[0]
+                source_statements = [] if present else _snapshot_sql(version, snapshot)
                 for statement in source_statements:
                     if _query_wire_size(statement) > _MESSAGE_LIMIT:
                         raise ValueError(f"One SQL statement exceeds the {_MESSAGE_LIMIT}-byte WebSocket message limit "
@@ -802,7 +881,7 @@ class Memory:
         statements.extend(self._invalidate_sql(retired, "retired", context))
         for path, source in current.items():
             if source is None:
-                statements.append(f"UPDATE member SET retired=true, knowledge_revision={_sql(uuid4().hex)} "
+                statements.append(f"UPDATE member SET retired=true "
                                   f"WHERE source={_sql(_record(by_path[path]['id']))};")
         submitted = {}
         for item in batch.get("members", []):
@@ -893,7 +972,6 @@ class Memory:
                 "kind": item["kind"], "text": item["text"], "basis": basis(item["evidence"]),
                 "conditions": item.get("conditions", ""), "claim_type": item.get("claim_type", ""),
                 "stale": False, "retired": False, "knowledge_revision": uuid4().hex}, "node"))
-        accepted_revisions = {record: value["knowledge_revision"] for record, value, _ in writes}
         accepted = {(record, value["knowledge_revision"]): value for record, value, _ in writes}
 
         def source_version(version):
@@ -906,8 +984,7 @@ class Memory:
             target = _record(record)
             key = (target, revision)
             if key not in accepted:
-                from .history import knowledge
-                accepted[key] = knowledge(self, target, knowledge_revision=revision)
+                accepted[key] = read_knowledge(self, target, knowledge_revision=revision)
             return {**accepted[key], "id": target}
 
         frozen_private = batch.get("compiled_private")
@@ -931,52 +1008,44 @@ class Memory:
 
         for record, value, _ in writes:
             mark_private(record, value)
-        for record, value, table in writes:
+        graph = Publication(self, writes, versions, source_version, knowledge_version)
+        for version in versions.values():
+            source = snapshots[version]["source"]
+            previous = by_id.get(f"{source.table}:{source.key}")
+            statements.extend(graph.source(version, snapshots[version], previous["version"] if previous else None))
+        for record, value, _ in writes:
             statements.append(f"CREATE {_sql(_Record('change', uuid4().hex))} SET operation='accept', target={_sql(record)}, previous=(SELECT * OMIT embedding FROM ONLY {_sql(record)}), at=time::now(), context={_sql(context)};")
-            if table == "node":
-                statements.append(f"IF {_sql(record)}.text != {_sql(value['text'])} OR {_sql(record)}.kind != {_sql(value['kind'])} OR {_sql(record)}.basis != {_sql(value['basis'])} {{ "
-                                  f"UPDATE semantic SET stale=true, knowledge_revision={_sql(uuid4().hex)} WHERE in={_sql(record)} OR out={_sql(record)}; }};")
             # MERGE preserves derived vectors; input_revision gates their validity.
             statements.append(f"UPSERT {_sql(record)} MERGE {_sql(value)} RETURN NONE;")
-        for item in batch.get("edges", []):
-            if not item["evidence"]:
-                raise ValueError(f"Semantic relation requires original evidence: {item['id']}")
-            record = _record(item["id"], "semantic")
-            value = {"kind": item["kind"], "text": item["text"], "conditions": item.get("conditions", ""),
-                     "basis": basis(item["evidence"]), "stale": False, "retired": False, "knowledge_revision": uuid4().hex}
-            endpoints = {}
-            for endpoint in ("in", "out"):
-                target = _record(item[endpoint])
-                pinned = item.get("endpoint_versions", {}).get(endpoint)
-                if pinned:
-                    if _record(pinned["id"]) != target:
-                        raise ValueError(f"Relation endpoint identity mismatch: {item['id']} {endpoint}")
-                    revision = pinned["knowledge_revision"]
-                    if accepted_revisions.get(target) != revision:
-                        self.knowledge(item[endpoint], knowledge_revision=revision)
-                else:
-                    revision = accepted_revisions.get(target)
-                    if revision is None:
-                        # Missing endpoints remain the native ENFORCED relation's
-                        # transaction error; no incomplete relation is published.
-                        revision = self._execute(
-                            f"SELECT VALUE knowledge_revision FROM ONLY {_sql(target)};")[0]
-                endpoints[endpoint] = {"id": target, "knowledge_revision": revision}
-            value["endpoint_versions"] = endpoints
-            mark_private(record, value)
+        for record, value, _ in writes:
+            statements.extend(graph.knowledge_facts(record, value, expected_heads.get(record)))
+
+        edge_ids = [_record(item["id"], "semantic") for item in batch.get("edges", [])]
+        if edge_ids:
+            edge_rows, edge_names = self._execute(
+                f"SELECT * FROM semantic WHERE id IN {_sql(edge_ids)}; "
+                f"RETURN [{', '.join(f'<string>{_sql(record)}' for record in edge_ids)}];")
+            previous_edges = {_record(row["id"]): row for row in edge_rows}
+        else:
+            edge_names, previous_edges = [], {}
+        for record in edge_ids:
             statements.append(f"CREATE {_sql(_Record('change', uuid4().hex))} SET operation='accept_edge', target={_sql(record)}, previous=(SELECT * FROM ONLY {_sql(record)}), at=time::now(), context={_sql(context)};")
-            # Native endpoints are immutable. Recreate only this accepted edge
-            # in the same transaction, after retaining its actual prior record.
-            statements.append(f"IF {_sql(record)}.id != NONE AND ({_sql(record)}.in != {_sql(_record(item['in']))} "
-                              f"OR {_sql(record)}.out != {_sql(_record(item['out']))}) {{ DELETE {_sql(record)}; }};")
-            statements.append(f"RELATE ({_sql(_record(item['in']))})->({_sql(record)})->({_sql(_record(item['out']))}) CONTENT {_sql(value)};")
+        statements.extend(graph.business(batch.get("edges", []), basis, previous_edges, frozen_private))
+
+        def previous_exact(record):
+            if record.table == "semantic":
+                row = self._execute(f"SELECT * FROM ONLY {_sql(record)};")[0]
+                return _record(row["head"])
+            return graph.version(record, expected_heads[record]).record
+
         for table, key in [("member", "delete_members"), ("node", "delete_nodes"), ("semantic", "delete_edges")]:
             for value in batch.get(key, []):
                 record = _record(value, table)
+                exact = previous_exact(record)
                 statements.append(f"CREATE {_sql(_Record('change', uuid4().hex))} SET operation='retire', target={_sql(record)}, previous=(SELECT * OMIT embedding FROM ONLY {_sql(record)}), at=time::now(), context={_sql(context)};")
-                statements.append(f"UPDATE {_sql(record)} SET stale=true, retired=true, knowledge_revision={_sql(uuid4().hex)};")
-                if table == "node":
-                    statements.append(f"UPDATE semantic SET stale=true, knowledge_revision={_sql(uuid4().hex)} WHERE in={_sql(record)} OR out={_sql(record)};")
+                statements.extend(invalidate(self, [exact], "needs_review"))
+                statements.append(set_state(exact, "retired"))
+                statements.append(f"UPDATE {_sql(record)} SET stale=true, retired=true;")
         for correction in batch.get("corrections", []):
             target = _record(correction["target"])
             # The snapshot precedes all accepts in the transaction.
@@ -984,6 +1053,8 @@ class Memory:
         # A correction without a replacement marks the known error unavailable.
         for correction in batch.get("corrections", []):
             target = _record(correction["target"])
+            if target in expected_heads:
+                statements.extend(invalidate(self, [previous_exact(target)], "needs_review"))
             if target in {_record(item["id"], table) for table, key in
                           [("member", "members"), ("node", "nodes"), ("semantic", "edges")]
                           for item in batch.get(key, [])}:
@@ -993,15 +1064,18 @@ class Memory:
                 statements.extend(self._invalidate_sql(correction_affected, "correction", context))
                 retired.update(correction_affected)
             else:
-                statements.append(f"UPDATE {_sql(target)} SET stale=true, knowledge_revision={_sql(uuid4().hex)};")
-                if target.table == "node":
-                    statements.append(f"UPDATE semantic SET stale=true, knowledge_revision={_sql(uuid4().hex)} WHERE in={_sql(target)} OR out={_sql(target)};")
+                statements.append(f"UPDATE {_sql(target)} SET stale=true;")
         for parent in parents:
             record = _sql(parent)
             statements.append(f"IF {record}.id = NONE OR {record}.retired = true "
                               "{ THROW 'Parent member does not exist or is retired'; };")
+        statements.extend(graph.availability_guards())
         result = {"sources": len(current), "members": len(submitted), "nodes": len(batch.get("nodes", [])),
                   "edges": len(batch.get("edges", [])), "invalidated": sorted(retired)}
+        if graph.relationships:
+            result["edge_versions"] = {
+                name: f"graph_edge:{graph.relationships[record].record.key}"
+                for record, name in zip(edge_ids, edge_names, strict=True)}
         statements.append(f"CREATE {_sql(receipt)} CONTENT {_sql({'batch_hash': batch_hash, 'result': result})};")
         statements.append("COMMIT;")
         # Encoding may take time; never publish a candidate from a changed original.
@@ -1021,7 +1095,8 @@ class Memory:
         self._publish(statements, control=control)
         return result
 
-    def search(self, text: str, *, scope: str = "", limit: int = 10, literal: bool = False) -> list[dict]:
+    def search(self, text: str, *, scope: str = "", limit: int = 10, literal: bool = False,
+               allow_private: bool = True, access: bool = True) -> list[dict]:
         """Return lexical candidates for hybrid retrieval."""
         from .query import normalize_scope
         scope = normalize_scope(scope)
@@ -1032,10 +1107,12 @@ class Memory:
         else:
             match = f"(text @1@ {_sql(text)} OR title @2@ {_sql(text)})"
             score = "search::score(1) + search::score(2)"
-        return self.access_hints(self._execute(f"SELECT *, source_revision AS revision, {score} AS lexical_score OMIT {_CANDIDATE_OMIT} FROM member "
+        privacy = "" if allow_private else "AND private=false "
+        rows = self._execute(f"SELECT *, source_revision AS revision, {score} AS lexical_score OMIT {_CANDIDATE_OMIT} FROM member "
                              f"WHERE stale=false AND retired!=true AND {match} "
-                             f"AND string::starts_with(path, {_sql(scope)}) "
-                             f"ORDER BY lexical_score DESC LIMIT {int(limit)};")[0])
+                             f"AND string::starts_with(path, {_sql(scope)}) {privacy}"
+                             f"ORDER BY lexical_score DESC, id ASC LIMIT {int(limit)};")[0]
+        return self.access_hints(rows) if access else rows
 
     def read(self, member_id: str, *, source_version: str | None = None,
              start_line: int | None = None, end_line: int | None = None,
@@ -1077,58 +1154,46 @@ class Memory:
             if len(accepted_paths) != 1:
                 raise ValueError(f"Source snapshot has ambiguous historical paths for member {member_id}: {version}")
             path = accepted_paths.pop()
-        revision = snapshot["revision"]
         if snapshot["kind"] == "image":
-            asset = self.config.memory_dir / snapshot["asset"]
-            if sha256(asset.read_bytes()).hexdigest() != revision:
-                raise ValueError(f"Image snapshot revision mismatch for {member_id}")
             if locator is None and source_version is None:
                 locator = member.get("locator")
-            return {"member": self.access_hints([member])[0], "original": {"path": path, "revision": revision,
-                    "private": snapshot.get("private", source_private(path)),
-                    "source_version": version, "image_path": str(asset), "locator": locator}}
-        if source_version is None:
+        elif source_version is None:
             start_line, end_line = member["start_line"], member["end_line"]
             if locator is None:
                 locator = member.get("locator")
         elif start_line is None or end_line is None:
             raise ValueError("Reading an explicit source version requires start_line and end_line")
-        text = snapshot["text"]
-        if sha256(text.encode("utf-8")).hexdigest() != revision:
-            raise ValueError(f"Text snapshot revision mismatch for {member_id}")
-        content = SourceContent(path, revision, len(text.encode("utf-8")), 0, text)
-        original = {"member_id": member["id"], "path": path, "revision": revision,
-                    "private": snapshot.get("private", source_private(path)),
-                    "source_version": version, "start_line": start_line, "end_line": end_line,
-                    "locator": locator, "text": _original(content, start_line, end_line, locator)}
-        if (self.config.root / path).resolve().parent == (self.config.memory_dir / "codex").resolve():
-            from .codex_locator import message_locations
-            original["chat_locations"] = message_locations(text, start_line, end_line)
+        original = _read_original(self.config, snapshot, path, version, start_line, end_line, locator,
+                                  member_id=member["id"])
         return {"member": self.access_hints([member])[0], "original": original}
 
     def neighbors(self, record_id: str, *, include_stale: bool = False,
-                  knowledge_revision: str | None = None) -> dict:
-        if knowledge_revision is not None:
-            from .history import historical_neighbors
-            result = historical_neighbors(self, self.knowledge(record_id, knowledge_revision=knowledge_revision),
-                                          include_stale=include_stale)
-            for key in ("children", "edges", "unpinned_children", "unpinned_edges"):
-                result[key] = self.access_hints(result[key])
-            for key in ("record", "parent"):
-                if result[key] is not None:
-                    result[key] = self.access_hints([result[key]])[0]
-            return result
-        record = _sql(_record(record_id))
-        fresh = "" if include_stale else " AND stale=false AND retired!=true"
-        current, children, edges = self._execute(
-            f"SELECT * OMIT embedding FROM ONLY {record}; SELECT * OMIT embedding FROM member WHERE parent={record}{fresh}; "
-            f"SELECT * FROM semantic WHERE (in={record} OR out={record}){fresh};")
-        parent = self._execute(f"SELECT * OMIT embedding FROM ONLY {_sql(_record(current['parent']))};")[0] if current and current.get("parent") else None
-        if parent and (parent["stale"] or parent.get("retired")) and not include_stale:
-            parent = None
-        return {"record": self.access_hints([current])[0] if current else None,
-                "parent": self.access_hints([parent])[0] if parent else None,
-                "children": self.access_hints(children), "edges": self.access_hints(edges)}
+                  knowledge_revision: str | None = None, direction: str = "both",
+                  types=(), scope: str = "", allow_private: bool = True, conditions: dict | None = None) -> dict:
+        from .graph_query_store import neighbors
+        return neighbors(self, record_id, include_stale=include_stale, knowledge_revision=knowledge_revision,
+                         direction=direction, types=types, scope=scope, allow_private=allow_private,
+                         conditions=conditions)
+
+    def basis_dependents(self, anchors: list[dict], *, scope: str = "", allow_private: bool = True) -> list[dict]:
+        """Find current knowledge that explicitly cites observed member and source versions."""
+        fields = ("id", "knowledge_revision", "source_version")
+        if not isinstance(anchors, list):
+            raise ValueError("Basis anchors must be a JSON array")
+        observed = {}
+        for anchor in anchors:
+            if not isinstance(anchor, dict) or any(not isinstance(anchor.get(field), str) or not anchor[field]
+                                                  for field in fields):
+                raise ValueError("Each basis anchor requires id, knowledge_revision and source_version strings")
+            member = _record(anchor["id"])
+            source = _record(anchor["source_version"], "source_version")
+            if member.table != "member" or source.table != "source_version":
+                raise ValueError("Basis anchors require a member ID and a source_version ID")
+            observed.setdefault((member, anchor["knowledge_revision"], source), {field: anchor[field] for field in fields})
+        if not observed:
+            return []
+        from .graph_query_store import basis_dependents
+        return basis_dependents(self, observed, scope=scope, allow_private=allow_private)
 
     def brief(self, task: str = "", *, limit: int = 6) -> dict:
         """Read published startup material without searching or inspecting originals."""
@@ -1137,7 +1202,7 @@ class Memory:
             "SELECT * OMIT embedding FROM member WHERE mandatory=true AND retired!=true; "
             "SELECT id,path,kind,private FROM member WHERE stale=true AND retired!=true; "
             "SELECT id,kind,private FROM node WHERE stale=true AND retired!=true; "
-            "SELECT id,kind,private FROM semantic WHERE stale=true AND retired!=true; "
+            "SELECT id,head.type AS kind,head.private AS private FROM semantic WHERE stale=true AND retired!=true; "
             "SELECT id,path,private,coverage_gaps AS gaps FROM member WHERE retired!=true AND array::len(coverage_gaps)>0; "
             "SELECT * OMIT embedding FROM member WHERE stale=false AND retired!=true AND mandatory=false AND kind IN ['file','section','image']; "
             "SELECT * FROM node WHERE stale=false AND retired!=true;")
@@ -1218,7 +1283,8 @@ class Memory:
         return self._check_changes(self.sources(), scope, deep=deep)
 
     def maintain(self, scope: list[str], *, include_registered: bool = False, control: str | None = None,
-                 timeout: float = 600, expected_snapshots: dict[str, str] | None = None) -> dict:
+                 timeout: float = 600, expected_snapshots: dict[str, str] | None = None,
+                 discover_graph: bool = False) -> dict:
         """Run deterministic maintenance and retain the semantic handoff."""
         from .maintenance import maintain
         from .owner import check_owned
@@ -1226,7 +1292,7 @@ class Memory:
             raise ValueError("Maintenance requires the project owner's control")
         check_owned(self.config.memory_dir, control)
         return maintain(self, scope, include_registered=include_registered, control=control, timeout=timeout,
-                        expected_snapshots=expected_snapshots)
+                        expected_snapshots=expected_snapshots, discover_graph=discover_graph)
 
     def _check_changes(self, known: list[dict], scope: list[str], *, deep: bool,
                        expected_snapshots: dict[str, str] | None = None) -> list[dict]:
@@ -1256,17 +1322,22 @@ class Memory:
         from .vectors import embed_members
         return embed_members(self, ids, timeout=timeout)
 
-    def vector_search(self, text: str, *, scope: str = "", limit: int = 12, timeout: float = 600):
+    def vector_search(self, text: str, *, scope: str = "", limit: int = 12, timeout: float = 600,
+                      allow_private: bool = True, access: bool = True):
         from .vectors import vector_search
         from .query import normalize_scope
-        result = vector_search(self, text, scope=normalize_scope(scope), limit=limit, timeout=timeout)
-        result["matches"] = self.access_hints(result["matches"])
+        result = vector_search(self, text, scope=normalize_scope(scope), limit=limit, timeout=timeout,
+                               allow_private=allow_private)
+        if access:
+            result["matches"] = self.access_hints(result["matches"])
         return result
 
     def hybrid_search(self, text: str, *, scope: str = "", limit: int = 12, timeout: float = 600,
-                      literal: bool = False):
+                      literal: bool = False, allow_private: bool = True, access: bool = True):
         from .vectors import hybrid_search
         from .query import normalize_scope
-        result = hybrid_search(self, text, scope=normalize_scope(scope), limit=limit, timeout=timeout, literal=literal)
-        result["matches"] = self.access_hints(result["matches"])
+        result = hybrid_search(self, text, scope=normalize_scope(scope), limit=limit, timeout=timeout, literal=literal,
+                               allow_private=allow_private)
+        if access:
+            result["matches"] = self.access_hints(result["matches"])
         return result

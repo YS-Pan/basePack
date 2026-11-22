@@ -21,7 +21,8 @@ def _read_reference(reference):
 
 def receipt_scope(material):
     return {"paths": [item["path"] for item in material["semantic"]],
-            "relations": [item["id"] for item in material["pending_relations"]],
+            "relations": [item["id"] for item in (*material["pending_relations"],
+                                                   *material.get("graph_candidates", ()))],
             "feedback": [item["id"] for item in material.get("feedback", [])]}
 
 
@@ -76,6 +77,10 @@ def prepare_stage(config, receipt, control, handoff, output, *, workers_ended, p
     wave = inspect(config.memory_dir, control, material["owner_run_id"], boundary["wave_id"])
     if not wave["closed"]:
         raise ValueError("Close the wave after publication and notification resolution before a stage handoff")
+    graph_scope = {item["id"] for item in material.get("graph_candidates", ())} & set(scope["relations"])
+    resolved = set(wave.get("resolved_graph_candidates", ())) & graph_scope
+    if set(boundary["completed"]["relations"]) & graph_scope != resolved:
+        raise ValueError("Completed graph candidates must match closed wave reviews and publications")
     receipts = []
     for ref in wave["history"]:
         previous_wave = _read_reference(ref)

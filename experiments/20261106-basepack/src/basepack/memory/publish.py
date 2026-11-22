@@ -7,13 +7,16 @@ from pathlib import Path
 from .draft import freeze_file, validate_batch
 
 
-def publish(memory, *, completed=None, output=None, frozen=None, control, result, timeout=600):
+def publish(memory, *, completed=None, output=None, frozen=None, control, result, timeout=600,
+            use_draft_context=True, batch_validator=None):
     """Compose freeze/apply; the publisher attests each assignment is complete.
 
     ``completed`` is an ordered list of {path, file_sha256, assignment} references.
     Paths are relative to the calling process, as with freeze/apply. ``frozen``
     instead resumes the exact saved batch, including its batch ID and UUIDs.
     The result file is only a projection of Memory.apply's database receipt.
+    Wave publication uses ``use_draft_context=False`` to omit batch context on new freezes.
+    An optional read-only ``batch_validator`` checks the same batch passed to apply.
     """
     if (completed is None) == (frozen is None):
         raise ValueError('Provide either completed drafts or an existing frozen batch')
@@ -42,7 +45,11 @@ def publish(memory, *, completed=None, output=None, frozen=None, control, result
             if file_sha256 != reference['file_sha256'].lower():
                 raise ValueError(f'completed[{index}] file SHA256 mismatch for {draft_path}: '
                                  f"expected {reference['file_sha256']}, found {file_sha256}")
-            drafts.append(json.loads(material.decode('utf-8')))
+            draft = json.loads(material.decode('utf-8'))
+            if not use_draft_context:
+                # A wave keeps author provenance with each fixed draft and task.
+                draft.pop('context', None)
+            drafts.append(draft)
             references.append({'path': str(draft_path), 'file_sha256': file_sha256,
                                'assignment': reference['assignment']})
         batch = freeze_file(drafts, path, config=memory.config)
@@ -52,6 +59,10 @@ def publish(memory, *, completed=None, output=None, frozen=None, control, result
         batch = json.loads(material.decode('utf-8'))
         validate_batch(batch)
 
+    if batch_validator is not None:
+        if completed is not None and json.loads(material.decode('utf-8')) != batch:
+            raise ValueError(f'Frozen batch changed after compilation: {path}')
+        batch_validator(batch)
     frozen_file_sha256 = sha256(material).hexdigest()
     applied = memory.apply(batch, control=control, timeout=timeout)
     receipt = {'batch_id': batch['batch_id'], 'frozen': str(path),

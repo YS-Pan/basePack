@@ -1,5 +1,6 @@
 import pytest
 
+from basepack.memory.content import original_text, read_source
 from basepack.memory.selection import select_scored
 
 
@@ -52,6 +53,46 @@ def test_same_member_keeps_complementary_ranges_from_one_snapshot():
     second = candidate("stable-member", "第二处依据", 85, start=8, end=9)
     first["source_version"] = second["source_version"] = "source_version:first"
     assert select_scored([first, second], 100)["items"] == [first, second]
+
+
+@pytest.mark.parametrize("whole_first", [False, True])
+def test_long_unicode_line_coverage_uses_columns(tmp_path, whole_first):
+    prefix = "前🙂" * 4000
+    excerpt = "证据🚀"
+    second_start = len(prefix + excerpt + "｜")
+    text = prefix + excerpt + "｜" + excerpt + "\r\n"
+    (tmp_path / "材料.md").write_bytes(text.encode("utf-8"))
+    source = read_source(tmp_path, "材料.md")
+    whole = {**candidate("stable-member", original_text(source, 1, 1), 100 if whole_first else 70, 1, 1),
+             "source_version": "source_version:first", "revision": source.revision}
+
+    def slice_candidate(start_col, end_col, score):
+        locator = {"start_col": start_col, "end_col": end_col}
+        return {**whole, "locator": locator, "text": original_text(source, 1, 1, locator), "score": score}
+
+    first = slice_candidate(len(prefix), len(prefix) + len(excerpt), 95)
+    second = slice_candidate(second_start, second_start + len(excerpt), 90)
+    inside = slice_candidate(len(prefix) + 1, len(prefix) + len(excerpt), 80)
+    assert first["text"] == second["text"] == excerpt
+
+    result = select_scored([first, second, inside, whole], len(text) + 2 * len(excerpt))
+
+    assert result["items"] == ([whole] if whole_first else [first, second, whole])
+    assert result["text_characters"] == len(text) + (0 if whole_first else 2 * len(excerpt))
+    covered = [item["locator"] for item in result["omitted"] if item["reason"] == "covered_original"]
+    assert covered == [item["locator"] for item in ([first, second, inside] if whole_first else [inside])]
+
+
+def test_multiline_columns_trim_only_the_endpoint_lines():
+    wide = {**candidate("wide", "一\r\n乙二\r\n丙", 95), "locator": {"start_col": 1, "end_col": 1}}
+    prefix = {**candidate("prefix", "甲", 90, 1, 1), "locator": {"start_col": 0, "end_col": 1}}
+    suffix = {**candidate("suffix", "三", 85, 3, 3), "locator": {"start_col": 1, "end_col": 2}}
+    interior = candidate("interior", "乙二\r\n", 80, 2, 2)
+
+    result = select_scored([wide, prefix, suffix, interior], 100)
+
+    assert result["items"] == [wide, prefix, suffix]
+    assert [(item["id"], item["reason"]) for item in result["omitted"]] == [("interior", "covered_original")]
 
 
 @pytest.mark.parametrize("kind", ["file", "section"])

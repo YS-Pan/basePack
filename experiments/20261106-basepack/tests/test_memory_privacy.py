@@ -198,7 +198,7 @@ def _initial(memory):
                   {"id": "mixed", "kind": "fact", "text": "Combined context",
                    "evidence": [{"member": 2}], "private": False}],
         "edges": [{"id": "mixed", "in": "node:mixed", "out": {"member": 0},
-                   "kind": "supports", "text": "Mixed endpoint", "evidence": [{"member": 0}], "private": False}],
+                   "type": "supports", "text": "Mixed endpoint", "evidence": [{"member": 0}]}],
     }])
     memory.apply(batch)
     return [row["id"] for row in batch["members"]]
@@ -253,10 +253,10 @@ def test_relations_use_retained_endpoint_markers_in_both_directions(memory):
     assert old_private["private"] is True
     memory.apply(freeze([{"sources": [], "expected": expected(), "edges": [
         {"id": "old_public", "in": "node:anchor", "out": public,
-         "kind": "supports", "text": "Earlier public endpoint", "evidence": [public],
+         "type": "supports", "text": "Earlier public endpoint", "evidence": [public],
          "endpoint_versions": {"in": {"id": "node:anchor", "knowledge_revision": old_public["knowledge_revision"]}}},
         {"id": "current_private", "in": "node:anchor", "out": public,
-         "kind": "supports", "text": "Current private endpoint", "evidence": [public]},
+         "type": "supports", "text": "Current private endpoint", "evidence": [public]},
     ]}]))
     assert memory.knowledge("semantic:old_public")["private"] is False
     assert memory.knowledge("semantic:current_private")["private"] is True
@@ -264,7 +264,7 @@ def test_relations_use_retained_endpoint_markers_in_both_directions(memory):
         {"id": "anchor", "kind": "fact", "text": "Public context again", "evidence": [public]}]}]))
     memory.apply(freeze([{"sources": [], "expected": expected(), "edges": [
         {"id": "old_private", "in": "node:anchor", "out": public,
-         "kind": "supports", "text": "Earlier private endpoint", "evidence": [public],
+         "type": "supports", "text": "Earlier private endpoint", "evidence": [public],
          "endpoint_versions": {"in": {"id": "node:anchor", "knowledge_revision": old_private["knowledge_revision"]}}},
     ]}]))
     assert memory.knowledge("node:anchor")["private"] is False

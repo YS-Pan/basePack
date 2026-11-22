@@ -153,7 +153,8 @@ def test_missing_text_ranges_identify_member_and_batch_position_without_writes(m
     del batch["members"][1]["start_line"], batch["members"][1]["end_line"]
     with pytest.raises(ValueError, match=rf"members\[1\].*{batch['members'][1]['id']}.*start_line.*end_line"):
         memory.apply(batch)
-    assert all(memory._rows(table) == [] for table in ["source", "source_version", "member", "node", "semantic", "change"])
+    assert all(memory._rows(table) == [] for table in (
+        "source", "source_version", "member", "node", "semantic", "graph_state", "graph_edge", "change"))
 
 
 def test_missing_read_id_reports_the_target(memory):
@@ -163,7 +164,8 @@ def test_missing_read_id_reports_the_target(memory):
 
 @pytest.mark.parametrize('field,item,prefix', [
     ('nodes', {'kind': 'entity', 'text': 'generated identity'}, 'node'),
-    ('edges', {'in': 'node:a', 'out': 'node:b', 'kind': 'supports'}, 'semantic'),
+    ('edges', {'in': 'node:a', 'out': 'node:b', 'type': 'supports', 'text': 'Related',
+               'evidence': ['node:a']}, 'semantic'),
 ])
 def test_freeze_generates_graph_identity(field, item, prefix):
     first = freeze([{'sources': [], field: [item]}])[field][0]['id']
@@ -174,11 +176,12 @@ def test_freeze_generates_graph_identity(field, item, prefix):
     assert first != second
 
 
-@pytest.mark.parametrize('item,missing', [
-    ({'id': 'relation', 'kind': 'supports'}, 'in, out'),
-    ({'id': 'relation', 'out': 'node:b', 'kind': 'supports'}, 'in'),
-    ({'id': 'relation', 'in': 'node:a', 'kind': 'supports'}, 'out'),
+@pytest.mark.parametrize('endpoints,missing', [
+    ({}, 'in, out'),
+    ({'out': 'node:b'}, 'in'),
+    ({'in': 'node:a'}, 'out'),
 ])
-def test_freeze_locates_missing_relation_endpoints(item, missing):
+def test_freeze_locates_missing_relation_endpoints(endpoints, missing):
+    item = {'id': 'relation', 'type': 'supports', 'text': 'Related', 'evidence': ['node:a'], **endpoints}
     with pytest.raises(ValueError, match=rf'drafts\[0\]\.edges\[0\] missing required fields: {missing}'):
         freeze([{'sources': [], 'edges': [item]}])

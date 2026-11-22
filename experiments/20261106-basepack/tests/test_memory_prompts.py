@@ -101,6 +101,7 @@ def test_coordinator_is_lazy_and_claimed_task_contains_bounded_hints(prompt_proj
     assert "secret-body" not in coordinator["prompt"]
     assert "single maintenance wave coordinator and publisher" in coordinator["prompt"]
     assert "finite wave" in coordinator["prompt"]
+    assert '"outputs": ["draft", "coverage", "errors"]' in coordinator["prompt"]
     assert "`spawn_arguments` object" in coordinator["prompt"]
     assert "--readers" in coordinator["prompt"] and "<reader-count>" in coordinator["prompt"]
     assert "verifies this exact coordinator turn ended and is idle" in coordinator["prompt"]
@@ -426,6 +427,12 @@ def test_retrieval_render_has_complete_flow_without_store_or_ownership(prompt_pr
     result = render_retrieval_prompt(prompt_project, request, available_subagents=available)
     assert "search" in result["prompt"] and "read" in result["prompt"] and "rank" in result["prompt"]
     assert "common 0–100 relevance scale" in result["prompt"]
+    assert "omit inapplicable excerpts from `scored.json`" in result["prompt"]
+    assert "historical comparison or counterevidence" in result["prompt"]
+    assert "re-read the relevant original subrange at its exact source version" in result["prompt"]
+    assert "prioritize the complete set over redundant excerpts" in result["prompt"]
+    assert "re-run rank with the same scores and budget" in result["prompt"]
+    assert "narrow the claim and report the gap" in result["prompt"]
     assert "--budget" in result["prompt"] and "600" in result["prompt"]
     assert "--control" not in result["prompt"] and "--receipt" not in result["prompt"]
     if available == 0:
@@ -464,8 +471,8 @@ def test_scope_is_a_literal_path_prefix_not_the_business_question(prompt_project
                 else "--scope" in first["search_command"])
     else:
         assert "--scope" not in first["search_command"]
-    assert "--knowledge-revision" in first["prompt"] and "endpoint_versions" in first["prompt"]
-    assert "host file-writing tool" in first["prompt"] and "incomplete stage" in first["prompt"]
+    assert "--knowledge-revision" in first["prompt"] and "exact paths and source locators" in first["prompt"]
+    assert "file-writing tool" in first["prompt"] and "incomplete step" in first["prompt"]
     assert not first["started"] and first["status"] == "prepared"
 
 
@@ -503,7 +510,7 @@ def test_rendered_search_native_arguments_keep_default_and_unicode_scope(prompt_
                                       "[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)\n" + command],
                                      text=True, encoding="utf-8")
     actual = json.loads(output)
-    expected = ["--config", str(prompt_project.path), "memory", "search", "--text", "<terms>"]
+    expected = ["--config", str(prompt_project.path), "memory", "search", "--text", "<terms>", "--public-only"]
     if scope:
         expected += ["--scope", scope]
     assert actual == expected

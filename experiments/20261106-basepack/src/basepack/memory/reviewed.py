@@ -4,12 +4,24 @@ from .images import ImageSource
 from .privacy import privacy_rules, source_private
 
 
+SOURCE_DECISION_FIELDS = ('dispositions', 'deferred_refinement', 'unavailable_gaps')
+
+
+def disposition_representations(entry, *, location):
+    kind = entry.get('kind')
+    if kind not in ('no_knowledge', 'duplicate'):
+        raise ValueError(f'{location}.kind: Expected no_knowledge or duplicate')
+    refs = entry.get('representations', [])
+    if (kind == 'duplicate') != bool(refs):
+        raise ValueError(f'{location}.representations: Required for duplicate and empty for no_knowledge')
+    return refs
+
+
 def dependencies(memory, batch, before_members, targets, expected):
     """Return versioned dependencies for the source-level author decisions."""
     from .store import _record
 
-    fields = ('dispositions', 'deferred_refinement', 'unavailable_gaps')
-    if not any(any(field in source for field in fields)
+    if not any(any(field in source for field in SOURCE_DECISION_FIELDS)
                for source in batch['sources']):
         return set()
     records = {_record(row['id']): row for row in before_members}
@@ -32,8 +44,8 @@ def dependencies(memory, batch, before_members, targets, expected):
             raise ValueError('Deferred gap must match a current member and its coverage gap')
         result.add(record)
 
-    for item in batch['sources']:
-        if not any(field in item for field in fields):
+    for position, item in enumerate(batch['sources']):
+        if not any(field in item for field in SOURCE_DECISION_FIELDS):
             continue
         if item.get('deleted'):
             raise ValueError('Deleted sources cannot record reading dispositions')
@@ -54,7 +66,7 @@ def dependencies(memory, batch, before_members, targets, expected):
                         and not source_private(source.path, privacy_rules(memory.config)['private_scope'])):
                     raise ValueError('Unavailable gap cannot expose a private member in a public source')
         for field in ('dispositions', 'deferred_refinement'):
-            for entry in item.get(field, []):
+            for index, entry in enumerate(item.get(field, [])):
                 if not isinstance(entry.get('reason'), str) or not entry['reason'].strip():
                     raise ValueError('Source disposition or refinement requires a reason')
                 if isinstance(source, ImageSource):
@@ -66,10 +78,7 @@ def dependencies(memory, batch, before_members, targets, expected):
                             or start < 1 or end < start or end > len(source.text.splitlines())):
                         raise ValueError('Source decision range is outside the original')
                 if field == 'dispositions':
-                    kind = entry['kind']
-                    refs = entry.get('representations', [])
-                    if kind not in {'no_knowledge', 'duplicate'} or (kind == 'duplicate') != bool(refs):
-                        raise ValueError('Invalid disposition kind or duplicate representations')
+                    refs = disposition_representations(entry, location=f'sources[{position}].{field}[{index}]')
                     for ref in refs:
                         reference(ref)
                 else:

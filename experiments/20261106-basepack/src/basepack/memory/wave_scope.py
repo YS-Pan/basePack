@@ -13,3 +13,4 @@ def validate_draft(task, material):
     for path in paths:
         if _path_key(path) not in allowed:
             raise ValueError(f"Task {task['id']} cannot write source outside its paths: {path}")
+    return draft

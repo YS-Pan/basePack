@@ -12,7 +12,19 @@ from basepack.project.config import _level_from_legacy_tier
 
 
 MAINTENANCE_RESERVE = {"automatic": 1, "manual": 1}
-MAINTENANCE_BOOTSTRAP = "Run the following command and follow the `prompt` field in its JSON output:"
+MAINTENANCE_BOOTSTRAP = (
+    "First run the read-only prompt-rendering command below in the normal project sandbox. "
+    "Follow the `prompt` field in its JSON output.\n"
+    "Read the shell result body. A `Rejected` wrapper can contain a Windows provisioning error confirming the process "
+    "never started. If Auto-review denied the command, the review route is unavailable, or execution or its result is "
+    "uncertain, report the actual error and status to the original parent and stop without repeating the command. "
+    "For a confirmed Windows pre-launch failure in a session that routes shell escalation to Auto-review, request at "
+    "most one per-command review of that exact invocation. Use `sandbox_permissions=\"require_escalated\"` where exposed "
+    "or the host's equivalent per-command option. Leave any reusable `prefix_rule` unset. "
+    "Keep the command, working directory and all arguments unchanged, including any `--holder`, `--control`, "
+    "`--run-id`, `--wave-id` or `--worker`. Give the actual launch error and the original rendering purpose as the "
+    "review reason."
+)
 MAINTENANCE_ORGANIZATION = "finite-wave-v1"
 
 
@@ -209,11 +221,12 @@ def _reader_hints(material, paths):
     relevant, unknown = [], 0
     for relation in material["pending_relations"]:
         basis = relation["basis"]
-        known_paths = [item.get("path") or member_paths.get(item["member"]) for item in basis]
+        known_paths = relation.get("scope_paths") or [item.get("path") or member_paths.get(item["member"])
+                                                      for item in basis]
         hint = {"id": relation["id"], "basis_members": [item["member"] for item in basis]}
         if any(path in selected for path in known_paths):
             relevant.append(hint)
-        elif not basis or any(path is None for path in known_paths):
+        elif not known_paths or any(path is None for path in known_paths):
             unknown += 1
     hints = {"sources": sources, "related_pending_relations": relevant, "unresolved_pending_relations_count": unknown}
     if "codex" in material:
@@ -240,6 +253,10 @@ def render_prompt(config, receipt, control, *, role="coordinator", level=None, p
         if not dispatch["publisher"]:
             stage_context.pop("remaining")
             stage_context["assigned_paths"] = paths
+    graph_candidates = material.get("graph_candidates", [])
+    if stage_context and dispatch["publisher"]:
+        remaining = set(stage_context["remaining"]["relations"])
+        graph_candidates = [item for item in graph_candidates if item["id"] in remaining]
     work = config.root / "tmp" / "basepack-maintenance" / receipt_path.stem / uuid4().hex
     reading, batch = work / "reading.json", work / "batch.json"
     wave_create = ["wave", "create", "--receipt", str(receipt_path), "--control", str(Path(control).resolve()),
@@ -277,6 +294,7 @@ def render_prompt(config, receipt, control, *, role="coordinator", level=None, p
         "reader_capacity": str(len(layout["teams"][0]["reader_task_names"])),
         "semantic_count": str(len(material["semantic"])),
         "relations_count": str(len(material["pending_relations"])),
+        "graph_candidates": json.dumps(graph_candidates, ensure_ascii=False),
         "feedback_count": str(len(material.get("feedback", []))),
         "paths": json.dumps(paths or [], ensure_ascii=False),
         "hints": json.dumps(_reader_hints(material, paths) if paths else {}, ensure_ascii=False),

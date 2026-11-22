@@ -5,6 +5,73 @@ import json
 from pathlib import Path
 from uuid import uuid4
 
+from .relation_contract import EXACT_ENDPOINT_TABLES, LOGICAL_ENDPOINT_TABLES, validate_edge
+from .reviewed import SOURCE_DECISION_FIELDS, disposition_representations
+
+
+def _reference_position(value, location, *, edge_allowed=False):
+    if isinstance(value, str):
+        return None
+    if isinstance(value, dict):
+        for kind in ('member', 'node', 'edge') if edge_allowed else ('member', 'node'):
+            if set(value) in ({kind}, {'draft', kind}) and type(value.get(kind)) is int:
+                if 'draft' in value and type(value['draft']) is not int:
+                    raise ValueError(f'{location}: Draft index must be an integer')
+                return value.get('draft'), kind, value[kind]
+    kinds = 'member, node, or edge' if edge_allowed else 'member or node'
+    raise ValueError(f'{location}: Use an existing record ID as a string, '
+                     f'or an object with an integer {kinds} position and optional draft index')
+
+
+def _reference_slots(draft, prefix, *, writable=False):
+    for field in ('members', 'nodes', 'edges'):
+        for index, item in enumerate(draft.get(field, [])):
+            location = f'{prefix}{field}[{index}]'
+            if field == 'members' and item.get('parent') is not None:
+                yield item, 'parent', f'{location}.parent', False
+            evidence = item.get('evidence', ())
+            if writable:
+                evidence = item['evidence'] = list(evidence)
+            elif 'evidence' in item and not isinstance(evidence, list):
+                raise ValueError(f'{location}.evidence: Expected an array of references')
+            for position in range(len(evidence)):
+                yield evidence, position, f'{location}.evidence[{position}]', False
+            if field == 'edges':
+                for endpoint in ('in', 'out'):
+                    if endpoint in item:
+                        yield item, endpoint, f'{location}.{endpoint}', True
+                for position, basis in enumerate(item.get('basis', [])):
+                    if 'id' in basis:
+                        yield basis, 'id', f'{location}.basis[{position}].id', False
+
+
+def validate_reference_shapes(draft, *, label, separator=': '):
+    """Check reference syntax before the wave's other drafts are available."""
+    prefix = f'{label}{separator}'
+    for index, item in enumerate(draft.get('edges', [])):
+        validate_edge(item, location=f'{prefix}edges[{index}]')
+    for target, key, location, edge_allowed in _reference_slots(draft, prefix):
+        _reference_position(target[key], location, edge_allowed=edge_allowed)
+
+
+def validate_source_decisions(proposal, *, prefix):
+    """Check authored source decisions without resolving any prepared evidence."""
+    for position, source in enumerate(proposal.get('sources', [])):
+        if isinstance(source, str):
+            continue
+        location = f'{prefix}sources[{position}]'
+        extra = source.keys() - {'path', *SOURCE_DECISION_FIELDS}
+        if extra:
+            raise ValueError(f'{location} has generated fields: {sorted(extra)}')
+        dispositions = source.get('dispositions', [])
+        if not isinstance(dispositions, list):
+            raise ValueError(f'{location}.dispositions: Expected an array')
+        for index, entry in enumerate(dispositions):
+            field = f'{location}.dispositions[{index}]'
+            if not isinstance(entry, dict):
+                raise ValueError(f'{field}: Expected an object')
+            disposition_representations(entry, location=field)
+
 
 def freeze(drafts, *, config=None):
     if not drafts:
@@ -18,7 +85,6 @@ def freeze(drafts, *, config=None):
               'privacy_rules': rules, 'privacy_rules_revision': rules_revision(rules)}
     drafts = deepcopy(drafts)
     scopes = []
-    node_scopes = []
     for scope, draft in enumerate(drafts):
         if any(key in draft for key in ('protocol', 'batch_id', 'new_members', 'member_mapping')):
             raise ValueError('Expected an author draft, not a frozen batch')
@@ -27,12 +93,7 @@ def freeze(drafts, *, config=None):
         unknown = draft.keys() - allowed
         if unknown:
             raise ValueError(f'Unknown draft fields: {sorted(unknown)}')
-        for field, required in (('nodes', ()), ('edges', ('in', 'out'))):
-            for index, item in enumerate(draft.get(field, [])):
-                missing = [key for key in required if key not in item]
-                if missing:
-                    raise ValueError(f"drafts[{scope}].{field}[{index}] missing required fields: "
-                                     f"{', '.join(missing)}")
+        validate_reference_shapes(draft, label=f'drafts[{scope}]', separator='.')
         ids = []
         for index, item in enumerate(draft.get('members', [])):
             if item.get('kind') in {'file', 'section', 'chunk'}:
@@ -47,43 +108,29 @@ def freeze(drafts, *, config=None):
                 ids.append(identity)
                 merged['new_members'].append(identity)
                 merged['member_mapping'].append({'draft': scope, 'member': index, 'id': identity})
-        scopes.append(ids)
-        node_scopes.append([item.setdefault('id', 'node:' + uuid4().hex)
-                            for item in draft.get('nodes', [])])
-        for item in draft.get('edges', []):
-            item.setdefault('id', 'semantic:' + uuid4().hex)
+        scopes.append({
+            'member': ids,
+            'node': [item.setdefault('id', 'node:' + uuid4().hex) for item in draft.get('nodes', [])],
+            'edge': [item.setdefault('id', 'semantic:' + uuid4().hex) for item in draft.get('edges', [])],
+        })
 
     for scope, draft in enumerate(drafts):
         members = draft.get('members', [])
-        ids = scopes[scope]
-        def ref(value):
-            if isinstance(value, dict):
-                kind = 'member' if 'member' in value else 'node'
-                if set(value) not in ({kind}, {'draft', kind}) or type(value.get(kind)) is not int:
-                    raise ValueError('Reference must name a draft and member or node position')
-                selected = value.get('draft', scope)
-                index = value[kind]
-                if type(selected) is not int or selected < 0 or selected >= len(scopes):
-                    raise ValueError(f'Draft index out of range: {selected}')
-                group = scopes[selected] if kind == 'member' else node_scopes[selected]
-                if index < 0 or index >= len(group):
-                    raise ValueError(f'{kind.title()} index out of range: {index}')
-                return group[index]
-            if not isinstance(value, str):
-                raise ValueError('Reference must be a record ID or local member position')
-            return value
-
-        for item, identity in zip(members, ids):
+        for item, identity in zip(members, scopes[scope]['member']):
             item['id'] = identity
-            if item.get('parent') is not None:
-                item['parent'] = ref(item['parent'])
-            item['evidence'] = [ref(value) for value in item.get('evidence', [])]
-        for key in ('nodes', 'edges'):
-            for item in draft.get(key, []):
-                item['evidence'] = [ref(value) for value in item.get('evidence', [])]
-                if key == 'edges':
-                    for endpoint in ('in', 'out'):
-                        item[endpoint] = ref(item[endpoint])
+        for target, key, location, edge_allowed in _reference_slots(draft, f'drafts[{scope}].', writable=True):
+            reference = _reference_position(target[key], location, edge_allowed=edge_allowed)
+            if reference is None:
+                continue
+            selected, kind, index = reference
+            if selected is None:
+                selected = scope
+            if selected < 0 or selected >= len(scopes):
+                raise ValueError(f'{location}: Draft index out of range: {selected}')
+            group = scopes[selected][kind]
+            if index < 0 or index >= len(group):
+                raise ValueError(f'{location}: {kind.title()} index out of range: {index}')
+            target[key] = group[index]
         for source in draft['sources']:
             if not source.get('deleted'):
                 source['private'] = source_private(source['path'], rules['private_scope'])
@@ -111,8 +158,8 @@ def freeze(drafts, *, config=None):
 def compile_proposals(proposals, *, config=None):
     """Compile author choices against the exact, hash-pinned reading packages.
 
-    Prepare supplies mechanical identities and versions; it never supplies a
-    semantic choice. The caller must save a new frozen file for every revision.
+    Prepare supplies identities and versions. The author chooses what to publish.
+    Save a new frozen file for every revision.
     """
     from hashlib import sha256
     from .store import _record
@@ -125,7 +172,30 @@ def compile_proposals(proposals, *, config=None):
     identity_text = {}
     records = {}
     historical = {}
+    exact = {}
+
+    def available(row):
+        return not (row.get('stale', False) or row.get('retired', False))
+
+    def observe_exact(identity, row):
+        record = _record(identity)
+        if record in exact and exact[record]['private'] != row['private']:
+            raise ValueError(f'Conflicting prepare private markers for {identity}')
+        exact[record] = {**exact.get(record, {}), **row}
+
+    def observe_knowledge(row):
+        if row.get('exact_id'):
+            observe_exact(row['exact_id'], row)
+
+    def observe_current(row):
+        record = _record(row['id'])
+        if record in records and available(records[record]) != available(row):
+            raise ValueError(f"Conflicting prepare availability for {row['id']}")
+        records[record] = row
+        observe_knowledge(row)
+
     for index, proposal in enumerate(proposals):
+        validate_source_decisions(proposal, prefix=f'proposals[{index}].')
         reference = proposal.pop('prepare')
         path = Path(reference['path']).resolve()
         material = path.read_bytes()
@@ -147,15 +217,21 @@ def compile_proposals(proposals, *, config=None):
             identity_text[record] = identity
         for source in prepared['sources']:
             for row in source.get('members', []):
-                records[_record(row['id'])] = row
+                observe_current(row)
+            previous = source.get('previous')
+            if previous and previous.get('source_version'):
+                observe_exact(previous['source_version'], {'path': source['path'], 'kind': 'text', **previous})
+        for snapshot in prepared.get('snapshots', []):
+            observe_exact(snapshot['id'], snapshot)
         for field in ('members', 'nodes', 'edges'):
             for row in prepared['neighborhood'][field]:
-                records[_record(row['id'])] = row
+                observe_current(row)
         for row in prepared.get('historical_versions', []):
             key = (_record(row['id']), row['knowledge_revision'])
             if key in historical and historical[key] != row:
                 raise ValueError(f'Conflicting historical prepare version: {row["id"]}@{row["knowledge_revision"]}')
             historical[key] = row
+            observe_knowledge(row)
         packages.append(prepared)
 
     for index, (proposal, prepared) in enumerate(zip(proposals, packages)):
@@ -164,9 +240,6 @@ def compile_proposals(proposals, *, config=None):
         for position, decision in enumerate(proposal.get('sources', [])):
             if isinstance(decision, str):
                 decision = {'path': decision}
-            extra = decision.keys() - {'path', 'dispositions', 'deferred_refinement', 'unavailable_gaps'}
-            if extra:
-                raise ValueError(f'proposals[{index}].sources[{position}] has generated fields: {sorted(extra)}')
             path = decision['path']
             if path not in sources:
                 raise ValueError(f'proposals[{index}].sources[{position}] not in prepare: {path}')
@@ -180,7 +253,7 @@ def compile_proposals(proposals, *, config=None):
                     compiled['kind'] = 'image'
             if 'id' in source:
                 compiled['id'] = source['id']
-            for field in ('dispositions', 'deferred_refinement', 'unavailable_gaps'):
+            for field in SOURCE_DECISION_FIELDS:
                 if field in decision:
                     compiled[field] = decision[field]
             for decision_item in compiled.get('dispositions', []):
@@ -208,11 +281,18 @@ def compile_proposals(proposals, *, config=None):
                         raise ValueError('Unavailable gap requires a reason')
             selected.append(compiled)
         proposal['sources'] = selected
+        for position, edge in enumerate(proposal.get('edges', [])):
+            validate_edge(edge, location=f'proposals[{index}].edges[{position}]')
+            for reference in edge.get('basis', []):
+                if 'path' in reference and reference['path'] not in sources:
+                    raise ValueError(f"Snapshot basis path absent from prepare: {reference['path']}")
         # IDs supplied for writes or retirements must be observed in prepare.
         for table, field in (('member', 'members'), ('node', 'nodes'), ('semantic', 'edges')):
             for position, item in enumerate(proposal.get(field, [])):
                 if 'id' in item and _record(item['id'], table) not in known:
-                    raise ValueError(f'proposals[{index}].{field}[{position}].id not in prepare: {item["id"]}')
+                    raise ValueError(f'proposals[{index}].{field}[{position}].id not in prepare: {item["id"]}. '
+                                     'Omit id for a new record so the compiler assigns one. '
+                                     'For an update, use the ID from a fixed prepare package.')
         for table, field in (('member', 'delete_members'), ('node', 'delete_nodes'), ('semantic', 'delete_edges')):
             for position, identity in enumerate(proposal.get(field, [])):
                 if _record(identity, table) not in known:
@@ -231,16 +311,11 @@ def compile_proposals(proposals, *, config=None):
     prepared_sources = {(source['path'], source['revision']): source
                         for package in packages for source in package['sources'] if not source.get('deleted')}
     originals = {}
-    for item in batch.get('members', []):
-        if item.get('kind') != 'chunk' or 'text' not in item:
-            continue
-        path = item['path']
-        selected = selected_sources[path]
-        key = (path, selected['revision'])
+
+    def prepared_original(source):
+        path, revision = source['path'], source['revision']
+        key = path, revision
         if key not in originals:
-            source = prepared_sources[key]
-            if source['kind'] != 'text':
-                raise ValueError(f'Chunk requires a text source: {path}')
             lines = []
             for number, line in enumerate(source['numbered_text'].splitlines(keepends=True), 1):
                 prefix = f'{number}: '
@@ -248,26 +323,48 @@ def compile_proposals(proposals, *, config=None):
                     raise ValueError(f'Invalid numbered original in prepare: {path}')
                 lines.append(line[len(prefix):])
             raw = ''.join(lines)
-            if sha256(raw.encode('utf-8')).hexdigest() != selected['revision']:
+            if sha256(raw.encode('utf-8')).hexdigest() != revision:
                 raise ValueError(f'Prepared original revision mismatch: {path}')
-            originals[key] = SourceContent(path, selected['revision'], len(raw.encode('utf-8')), 0, raw)
-        raw = original_text(originals[key], item['start_line'], item['end_line'], item.get('locator'))
+            originals[key] = SourceContent(path, revision, len(raw.encode('utf-8')), 0, raw)
+        return originals[key]
+
+    for item in batch.get('members', []):
+        if item.get('kind') != 'chunk' or 'text' not in item:
+            continue
+        path = item['path']
+        selected = selected_sources[path]
+        source = prepared_sources[path, selected['revision']]
+        if source['kind'] != 'text':
+            raise ValueError(f'Chunk requires a text source: {path}')
+        raw = original_text(prepared_original(source), item['start_line'], item['end_line'], item.get('locator'))
         if item['text'] != raw:
             raise ValueError(f"Chunk {item['id']} text differs from its original range: {path}")
+
+    def check_snapshot_location(source, reference):
+        start, end = reference.get('start_line'), reference.get('end_line')
+        if source['kind'] == 'image':
+            if start is not None or end is not None:
+                raise ValueError(f"Image basis uses a locator without lines: {source['path']}")
+        elif start is None or end is None:
+            raise ValueError(f"Text basis requires start_line and end_line: {source['path']}")
+        elif 'numbered_text' in source:
+            original_text(prepared_original(source), start, end, reference.get('locator'))
+
+    def require_exact(record):
+        row = exact.get(record)
+        if row is None:
+            raise ValueError(f'References absent from prepare: {record.table}:{record.key}')
+        return row
+
     # Apply checks precisely the writes and dependencies it uses. Keep only that
     # closure and reject unknown external references before the frozen file exists.
-    new = {_record(identity) for identity in batch['new_members']}
-    for table, field in (('node', 'nodes'), ('semantic', 'edges')):
-        for item in batch.get(field, []):
-            record = _record(item['id'], table)
-            if record not in known:
-                new.add(record)
-    needed = set()
-    for table, field, removed in (('member', 'members', 'delete_members'),
-                                   ('node', 'nodes', 'delete_nodes'),
-                                   ('semantic', 'edges', 'delete_edges')):
-        needed.update(_record(item['id'], table) for item in batch.get(field, []))
-        needed.update(_record(item, table) for item in batch.get(removed, []))
+    writes = {_record(item['id'], table): (item['id'], item)
+              for table, field in (('member', 'members'), ('node', 'nodes'), ('semantic', 'edges'))
+              for item in batch.get(field, [])}
+    new = set(writes) - set(known)
+    retired = {_record(value, table) for table, field in (('member', 'delete_members'),
+               ('node', 'delete_nodes'), ('semantic', 'delete_edges')) for value in batch.get(field, [])}
+    needed = set(writes) | retired
     needed.update(_record(item['target']) for item in batch.get('corrections', []))
     targets = set(needed)
     walk_roots = set()
@@ -284,14 +381,55 @@ def compile_proposals(proposals, *, config=None):
             if field == 'edges':
                 for endpoint in ('in', 'out'):
                     target = _record(item[endpoint])
-                    needed.add(target)
                     pin = item.get('endpoint_versions', {}).get(endpoint)
+                    if target.table in EXACT_ENDPOINT_TABLES:
+                        if pin:
+                            raise ValueError(f"Exact endpoint already pins the version: {item['id']} {endpoint}")
+                        require_exact(target)
+                        continue
+                    if target.table not in LOGICAL_ENDPOINT_TABLES:
+                        raise ValueError(f"Unsupported edge endpoint: {item[endpoint]}")
+                    needed.add(target)
+                    if not pin and target not in writes and target in known:
+                        row = records.get(target)
+                        if target in retired or row is None or not available(row):
+                            raise ValueError(f"Choose an exact version for an unavailable endpoint: {item[endpoint]}")
+                        pin = {'id': item[endpoint], 'knowledge_revision': known[target]}
+                        item.setdefault('endpoint_versions', {})[endpoint] = pin
                     if pin:
                         if _record(pin['id']) != target:
                             raise ValueError(f"Historical endpoint identity mismatch: {item['id']} {endpoint}")
+                        if target not in known:
+                            raise ValueError(f"Explicit endpoint pin is absent from prepare: {item[endpoint]}")
                         walk_pins.append((target, pin['knowledge_revision']))
                     else:
                         walk_roots.add(target)
+                for reference in item.get('basis', []):
+                    if 'path' in reference:
+                        path = reference['path']
+                        if path not in selected_sources:
+                            raise ValueError(f'Snapshot basis path must be selected for publication: {path}')
+                        source = prepared_sources[path, selected_sources[path]['revision']]
+                        check_snapshot_location(source, reference)
+                    elif 'source_version' in reference:
+                        snapshot = _record(reference['source_version'])
+                        if snapshot.table != 'source_version':
+                            raise ValueError('Snapshot basis requires a source_version ID')
+                        check_snapshot_location(require_exact(snapshot), reference)
+                    else:
+                        target = _record(reference['id'])
+                        revision = reference.get('knowledge_revision')
+                        if target.table == 'knowledge_version' and revision is None:
+                            require_exact(target)
+                        elif target.table not in {'member', 'node'}:
+                            raise ValueError(f"Basis needs a knowledge version: {reference['id']}")
+                        elif revision is not None:
+                            if target not in known:
+                                raise ValueError(f"Basis absent from prepare: {reference['id']}")
+                            needed.add(target)
+                            walk_pins.append((target, revision))
+                        elif target not in writes:
+                            raise ValueError(f"Existing basis requires an exact knowledge version: {reference['id']}")
     for source in batch['sources']:
         for item in source.get('dispositions', []):
             ids = {_record(ref['id']) for ref in item.get('representations', [])}
@@ -306,14 +444,12 @@ def compile_proposals(proposals, *, config=None):
         walk_roots.update(ids)
     evidence = {_record(value) for field in ('members', 'nodes', 'edges')
                 for item in batch.get(field, []) for value in item.get('evidence', [])}
-    retired = {_record(value, table) for table, field in (('member', 'delete_members'),
-               ('node', 'delete_nodes'), ('semantic', 'delete_edges')) for value in batch.get(field, [])}
     rewritten = {_record(item['id']) for item in batch.get('members', [])}
     for record in evidence - new - rewritten:
         if record not in known:
             raise ValueError(f'References absent from prepare: {record}')
         row = records.get(record)
-        if record in retired or row is None or row.get('retired') or row.get('stale'):
+        if record in retired or row is None or not available(row):
             raise ValueError(f'Evidence is unavailable, stale or retired in prepare: {identity_text.get(record, record)}')
     # Follow each accepted edge at its pinned version, while separately
     # guarding the current head of every logical identity against races.
@@ -326,10 +462,15 @@ def compile_proposals(proposals, *, config=None):
         if key in walked:
             continue
         walked.add(key)
-        row = records.get(record) if known.get(record) == revision else historical.get(key)
+        row = historical.get(key)
+        if row is None and known.get(record) == revision:
+            row = records.get(record)
         if row is None or row.get('knowledge_revision') != revision:
             raise ValueError(f'Pinned knowledge version absent from prepare: {identity_text.get(record, record)}@{revision}')
-        ancestors = [(entry['member'], entry['knowledge_revision']) for entry in row.get('basis', [])]
+        ancestors = [(entry['member'], entry['knowledge_revision']) for entry in row.get('basis', [])
+                     if 'member' in entry]
+        ancestors.extend((entry['id'], entry['knowledge_revision']) for entry in row.get('direct_basis', [])
+                         if 'id' in entry and 'knowledge_revision' in entry)
         if row.get('parent_version'):
             parent = row['parent_version']
             ancestors.append((parent['id'], parent['knowledge_revision']))
@@ -347,15 +488,27 @@ def compile_proposals(proposals, *, config=None):
     if missing:
         raise ValueError('References absent from prepare: ' + ', '.join(sorted(f'{r.table}:{r.key}' for r in missing)))
     batch['expected'] = {identity_text[record]: known[record] for record in needed if record in known}
+    batch['expected_status'] = {
+        identity_text[record]: available(row)
+        for record, row in records.items() if identity_text.get(record) in batch['expected']
+    }
 
     # Freeze classification for exactly the author's writes, using only the
     # selected sources and version-pinned records in the reading packages.
     sources = {source['path']: source for source in batch['sources']}
-    writes = {_record(item['id'], table): (item['id'], item)
-              for table, field in (('member', 'members'), ('node', 'nodes'), ('semantic', 'edges'))
-              for item in batch.get(field, [])}
     private = {}
     resolving = set()
+
+    def exact_classification(identity, revision=None):
+        if revision is None:
+            row = require_exact(identity)
+        else:
+            row = historical.get((identity, revision))
+            if row is None and known.get(identity) == revision:
+                row = records.get(identity)
+        if row is None or type(row.get('private')) is not bool:
+            raise ValueError(f"Exact private classification absent from prepare: {identity}@{revision}")
+        return row['private']
 
     def classification(record):
         if record in private:
@@ -379,18 +532,22 @@ def compile_proposals(proposals, *, config=None):
             for endpoint in ('in', 'out'):
                 target = _record(item[endpoint])
                 pin = item.get('endpoint_versions', {}).get(endpoint)
-                if pin:
-                    if _record(pin['id']) != target:
-                        raise ValueError(f"Historical endpoint identity mismatch: {item['id']} {endpoint}")
-                    revision = pin['knowledge_revision']
-                    row = historical.get((target, revision))
-                    if row is None and known.get(target) == revision:
-                        row = records.get(target)
-                    if row is None or type(row.get('private')) is not bool:
-                        raise ValueError(f"Historical endpoint private classification absent from prepare: {item['id']} {endpoint}")
-                    markers.append(row['private'])
+                if pin or target.table in EXACT_ENDPOINT_TABLES:
+                    markers.append(exact_classification(target, pin['knowledge_revision'] if pin else None))
                 else:
                     markers.append(classification(target))
+            for reference in item.get('basis', []):
+                if 'path' in reference:
+                    markers.append(selected_sources[reference['path']]['private'])
+                elif 'source_version' in reference:
+                    markers.append(exact_classification(_record(reference['source_version'])))
+                else:
+                    target = _record(reference['id'])
+                    revision = reference.get('knowledge_revision')
+                    if revision or target.table == 'knowledge_version':
+                        markers.append(exact_classification(target, revision))
+                    else:
+                        markers.append(classification(target))
         resolving.remove(record)
         private[record] = any(markers)
         return private[record]
@@ -425,6 +582,8 @@ def validate_batch(batch):
         raise ValueError('Duplicate source path or identity')
 
     def member(value):
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError('Frozen references must use record IDs')
         record = _record(value)
         if record.table == 'member' and (not isinstance(record.key, str) or
                                          not re.fullmatch(r'[0-9a-f]{32}', record.key)):
@@ -437,6 +596,10 @@ def validate_batch(batch):
         if identity in expected:
             raise ValueError(f'Duplicate expected identity: {key}')
         expected[identity] = revision
+    statuses = batch.get('expected_status', {})
+    if (not isinstance(statuses, dict) or statuses.keys() - batch['expected'].keys()
+            or any(type(status) is not bool for status in statuses.values())):
+        raise ValueError('Expected availability must match prepared identities and use booleans')
     new = [member(value) for value in batch['new_members']]
     if len(new) != len(set(new)) or any(value.table != 'member' for value in new):
         raise ValueError('Invalid or duplicate new member identity')
@@ -466,17 +629,29 @@ def validate_batch(batch):
             if value.table == 'member':
                 member(value.table + ':' + str(value.key))
     for field in ('members', 'nodes', 'edges'):
-        for item in batch.get(field, []):
+        for index, item in enumerate(batch.get(field, [])):
             for value in item.get('evidence', []):
                 if member(value).table != 'member':
                     raise ValueError('Evidence must reference a member')
             if field == 'members' and item.get('parent'):
                 member(item['parent'])
             if field == 'edges':
+                validate_edge(item, location=f'edges[{index}]')
                 for endpoint in ('in', 'out'):
-                    member(item[endpoint])
-                    if endpoint in item.get('endpoint_versions', {}):
-                        member(item['endpoint_versions'][endpoint]['id'])
+                    target = member(item[endpoint])
+                    if target.table not in EXACT_ENDPOINT_TABLES | LOGICAL_ENDPOINT_TABLES:
+                        raise ValueError(f'Unsupported edge endpoint: {item[endpoint]}')
+                    pin = item.get('endpoint_versions', {}).get(endpoint)
+                    if pin and (target.table in EXACT_ENDPOINT_TABLES or member(pin['id']) != target):
+                        raise ValueError(f'Endpoint pin must name the same logical record: {item[endpoint]}')
+                for reference in item.get('basis', []):
+                    if 'source_version' in reference and _record(reference['source_version']).table != 'source_version':
+                        raise ValueError('Snapshot basis requires a source_version ID')
+                    if 'id' in reference:
+                        table = member(reference['id']).table
+                        if (table not in {'member', 'node', 'knowledge_version'}
+                                or (table == 'knowledge_version' and 'knowledge_revision' in reference)):
+                            raise ValueError('Basis requires an exact knowledge version')
     corrections = [member(item['target']) for item in batch.get('corrections', [])]
     if len(corrections) != len(set(corrections)):
         raise ValueError('Duplicate correction target')

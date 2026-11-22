@@ -9,7 +9,18 @@ import pytest
 from basepack.memory import candidate_vectors
 from basepack.memory.draft import freeze
 from basepack.memory.maintenance import MaintenanceStopped, stop
+from basepack.memory.store import _publication_groups, _query_wire_size
 from test_memory_store import batch_for, memory
+
+
+def test_publication_frame_accounts_for_unicode_json_escaping_and_newlines():
+    statements = ['RETURN "测\\试";', 'RETURN "第二行";\nRETURN "\t表";', 'RETURN "⿰";']
+    pair = "\n".join(statements[:2])
+    limit = _query_wire_size(pair)
+    assert _publication_groups(statements, limit) == [pair, statements[-1]]
+    assert _publication_groups(statements, limit - 1) == [statements[0], "\n".join(statements[1:])]
+    with pytest.raises(ValueError, match=fr"{limit}-byte.*{_query_wire_size(pair + chr(10))} encoded bytes"):
+        _publication_groups([pair + "\n"], limit)
 
 
 def test_change_detection_cannot_invalidate_a_newer_accept(memory, monkeypatch):

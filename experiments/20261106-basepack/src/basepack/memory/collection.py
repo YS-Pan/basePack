@@ -6,7 +6,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from .content import _read_bytes
 from .discovery import retained_codex_paths
@@ -37,20 +37,113 @@ def _write_receipt(path, receipt, *, checkpoint=None):
             temporary.unlink(missing_ok=True)
 
 
-def collect(config, registry_path=None, *, control=None, output=None, attempt_id=None):
+def _trial_path(memory_dir):
+    return Path(memory_dir) / "codex-trials.json"
+
+
+def _trial_state(memory_dir, project_id):
+    path = _trial_path(memory_dir)
+    try:
+        state = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {"project_id": project_id, "pending": None, "registered": {}}
+    if state["project_id"] != project_id:
+        raise ValueError(f"Codex trial registry belongs to another project: {path}")
+    return state
+
+
+def codex_trial(config, action, *, reservation=None, thread_id=None):
+    """Serialize a durable creation reservation with formal capture."""
+    project_id = config.raw["memory"].get("codex", {}).get("project_id")
+    if not project_id:
+        raise ValueError("Codex trial registration requires a configured Codex project ID")
+    memory_dir = Path(config.memory_dir)
+    path = _trial_path(memory_dir)
+    with _locked(memory_dir / "collection.lock"):
+        state = _trial_state(memory_dir, project_id)
+        pending = state["pending"]
+        registered = state["registered"]
+        if action == "begin":
+            if pending:
+                raise ValueError("A Codex trial creation reservation is already pending")
+            state["pending"] = uuid4().hex
+        elif action == "register":
+            thread_id = str(UUID(thread_id))
+            if thread_id not in registered or registered[thread_id] != reservation:
+                if pending is None or pending != reservation:
+                    raise ValueError("Codex trial creation reservation does not match")
+                if thread_id in registered:
+                    raise ValueError(f"Codex trial thread is already registered: {thread_id}")
+                registered[thread_id] = reservation
+                state["pending"] = None
+        elif action == "cancel":
+            if pending is None or pending != reservation:
+                raise ValueError("Codex trial creation reservation does not match")
+            state["pending"] = None
+        elif action != "status":
+            raise ValueError(f"Unknown Codex trial operation: {action}")
+        if action != "status":
+            _write_receipt(path, state)
+    return {"project_id": project_id, "registry": str(path),
+            "pending_reservation": state["pending"], "excluded_root_thread_ids": list(registered)}
+
+
+def trial_exclusion(roots, threads):
+    """Classify known and unverified trial ancestry before reading items."""
+    from .codex import thread_parent
+
+    by_id = {thread["id"]: thread for thread in threads}
+
+    def reason(thread):
+        pending = [thread]
+        seen = set()
+        unknown = False
+        while pending:
+            current = pending.pop()
+            identity = current["id"]
+            if identity in roots:
+                return "registered_codex_trial"
+            if identity in seen:
+                continue
+            seen.add(identity)
+            parent = thread_parent(current)
+            source = current.get("source")
+            if (isinstance(source, dict) and "subAgent" in source and not parent):
+                unknown = True
+            for ancestor in (parent, current.get("forkedFromId"), current.get("attachedToThreadId")):
+                if ancestor in roots:
+                    return "registered_codex_trial"
+                if ancestor:
+                    if ancestor in by_id:
+                        pending.append(by_id[ancestor])
+                    else:
+                        unknown = True
+        if unknown:
+            return "codex_trial_ancestry_unavailable"
+        return None
+
+    return reason
+
+
+def collect(config, registry_path=None, *, control=None, output=None, attempt_id=None,
+            thread_ids=None):
     """Capture assigned chats and record the hashes of the captured bytes.
 
-    The project lock covers capture and receipt publication. Later readers verify
-    the receipt against the source files independently.
+    Explicit thread IDs limit the project-matched roots. The project lock covers
+    capture and receipt publication. Later readers verify the receipt against
+    the source files independently.
     """
     from . import owner
     from .codex import AppServer, collect_codex, list_threads
     from .codex_binding import classify_threads, discover_binding
 
     root = Path(config.root).resolve()
-    memory_dir = Path(config.memory_dir)
+    memory_dir = Path(config.memory_dir).resolve()
     path = _inside(root, output or (memory_dir / "maintenance" / f"collection-{uuid4().hex}.json"))
+    if path in (_trial_path(memory_dir), memory_dir / "collection.lock"):
+        raise ValueError(f"Collection output is reserved: {path}")
     result = {"status": "started", "root": str(root), "project_id": None,
+              "memory_dir": str(memory_dir),
               "paths": [], "snapshots": [], "receipt": str(path),
               "snapshot_policy": "verify_on_load"}
 
@@ -71,13 +164,20 @@ def collect(config, registry_path=None, *, control=None, output=None, attempt_id
                 raise FileExistsError(f"Collection receipt already exists for this attempt: {path}")
             failure_path = path
             checkpoint()
+            selected_roots = (None if thread_ids is None
+                              else list(dict.fromkeys(str(UUID(thread_id)) for thread_id in thread_ids)))
             configured = config.raw["memory"].get("codex", {})
             binding = (json.loads(Path(registry_path).read_text(encoding="utf-8"))
                        if registry_path else configured)
             result["project_id"] = project_id = binding.get("project_id")
             if registry_path and configured.get("project_id") and project_id != configured["project_id"]:
                 raise ValueError("Collection registry project ID does not match the configured Codex project ID")
+            trials = _trial_state(memory_dir, project_id)
+            if trials["pending"]:
+                raise RuntimeError("Codex collection is paused while a trial creation reservation is pending")
             if not project_id or not binding.get("registry_complete"):
+                if selected_roots is not None:
+                    raise ValueError("Selecting Codex threads requires a complete project binding")
                 result.update(status="binding_unavailable",
                               gap="Host project ID and complete registered project roots are required.")
                 _write_receipt(path, result)
@@ -86,10 +186,29 @@ def collect(config, registry_path=None, *, control=None, output=None, attempt_id
             checkpoint()
             client = AppServer(os.environ.get("CODEX_APP_RUNTIME_CLI_PATH", "codex"))
             try:
-                discovered = classify_threads(resolved, list_threads(client, checkpoint=checkpoint))
-                captured = collect_codex(project_id, [row["id"] for row in discovered["matched"]],
-                                         memory_dir / "codex", client=client,
-                                         project_binding=resolved, checkpoint=checkpoint)
+                threads = list_threads(client, checkpoint=checkpoint)
+                discovered = classify_threads(resolved, threads)
+                options = {}
+                matched_roots = []
+                if trials["registered"]:
+                    options["exclusion_reason"] = trial_exclusion(trials["registered"], threads)
+                for thread in discovered["matched"]:
+                    reason = options["exclusion_reason"](thread) if options else None
+                    if reason:
+                        category = "excluded" if reason == "registered_codex_trial" else "unresolved"
+                        discovered[category].append({"thread": thread, "reason": reason})
+                    else:
+                        matched_roots.append(thread["id"])
+                capture_roots = matched_roots
+                if selected_roots is not None:
+                    matched_ids = set(matched_roots)
+                    unmatched = [thread_id for thread_id in selected_roots if thread_id not in matched_ids]
+                    if unmatched:
+                        raise ValueError(f"Codex threads do not match this project: {', '.join(unmatched)}")
+                    capture_roots = selected_roots
+                    result["selected_root_thread_ids"] = selected_roots
+                captured = collect_codex(project_id, capture_roots, memory_dir / "codex", client=client,
+                                         project_binding=resolved, checkpoint=checkpoint, **options)
             finally:
                 client.close()
             hashes = captured.pop("snapshot_hashes")
@@ -134,12 +253,17 @@ def load_collection(config, path):
     configured = config.raw["memory"].get("codex", {}).get("project_id")
     if not project_id or (configured and configured != project_id):
         raise ValueError("Collection receipt belongs to another project")
+    memory_dir = Path(config.memory_dir).resolve()
+    if "memory_dir" in receipt and Path(receipt["memory_dir"]).resolve() != memory_dir:
+        raise ValueError("Collection receipt belongs to another memory directory")
     snapshots = receipt["snapshots"]
     if receipt["paths"] != [item["path"] for item in snapshots]:
         raise ValueError("Collection paths do not match its snapshot manifest")
     for item in snapshots:
-        _inside(root, item["path"])
-        data, _ = _read_bytes(_inside(root, item["path"]))
+        source = _inside(root, item["path"])
+        if source.parent not in (memory_dir / "codex", memory_dir / "codex-attachments"):
+            raise ValueError(f"Collection snapshot belongs to another memory directory: {item['path']}")
+        data, _ = _read_bytes(source)
         if sha256(data).hexdigest() != item["sha256"]:
             raise ValueError(f"Collection snapshot changed: {item['path']}")
     return receipt

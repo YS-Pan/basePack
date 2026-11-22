@@ -304,7 +304,7 @@ def test_maintenance_reuses_semantics_for_line_endings_and_preserves_old_snapsho
     batch = batch_for(memory, original)
     batch['nodes'].append({'id': 'archive', 'kind': 'decision', 'text': '保留资料', 'evidence': [{'member': 3}]})
     batch['edges'].append({'id': 'node_link', 'in': 'node:local', 'out': 'node:archive',
-                           'kind': 'depends', 'text': '两项要求', 'evidence': [{'member': 2}, {'member': 3}]})
+                           'type': 'requires', 'text': '两项要求', 'evidence': [{'member': 2}, {'member': 3}]})
     batch = freeze([batch])
     storage_id = batch['members'][2]['id']
     memory.apply(batch)
@@ -723,19 +723,19 @@ def test_node_merge_and_deleted_support_preserve_remaining_evidence(memory):
     batch = batch_for(memory, "# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n")
     batch["nodes"].append({"id": "alias", "kind": "decision", "text": "采用本地数据库", "evidence": [{'member': 2}]})
     batch["edges"].append({"id": "preserve", "in": "node:alias", "out": {'member': 3},
-                           "kind": "depends", "text": "资料需保留", "evidence": [{'member': 3}]})
+                           "type": "requires", "text": "资料需保留", "evidence": [{'member': 3}]})
     batch = freeze([batch])
     storage_id = batch['members'][2]['id']
     retention_id = batch['members'][3]['id']
-    memory.apply(batch)
+    old_relation = memory.apply(batch)["edge_versions"]["semantic:preserve"]
     expected = memory.prepare(["guide.md"])["expected"]
     memory.apply(freeze([{"sources": [], "expected": expected, "delete_nodes": ["alias"],
                   "edges": [{"id": "preserve", "in": "node:local", "out": retention_id,
-                             "kind": "depends", "text": "资料需保留", "evidence": [retention_id]}]}]))
+                             "type": "requires", "text": "资料需保留", "evidence": [retention_id]}]}]))
     assert {edge["id"] for edge in memory.neighbors("node:local")["edges"]} == {"semantic:requires", "semantic:preserve"}
     assert memory.neighbors("node:alias")["record"]["retired"] is True
-    assert any(row.get("previous") and row["previous"].get("in") == "node:alias"
-               for row in memory._rows("change") if row.get("target") == "semantic:preserve")
+    retained = memory.history("semantic:preserve")["versions"]
+    assert next(row for row in retained if row["exact_id"] == old_relation)["in"] == "node:alias"
 
     (memory.config.root / "backup.md").write_bytes("本地数据库隔离项目。\n".encode("utf-8"))
     prepared = memory.prepare(["guide.md", "backup.md"])
@@ -746,7 +746,7 @@ def test_node_merge_and_deleted_support_preserve_remaining_evidence(memory):
         {"kind": "chunk", "path": "backup.md", "parent": {'member': 0},
          "start_line": 1, "end_line": 1, "title": "隔离要求", "text": "本地数据库隔离项目。\n"}
     ]
-    edge = {"id": "requires", "in": "node:local", "out": storage_id, "kind": "depends",
+    edge = {"id": "requires", "in": "node:local", "out": storage_id, "type": "requires",
             "text": "本地数据库隔离项目", "evidence": [storage_id, {'member': 1}]}
     backup_batch = freeze([{"sources": [{"path": "backup.md", "revision": backup["revision"]}],
                   "expected": prepared["expected"], "members": members, "edges": [edge]}])
@@ -818,14 +818,14 @@ def test_retired_chunk_does_not_invalidate_reaccepted_ancestors(memory):
     assert prepared["expected"][storage_id] == before[storage_id]["knowledge_revision"]
     assert memory.brief(limit=0)["pending_count"] == 0
     relation = {"id": "current_support", "in": current_storage_id, "out": retention_id,
-                "kind": "supports", "text": "当前条件共同约束存储", "evidence": [current_storage_id, retention_id]}
+                "type": "supports", "text": "当前条件共同约束存储", "evidence": [current_storage_id, retention_id]}
     result = memory.apply(freeze([{"sources": updated["sources"], "expected": prepared["expected"], "edges": [relation]}]))
     assert result["invalidated"] == []
     assert memory.brief(limit=0)["pending_count"] == 0
     assert memory.read(current_storage_id)["original"]["text"] == "数据库离线运行并隔离项目。\n"
     assert {row["id"] for row in memory.neighbors(current_storage_id)["edges"]} == {
         "semantic:requires", "semantic:current_support"}
-    after = {row["id"]: row for row in memory._rows("member")}
+    after = {row["id"]: row for row in memory.prepare(["guide.md"])["sources"][0]["members"]}
     for member_id in (guide_id, storage_section_id, storage_id):
         assert after[member_id] == before[member_id]
     assert memory.apply(freeze([{"sources": updated["sources"]}]))["invalidated"] == []
@@ -883,9 +883,8 @@ def test_retired_unchanged_history_keeps_source_version_and_can_be_explicitly_re
     with pytest.raises(ValueError, match='Existing member updates require prepare UUID and expected revision'):
         memory.apply(freeze([revival]))
     memory.apply(freeze([{"sources": [], "expected": prepared["expected"], "delete_members": [storage_id]}]))
-    with pytest.raises(RuntimeError, match="Knowledge revision changed"):
-        memory.apply(freeze([{**revival, "expected": prepared["expected"]}]))
-    memory.apply(freeze([{**revival, "expected": memory.prepare(["guide.md"])["expected"],
+    assert next(row for row in memory._rows("member") if row["id"] == storage_id) == after[storage_id]
+    memory.apply(freeze([{**revival, "expected": prepared["expected"],
                   "corrections": [{"id": "revive_storage", "target": storage_id, "reason": "重新接受当前原文"}]}]))
     current = memory.read(storage_id)["member"]
     assert current["retired"] is False

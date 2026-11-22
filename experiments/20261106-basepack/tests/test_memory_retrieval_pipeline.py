@@ -23,7 +23,7 @@ def test_request_names_are_unique_and_stable_and_prompt_has_executable_pipeline(
     assert a['task_name'] != b['task_name']
     assert render_retrieval_prompt(config, a['request'])['task_name'] == a['task_name']
     prompt = render_retrieval_prompt(config, a['request'])['prompt']
-    assert 'retrieval-start' in prompt and 'retrieval-receipt' in prompt
+    assert all(command in prompt for command in ('retrieval-start', 'graph-query', 'read-source', 'retrieval-receipt'))
 
 
 def test_independent_anchor_is_frozen_before_behavior_and_receipt_uses_it(config, monkeypatch):
@@ -36,7 +36,8 @@ def test_independent_anchor_is_frozen_before_behavior_and_receipt_uses_it(config
     memory.hybrid_search = lambda *args, **kwargs: {'matches': [one, two], 'vector_coverage': {}}
     memory.knowledge = lambda record_id: {'id': record_id, 'knowledge_revision': 'v3', 'path': 'c.md'}
     memory.access_hints = lambda items: [{**row, 'access_interval': [0.01, 0.2]} for row in items]
-    def behavior(mem, anchors, limit, scope):
+    def behavior(mem, anchors, limit, scope, *, allow_private):
+        assert not allow_private
         calls.append(anchors)
         assert json.loads((__import__('pathlib').Path(prepared['work']) / 'anchors.json').read_text(encoding='utf-8'))['anchors'] == anchors
         return {'model': 'sigma', 'candidates': [{'id': 'member:c', 'knowledge_revision': 'v3', 'behavior_similarity_interval': [0.8, 0.9]}]}
@@ -63,7 +64,7 @@ def test_empty_base_keeps_unknown_anchor_and_behavior_model(config, monkeypatch)
     memory = SimpleNamespace(config=config, vector_search=lambda *a, **k: {'matches': [], 'vector_coverage': {}},
                              hybrid_search=lambda *a, **k: {'matches': [], 'vector_coverage': {}},
                              access_hints=lambda items: items)
-    monkeypatch.setattr(behavior_projection, 'behavior_candidates', lambda memory, anchors, limit, scope: {'model': None, 'candidates': []}, raising=False)
+    monkeypatch.setattr(behavior_projection, 'behavior_candidates', lambda *args, **kwargs: {'model': None, 'candidates': []})
     result = start_retrieval(memory, prepared['request'])
     assert result['frozen']['anchors'] == []
     assert make_delivery_receipt(config, prepared['request'], {'items': []}, [])['context']['model'] is None

@@ -82,13 +82,27 @@ def test_compiles_source_versions_scoped_members_and_graph(tmp_path):
     proposals = [{'prepare': ref, 'sources': ['a.md'], 'members': [
         {'kind': 'chunk', 'path': 'a.md', 'start_line': 1, 'end_line': 1}],
         'nodes': [{'kind': 'topic', 'text': 'A', 'evidence': [{'member': 0}]}],
-        'edges': [{'kind': 'relates', 'text': 'A', 'in': {'member': 0},
+        'edges': [{'type': 'other', 'label': 'illustrates', 'text': 'A', 'in': {'member': 0},
                    'out': {'node': 0}, 'evidence': [{'member': 0}]}]}]
     batch = freeze_file(proposals, tmp_path / 'frozen.json')
     assert batch['sources'][0]['revision'] == 'source-rev'
     assert batch['edges'][0]['in'] == batch['members'][0]['id']
     assert batch['edges'][0]['out'] == batch['nodes'][0]['id']
     assert batch['expected'] == {}
+
+
+def test_disposition_kind_is_required_before_a_proposal_can_freeze(tmp_path):
+    disposition = {'start_line': 1, 'end_line': 1, 'reason': 'Read'}
+    proposal = {'prepare': prepared(tmp_path),
+                'sources': [{'path': 'a.md', 'dispositions': [disposition]}]}
+    output = tmp_path / 'frozen.json'
+    with pytest.raises(ValueError, match=r'proposals\[0\]\.sources\[0\]\.dispositions\[0\].*kind'):
+        freeze_file([proposal], output)
+    assert not output.exists()
+
+    disposition['kind'] = 'no_knowledge'
+    batch = freeze_file([proposal], output)
+    assert batch['sources'][0]['dispositions'] == [disposition]
 
 
 def test_prepare_versions_are_compiled_for_only_actual_dependencies(tmp_path):
@@ -164,11 +178,85 @@ def test_historical_endpoint_classification_uses_exact_fixed_version(tmp_path):
     ref['file_sha256'] = sha256((tmp_path / 'reading.json').read_bytes()).hexdigest()
     proposal = {'prepare': ref, 'sources': ['a.md'], 'members': [
         {'kind': 'chunk', 'path': 'a.md', 'start_line': 1, 'end_line': 1}],
-        'edges': [{'kind': 'evolution', 'text': 'historical', 'in': mid, 'out': {'member': 0},
-                   'endpoint_versions': {'in': {'id': mid, 'knowledge_revision': 'old'}},
+        'edges': [{'type': 'supersedes', 'text': 'Replaces earlier rule', 'in': {'member': 0}, 'out': mid,
+                   'endpoint_versions': {'out': {'id': mid, 'knowledge_revision': 'old'}},
                    'evidence': [{'member': 0}]}]}
     batch = compile_proposals([proposal])
     assert batch['compiled_private'][batch['edges'][0]['id']] is True
-    proposal['edges'][0]['endpoint_versions']['in']['knowledge_revision'] = 'missing'
+    proposal['edges'][0]['endpoint_versions']['out']['knowledge_revision'] = 'missing'
     with pytest.raises(ValueError, match='Pinned knowledge version absent from prepare'):
         compile_proposals([proposal])
+
+
+def test_freeze_pins_current_endpoint_and_private_original_snapshot_basis(tmp_path):
+    member = 'member:' + 'a' * 32
+    snapshot = 'source_version:' + 'c' * 64
+    ref = chunk_prepare(tmp_path)
+    path = tmp_path / 'reading.json'
+    package = json.loads(path.read_text(encoding='utf-8'))
+    current = package['sources'][0]
+    current['members'] = [{'id': member, 'knowledge_revision': 'v1',
+                           'stale': False, 'retired': False, 'private': False}]
+    package['expected'] = {member: 'v1'}
+    old_text = 'Exact evidence\n'
+    current['previous'] = {'source_version': snapshot, 'private': True,
+                           'revision': sha256(old_text.encode('utf-8')).hexdigest(),
+                           'numbered_text': '1: ' + old_text}
+    path.write_text(json.dumps(package), encoding='utf-8')
+    ref['file_sha256'] = sha256(path.read_bytes()).hexdigest()
+
+    basis = {'source_version': snapshot, 'start_line': 1, 'end_line': 1,
+             'locator': {'start_col': 0, 'end_col': 5}}
+    draft = {'prepare': ref, 'sources': ['a.md'], 'members': [
+        {'kind': 'chunk', 'path': 'a.md', 'start_line': 1, 'end_line': 1}],
+        'edges': [{'type': 'contradicts', 'text': 'Conflicts under load',
+                   'in': {'member': 0}, 'out': member, 'conditions': {'load': 'high'},
+                   'basis': [basis]}]}
+    batch = compile_proposals([draft])
+    [edge] = batch['edges']
+    assert edge['endpoint_versions'] == {'out': {'id': member, 'knowledge_revision': 'v1'}}
+    assert edge['basis'] == [basis] and edge['conditions'] == {'load': 'high'}
+    assert batch['expected_status'] == {member: True}
+    assert batch['compiled_private'][edge['id']] is True
+
+    basis['end_line'] = 2
+    with pytest.raises(ValueError, match='Invalid line range'):
+        compile_proposals([draft])
+    basis['source_version'] = 'source_version:' + 'd' * 64
+    with pytest.raises(ValueError, match='References absent from prepare: source_version'):
+        compile_proposals([draft])
+
+
+def test_freeze_resolves_new_relationship_endpoint_and_source_basis(tmp_path):
+    draft = {'prepare': chunk_prepare(tmp_path), 'sources': ['a.md'], 'members': [
+        {'kind': 'chunk', 'path': 'a.md', 'start_line': 1, 'end_line': 1},
+        {'kind': 'chunk', 'path': 'a.md', 'start_line': 2, 'end_line': 2}],
+        'edges': [
+            {'type': 'supports', 'text': 'First statement supports second',
+             'in': {'member': 0}, 'out': {'member': 1}, 'basis': [{'id': {'member': 0}}]},
+            {'type': 'other', 'label': 'clarifies the scope of', 'text': 'An exact source clarifies the relation',
+             'in': {'member': 1}, 'out': {'edge': 0},
+             'basis': [{'path': 'a.md', 'start_line': 2, 'end_line': 2}]},
+        ]}
+    batch = freeze_file([draft], tmp_path / 'edges.json')
+    first, second = batch['edges']
+    assert second['out'] == first['id']
+    assert first['basis'] == [{'id': batch['members'][0]['id']}]
+    assert second['basis'] == draft['edges'][1]['basis']
+    assert not batch['compiled_private'][second['id']]
+
+
+@pytest.mark.parametrize(('fields', 'error'), [
+    ({'kind': 'supports'}, 'Unknown edge fields'),
+    ({'type': 'from_snapshot'}, 'Choose an authored edge type'),
+    ({'type': 'other'}, 'specific English relation phrase'),
+    ({'label': 'supports'}, 'Only other takes a label'),
+    ({'conditions': []}, 'Use text or an object'),
+    ({'private': False}, 'Unknown edge fields'),
+])
+def test_freeze_rejects_invalid_authored_relationship_shape(tmp_path, fields, error):
+    draft = {'prepare': prepared(tmp_path), 'sources': [], 'edges': [
+        {'in': 'node:a', 'out': 'node:b', 'type': 'supports', 'text': 'Supporting evidence',
+         'evidence': ['member:' + 'a' * 32], **fields}]}
+    with pytest.raises(ValueError, match=error):
+        compile_proposals([draft])

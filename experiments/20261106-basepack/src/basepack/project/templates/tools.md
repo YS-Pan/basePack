@@ -1,7 +1,9 @@
 <a id="ai-resources"></a>
 ## AI 与资源
 
-宿主分配普通 AI 工作前，用本机 Python/配置前缀运行 `config ai` 解析日常默认，或用 `config ai --level 3` 显式选档。按返回的 `model` 与 `reasoning_effort` 派工。记忆维护使用返回的 `worker`；检索使用 `memory retrieve --question '<业务问题>'`，默认全项目、6000 字符。`--scope` 仅为项目相对路径前缀，业务限制写入问题。命令只准备派工，宿主按返回名称、模型和推理强度实际创建 worker、接收最终内容后确认交付；检索不取得维护所有权。[检索派工与交付](<$skill#retrieve-in-one-delegation>)。
+通用任务的子 agent 默认沿用直接上级的模型。任务指定使用项目 AI 档位时，用本机 Python/配置前缀运行 `config ai` 解析项目日常档位，或用 `config ai --level <n>` 选择指定档位，再使用返回的 `model` 与 `reasoning_effort`。
+
+记忆维护使用返回的 `worker`；检索使用 `memory retrieve --question '<业务问题>'`，默认全项目、6000 字符。`--scope` 仅为项目相对路径前缀，业务限制写入问题。命令只准备派工，宿主按返回名称、模型和推理强度实际创建 worker、接收最终内容后确认交付；检索不取得维护所有权。[检索派工与交付](<$skill#retrieve-in-one-delegation>)。
 
 安装、升级或维护本项目 basePack 配置时，先读 [项目配置维护要点](https://github.com/YS-Pan/basePack/blob/main/experiments/20261106-basepack/docs/project-config-maintenance.md)，按受影响的变更同步；普通业务沿现有配置执行。
 

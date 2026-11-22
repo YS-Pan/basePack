@@ -1,11 +1,12 @@
 """Host-driven finite maintenance waves over the existing publication chain."""
 
 import json
+from functools import partial
 from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
 
-from . import waves
+from . import graph_review, waves
 from .prompts import MAINTENANCE_BOOTSTRAP, _wave_layout, memory_command, render_template
 from .stages import _read_reference, load_stage
 
@@ -22,7 +23,11 @@ def register(parser):
             action.add_argument("--wave-id", required=True)
     create = actions["create"]
     create.add_argument("--receipt", required=True)
-    create.add_argument("--tasks", required=True, help="JSON array of finite independent task objects")
+    work = create.add_mutually_exclusive_group(required=True)
+    work.add_argument("--tasks", help="JSON array of finite independent task objects")
+    work.add_argument("--inventory", help="Fixed inventory report to use for grouped tasks")
+    create.add_argument("--groups", nargs="+", help="Inventory group IDs selected for this wave")
+    create.add_argument("--read-paths", nargs="+", help="Additional read-only files in the selected groups")
     create.add_argument("--coordinator", required=True, help="Canonical non-root coordinator task path")
     create.add_argument("--readers", type=int, required=True, help="Fixed reader pool size chosen for this wave")
     create.add_argument("--stage", help="Fixed continuation stage, if any")
@@ -71,9 +76,34 @@ def _command(config, action, control, run_id, wave_id, *args):
 def create(config, args, tasks):
     from .content import _project_path
 
+    receipt_path = Path(args.receipt).resolve()
+    receipt_bytes = receipt_path.read_bytes()
+    receipt_hash = sha256(receipt_bytes).hexdigest()
+    material = json.loads(receipt_bytes.decode("utf-8"))
+    if material["owner_run_id"] != args.run_id:
+        raise PermissionError("Receipt belongs to a different maintenance owner")
+    if bool(args.stage) != bool(args.stage_sha256):
+        raise ValueError("A stage and its fixed SHA256 must be supplied together")
+    stage = (load_stage(args.receipt, args.control, args.stage, file_sha256=args.stage_sha256)
+             if args.stage else None)
+    layout = _wave_layout((stage or material)["layout"])
+
+    grouped = None
+    if getattr(args, "inventory", None):
+        from .inventory_work import grouped_tasks
+        from .query import load_json_file
+        if not args.groups:
+            raise ValueError("Select at least one inventory group using --groups")
+        tasks, grouped = grouped_tasks(config, load_json_file(args.inventory), material, args.groups,
+                                       read_paths=args.read_paths or (), stage=stage)
+    elif getattr(args, "groups", None) or getattr(args, "read_paths", None):
+        raise ValueError("--groups and --read-paths require --inventory")
+
     root = Path(config.root).resolve()
     for task in tasks:
         for key in ("paths", "read_paths"):
+            if key == "read_paths" and "graph_candidate" in task:
+                continue
             values = task.get(key, [])
             if not isinstance(values, list) or any(not isinstance(value, str) or not value.strip() for value in values):
                 raise ValueError(f"Task {task['id']} {key} must be a list of project-relative files")
@@ -84,17 +114,6 @@ def create(config, args, tasks):
                     raise ValueError(f"Task paths must identify files: {value}")
                 normalized.append(path.relative_to(root).as_posix())
             task[key] = list(dict.fromkeys(normalized))
-    receipt_path = Path(args.receipt).resolve()
-    receipt_bytes = receipt_path.read_bytes()
-    receipt_hash = sha256(receipt_bytes).hexdigest()
-    material = json.loads(receipt_bytes.decode("utf-8"))
-    if material["owner_run_id"] != args.run_id:
-        raise PermissionError("Receipt belongs to a different maintenance owner")
-    layout = _wave_layout(material["layout"])
-    if bool(args.stage) != bool(args.stage_sha256):
-        raise ValueError("A stage and its fixed SHA256 must be supplied together")
-    if args.stage:
-        layout = _wave_layout(load_stage(args.receipt, args.control, args.stage, file_sha256=args.stage_sha256)["layout"])
     if not layout["teams"] or not layout["teams"][0]["reader_task_names"]:
         raise ValueError("A wave requires at least one reader and a reserved coordinator recovery seat")
     if not args.coordinator.startswith("/") or args.coordinator == "/root":
@@ -117,7 +136,7 @@ def create(config, args, tasks):
         dispatches.append({"task_name": worker, "fork_turns": "none", "model": ai["model"],
                            "reasoning_effort": ai["reasoning_effort"],
                            "message": f"{MAINTENANCE_BOOTSTRAP}\n{command}"})
-    return {"wave_id": wave_id, "run_id": args.run_id, "control": state["control"],
+    result = {"wave_id": wave_id, "run_id": args.run_id, "control": state["control"],
             "receipt": state["source_receipt"], "coordinator": state["coordinator"],
             "workers": [{"task_name": worker, "spawn_arguments": dispatch}
                         for worker, dispatch in zip(workers, dispatches)],
@@ -125,6 +144,9 @@ def create(config, args, tasks):
                                "go_message": f"go {wave_id}",
                                "close_command": _command(config, "close", args.control, args.run_id, wave_id)},
             "startup": "Spawn and register each worker, report initialization, then end this turn. Parent seals only after observing this coordinator idle."}
+    if grouped is not None:
+        result["grouping"] = grouped
+    return result
 
 
 def worker_prompt(config, control, run_id, wave_id, worker):
@@ -147,9 +169,13 @@ def task_prompt(config, control, run_id, wave_id, worker, task_id):
     material = _read_reference(state["source_receipt"])
     work = config.root / "tmp" / "basepack-waves" / wave_id / sha256(task_id.encode("utf-8")).hexdigest()[:20]
     paths = list(dict.fromkeys([*task["paths"], *task.get("read_paths", [])]))
+    preparation = []
+    if "expected_revisions" in task:
+        preparation = ["--expected-revisions", json.dumps(task["expected_revisions"], ensure_ascii=False)]
     values = {"task": json.dumps(task, ensure_ascii=False), "hints": json.dumps(_reader_hints(material, paths), ensure_ascii=False),
               "work": str(work), "skill": str(Path(__file__).with_name("SKILL.md")),
               "prepare_command": memory_command(config, "prepare", "--paths", *(paths or ["<identified-project-relative-file>"]),
+                                                *preparation,
                                                 "--output", work / "reading.json"),
               "read_command": memory_command(config, "read", "<member-id>"),
               "search_command": memory_command(config, "search", "--text", "<query>"),
@@ -166,11 +192,17 @@ def publish(config, args, completed):
                                       drafts=completed, frozen=frozen, result=result)
     if intent["status"] == "committed":
         return waves.publication_committed(config.memory_dir, args.control, args.run_id, args.wave_id)
+    options = {}
+    if "graph_tasks" in intent:
+        options["batch_validator"] = partial(graph_review.frozen_edges, intent)
     if Path(frozen).exists():
-        outcome = publish_batch(Memory(config), frozen=frozen, control=args.control, result=result, timeout=args.timeout)
+        outcome = publish_batch(Memory(config), frozen=frozen, control=args.control, result=result,
+                                timeout=args.timeout, **options)
     else:
+        if "graph_tasks" in intent:
+            graph_review.validate_publication(intent)
         outcome = publish_batch(Memory(config), completed=completed, output=frozen, control=args.control,
-                                result=result, timeout=args.timeout)
+                                result=result, timeout=args.timeout, use_draft_context=False, **options)
     waves.publication_committed(config.memory_dir, args.control, args.run_id, args.wave_id)
     return outcome
 
@@ -180,7 +212,7 @@ def dispatch(config, args):
     action = args.wave_action
     common = (config.memory_dir, args.control, args.run_id)
     if action == "create":
-        return create(config, args, load_json_file(args.tasks))
+        return create(config, args, load_json_file(args.tasks) if args.tasks else None)
     common += (args.wave_id,)
     if action == "started":
         return waves.started(*common, args.worker, args.handle)

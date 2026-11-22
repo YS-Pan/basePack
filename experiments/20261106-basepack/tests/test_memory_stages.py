@@ -124,6 +124,28 @@ def test_same_previous_stage_cannot_create_a_second_publisher(stage_project, tmp
     assert not (tmp_path / "duplicate.json").exists()
 
 
+def test_pending_graph_candidate_survives_a_stage_handoff(stage_project, tmp_path):
+    config, receipt, control = stage_project
+    material = json.loads(receipt.read_text(encoding="utf-8"))
+    candidate = "pair:unreviewed"
+    material["graph_candidates"] = [{"id": candidate, "endpoints": [], "signals": ["reference"]}]
+    receipt.write_text(json.dumps(material), encoding="utf-8")
+
+    handoff = write_handoff(config, receipt, control, "graph-handoff.json")
+    boundary = json.loads(handoff.read_text(encoding="utf-8"))
+    boundary["completed"]["relations"] = [candidate]
+    handoff.write_text(json.dumps(boundary), encoding="utf-8")
+    with pytest.raises(ValueError, match="Completed graph candidates must match"):
+        prepare_stage(config, receipt, control, handoff, tmp_path / "stage.json", workers_ended=True)
+
+    boundary["completed"]["relations"] = []
+    boundary["remaining"]["relations"].append(candidate)
+    handoff.write_text(json.dumps(boundary), encoding="utf-8")
+    following = prepare_stage(config, receipt, control, handoff, tmp_path / "stage.json", workers_ended=True)
+    assert following["remaining"]["relations"] == ["semantic:r", candidate]
+    assert candidate in render_prompt(config, receipt, control, stage=following["stage"]["path"])["prompt"]
+
+
 @pytest.mark.parametrize("state", ["inflight", "stopped", "other-owner"])
 def test_stage_rejects_uncertain_publication_parent_stop_or_wrong_run(stage_project, tmp_path, state):
     config, receipt, control = stage_project

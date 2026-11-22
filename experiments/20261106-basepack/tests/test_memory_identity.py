@@ -11,7 +11,7 @@ from uuid import uuid4
 import pytest
 
 from basepack.memory.draft import freeze, validate_batch
-from basepack.memory.store import Memory, SqlResponseError
+from basepack.memory.store import Memory, SqlResponseError, _record, _sql
 from basepack.project.config import MachineConfig, ProjectConfig
 from test_memory_store import DeterministicEmbeddingClient, EMBEDDING_IDENTITY
 
@@ -24,6 +24,7 @@ def test_scoped_drafts_allocate_distinct_ids_and_resolve_references():
         {'sources': [{'path': 'b', 'revision': 'b'}], 'expected': {},
          'members': [{'kind': 'chunk', 'start_line': 1, 'end_line': 1}],
          'edges': [{'id': 'link', 'in': {'draft': 0, 'member': 0}, 'out': {'member': 0},
+                    'type': 'supports', 'text': 'Related',
                     'evidence': [{'draft': 0, 'member': 0}, {'member': 0}]}]},
     ]
     frozen = freeze(drafts)
@@ -147,16 +148,25 @@ def test_real_cross_reader_graph_and_duplicate_update_leave_no_partial_write(mem
                            {'kind': 'chunk', 'path': source['path'], 'title': 'same',
                             'start_line': 1, 'end_line': 1}]})
     drafts[1]['edges'] = [{'id': 'link', 'in': {'draft': 0, 'member': 0}, 'out': {'member': 0},
-                           'kind': 'supports', 'text': 'Related',
+                           'type': 'supports', 'text': 'Related',
                            'evidence': [{'draft': 0, 'member': 0}, {'member': 0}]}]
     frozen = freeze(drafts)
     ids = [entry['id'] for entry in frozen['members']]
     assert ids[0] != ids[1]
     memory.apply(frozen)
-    edge = memory._rows('semantic')[0]
+    edge = memory.knowledge('semantic:link')
     assert edge['in'] == ids[0] and edge['out'] == ids[1]
-    assert [entry['member'] for entry in edge['basis']] == ids
+    assert {entry['member'] for entry in edge['basis']} == set(ids)
     assert [edge['endpoint_versions'][side]['id'] for side in ('in', 'out')] == ids
+    head = memory._execute(f"SELECT * FROM ONLY {_sql(_record(edge['id']))};")[0]
+    assert set(head) == {'id', 'head', 'knowledge_revision', 'stale', 'retired'}
+    native = memory._execute(f"SELECT * FROM ONLY {_sql(_record(head['head']))};")[0]
+    assert native['logical_id'] == head['id'] and native['type'] == 'supports'
+    versions = memory._execute(
+        f"SELECT id, target FROM knowledge_version WHERE id IN {_sql([_record(native['in']), _record(native['out'])])};"
+    )[0]
+    endpoints = {item['id']: item['target'] for item in versions}
+    assert [endpoints[native[side]] for side in ('in', 'out')] == ids
     before = memory._rows('member')
     prepared = memory.prepare(['a.md'])
     update = deepcopy(drafts[0])
@@ -187,19 +197,20 @@ def test_same_source_identity_cannot_be_written_twice(memory):
     assert memory.sources() == before
 
 
-def test_schema_three_requires_explicit_legacy_handoff_and_preserves_fact_head(memory):
+@pytest.mark.parametrize('old_schema', ['UNSET memory_schema_version', 'SET memory_schema_version=3'])
+def test_graph_schema_requires_offline_migration_and_preserves_fact_head(memory, old_schema):
     project = memory._execute('SELECT * FROM ONLY meta:project;')[0]
-    assert project['memory_schema_version'] == 3
+    assert project['memory_schema_version'] == 4
     memory._execute('UPDATE meta:delivery SET j=7;')
     memory.install_schema()
     assert memory._execute('SELECT * FROM ONLY meta:delivery;')[0]['j'] == 7
-    memory._execute('UPDATE meta:project UNSET memory_schema_version;', check_project=False)
+    memory._execute(f'UPDATE meta:project {old_schema};', check_project=False)
     for action in (
         memory.install_schema,
         lambda: memory._execute("CREATE feedback:schema_gate SET issue='must not write';"),
         lambda: memory._publish(['BEGIN;', "CREATE feedback:schema_gate SET issue='must not write';", 'COMMIT;']),
     ):
-        with pytest.raises(RuntimeError, match='schema 3 offline migration required'):
+        with pytest.raises(RuntimeError, match='graph schema 4 offline migration required'):
             action()
     assert memory._execute('SELECT * FROM ONLY feedback:schema_gate;', check_project=False)[0] is None
     assert memory._execute('SELECT * FROM ONLY meta:delivery;', check_project=False)[0]['j'] == 7

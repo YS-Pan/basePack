@@ -73,6 +73,18 @@ def test_decision_rejects_unread_or_invalid_ranges(memory):
     assert memory.sources() == []
 
 
+def test_apply_can_locate_a_missing_kind_in_an_existing_frozen_batch(memory):
+    path = memory.config.root / 'source.md'
+    path.write_bytes(b'original\n')
+    source = memory.prepare(['source.md'])['sources'][0]
+    batch = freeze([{'sources': [{'path': 'source.md', 'revision': source['revision'],
+                                 'dispositions': [{'start_line': 1, 'end_line': 1, 'reason': 'Read'}]}]}])
+
+    with pytest.raises(ValueError, match=r'sources\[0\]\.dispositions\[0\]\.kind'):
+        memory.apply(batch)
+    assert memory.sources() == []
+
+
 def test_deferral_cannot_claim_an_unrecorded_gap(memory):
     batch = batch_for(memory, '# 数据库\n本地数据库隔离项目。\n\n# 保留\n资料必须保留。\n')
     batch['members'][0]['coverage_gaps'] = ['unread']

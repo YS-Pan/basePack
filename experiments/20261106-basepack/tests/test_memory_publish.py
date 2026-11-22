@@ -64,9 +64,12 @@ def publication_paths(memory, tmp_path):
 
 
 def test_completed_drafts_keep_order_scopes_and_receipt_details(tmp_path):
-    completed = [completed_file(tmp_path, {'sources': [], 'members': [{'kind': 'chunk', 'start_line': 1, 'end_line': 1}]}, name='a.json'),
+    context = {'chat': 'standalone-publisher', 'turn': 'publish-turn'}
+    completed = [completed_file(tmp_path, {'sources': [], 'context': context,
+                     'members': [{'kind': 'chunk', 'start_line': 1, 'end_line': 1}]}, name='a.json'),
                  completed_file(tmp_path, {'sources': [], 'members': [{'kind': 'chunk', 'start_line': 1, 'end_line': 1}],
                      'edges': [{'in': {'draft': 0, 'member': 0}, 'out': {'member': 0},
+                                'type': 'supports', 'text': 'Evidence supports the finding',
                                 'evidence': [{'draft': 0, 'member': 0}, {'member': 0}]}]}, name='b.json')]
     files = paths(tmp_path)
     applied = {'sources': 0, 'members': 2, 'nodes': 0, 'edges': 1, 'invalidated': ['member:old']}
@@ -82,6 +85,7 @@ def test_completed_drafts_keep_order_scopes_and_receipt_details(tmp_path):
     a, b = [member['id'] for member in batch['members']]
     assert a != b and batch['edges'][0]['in'] == a and batch['edges'][0]['out'] == b
     assert batch['edges'][0]['evidence'] == [a, b]
+    assert batch['context'] == context
     assert kwargs == {'control': files['control'], 'timeout': 42}
     assert summary == {'batch_id': batch['batch_id'], 'frozen': str(files['output']),
                        'result': str(files['result']), 'sources': 0, 'members': 2, 'nodes': 0,
@@ -112,6 +116,28 @@ def test_existing_scope_validation_runs_before_save_or_apply(tmp_path):
         publish(SimpleNamespace(config=None, apply=lambda *a, **kw: pytest.fail('applied invalid draft')),
                 completed=completed, **files)
     assert not files['output'].exists()
+
+
+def test_freeze_allocates_new_edge_id_and_rejects_unknown_explicit_id(tmp_path):
+    reference = completed_file(tmp_path, {'sources': [], 'members': [
+        {'kind': 'chunk', 'start_line': 1, 'end_line': 1},
+        {'kind': 'chunk', 'start_line': 2, 'end_line': 2}],
+        'edges': [{'id': 'semantic:shadow-edge', 'in': {'member': 0}, 'out': {'member': 1},
+                   'type': 'supports', 'text': 'Evidence supports the finding',
+                   'evidence': [{'member': 0}, {'member': 1}]}]})
+    draft = json.loads(Path(reference['path']).read_bytes())
+    output = tmp_path / 'frozen.json'
+
+    with pytest.raises(ValueError, match=r'proposals\[0\]\.edges\[0\]\.id not in prepare: '
+                        r'semantic:shadow-edge.*Omit id for a new record.*use the ID from a fixed prepare package'):
+        freeze_file([draft], output)
+    assert not output.exists()
+
+    del draft['edges'][0]['id']
+    batch = freeze_file([draft], output)
+    edge = batch['edges'][0]
+    assert edge['id'].startswith('semantic:') and edge['id'] != 'semantic:shadow-edge'
+    assert [edge['in'], edge['out']] == [member['id'] for member in batch['members']]
 
 
 def test_powershell_uppercase_file_hash_is_accepted_and_normalized(tmp_path):
@@ -217,7 +243,7 @@ def test_frozen_private_is_checked_for_members_nodes_and_edges(memory, tmp_path,
                     {'kind': 'chunk', 'path': 'public.md', 'start_line': 1, 'end_line': 1, 'title': 'public'},
                     {'kind': 'chunk', 'path': 'private/secret.md', 'start_line': 1, 'end_line': 1, 'title': 'private'}],
                 'nodes': [{'kind': 'topic', 'text': 'private topic', 'evidence': [{'member': 1}]}],
-                'edges': [{'kind': 'relates', 'text': 'linked', 'in': {'member': 0}, 'out': {'node': 0},
+                'edges': [{'type': 'other', 'label': 'illustrates', 'text': 'linked', 'in': {'member': 0}, 'out': {'node': 0},
                            'evidence': [{'member': 1}]}]}
     ref = completed_file(tmp_path, proposal, prepared=reading)
     proposal = json.loads(Path(ref['path']).read_text(encoding='utf-8'))
@@ -235,6 +261,38 @@ def test_frozen_private_is_checked_for_members_nodes_and_edges(memory, tmp_path,
     assert (applied['members'], applied['nodes'], applied['edges']) == (2, 1, 1)
     assert {row['id']: row['private'] for row in memory._rows('member')} == {public_id: False, private_id: True}
     assert memory._rows('node')[0]['private'] and memory._rows('semantic')[0]['private']
+
+
+def test_exact_snapshot_basis_survives_ordinary_author_publication(memory, tmp_path, publication_paths):
+    from basepack.memory.graph_query_store import read_source_version
+
+    path = memory.config.root / 'evidence.md'
+    path.write_bytes(b'Run under high load\nVerdict follows\n')
+    reading = memory.prepare(['evidence.md'])
+    reference = completed_file(tmp_path, {'sources': [{'path': 'evidence.md'}], 'members': [
+        {'kind': 'chunk', 'path': 'evidence.md', 'start_line': number, 'end_line': number}
+        for number in (1, 2)]}, name='first.json', prepared=reading)
+    first = freeze_file([json.loads(Path(reference['path']).read_bytes())], tmp_path / 'first-frozen.json',
+                        config=memory.config)
+    memory.apply(first, control=publication_paths['control'])
+
+    reading = memory.prepare(['evidence.md'])
+    source = reading['sources'][0]
+    snapshot = source['previous']['source_version']
+    run, verdict = sorted(source['members'], key=lambda row: row['start_line'])
+    reference = completed_file(tmp_path, {'sources': [], 'edges': [{
+        'type': 'supports', 'text': 'Run supports the verdict under high load',
+        'conditions': {'load': 'high'}, 'in': run['exact_id'], 'out': verdict['exact_id'],
+        'basis': [{'source_version': snapshot, 'start_line': 1, 'end_line': 1,
+                   'locator': {'start_col': 10, 'end_col': 19}}],
+    }]}, name='relation.json', prepared=reading)
+    second = freeze_file([json.loads(Path(reference['path']).read_bytes())], tmp_path / 'relation-frozen.json',
+                         config=memory.config)
+    result = memory.apply(second, control=publication_paths['control'])
+    relation = result['edge_versions'][second['edges'][0]['id']]
+    [link] = memory.neighbors(relation, direction='OUT', types=['has_basis'])['adjacency']
+    assert link['in'] == relation and link['out'] == snapshot
+    assert read_source_version(memory, link['out'], **link['locator'])['original']['text'] == 'high load'
 
 
 def test_history_private_from_exact_prepare_version(memory, tmp_path, publication_paths):
@@ -261,8 +319,9 @@ def test_history_private_from_exact_prepare_version(memory, tmp_path, publicatio
     proposal = {'sources': [{'path': 'guide.md'}],
                 'members': [{'kind': 'chunk', 'path': 'guide.md', 'title': 'current',
                              'start_line': 1, 'end_line': 1}],
-                'edges': [{'kind': 'evolution', 'text': 'evolution', 'in': identity, 'out': {'member': 0},
-                           'endpoint_versions': {'in': old_version}, 'evidence': [{'member': 0}]}]}
+                'edges': [{'type': 'supersedes', 'text': 'Current version replaces the earlier rule',
+                           'in': {'member': 0}, 'out': identity,
+                           'endpoint_versions': {'out': old_version}, 'evidence': [{'member': 0}]}]}
     missing_ref = completed_file(tmp_path, proposal, name='missing.json', prepared=memory.prepare(['guide.md']))
     missing = json.loads(Path(missing_ref['path']).read_text(encoding='utf-8'))
     with pytest.raises(ValueError, match='Pinned knowledge version absent from prepare'):

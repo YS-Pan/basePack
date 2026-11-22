@@ -125,7 +125,7 @@ def test_real_native_restore_and_rebuild_from_retained_text_and_pixels(real_memo
                       {"kind": "image", "path": "shapes.png", "title": "形状示意图",
                        "text": "白底，左侧红三角，右侧蓝方块。", "locator": {"page": 1}}],
                   "edges": [{"id": "visual", "in": {"member": 0}, "out": "node:local",
-                             "kind": "illustrates", "text": "测试图与项目决定在同库共存", "evidence": [{"member": 0}]}]}])
+                             "type": "other", "label": "illustrates", "text": "测试图与项目决定在同库共存", "evidence": [{"member": 0}]}]}])
     shapes = image_batch['members'][0]['id']
     memory.apply(image_batch)
     memory.embed_members()

@@ -7,6 +7,7 @@ from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
 
+from . import graph_review
 from .maintenance import _locked
 from .owner import _begin_owned, _control, _owned, _paths, _read, _write
 from .query import normalize_scope
@@ -94,11 +95,22 @@ def create(memory_dir, control, run_id, receipt, tasks, workers, *, wave_id=None
         graph_targets = [target for task in tasks for target in task["write_targets"]]
         if len(set(graph_targets)) != len(graph_targets):
             raise ValueError("Each graph write target must belong to one task")
+        graph_candidates = {item["id"]: item for item in material.get("graph_candidates", ())}
+        if stage is not None:
+            graph_candidates = {key: graph_candidates[key] for key in package["remaining"].get("relations", ())
+                                if key in graph_candidates}
+        resolved = (set(previous.get("resolved_graph_candidates", ()))
+                    if previous and previous["source_receipt"] == source_receipt else set())
+        unavailable = (resolved | graph_review.reviewed_pairs(memory_dir)
+                       if any("graph_candidate" in task for task in tasks) else resolved)
         normalized_tasks = []
         owned_sources = set()
         for task in tasks:
-            if not task["goal"] or not task["outputs"] or not isinstance(task["paths"], list):
-                raise ValueError("Each task needs a goal, source path list and outputs")
+            for field in ("goal", "outputs"):
+                if not task.get(field):
+                    raise ValueError(f"Task {task['id']!r} {field} must be nonempty")
+            if not isinstance(task.get("paths"), list):
+                raise ValueError(f"Task {task['id']!r} paths must be a list of project-relative files")
             paths = [_source_path(path) for path in task["paths"]]
             keys = [_path_key(path) for path in paths]
             if any(key not in scope_by_key for key in keys):
@@ -111,7 +123,7 @@ def create(memory_dir, control, run_id, receipt, tasks, workers, *, wave_id=None
                 if not isinstance(task["read_paths"], list):
                     raise ValueError("read_paths must be a list")
                 task["read_paths"] = [_source_path(path) for path in task["read_paths"]]
-            normalized_tasks.append(task)
+            normalized_tasks.append(graph_review.grant(task, graph_candidates, unavailable, _path_key))
         wave_id = wave_id or uuid4().hex
         if not wave_id.isascii() or not wave_id.isalnum():
             raise ValueError("Wave identifier must contain only ASCII letters and digits")
@@ -135,6 +147,8 @@ def create(memory_dir, control, run_id, receipt, tasks, workers, *, wave_id=None
                  "workers": {name: {"status": "registered", "handle": None, "error": None,
                                      "retired_at": None, "failed_at": None} for name in workers},
                  "receipt": None, "notification": None}
+        if resolved:
+            state["resolved_graph_candidates"] = sorted(resolved)
         _write(_state_path(memory_dir), state)
         return state
 
@@ -286,14 +300,23 @@ def submit(memory_dir, control, run_id, wave_id, worker, task_id, *, drafts, cov
         if draft_hashes is not None and ([ref["file_sha256"] for ref in draft_refs] !=
                                          [digest.lower() for digest in draft_hashes]):
             raise ValueError("Draft changed after source ownership validation")
+        from .draft import validate_reference_shapes, validate_source_decisions
         from .wave_scope import validate_draft
+        coverage_ref = fixed_reference(coverage)
+        if not failed and "graph_candidate" in task:
+            graph_review.read_review(task, coverage_ref, len(draft_refs))
         for ref in draft_refs:
             material = Path(ref["path"]).read_bytes()
             if sha256(material).hexdigest() != ref["file_sha256"]:
                 raise ValueError("Draft changed while fixing its source ownership")
-            validate_draft(task, material)
+            draft = validate_draft(task, material)
+            if not failed:
+                validate_source_decisions(draft, prefix=f"{ref['path']}: ")
+                validate_reference_shapes(draft, label=ref["path"])
+                if "graph_candidate" in task:
+                    graph_review.validate_draft(task, draft, ref["path"])
         task["result"] = {"drafts": draft_refs,
-                          "coverage": fixed_reference(coverage), "errors": fixed_reference(errors)}
+                          "coverage": coverage_ref, "errors": fixed_reference(errors)}
         task["status"] = "failed" if failed else "submitted"
         task["submitted_at"] = _utc_now()
         _write(_state_path(memory_dir), state)
@@ -401,7 +424,19 @@ def publication_intent(memory_dir, control, run_id, wave_id, *, drafts, frozen, 
             raise ValueError("Frozen and result paths must differ")
         if Path(intent["frozen"]).exists() or Path(intent["result"]).exists():
             raise FileExistsError("New publication destinations must not exist")
-        state["publication"] = {"status": "intent", "intent": intent, "frozen": None, "result": None}
+        publication = {"status": "intent", "intent": intent, "frozen": None, "result": None}
+        assignments = {ref["assignment"] for ref in drafts}
+        graph_tasks = {task["id"]: {key: task[key] for key in
+                                   ("graph_candidate", "graph_endpoints", "expected_revisions")}
+                       for task in state["tasks"] if task["id"] in assignments and "graph_candidate" in task}
+        if graph_tasks:
+            for ref in drafts:
+                if ref["assignment"] in graph_tasks:
+                    edge, = _read_reference(ref)["edges"]
+                    graph_tasks[ref["assignment"]].update(graph_edge_spec=graph_review.edge_spec(edge),
+                                                          graph_edge_content=graph_review.edge_content(edge))
+            publication["graph_tasks"] = graph_tasks
+        state["publication"] = publication
         _write(_state_path(memory_dir), state)
         return state["publication"]
 
@@ -427,6 +462,12 @@ def publication_committed(memory_dir, control, run_id, wave_id):
             if publication["frozen"] != frozen or publication["result"] != result:
                 raise ValueError("Committed publication files changed")
             return publication
+        if "graph_tasks" in publication:
+            if projection["apply"]["edges"] != len(batch["edges"]):
+                raise ValueError("Publication result does not account for the frozen graph writes")
+            exact_ids = projection["apply"]["edge_versions"]
+            publication["graph_edges"] = {candidate: exact_ids[logical_id] for candidate, logical_id in
+                                          graph_review.frozen_edges(publication, batch).items()}
         publication.update(status="committed", frozen=frozen, result=result)
         _write(_state_path(memory_dir), state)
         return publication
@@ -479,8 +520,16 @@ def close(memory_dir, control, run_id, wave_id, *, no_publication=False):
         published = publication["intent"]["drafts"] if publication and publication["status"] == "committed" else []
         state["unpublished"] = [ref for ref in submitted if ref not in published]
         path = Path(memory_dir) / "maintenance" / f"wave-{wave_id}-closure.json"
-        state["closure"] = _fixed_json(path, {key: state[key] for key in
-                                           ("wave_id", "run_id", "receipt", "notification", "publication", "unpublished")})
+        closure = {key: state[key] for key in ("wave_id", "run_id", "receipt", "notification", "publication", "unpublished")}
+        reviews = graph_review.closure_reviews(state)
+        if reviews:
+            closure["graph_reviews"] = reviews
+        state["closure"] = _fixed_json(path, closure)
+        if reviews:
+            graph_review.retain_reviews(memory_dir, reviews)
+            resolved = set(state.get("resolved_graph_candidates", ()))
+            resolved.update(review["candidate"] for review in reviews if review["outcome"] != "pending")
+            state["resolved_graph_candidates"] = sorted(resolved)
         state["closed"] = True
         _write(_state_path(memory_dir), state)
         return state

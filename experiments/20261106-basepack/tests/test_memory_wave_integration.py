@@ -16,7 +16,7 @@ from basepack.memory import owner, waves
 from basepack.memory.cli import dispatch, register_commands
 from basepack.memory.maintenance import MaintenanceStopped
 from basepack.memory.privacy import privacy_rules, rules_revision
-from basepack.memory.prompts import maintenance_layout
+from basepack.memory.prompts import maintenance_layout, memory_command
 from basepack.memory.stages import fixed_reference
 from basepack.memory.store import PublicationOutcomeUnknown
 from basepack.project.config import load_project_config
@@ -102,23 +102,28 @@ def wave_project(tmp_path):
         owner.release(config.memory_dir, control)
 
 
-def complete_wave(project, *, draft=False):
+def save_proposal(project, task, *, context=None):
+    rules = privacy_rules(project.config)
+    path = task["paths"][0]
+    reading = write_json(project.config.root / f"{task['id']}-reading.json", {
+        "sources": [{"path": path, "revision": sha256((project.config.root / path).read_bytes()).hexdigest(),
+                     "kind": "text", "members": []}],
+        "neighborhood": {"members": [], "nodes": [], "edges": []}, "expected": {},
+        "privacy_rules": rules, "privacy_rules_revision": rules_revision(rules)})
+    proposal = {"prepare": fixed_reference(reading), "sources": [path],
+                "members": [{"kind": "chunk", "path": path, "start_line": 1,
+                             "end_line": 1, "title": "Toy evidence"}]}
+    if context is not None:
+        proposal["context"] = context
+    return write_json(project.config.root / f"{task['id']}-proposal.json", proposal)
+
+
+def complete_wave(project, *, draft=False, context=None):
     project.create(count=1)
     project.start_and_seal()
     worker = project.workers[0]
     task = project.call("claim", "--worker", worker)["task"]
-    drafts = []
-    if draft:
-        rules = privacy_rules(project.config)
-        path = task["paths"][0]
-        reading = write_json(project.config.root / "reading.json", {
-            "sources": [{"path": path, "revision": sha256((project.config.root / path).read_bytes()).hexdigest(),
-                         "kind": "text", "members": []}],
-            "neighborhood": {"members": [], "nodes": [], "edges": []}, "expected": {},
-            "privacy_rules": rules, "privacy_rules_revision": rules_revision(rules)})
-        drafts = [write_json(project.config.root / "proposal.json", {
-            "prepare": fixed_reference(reading), "sources": [path],
-            "members": [{"kind": "chunk", "path": path, "start_line": 1, "end_line": 1, "title": "Toy evidence"}]})]
+    drafts = [save_proposal(project, task, context=context)] if draft else []
     project.submit(worker, task, drafts=drafts)
     retired = project.call("claim", "--worker", worker)
     assert retired["notification"]["worker"] == worker
@@ -184,7 +189,21 @@ def test_wave_cli_gate_and_claimed_prompt_use_fixed_receipt_and_actual_worker(wa
         assert set(supplied) == {"task_name", "fork_turns", "model", "reasoning_effort", "message"}
         assert supplied["task_name"] == worker["task_name"]
         assert (supplied["model"], supplied["reasoning_effort"], supplied["fork_turns"]) == ("gpt-6-luna", "max", "none")
-        assert "worker-prompt" in supplied["message"] and worker["task_name"] in supplied["message"]
+        bootstrap, command = supplied["message"].rsplit("\n", 1)
+        assert "normal project sandbox" in bootstrap and "`prompt` field in its JSON output" in bootstrap
+        assert ("Read the shell result body. A `Rejected` wrapper can contain a Windows provisioning error confirming "
+                "the process never started.") in bootstrap
+        assert ("For a confirmed Windows pre-launch failure in a session that routes shell escalation to Auto-review, "
+                "request at most one per-command review of that exact invocation.") in bootstrap
+        assert '`sandbox_permissions="require_escalated"` where exposed' in bootstrap
+        assert "Leave any reusable `prefix_rule` unset" in bootstrap
+        assert "Keep the command, working directory and all arguments unchanged" in bootstrap
+        assert "Give the actual launch error and the original rendering purpose" in bootstrap
+        assert ("If Auto-review denied the command, the review route is unavailable, or execution or its result is uncertain, "
+                "report the actual error and status to the original parent and stop without repeating the command.") in bootstrap
+        assert command == memory_command(project.config, "wave", "worker-prompt", "--control", project.control,
+                                         "--run-id", project.run, "--wave-id", project.wave,
+                                         "--worker", worker["task_name"])
     first, second = project.workers
     project.call("started", "--worker", first, "--handle", project.coordinator + "/" + first)
     pending = project.call("claim", "--worker", first)
@@ -206,6 +225,7 @@ def test_wave_cli_gate_and_claimed_prompt_use_fixed_receipt_and_actual_worker(wa
     prompt = project.call("task-prompt", "--worker", first, "--task-id", task["id"])
     assert task["paths"][0] in prompt["prompt"]
     assert "explicit field allowlists" in prompt["prompt"]
+    assert "Omit `context` from wave drafts" in prompt["prompt"]
     with pytest.raises(PermissionError):
         project.call("task-prompt", "--worker", second, "--task-id", task["id"])
 
@@ -302,12 +322,57 @@ def test_wave_cli_pending_callback_needs_parent_ack_before_close_or_next_wave(wa
     assert project.call("inspect")["history"][-1] == closed["closure"]
 
 
-def test_wave_cli_projection_write_failure_resumes_same_frozen_and_callback_once(wave_project, monkeypatch):
+def test_wave_cli_publishes_mixed_author_contexts_with_fixed_attribution(wave_project, monkeypatch):
     project = wave_project
-    worker, task, drafts = complete_wave(project, draft=True)
+    project.create()
+    project.start_and_seal()
+    first, second = project.workers
+    completed, draft_material, task_authors = [], [], {}
+    for worker, context in ((first, {"chat": "reader-first", "turn": "turn-1", "root_chat": "root-chat"}),
+                            (second, {"chat": "reader-second", "turn": "turn-2", "root_chat": "root-chat"}),
+                            (first, None)):
+        task = project.call("claim", "--worker", worker)["task"]
+        path = save_proposal(project, task, context=context)
+        draft_material.append((path, path.read_bytes()))
+        submitted = project.submit(worker, task, drafts=[path])
+        completed.append({**submitted["result"]["drafts"][0], "assignment": task["id"]})
+        task_authors[task["id"]] = worker
+    assert project.call("claim", "--worker", first)["retired"]
+    assert project.call("claim", "--worker", second)["notification"]["worker"] == second
+    project.call("notification-pending", "--worker", second)
+    fixed = project.call("finish")["receipt"]
+    calls, admissions = owner_admitted_boundary(project, monkeypatch)
+    references = write_json(project.config.root / "completed.json", completed)
+    frozen, result = project.config.root / "frozen.json", project.config.root / "published.json"
+
+    summary = project.call("publish", "--completed", references, "--frozen", frozen, "--result", result)
+
+    assert summary["sources"] == summary["members"] == 3
+    assert len(calls) == len(admissions) == 1 and "context" not in calls[0]
+    assert json.loads(result.read_bytes())["completed"] == completed
+    assert all(path.read_bytes() == material for path, material in draft_material)
+    wave_receipt = json.loads(Path(fixed["path"]).read_bytes())
+    assert wave_receipt["coordinator"] == project.coordinator
+    assert {task["id"]: task["worker"] for task in wave_receipt["tasks"]} == task_authors
+    acknowledge(project, second)
+    assert project.call("close")["unpublished"] == []
+
+
+@pytest.mark.parametrize("legacy_frozen", [False, True])
+def test_wave_cli_projection_write_failure_resumes_same_frozen_and_callback_once(wave_project, monkeypatch, legacy_frozen):
+    project = wave_project
+    author_context = {"chat": "reader", "turn": "author-turn"}
+    worker, task, drafts = complete_wave(project, draft=True, context=author_context)
     calls, admissions = owner_admitted_boundary(project, monkeypatch)
     options = publication_inputs(project, task, drafts)
     frozen, result = project.config.root / "frozen.json", project.config.root / "published.json"
+    if legacy_frozen:
+        waves.publication_intent(project.config.memory_dir, project.control, project.run, project.wave,
+                                 drafts=[{**fixed_reference(drafts[0]), "assignment": task["id"]}],
+                                 frozen=frozen, result=result)
+        # Reproduce the bytes an earlier version could freeze under this intent.
+        dispatch(arguments("freeze", "--drafts", *drafts, "--output", frozen), project.config)
+        legacy_material = frozen.read_bytes()
     write_text = Path.write_text
     original = OSError("local result projection unavailable after apply returned")
     fail_once = True
@@ -325,6 +390,10 @@ def test_wave_cli_projection_write_failure_resumes_same_frozen_and_callback_once
     assert failure.value is original
     material = frozen.read_bytes()
     batch = json.loads(material)
+    if legacy_frozen:
+        assert material == legacy_material and batch["context"] == author_context
+    else:
+        assert "context" not in batch
     assert owner.status(project.config.memory_dir)["publications"] == []
     assert project.call("inspect")["publication"]["status"] == "intent"
     assert project.call("finish")["already_finished"] is True
@@ -333,7 +402,7 @@ def test_wave_cli_projection_write_failure_resumes_same_frozen_and_callback_once
     assert committed["status"] == "committed"
     assert frozen.read_bytes() == material
     assert len(calls) == len(admissions) == 2
-    assert all(call["batch_id"] == batch["batch_id"] and call["members"] == batch["members"] for call in calls)
+    assert calls == [batch, batch]
     with pytest.raises(RuntimeError, match="notification"):
         project.call("close")
     acknowledge(project, worker)
@@ -481,6 +550,21 @@ def test_wave_cli_read_dependencies_are_preparable_but_not_write_authority(wave_
                      errors=project.config.root / "task-0-errors.json")
     write_json(draft, {"sources": ["source-0.md"], "members": []})
     assert project.submit(worker, task, drafts=[draft])["status"] == "submitted"
+
+
+@pytest.mark.parametrize("field", ["goal", "outputs"])
+def test_wave_cli_reports_task_and_empty_required_field(wave_project, field):
+    project = wave_project
+    task = project.task_list[1]
+    expected = task[field]
+    task[field] = [] if field == "outputs" else ""
+    with pytest.raises(ValueError, match=rf"Task 'task-1' {field} must be nonempty"):
+        project.create(count=2)
+    assert not (project.config.memory_dir / "maintenance/wave.json").exists()
+
+    task[field] = expected
+    project.create(count=2)
+    assert project.call("inspect")["tasks"][1][field] == expected
 
 
 def test_wave_cli_graph_only_task_keeps_empty_write_paths_with_read_evidence(wave_project):

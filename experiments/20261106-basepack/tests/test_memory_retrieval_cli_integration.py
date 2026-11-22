@@ -4,6 +4,7 @@ import json
 from basepack.memory import cli
 from basepack.memory.draft import freeze
 from test_memory_store import memory, batch_for
+import pytest
 
 
 def test_retrieval_cli_actual_database_pipeline(memory, monkeypatch, tmp_path):
@@ -22,19 +23,39 @@ def test_retrieval_cli_actual_database_pipeline(memory, monkeypatch, tmp_path):
     assert start['frozen']['anchors']
     assert start['behavior_candidates']['model'] is None
     assert run('retrieval-start', '--request', request)['frozen']['anchors'] == start['frozen']['anchors']
+    initial_round = run('graph-query', '--request', request)
+    assert initial_round['seeds'] and all(row['origin'] == 'base' for row in initial_round['seeds'])
+    followup = run('graph-query', '--request', request, '--text', '', '--seed', 'node:local',
+                   '--branch', 'out:has_basis', '--branch', 'out:from_snapshot')
+    assert followup['seeds'][0]['id'] == 'node:local'
+    original = next(row for row in followup['candidates'] if row['record_type'] == 'source_version')
+    assert [edge['type'] for edge in original['paths'][0]['edges']] == ['has_basis', 'from_snapshot']
+    read = run('read-source', original['exact_id'], '--start-line', original['start_line'],
+               '--end-line', original['end_line'])
+    assert read['original']['text'] == '本地数据库隔离项目。\n'
     items = start['frozen']['base']['matches']
     candidates = tmp_path / 'candidates.json'
     candidates.write_text(json.dumps(items, ensure_ascii=False), encoding='utf-8')
     selected = items[0]
-    evidence = memory.read(selected['id'], knowledge_revision=selected['knowledge_revision'])
+    accepted = run('knowledge', selected['id'], '--knowledge-revision', selected['knowledge_revision'],
+                   '--scope', 'guide.md', '--public-only')
+    assert accepted['knowledge_revision'] == selected['knowledge_revision']
+    evidence = run('read', selected['id'], '--knowledge-revision', selected['knowledge_revision'],
+                   '--scope', 'guide.md', '--public-only')
+    with pytest.raises(ValueError, match='unavailable within'):
+        run('read', selected['id'], '--scope', 'outside/', '--public-only')
     row = {**evidence['member'], **evidence['original'], 'score': 90, 'reason': 'Relevant evidence'}
     row['id'] = selected['id']
     row['knowledge_revision'] = selected['knowledge_revision']
+    original_row = {**read['original'], 'id': original['exact_id'], 'record_type': 'source_version',
+                    'kind': 'chunk', 'score': 80, 'reason': 'Original snapshot'}
     scored = tmp_path / 'scored.json'
     ranked = tmp_path / 'ranked.json'
     receipt = tmp_path / 'delivery.json'
-    scored.write_text(json.dumps([row], ensure_ascii=False), encoding='utf-8')
+    scored.write_text(json.dumps([row, original_row], ensure_ascii=False), encoding='utf-8')
     run('rank', '--input', scored, '--budget', '6000', '--output', ranked)
+    ranking = json.loads(ranked.read_text(encoding='utf-8'))
+    assert ranking['text_characters'] == len(row['text']) + len(original_row['text'])
     run('retrieval-receipt', '--request', request, '--ranked', ranked, '--candidates', candidates, '--output', receipt)
     fact = run('delivery', '--input', receipt)
     assert fact['items'][0]['id'] == selected['id']
@@ -42,6 +63,14 @@ def test_retrieval_cli_actual_database_pipeline(memory, monkeypatch, tmp_path):
     assert fact['context']['model'] is None
     assert fact['context']['access_observations']
     assert all('access_model' in row for row in fact['context']['access_observations'])
+    graph_rounds = fact['context']['graph_rounds']
+    assert [row['round_id'] for row in graph_rounds] == [initial_round['round_id'], followup['round_id']]
+    assert {'id': followup['seeds'][0]['id'], 'knowledge_revision': followup['seeds'][0]['knowledge_revision']} in (
+        fact['context']['candidates'])
+    assert len(fact['items']) == 1
+    original_fact = fact['context']['source_items'][0]
+    assert (original_fact['id'], original_fact['revision'], original_fact['start_line']) == (
+        original['exact_id'], read['original']['revision'], original['start_line'])
     assert run('delivery', '--input', receipt)['duplicate'] is True
 
     # Train on one real co-delivery, then age the second exact version with repeated

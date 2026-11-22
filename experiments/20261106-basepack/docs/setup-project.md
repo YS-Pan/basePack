@@ -99,7 +99,7 @@ New-Item -ItemType Junction -Path $entry -Value $original | Out-Null
 
 ## AI 档位
 
-项目配置 `[ai]` 用正整数选择日常与检索档位，初始值为 `default_level = 3` 和 `retrieval_level = 1`。`[ai.levels.<n>]` 配置该档的 `model` 和 `reasoning_effort`。项目模板含 1 至 4 档，常用分工为 1 档阅读与检索、2 档协调、3 档日常、4 档专项。新调用从项目配置解析映射。初始模型和推理强度见 [项目模板](../src/basepack/project/templates/project.toml)。
+通用任务的子 agent 默认沿用直接上级的模型。专用流程和显式选档用项目配置 `[ai]` 解析档位。日常与检索档位的初始值分别为 `default_level = 3` 和 `retrieval_level = 1`。`[ai.levels.<n>]` 配置每档的 `model` 和 `reasoning_effort`。初始配置见 [项目模板](../src/basepack/project/templates/project.toml)。
 
 ```powershell
 bp --config $config config ai
@@ -169,6 +169,26 @@ Codex 宿主按项目归属默认接入可取得的聊天，不要求逐 thread 
 ## 版本升级
 
 已有字符串档位配置的项目按 [AI 档位迁移](project-config-maintenance.md#ai-档位迁移) 更新配置、命令及技能副本，并核对原模型和推理强度。
+
+### 升级到 0.19 的统一图
+
+先保存 schema 3 的原生备份和同一截点的恢复集合。保留实际旧客户端、配置和入口、原凭据、受管原件和附件、`assets` 与 `behavior`。核实已接受的发布和交付，保存待续固定稿、回执和当时的范围。切换前结清旧维护所有权和在途提交。 [恢复集合](memory.md#备份与恢复)
+
+在源项目内用新客户端校验固定备份并生成迁移包。下例中的变量来自这一截点。原项目 UUID、namespace 与 database 沿用原值。
+
+```powershell
+$migrationOptions = @(
+    '--surreal', $surrealExe
+    '--source-export', $oldExport, '--source-sha256', $oldExportSha256
+    '--project-id', $projectId, '--namespace', $namespace, '--database', $database
+    '--output', $newBundle
+)
+& $newPython -I -B -X utf8 -m basepack.memory.graph_migration @migrationOptions
+```
+
+在有受引用工件的项目上将 `--assets <目录>` 和 `--behavior-assets <目录>` 加入参数。已有经原证核实的关系可用 `--relations <JSON文件>` 提供，每项包含旧 `id`、`knowledge_revision`、`legacy_kind`、确认的 `type` 和适用的 `label`。原方向、两端精确钉和原有依据仍需通过校验。其余旧版关系的原记录和原因保留在历史入口，可用旧 ID 及版本执行 `memory knowledge` 或 `memory history`，迁移回执给出可跟进清单。旧记录缺私有标记时保留未确认状态，并从公开范围排除；项目内已授权的检索可显式指定 `--include-private`。
+
+迁移在独立物理库内完成，结果为通过独立恢复复核的 `schema4.surql`、`migration.json` 和受引用工件。演练目标是新的空物理库。核项目身份、关键精确原文、必保、向量、交付顺序、反馈、旧关系及待核清单，验证原入口和新接受写入的回退恢复。正式切换沿同一流程保存新鲜截点，切换客户端和库后验证实际入口，再开放写入。回退时先固定已接受的新版本、交付和完整 schema 4 原生备份，保留其可回读入口。 [Windows 用户任务和备份恢复](administrator.md#windows-用户任务) · [迁移实际进度](../../../devDoc/tasks/20261122-memory-graph-redesign/progress.md#旧库迁移与回退演练)
 
 ### 升级到 0.18：有限任务池
 

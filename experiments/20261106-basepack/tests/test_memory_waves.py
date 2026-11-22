@@ -8,6 +8,7 @@ import sys
 import pytest
 
 from basepack.memory import owner, waves
+from basepack.memory.draft import freeze
 from basepack.memory.maintenance import MaintenanceStopped
 
 
@@ -411,6 +412,65 @@ def test_write_scope_includes_authorized_stable_sources_but_not_read_only_source
     assert waves.submit(tmp_path, control, run, state["wave_id"], "w", task["id"], drafts=[draft],
                         coverage=coverage, errors=errors)["status"] == "submitted"
     assert (waves._path_key("src/A.md") == waves._path_key("src/a.md")) == (os.name == "nt")
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_submit_reports_bad_reference_on_the_original_claim(tmp_path, failed):
+    control, run, wave, (worker,) = setup_wave(tmp_path)
+    waves.started(tmp_path, control, run, wave, worker, "host")
+    seal_wave(tmp_path, control, run, wave)
+    task = waves.claim(tmp_path, control, run, wave, worker)["task"]
+    draft, coverage, errors = result_files(tmp_path)
+    proposal = {"sources": [], "members": [{"path": "source-0",
+                                            "evidence": [{"member": "member:already_known"}]}]}
+    draft.write_text(json.dumps(proposal), encoding="utf-8")
+    args = {"drafts": [draft], "coverage": coverage, "errors": errors}
+    if failed:
+        task = waves.submit(tmp_path, control, run, wave, worker, task["id"], **args, failed=True)
+        assert task["status"] == "failed"
+        return
+
+    with pytest.raises(ValueError, match=r"result-0\.json: members\[0\]\.evidence\[0\]: .*ID as a string"):
+        waves.submit(tmp_path, control, run, wave, worker, task["id"], **args)
+    assert waves.inspect(tmp_path, control, run, wave)["tasks"][0]["status"] == "claimed"
+    with pytest.raises(ValueError, match=r"drafts\[0\]\.members\[0\]\.evidence\[0\]"):
+        freeze([proposal])
+
+    proposal["members"][0]["evidence"] = "member:already_known"
+    draft.write_text(json.dumps(proposal), encoding="utf-8")
+    with pytest.raises(ValueError, match=r"members\[0\]\.evidence: Expected an array"):
+        waves.submit(tmp_path, control, run, wave, worker, task["id"], **args)
+
+    proposal["members"][0]["evidence"] = ["member:already_known", {"draft": 1, "member": 2}]
+    draft.write_text(json.dumps(proposal), encoding="utf-8")
+    task = waves.submit(tmp_path, control, run, wave, worker, task["id"], **args)
+    assert task["status"] == "submitted"
+    batch = freeze([proposal, {"sources": [], "members": [{}, {}, {}]}])
+    assert batch["members"][0]["evidence"] == ["member:already_known", batch["members"][3]["id"]]
+
+
+@pytest.mark.parametrize("source_fields,error", [
+    ({"dispositions": [{"start_line": 1, "end_line": 1, "reason": "Read"}]},
+     r"sources\[0\]\.dispositions\[0\].*kind"),
+    ({"members": []}, r"sources\[0\].*members"),
+])
+def test_submit_checks_source_decisions_before_accepting_a_draft(tmp_path, source_fields, error):
+    control, run, wave, (worker,) = setup_wave(tmp_path)
+    waves.started(tmp_path, control, run, wave, worker, "host")
+    seal_wave(tmp_path, control, run, wave)
+    task = waves.claim(tmp_path, control, run, wave, worker)["task"]
+    draft, coverage, errors = result_files(tmp_path)
+    proposal = {"prepare": waves.fixed_reference(coverage), "sources": [{"path": "source-0", **source_fields}]}
+    draft.write_text(json.dumps(proposal), encoding="utf-8")
+    args = {"drafts": [draft], "coverage": coverage, "errors": errors}
+    with pytest.raises(ValueError, match=rf"result-0\.json.*{error}"):
+        waves.submit(tmp_path, control, run, wave, worker, task["id"], **args)
+    assert waves.inspect(tmp_path, control, run, wave)["tasks"][0]["status"] == "claimed"
+
+    proposal["sources"][0] = {"path": "source-0", "dispositions": [{
+        "kind": "no_knowledge", "start_line": 1, "end_line": 1, "reason": "Read"}]}
+    draft.write_text(json.dumps(proposal), encoding="utf-8")
+    assert waves.submit(tmp_path, control, run, wave, worker, task["id"], **args)["status"] == "submitted"
 
 
 @pytest.mark.parametrize("pending,accepted", [(False, False), (True, False), (True, True)])

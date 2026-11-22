@@ -1,4 +1,4 @@
-- 判断项目现状、剩余工作、待决策或历史要求时先完成一次跨历史检索；点名聊天直接读并沿引用核后续发布：[检索](.basepack/instructions.md#startup)。
+- 作出结论或决定下一步前，如果项目既有要求、决定或验收结果可能改变判断，而关键原证还没核实，先派一名检索 worker，收到相关证据后再作取舍。点名聊天和已知的少量材料先直接读，读完仍有关键缺口时再派。同一问题已有足够证据时直接复用。 [检索](.basepack/instructions.md#startup)。
 - 主任务开始时运行一次 `memory brief`；同任务接续沿用已有 brief，新 shell 仅初始化参数与 UTF-8。保留 mandatory，待核内容按需回源：[启动](.basepack/instructions.md#startup)。
 - 主任务直觉预计不超过十分钟时跳过整个自动维护；更长任务在宿主支持生命周期时用 `memory maintain-start --mode automatic` 异步启动。范围明显扩大时重估，子任务按委托执行。[自动维护](.basepack/instructions.md#maintenance)。
 - 按启动返回的 `spawn_arguments` 派唯一协调者。协调者负责预检及 reader 初始化，原父确认其 turn 结束后封口并发 go。[启动与派工](.basepack/instructions.md#dispatch)。

@@ -140,7 +140,7 @@ def test_memory_init_refreshes_both_entries_only_after_schema_identity_check(tmp
             return {"schema": "checked"}
 
     monkeypatch.setattr("basepack.memory.store.Memory", Memory)
-    args = argparse.Namespace(memory_action="init", output=None)
+    args = argparse.Namespace(memory_action="init", output=None, no_project_entry=False)
     if failure:
         with pytest.raises(RuntimeError, match="schema identity mismatch"):
             dispatch(args, config)
