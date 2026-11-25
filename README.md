@@ -13,6 +13,17 @@ The project aimed to help an agent recover evidence it knows to look for and sur
 - **End-to-end maintenance was expensive.** Waiting for agents, encoding, publishing, recovering failed batches, and checking source readback all added time. One engineering case took roughly seven hours to do the original work. Follow-on maintenance for the same results had a recorded lower bound above 26 hours across attempts, with coverage still incomplete. That elapsed time includes mixed work and waits. Reduced file-summary counts alone did not establish a speedup.
 - **Deployment and follow-through required hands-on attention.** Windows database startup and embedding readiness could time out. Host sandbox and approval boundaries could interrupt chat collection or cross-chat follow-up. Publication sometimes needed repairs to source ranges, version references, or privacy metadata. Some trial failures went unretested until a coordinator assigned the repair and checked it from the normal entry point. Keeping the growing implementation, tests, and agent instructions aligned added maintenance work while the gains on ordinary tasks remained uneven.
 
+**Follow-up trials with different maintenance models.** Two projects each supplied five related files. In each project, four independent teams started from empty databases and used basePack `v0.19.1` to maintain identical copies of those files. Each team had one coordinator and one reader. The table counts the cross-file relations each team authored and published.
+
+| Coordinator | Reader | Array reconstruction | Dual-arm S21 calibration |
+| --- | --- | ---: | ---: |
+| GPT-6.1 Terra Ultra | GPT-6 Luna Max | 4 | 4 |
+| GPT-6.1 Terra Ultra | GPT-6.2 Sol Max | 4 | 5 |
+| GPT-6.2 Sol Max | GPT-6 Luna Max | 0 | 4 |
+| GPT-6.2 Sol Max | GPT-6.2 Sol Max | 7 | 5 |
+
+Switching both roles to Sol produced more relations than the default Terra/Luna pair on both samples. In array reconstruction, switching only the reader left the count at four, and switching only the coordinator yielded zero. In calibration, switching the reader added one relation with either coordinator. Both Sol readers linked the documented configuration-check command to the baseline file it reads. The Sol readers also produced fewer memory entries than the Luna readers in calibration and more in array reconstruction. Each combination ran once per sample. Retrieval accuracy and run-to-run variability remain unmeasured.
+
 The last trials point to smaller tests drawn from real maintenance backlogs. Each test can start from a concrete output, compare directory search and direct reading with the indexed workflow on a held-out question, and keep verified results for later use. Measure the time through successful readback. The [project setup](experiments/20261106-basepack/docs/setup-project.md) and [memory guide](experiments/20261106-basepack/docs/memory.md) remain the entry points for existing projects.
 
 | Capability | Purpose | Requirements |
