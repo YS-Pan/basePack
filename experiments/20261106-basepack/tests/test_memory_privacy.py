@@ -175,6 +175,21 @@ def test_anonymous_in_batch_evidence_cycle_terminates():
                           knowledge_version=lambda *_: row) is False
 
 
+def test_restricted_migration_marker_uses_fixed_provenance():
+    legacy = {"private": True, "privacy_unknown": True,
+              "source_version": "source_version:old", "path": "guide.md"}
+    snapshots = [
+        ({"private": True, "path": "guide.md"}, True),
+        ({"private": False, "path": "guide.md"}, False),
+        ({"private": True, "privacy_unknown": True, "path": "guide.md"}, None),
+        ({"private": True, "privacy_unknown": True, "path": "private/old.md"}, True),
+        (None, None),
+    ]
+    for snapshot, expected in snapshots:
+        assert derive_private(legacy, source_version=lambda _: snapshot,
+                              knowledge_version=lambda *_: None) is expected
+
+
 def _initial(memory):
     (memory.config.root / "private").mkdir()
     paths = {"guide.md": "Public context cites private/source.md as an optional path.\n",

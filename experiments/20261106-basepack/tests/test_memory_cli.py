@@ -583,6 +583,36 @@ def test_delegated_start_has_no_assignment_when_busy_or_capacity_unavailable(tmp
     assert "spawn_arguments" not in launch
 
 
+def test_collection_registry_stays_out_of_git_and_explicit_business_sources(tmp_path):
+    from basepack.memory.discovery import discover_sources
+
+    machine = tmp_path / "machine.toml"
+    machine.write_text("schema_version=1\n", encoding="utf-8")
+    project = tmp_path / "project"
+    config = load_project_config(init_project(project, machine, max_concurrent_subagents=3,
+                                              concurrency_source="test fixture", codex_project_id="owned-project"))
+    config.raw["memory"]["data_dir"] = ".basepack/isolated-memory"
+    subprocess.run(["git", "init", "--quiet"], cwd=project, check=True)
+    assert (project / ".gitignore").read_text(encoding="utf-8").splitlines() == ["/.basepack/"]
+
+    business = project / "tmp/business-note.md"
+    business.parent.mkdir()
+    business.write_text("Regular project material.\n", encoding="utf-8")
+    launch, _ = dispatch(_memory_args("maintain-start", "--holder", "parent"), config)
+    prompt, _ = dispatch(_memory_args("collect-prompt", "--attempt", launch["attempt_id"]), config)
+    registry = Path(prompt["registry"])
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    registry.write_text(json.dumps({"project_id": "owned-project", "other_project_roots": [],
+                                    "registry_complete": True}), encoding="utf-8")
+
+    registry_relative = registry.relative_to(project).as_posix()
+    for scope in (None, ["tmp", ".basepack"]):
+        discovered = discover_sources(config, scope)["paths"]
+        assert "tmp/business-note.md" in discovered
+        assert registry_relative not in discovered
+    assert registry.parent == Path(prompt["receipt"]).parent == config.memory_dir / "maintenance"
+
+
 def test_retained_fallback_is_explicit_in_the_clean_coordinator_prompt(tmp_path, monkeypatch):
     config, _, _ = _maintenance_setup(tmp_path, monkeypatch)
     config.raw["memory"]["codex"]["project_id"] = "owned-project"
@@ -664,7 +694,9 @@ def test_maintain_consumes_verified_collection_and_hands_off_provenance(tmp_path
     # Provenance stays in the coordinator plan; reader prompts now come from a claimed wave task.
     from basepack.memory.prompts import render_prompt
     rendered = render_prompt(config, result["receipt"], result["control"])
-    assert f"Codex provenance inputs: {json.dumps(material['codex'], ensure_ascii=False)}" in rendered["prompt"]
+    provenance = json.loads(rendered["prompt"].split("Codex provenance inputs: ", 1)[1].splitlines()[0])
+    assert provenance == {field: material["codex"][field] for field in
+                          ("status", "project_id", "receipt", "capture_dir", "attachment_dir")}
     with pytest.raises(SystemExit):
         _memory_args("prompt", "--receipt", str(receipt), "--control", str(tmp_path / "control"),
                      "--role", "reader", "--paths", captured)

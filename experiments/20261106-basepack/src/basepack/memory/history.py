@@ -1,5 +1,6 @@
 """Address retained knowledge versions without substituting a current record."""
 
+from .privacy import _UNPROVEN_PRIVATE
 from .store import _record, _sql
 
 
@@ -7,13 +8,18 @@ def _identity(row):
     return _record(row["id"]), row["knowledge_revision"]
 
 
-def _effective_privacy(record, version):
+def _effective_privacy(record, version, *, verify_promotion=False):
     """Use the exact version's visibility while retaining its original payload."""
     effective = dict(record)
     if type(version.get("private")) is bool:
         effective["private"] = version["private"]
     if version.get("privacy_unknown"):
         effective["privacy_unknown"] = True
+    if verify_promotion and version.get("private") is True:
+        original = version["record"].get("private") if "record" in version else version.get("original_private")
+        if original is False:
+            # Migration used restricted visibility for both proven and missing provenance.
+            effective[_UNPROVEN_PRIVATE] = True
     return effective
 
 
@@ -54,7 +60,8 @@ def _semantic_versions(memory, edges):
             elif fact.get("target"):
                 row["direct_basis"].append({"id": fact["target"], "knowledge_revision": fact["knowledge_revision"]})
             else:
-                row["direct_basis"].append({"source_version": fact["out"], **fact.get("locator", {})})
+                locator = fact.get("locator")
+                row["direct_basis"].append({"source_version": fact["out"], **({} if locator is None else locator)})
         rows.append(row)
     return rows
 
@@ -173,7 +180,7 @@ def history(memory, record_id):
                          "note": "Retained versions only; pre-installation gaps may remain."}}
 
 
-def knowledge(memory, record_id, *, knowledge_revision=None):
+def knowledge(memory, record_id, *, knowledge_revision=None, verify_promotion=False):
     target = _record(record_id)
     if target.table == "semantic":
         return _semantic_knowledge(memory, target, knowledge_revision)
@@ -187,7 +194,8 @@ def knowledge(memory, record_id, *, knowledge_revision=None):
                 if row.get("legacy_history_only"):
                     return _legacy_semantic(row)
                 return _semantic_knowledge(memory, logical, row["knowledge_revision"])
-            return {**_effective_privacy(row["record"], row), "exact_id": row["id"]}
+            return {**_effective_privacy(row["record"], row, verify_promotion=verify_promotion),
+                    "exact_id": row["id"]}
         return row
     if target.table not in {"member", "node"}:
         raise ValueError("Knowledge requires a logical knowledge ID or an exact graph record ID")
@@ -201,9 +209,9 @@ def knowledge(memory, record_id, *, knowledge_revision=None):
         f"SELECT record,private,privacy_unknown FROM knowledge_version WHERE target={_sql(target)} "
         f"AND knowledge_revision={_sql(knowledge_revision)} LIMIT 1;")
     if current and current["knowledge_revision"] == knowledge_revision:
-        return _effective_privacy(current, retained[0]) if retained else current
+        return _effective_privacy(current, retained[0], verify_promotion=verify_promotion) if retained else current
     if retained:
-        return _effective_privacy(retained[0]["record"], retained[0])
+        return _effective_privacy(retained[0]["record"], retained[0], verify_promotion=verify_promotion)
     rows = history(memory, record_id)["versions"]
     for row in rows:
         if row["knowledge_revision"] == knowledge_revision:

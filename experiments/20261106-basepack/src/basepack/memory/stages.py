@@ -11,18 +11,23 @@ def fixed_reference(path):
     return {"path": str(path), "file_sha256": sha256(path.read_bytes()).hexdigest()}
 
 
-def _read_reference(reference):
+def read_fixed_bytes(reference):
     path = Path(reference["path"])
     material = path.read_bytes()
     if sha256(material).hexdigest() != reference["file_sha256"]:
         raise ValueError(f"Stage reference file SHA256 mismatch: {path}")
-    return json.loads(material.decode("utf-8"))
+    return material
+
+
+def _read_reference(reference):
+    return json.loads(read_fixed_bytes(reference).decode("utf-8"))
 
 
 def receipt_scope(material):
+    outcomes = [material["outcome_candidate"]] if "outcome_candidate" in material else []
     return {"paths": [item["path"] for item in material["semantic"]],
             "relations": [item["id"] for item in (*material["pending_relations"],
-                                                   *material.get("graph_candidates", ()))],
+                                                   *material.get("graph_candidates", ()), *outcomes)],
             "feedback": [item["id"] for item in material.get("feedback", [])]}
 
 
@@ -81,6 +86,11 @@ def prepare_stage(config, receipt, control, handoff, output, *, workers_ended, p
     resolved = set(wave.get("resolved_graph_candidates", ())) & graph_scope
     if set(boundary["completed"]["relations"]) & graph_scope != resolved:
         raise ValueError("Completed graph candidates must match closed wave reviews and publications")
+    outcome = material.get("outcome_candidate")
+    if outcome and outcome["id"] in scope["relations"]:
+        resolved = outcome["id"] in wave.get("resolved_outcome_candidates", ())
+        if (outcome["id"] in boundary["completed"]["relations"]) != resolved:
+            raise ValueError("Completed outcome candidate must match its closed wave review and publication")
     receipts = []
     for ref in wave["history"]:
         previous_wave = _read_reference(ref)

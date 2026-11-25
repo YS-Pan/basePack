@@ -1,3 +1,4 @@
+from codecs import BOM_UTF8
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -288,13 +289,17 @@ def test_mixed_wave_distinguishes_relationships_with_the_same_endpoints(assignme
         assert applied == []
 
 
-def test_frozen_graph_retry_and_committed_pair_are_exact(assignment, monkeypatch):
+@pytest.mark.parametrize('bom', [False, True])
+def test_frozen_graph_retry_and_committed_pair_are_exact(assignment, monkeypatch, bom):
     from basepack.memory import store
 
     case = assignment
     args = _start(case)
     waves.claim(*args, "reader")
-    submitted = _submit(case, args, outcome="proposed", draft=_json(case.root / "graph.json", _proposal(case)))
+    draft = _json(case.root / "graph.json", _proposal(case))
+    if bom:
+        draft.write_bytes(BOM_UTF8 + draft.read_bytes())
+    submitted = _submit(case, args, outcome="proposed", draft=draft)
     _finish(args)
     selected = [{**submitted["result"]["drafts"][0], "assignment": "graph"}]
     config = SimpleNamespace(memory_dir=case.root, raw={"memory": {}})

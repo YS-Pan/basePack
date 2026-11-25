@@ -100,6 +100,8 @@ def _retrieval_work(config, request_path, request):
 
 
 def render_retrieval_prompt(config, request_path, slot=0, available_subagents=None, level=None):
+    from .codex_index_config import configured
+
     """Read the retrieval request and template only; never claim or inspect maintenance state."""
     dispatch = retrieval_dispatch(config, request_path, slot, available_subagents, level)
     request = _retrieval_request(request_path)
@@ -137,14 +139,51 @@ def render_retrieval_prompt(config, request_path, slot=0, available_subagents=No
               "receipt_command": memory_command(config, "retrieval-receipt", "--request", Path(request_path).resolve(),
                                                 "--ranked", work / "ranked.json", "--candidates", work / "candidates.json",
                                                 "--output", work / "delivery.json")}
+    if configured(config):
+        coverage = memory_command(config, "dialogue-coverage", *evidence_args)
+        locations = memory_command(config, "dialogue-locations", "<node-id>",
+                                   "--knowledge-revision", "<observed-knowledge-revision>", *evidence_args)
+        read = memory_command(config, "read", "<codex_chunk-id>", *evidence_args)
+        values["source_step"] = (f"1. Run `{coverage}` to inspect authorized dialogue coverage. Keep missing "
+                                 "messages and unavailable originals as gaps. Use the configured index without "
+                                 "legacy captures or another host reader.")
+        values["dialogue_reference_rules"] = (
+            f"   For a dialogue node, run `{locations}`. For a specific hit or listed location, run `{read}` "
+            "for an immediate read and version check. Save the observed node and revision, dialogue_chunk and "
+            "bookmark in candidates, scores and delivery. Use your own short evidence summary wherever scoring "
+            "requires text. Keep dialogue quotations and neighboring messages out of every saved file and the "
+            "default handoff. Report locators, coverage and original-read gaps for dialogue.\n\n"
+        )
+    else:
+        values["source_step"] = render_template("retrieval-source", **values).rstrip("\n")
+        values["dialogue_reference_rules"] = ""
     return {"prompt": render_template("retrieval", **values), "delivery_id": request["delivery_id"],
             "search_command": values["search_command"], "graph_command": values["graph_command"],
             "work": str(work), "scope": request["scope"], **dispatch}
 
 
+def _contains_dialogue(value):
+    if isinstance(value, dict):
+        identifier = value.get("id", "")
+        prefixes = ("node:codex-", "node:`codex-", "node:⟨codex-", "codex_chunk:")
+        return ("dialogue_chunk" in value or "codex_thread_id" in value or value.get("kind") == "codex_thread"
+                or isinstance(identifier, str) and identifier.startswith(prefixes)
+                or any(_contains_dialogue(item) for item in value.values()))
+    if isinstance(value, list):
+        return any(_contains_dialogue(item) for item in value)
+    return False
+
+
+def _require_frozen_authorization(current, frozen, *values):
+    if (frozen.get("dialogue_authorization") != current or
+            current is None and any(_contains_dialogue(value) for value in (frozen, *values))):
+        raise ValueError("Codex dialogue authorization changed after retrieval was frozen; start a new retrieval")
+
+
 def start_retrieval(memory, request_path):
     """Freeze the base result before adding behavioral candidates; reuse it for every round."""
     from .behavior_projection import behavior_candidates
+    from .dialogue_query import authorization_fingerprint
     from .graph_query_store import filter_record_details
     from .graph_retrieval import base_search
 
@@ -152,10 +191,12 @@ def start_retrieval(memory, request_path):
     work = _retrieval_work(memory.config, request_path, request)
     anchor_path = work / "anchors.json"
     request_hash = sha256(json.dumps(request, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    authorization = authorization_fingerprint(memory.config)
     if anchor_path.exists():
         frozen = json.loads(anchor_path.read_text(encoding="utf-8"))
         if frozen["request_hash"] != request_hash:
             raise ValueError("Retrieval request changed after its anchors were frozen")
+        _require_frozen_authorization(authorization, frozen)
     else:
         mode = memory.config.memory_search_mode
         base = base_search(memory, request["question"], scope=request["scope"],
@@ -170,7 +211,8 @@ def start_retrieval(memory, request_path):
                     "base_quality_details": {key: row[key] for key in
                                      ("rrf_score", "lexical_score", "lexical_rank", "distance", "vector_rank")
                                      if key in row}} for row in rows]
-        frozen = {"request_hash": request_hash, "delivery_id": request["delivery_id"], "query": request["question"],
+        frozen = {"request_hash": request_hash, "dialogue_authorization": authorization,
+                  "delivery_id": request["delivery_id"], "query": request["question"],
                   "episode": request["delivery_id"], "anchors": anchors,
                   "knowledge_cutoff": {"kind": "observed_versions",
                       "observed_at": datetime.now(timezone.utc).isoformat(),
@@ -187,6 +229,7 @@ def start_retrieval(memory, request_path):
     candidate_path = work / "behavior.json"
     if candidate_path.exists():
         related = json.loads(candidate_path.read_text(encoding="utf-8"))
+        _require_frozen_authorization(authorization, frozen, related)
     else:
         allow_private = request.get("include_private", False)
         related = behavior_candidates(memory, frozen["anchors"], limit=12, scope=frozen["policy"]["scope"],
@@ -235,6 +278,8 @@ def retrieval_graph_round(memory, request_path, *, text=None, scope=None, allow_
 
 def make_delivery_receipt(config, request_path, ranked, candidates):
     """Build host-confirmable delivery context from the independent fixed anchor package."""
+    from .dialogue_query import authorization_fingerprint
+
     request = _retrieval_request(request_path)
     work = _retrieval_work(config, request_path, request)
     frozen = json.loads((work / "anchors.json").read_text(encoding="utf-8"))
@@ -244,6 +289,7 @@ def make_delivery_receipt(config, request_path, ranked, candidates):
     behavior = json.loads((work / "behavior.json").read_text(encoding="utf-8"))
     rounds = sorted((json.loads(path.read_text(encoding="utf-8")) for path in
                      (work / "graph-rounds").glob("*.json")), key=lambda row: (row["observed_at"], row["round_id"]))
+    _require_frozen_authorization(authorization_fingerprint(config), frozen, behavior, rounds, candidates, ranked)
     graph_observations = [row for episode in rounds for row in episode["observations"]]
     knowledge_candidates = [row for row in candidates if row.get("record_type") != "source_version"]
     actual_candidates = []

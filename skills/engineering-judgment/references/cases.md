@@ -2,6 +2,14 @@
 
 These situations illustrate the evidence and responsibility behind a decision. Read the cases relevant to the current task; their local facts determine the result.
 
+## Shared graph operations, distinct relationship meanings
+
+A conclusion cites a particular revision of a report. A reader must also be able to start at that report revision and find the conclusions that cite it. Trace both queries and a later revision of the report before choosing storage. Evidence and semantic relationships can use the same typed-edge model and traversal operations. `has_basis` records a citation. A conditional `supports` edge records a separately verified assertion. Each keeps its own direction, exact endpoints, and applicable conditions.
+
+## Stable identity, exact revision, and current state
+
+Two drafts can both use `fig-1`. Resolve each label within its own draft and allocate a stable identity when preparing it for publication. A saved citation to revision 1 still resolves after revision 2 becomes current. A write prepared against revision 2 must detect a conflict if revision 3 becomes current before commit. Check the exact revision for the citation and the expected current revision for the write.
+
 ## Required fields and valid absence
 
 A worker receipt promises a start time once a job has started. Replacing a missing start time with zero creates a plausible duration while hiding a broken receipt. Read the required value directly so the failure identifies the producer or contract that needs repair. If the job has never started, represent that documented state as such.

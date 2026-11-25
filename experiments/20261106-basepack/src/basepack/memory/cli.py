@@ -7,7 +7,7 @@ from pathlib import Path
 
 _LOCAL_ACTIONS = frozenset({
     "guide", "rank", "freeze", "stop", "owner", "release", "recover-owner",
-    "prompt", "stage", "maintain-start", "collect-prompt", "collect", "check-codex-capture", "codex-trial",
+    "prompt", "stage", "maintain-start", "collect-prompt", "collect", "check-codex-capture", "codex-trial", "dialogue-register",
     "retrieve", "retrieval-dispatch", "retrieval-prompt", "retrieval-receipt",
 })
 
@@ -17,7 +17,7 @@ _COMMAND_GROUPS = (
         ("search", "Search published knowledge."),
         ("retrieve", "Prepare a retrieval assignment for the host to launch."),
         ("graph-query", "Find versioned evidence and relationships in a bounded graph round."),
-        ("read", "Read a member and its evidence."),
+        ("read", "Read member evidence or a verified Codex dialogue location."),
         ("read-source", "Read a retained original snapshot at its exact location."),
         ("knowledge", "Inspect an accepted knowledge record."),
         ("history", "List retained knowledge versions."),
@@ -28,6 +28,9 @@ _COMMAND_GROUPS = (
     )),
     ("Sources", (
         ("check-codex-capture", "Compare active and archived project Codex chats with capture records."),
+        ("dialogue-register", "Register one verified current-project dialogue as private."),
+        ("dialogue-coverage", "Report authorized dialogue indexing coverage without original text."),
+        ("dialogue-locations", "List indexed message locations for an authorized dialogue node."),
         ("check-file-changes", "Compare selected files with registered source versions."),
         ("inventory", "Inspect project originals and suggest source groups without starting maintenance."),
         ("sources", "List registered project sources."),
@@ -151,12 +154,27 @@ def register_commands(subparsers):
     actions["search"].add_argument("--timeout", type=float, default=600)
     actions["embed"].add_argument("--ids", nargs="+", help="Member IDs; otherwise index current representations")
     actions["embed"].add_argument("--timeout", type=float, default=600)
-    actions["read"].add_argument("id", help="Member ID; follow a knowledge node's evidence via neighbors")
+    actions["read"].add_argument("id", help="Member ID or codex_chunk ID")
     actions["read"].add_argument("--knowledge-revision", help="Read the observed knowledge version, including its original evidence")
     actions["read"].add_argument("--source-version", help="Read an original evidence snapshot; use --knowledge-revision for the old accepted representation")
     actions["read"].add_argument("--start-line", type=int, help="Evidence start line (inclusive)")
     actions["read"].add_argument("--end-line", type=int, help="Evidence end line (inclusive)")
     actions["read"].add_argument("--locator", help="Text-column or image evidence locator as a JSON object")
+    actions["read"].add_argument("--include-private", action="store_true",
+                                 help="Include explicitly authorized private dialogue evidence")
+    actions["read"].add_argument("--context", type=int, default=1, help="Nearby Codex message parts to read")
+    registration = actions["dialogue-register"]
+    registration.add_argument("thread_id", help="Canonical UUID of an ordinary current-project dialogue")
+    registration.add_argument("--binding", help="Current-project manifest key when more than one key matches")
+    dialogue = actions["dialogue-locations"]
+    dialogue.add_argument("id", help="Observed dialogue node ID")
+    dialogue.add_argument("--knowledge-revision", help="Observed dialogue node revision")
+    dialogue.add_argument("--limit", type=int, default=30)
+    dialogue.add_argument("--offset", type=int, default=0)
+    for name in ("dialogue-coverage", "dialogue-locations"):
+        actions[name].add_argument("--scope", default="", help="Project-relative scope prefix")
+        actions[name].add_argument("--include-private", action="store_true",
+                                   help="Include explicitly authorized private dialogue metadata")
     graph = actions["graph-query"]
     graph.add_argument("--request", help="Reuse a prepared retrieval request and record this round's observations")
     graph.add_argument("--text", help="This round's question or search terms")
@@ -274,6 +292,12 @@ def register_commands(subparsers):
 
 def dispatch(args, config):
     action = args.memory_action
+    if (action in {"dialogue-register", "dialogue-coverage", "dialogue-locations"}
+            or (action == "read" and args.id.startswith("codex_chunk:"))):
+        from .codex_index_config import configured
+
+        if not configured(config):
+            raise PermissionError("Codex dialogue index is disabled for this project")
     if action == "maintain":
         return _dispatch_maintain(args, config)
     if action in _LOCAL_ACTIONS or (action == "wave" and args.wave_action != "publish"):
@@ -325,15 +349,20 @@ def _dispatch(args, config):
     from .query import load_json_file
 
     action = args.memory_action
+    if action in {"collect", "collect-prompt", "check-codex-capture"}:
+        from .codex_index_config import configured
+
+        if configured(config):
+            raise ValueError("Legacy Codex capture is unavailable in dialogue-index mode")
     if action == "wave":
         from .wave_cli import dispatch as dispatch_wave
         return dispatch_wave(config, args), 0
     if action == "freeze":
-        from .draft import freeze_file
+        from .draft import freeze_file, read_author_draft
         if not args.output:
             raise ValueError('memory freeze requires --output for the frozen batch')
         path = Path(args.output).resolve()
-        batch = freeze_file([load_json_file(path) for path in args.drafts], path, config=config)
+        batch = freeze_file([read_author_draft(draft) for draft in args.drafts], path, config=config)
         return {"output": str(path), "batch_id": batch['batch_id']}, 0
     if action == "guide":
         result = {"skill": str(Path(__file__).with_name("SKILL.md"))}
@@ -391,6 +420,11 @@ def _dispatch(args, config):
         from .collection import codex_trial
         return codex_trial(config, args.trial_action, reservation=getattr(args, "reservation", None),
                            thread_id=getattr(args, "thread", None)), 0
+    elif action == "dialogue-register":
+        from .codex_index_config import register_thread
+        if args.output is not None:
+            raise ValueError("Dialogue registration writes its receipt to standard output")
+        return register_thread(config, args.thread_id, binding=args.binding), 0
     elif action == "retrieval-receipt":
         from .retrieval import make_delivery_receipt
         result = make_delivery_receipt(config, args.request, load_json_file(args.ranked),
@@ -455,6 +489,24 @@ def _dispatch(args, config):
         elif action == "inventory":
             from .inventory_work import inventory_report
             result = inventory_report(config, memory, collection=args.collection, group_map_path=args.group_map)
+        elif action == "dialogue-coverage":
+            from .codex_index import coverage
+            from .codex_index_config import visible_threads
+            from .dialogue_query import authorized_ancestry
+
+            allowed = visible_threads(config, scope=args.scope, allow_private=args.include_private)
+            result = coverage(memory, list(allowed))
+            result["threads"] = [row for row in result["threads"]
+                                 if (args.include_private or not row.get("private", False))
+                                 and row.get("path", allowed[row["thread_id"]]["path"]) == allowed[row["thread_id"]]["path"]
+                                 and (row["status"] == "not_indexed"
+                                      or authorized_ancestry(config, row["thread_id"], row.get("ancestor_thread_ids")))]
+        elif action == "dialogue-locations":
+            from .dialogue_query import dialogue_locations
+
+            result = dialogue_locations(memory, args.id, knowledge_revision=args.knowledge_revision,
+                                        scope=args.scope, allow_private=args.include_private,
+                                        limit=args.limit, offset=args.offset)
         elif action == "prepare":
             options = {}
             if args.expected_revisions is not None:
@@ -478,6 +530,21 @@ def _dispatch(args, config):
             else:
                 result = memory.hybrid_search(args.text, scope=args.scope, limit=args.limit,
                                               timeout=args.timeout, literal=args.literal, **visibility)
+        elif action == "read" and args.id.startswith("codex_chunk:"):
+            from types import SimpleNamespace
+            from .codex_index_route import read_host
+            from .dialogue_query import read_chunk
+
+            if args.output:
+                raise ValueError("Codex original text is only available on standard output")
+            if any(value is not None for value in (args.knowledge_revision, args.source_version,
+                                                   args.start_line, args.end_line, args.locator)):
+                raise ValueError("A Codex chunk ID already fixes the exact original location")
+            if args.public_only and args.include_private:
+                raise ValueError("Choose either --public-only or --include-private")
+            host = SimpleNamespace(read=lambda bookmark, *, context: read_host(config, bookmark, context=context))
+            result = read_chunk(memory, args.id, host=host, scope=args.scope,
+                                allow_private=args.include_private, context=args.context)
         elif action == "read":
             revision = args.knowledge_revision
             record_id = args.id
@@ -562,6 +629,7 @@ def _output(result, output):
 def _maintain(config, args, claim, *, memory=None):
     """Consume selected originals; collection has its own outcome and no owner."""
     from .collection import load_collection, retained_snapshots
+    from .codex_index_config import configured, legacy_capture_path
     from .discovery import discover_sources
     from .maintenance import check
     from .prompts import maintenance_layout, prompt_dispatch
@@ -571,7 +639,12 @@ def _maintain(config, args, claim, *, memory=None):
     check(control)
     discovery = discover_sources(config, args.scope)
     binding = config.raw["memory"].get("codex", {})
-    if args.collection:
+    indexed = configured(config)
+    if indexed:
+        if args.collection is not None or args.retained:
+            raise ValueError("Dialogue indexing cannot use --collection or --retained")
+        codex = {"status": "indexed", "paths": []}
+    elif args.collection:
         codex = load_collection(config, args.collection)
     elif args.retained:
         codex = retained_snapshots(config, binding.get("project_id"))
@@ -593,17 +666,31 @@ def _maintain(config, args, claim, *, memory=None):
                          if any(not prefix or row["path"] == prefix or row["path"].startswith(prefix + "/")
                                 for prefix in prefixes)] if args.scope else [])
     scope = list(dict.fromkeys([*discovered_paths, *captured_paths, *registered_paths]))
+    if indexed:
+        scope = [path for path in scope if not legacy_capture_path(config, path)]
     selected_captures = set(captured_paths)
     expected_snapshots = {item["path"]: item["sha256"] for item in codex.get("snapshots", ())
                           if item["path"] in selected_captures}
     options = {"expected_snapshots": expected_snapshots} if expected_snapshots else {}
     if args.scope is None and args.mode == "manual":
         options["discover_graph"] = True
+        chat_dir = config.memory_dir.resolve() / "codex"
+        holder = str(claim["owner"]["holder"]).rsplit("/", 1)[-1].casefold()
+        native_paths = tuple(path for path in captured_paths
+                             if (config.root / path).parent == chat_dir
+                             and Path(path).suffix == ".txt" and Path(path).stem.casefold() != holder)
+        if native_paths:
+            options["outcome_sources"] = native_paths
     result = memory.maintain(scope, control=control, timeout=args.timeout,
                              include_registered=args.scope is None, **options)
+    if indexed:
+        from .codex_index_route import index_workset
+
+        codex.update(index_workset(memory, scope=args.scope, control=control, timeout=args.timeout))
     layout = maintenance_layout(config, mode=args.mode, available_subagents=args.available_subagents,
                                 work_items=max(result["semantic_sources"],
-                                               result["pending_relations"] + result.get("graph_candidates", 0),
+                                               result["pending_relations"] + result.get("graph_candidates", 0)
+                                               + result.get("outcome_candidates", 0),
                                                result["feedback"]),
                                 run_id=claim["owner"]["run_id"])
     codex_info = {key: value for key, value in codex.items() if key not in ("paths", "snapshots", "capture")}
@@ -611,9 +698,12 @@ def _maintain(config, args, claim, *, memory=None):
                   discovery={"mode": discovery["mode"], "sources": len(scope), "gaps": discovery["gaps"]})
     receipt = Path(result["receipt"])
     material = json.loads(receipt.read_text(encoding="utf-8"))
+    provenance = codex_info if indexed else {
+        **codex_info, "capture_dir": str(config.memory_dir / "codex"),
+        "attachment_dir": str(config.memory_dir / "codex-attachments"),
+    }
     material.update(layout=layout, owner_run_id=claim["owner"]["run_id"],
-                    codex={**codex_info, "capture_dir": str(config.memory_dir / "codex"),
-                           "attachment_dir": str(config.memory_dir / "codex-attachments")},
+                    codex=provenance,
                     discovery=result["discovery"])
     receipt.write_text(json.dumps(material, ensure_ascii=False, indent=2), encoding="utf-8")
     if result["needs_semantic"] and layout["teams"]:

@@ -173,6 +173,7 @@ def task_prompt(config, control, run_id, wave_id, worker, task_id):
     if "expected_revisions" in task:
         preparation = ["--expected-revisions", json.dumps(task["expected_revisions"], ensure_ascii=False)]
     values = {"task": json.dumps(task, ensure_ascii=False), "hints": json.dumps(_reader_hints(material, paths), ensure_ascii=False),
+              "receipt": json.dumps(state["source_receipt"], ensure_ascii=False),
               "work": str(work), "skill": str(Path(__file__).with_name("SKILL.md")),
               "prepare_command": memory_command(config, "prepare", "--paths", *(paths or ["<identified-project-relative-file>"]),
                                                 *preparation,
@@ -185,6 +186,7 @@ def task_prompt(config, control, run_id, wave_id, worker, task_id):
 
 
 def publish(config, args, completed):
+    from .graph_outcomes import reject_current_duplicates
     from .publish import publish as publish_batch
     from .store import Memory
     frozen, result = str(Path(args.frozen).resolve()), str(Path(args.result).resolve())
@@ -201,7 +203,11 @@ def publish(config, args, completed):
     else:
         if "graph_tasks" in intent:
             graph_review.validate_publication(intent)
-        outcome = publish_batch(Memory(config), completed=completed, output=frozen, control=args.control,
+        memory = Memory(config)
+        if "outcome_assignment" in intent:
+            reference = next(ref for ref in completed if ref["assignment"] == intent["outcome_assignment"])
+            reject_current_duplicates(memory, reference)
+        outcome = publish_batch(memory, completed=completed, output=frozen, control=args.control,
                                 result=result, timeout=args.timeout, use_draft_context=False, **options)
     waves.publication_committed(config.memory_dir, args.control, args.run_id, args.wave_id)
     return outcome

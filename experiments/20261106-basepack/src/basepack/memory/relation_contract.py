@@ -75,3 +75,15 @@ def validate_basis(reference, *, location):
         raise ValueError(f'{location}: Use an inclusive, positive start_line and end_line')
     if reference.get('locator') is not None and not isinstance(reference['locator'], dict):
         raise ValueError(f'{location}.locator: Expected an object')
+
+
+def validate_image_region(locator, *, location=None):
+    """Check the optional region for an image snapshot basis."""
+    if not isinstance(locator, dict) or 'region' not in locator:
+        return
+    region = locator['region']
+    if (not isinstance(region, list) or len(region) != 4
+            or any(type(coord) not in (int, float) or not 0 <= coord < float('inf') for coord in region)
+            or region[0] >= region[2] or region[1] >= region[3]):
+        error = 'Image locator region requires ordered nonnegative coordinates'
+        raise ValueError(f'{location}: {error}' if location else error)

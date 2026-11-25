@@ -1,5 +1,7 @@
 """Publish, revise, and reject graph facts through the native store."""
 
+from base64 import b64decode
+
 import pytest
 
 from basepack.memory.draft import freeze
@@ -11,6 +13,32 @@ from test_memory_store import batch_for, memory
 def _facts(memory, anchor):
     return memory._execute(
         f"SELECT * FROM graph_edge WHERE in={_sql(_record(anchor))};")[0]
+
+
+def test_neighbors_reads_a_relationship_with_whole_image_basis(memory):
+    originals = {
+        "figure.png": b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aSqoAAAAASUVORK5CYII="),
+        "editor.md": b"Draw the reviewed circuit as one figure.\n",
+    }
+    for path, data in originals.items():
+        (memory.config.root / path).write_bytes(data)
+    prepared = memory.prepare(list(originals))
+    memory.apply(freeze([{"sources": [{"path": row["path"], "revision": row["revision"]}
+                                       for row in prepared["sources"]]}]))
+    versions = {row["path"]: row["previous"]["source_version"]
+                for row in memory.prepare(list(originals))["sources"]}
+    image, editor = versions["figure.png"], versions["editor.md"]
+    published = memory.apply(freeze([{"sources": [], "edges": [{
+        "id": "figure_edit", "type": "derived_from", "in": image, "out": editor,
+        "text": "The editable drawing produced the reviewed image.",
+        "basis": [{"source_version": image}],
+    }]}]))
+    exact = published["edge_versions"]["semantic:figure_edit"]
+    assert any(row["type"] == "has_basis" and row.get("locator") is None for row in _facts(memory, exact))
+    for source, direction in ((image, "out"), (editor, "in")):
+        result = memory.neighbors(source, direction=direction, types=["derived_from"])
+        assert [row["id"] for row in result["adjacency"]] == [exact]
+        assert [row["direct_basis"] for row in result["edges"]] == [[{"source_version": image}]]
 
 
 def test_graph_publish_replay_and_exact_evidence_after_revision(memory):

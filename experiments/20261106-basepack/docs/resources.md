@@ -68,6 +68,8 @@ python -m basepack --config '<project-config>' jobs run --spec '<project>/job.js
 
 首次接入执行器或改变账户、环境、会话条件时，在真正执行账户下完成一次最短调用，核实际 Python／DLL、输入读取、输出创建及后续读取；需要 GUI 或许可证的求解器还须核对应条件。提交账户与 slot 执行账户可能不同，容量查询成功也不代表队列认证或应用可运行。保留具体失败操作、账户和原错；已有完成／取消证据继续复用，只补变更涉及的条件。
 
+若 `runtime.python` 安装在个人目录，由管理员在机器配置的 `[htcondor]` 设置 `execute_python`，指向槽账户可执行的 Python。`config show` 的 `machine_paths.htcondor.execute_python` 显示实际选用的解释器，省略时沿用 `runtime.python`。作业 worker 仅用 Python 标准库，随本次提交生成。JobSpec 的 `executable` 和应用依赖也须能由槽账户使用。
+
 JobSpec 的资源申报针对所提交 worker 及其应用后代。可信生成、评价或监控 owner 若在队列外运行，应单独声明其 CPU、内存、GPU 与时限范围并记录必要观测；worker 的申报或单独内存限制不等于整个实验总预算。较重的 owner 阶段按实际需要作为独立步骤接入同一 Condor。HTCondor 继续拥有容量准入与排队；项目为明确隔离职责设置的 Windows Job 或账户权限各自保留。
 
 应用自行设置真实的进程、线程和任务并行度。按单个任务的进程树峰值及并发数量估计总需求，计入原生库线程、缓存与 workspace；首次未知时先用有界样例。`cpus` 申请和线程环境变量都不能证明应用采用了预期并行。接入 GUI／远端执行器时，核真正的求解进程是否受该作业管理，仅把连接已有求解器的客户端入队不能证明求解器已受管。
@@ -110,19 +112,19 @@ python -m basepack --config '<project-config>' jobs cancel '<cluster.proc>'
 
 `status --analyze` 返回原生匹配诊断。partitionable slot 当前资源不足时，Condor会模拟排空后分析，因此“可匹配”不等于当前有空闲配额；任务仍可处于queued。[Condor分析说明](https://htcondor.readthedocs.io/en/25.0/man-pages/condor_q.html#analyze)
 
-默认同机共享目录访问，不传输模型、环境或源码。需要 scratch 隔离时填写 transfer_inputs 和 transfer_outputs：输入路径相对 cwd，按原生 basename 语义进入 scratch；要保留层级可传整个目录，应用用其目录名访问。输出路径相对 scratch，显式列出嵌套输出目录可回传到 cwd；正常或应用失败退出时回传，取消时不保证。submit 字段须能用本机原生编码表示，文件清单拒绝逗号、控制字符和 `$(...)` 宏；应用参数通过 UTF-8 JSON 传递，不受 submit 编码限制。显式输出缺件可能导致 Condor hold。
+默认同机共享目录访问，槽账户须能读取 `.basepack/jobs/<submission-id>/` 中的 worker 和任务文件，并访问 `cwd` 与应用所需文件。需要 scratch 隔离时填写 `transfer_inputs` 或 `transfer_outputs`，Condor 将 worker、任务文件和指定输入一起传入 scratch。输入路径相对 `cwd`，按原生 basename 语义进入 scratch；要保留层级可传整个目录，应用用其目录名访问。输出路径相对 scratch，显式列出嵌套输出目录可回传到 `cwd`；正常或应用失败退出时回传，取消时不保证。submit 字段须能用本机原生编码表示，文件清单拒绝逗号、控制字符和 `$(...)` 宏；应用参数通过 UTF-8 JSON 传递，不受 submit 编码限制。显式输出缺件可能导致 Condor hold。
 
 从项目 `.basepack/jobs/<submission-id>/` 的提交材料、stdout、stderr 和事件日志定位失败；关键应用回执可写项目共享绝对路径。保留 job ID，可用 status --analyze 查看无匹配原因。
 
 Python 同样可一次调用：
 
 ```python
-import sys
 from basepack.project.config import load_project_config
 from basepack.jobs import JobSpec, CondorClient
 
-jobs = CondorClient(load_project_config("<absolute-project-config>"))
+config = load_project_config("<absolute-project-config>")
+jobs = CondorClient(config)
 capacity = jobs.capacity()
-result = jobs.run(JobSpec(executable=sys.executable, arguments=["analysis.py"],
+result = jobs.run(JobSpec(executable=str(config.jobs_execute_python), arguments=["analysis.py"],
                           cpus=2, memory_mib=2048, disk_mib=256))
 ```

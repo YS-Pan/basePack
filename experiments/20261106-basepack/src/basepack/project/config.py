@@ -108,6 +108,12 @@ class ProjectConfig:
     def jobs_dir(self) -> Path:
         return self.data_path("jobs", "jobs_dir")
 
+    @property
+    def jobs_execute_python(self) -> Path:
+        if "execute_python" in self.machine.raw.get("htcondor", {}):
+            return self.machine.path_value("htcondor", "execute_python")
+        return self.python
+
     def resolve_ai(self, *, purpose: str = "task", level: int | None = None) -> dict:
         ai = self.raw["ai"]
         if level is None:
@@ -187,6 +193,8 @@ def describe(config: ProjectConfig) -> dict:
     for section, keys in {"embedding": ["model_root"], "htcondor": ["bin_dir", "config_file"]}.items():
         if section in machine.raw:
             paths[section] = {key: str(machine.path_value(section, key)) for key in keys}
+    if "htcondor" in paths:
+        paths["htcondor"]["execute_python"] = str(config.jobs_execute_python)
     result = {
         "installation": installation(),
         "project_config": str(config.path),

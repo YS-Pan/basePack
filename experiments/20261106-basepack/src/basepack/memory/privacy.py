@@ -6,6 +6,9 @@ import json
 import re
 
 
+_UNPROVEN_PRIVATE = "_unproven_private"
+
+
 def privacy_rules(config=None) -> dict:
     """Freeze the one-way project path policy, independently of discovery."""
     scope = [] if config is None else config.raw["memory"].get("private_scope", [])
@@ -32,6 +35,20 @@ def source_private(path: str, private_scope=()) -> bool:
         prefix == "." or path == prefix or path.startswith(prefix + "/") for prefix in private_scope))
 
 
+def known_private(row: dict) -> bool | None:
+    """Read a classification, excluding a conservative visibility marker."""
+    marker = row.get("private")
+    if type(marker) is bool and not (row.get("privacy_unknown") or row.get(_UNPROVEN_PRIVATE)):
+        return marker
+    return None
+
+
+def privacy_fields(marker: bool | None) -> dict:
+    if marker is None:
+        return {"private": True, "privacy_unknown": True}
+    return {"private": marker}
+
+
 def derive_private(record: dict, *, source_version, knowledge_version) -> bool | None:
     """Return None when legacy provenance cannot establish either marker.
 
@@ -52,32 +69,43 @@ def derive_private(record: dict, *, source_version, knowledge_version) -> bool |
         if identity in seen:
             continue
         seen[identity] = row
-        if "private" in row:
-            if row["private"]:
+        marker = known_private(row)
+        if marker is not None:
+            if marker:
                 return True
             continue
+        if row.get(_UNPROVEN_PRIVATE):
+            unknown = True
         if "source_version" in row:
             snapshot = source_version(row["source_version"])
             # Old snapshots without a path can use the path retained in the
             # exact knowledge version that refers to them, never today's source.
-            if snapshot is None or "private" not in snapshot and "path" not in snapshot:
-                snapshot = {**(snapshot or {}), **({"path": row["path"]} if "path" in row else {})}
+            if snapshot is not None and "path" not in snapshot and "path" in row:
+                snapshot = {**snapshot, "path": row["path"]}
             pending.append(snapshot)
         elif "path" in row:
             if source_private(row["path"]):
                 return True
-        elif not row.get("basis"):
+            if row.get("privacy_unknown"):
+                unknown = True
+        elif not (row.get("basis") or row.get("direct_basis") or row.get("endpoint_versions")):
             unknown = True
         for basis in row.get("basis", []):
             pinned = (knowledge_version(basis["member"], basis["knowledge_revision"])
                       if basis.get("knowledge_revision") else None)
             pending.append(pinned)
             snapshot = source_version(basis["source_version"]) if basis.get("source_version") else None
-            if (snapshot is not None and "private" not in snapshot and "path" not in snapshot
+            if (snapshot is not None and "path" not in snapshot
                     and pinned is not None and "path" in pinned
                     and pinned.get("source_version") == basis.get("source_version")):
                 snapshot = {**snapshot, "path": pinned["path"]}
             pending.append(snapshot)
+        for basis in row.get("direct_basis", []):
+            if basis.get("source_version"):
+                pending.append(source_version(basis["source_version"]))
+            else:
+                pending.append(knowledge_version(basis["id"], basis["knowledge_revision"])
+                               if basis.get("id") and basis.get("knowledge_revision") else None)
         for endpoint in row.get("endpoint_versions", {}).values():
             pending.append(knowledge_version(endpoint["id"], endpoint["knowledge_revision"])
                            if endpoint.get("knowledge_revision") else None)

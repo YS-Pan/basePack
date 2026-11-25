@@ -188,13 +188,13 @@ $migrationOptions = @(
 
 在有受引用工件的项目上将 `--assets <目录>` 和 `--behavior-assets <目录>` 加入参数。已有经原证核实的关系可用 `--relations <JSON文件>` 提供，每项包含旧 `id`、`knowledge_revision`、`legacy_kind`、确认的 `type` 和适用的 `label`。原方向、两端精确钉和原有依据仍需通过校验。其余旧版关系的原记录和原因保留在历史入口，可用旧 ID 及版本执行 `memory knowledge` 或 `memory history`，迁移回执给出可跟进清单。旧记录缺私有标记时保留未确认状态，并从公开范围排除；项目内已授权的检索可显式指定 `--include-private`。
 
-迁移在独立物理库内完成，结果为通过独立恢复复核的 `schema4.surql`、`migration.json` 和受引用工件。演练目标是新的空物理库。核项目身份、关键精确原文、必保、向量、交付顺序、反馈、旧关系及待核清单，验证原入口和新接受写入的回退恢复。正式切换沿同一流程保存新鲜截点，切换客户端和库后验证实际入口，再开放写入。回退时先固定已接受的新版本、交付和完整 schema 4 原生备份，保留其可回读入口。 [Windows 用户任务和备份恢复](administrator.md#windows-用户任务) · [迁移实际进度](../../../devDoc/tasks/20261122-memory-graph-redesign/progress.md#旧库迁移与回退演练)
+迁移在独立物理库内完成，结果为通过独立恢复复核的 `schema4.surql`、`migration.json` 和受引用工件。演练目标是新的空物理库。核项目身份、关键精确原文、必保、向量、交付顺序、反馈、旧关系及待核清单，验证原入口和新接受写入的回退恢复。正式切换沿同一流程保存新鲜截点，切换客户端和库后验证实际入口，再开放写入。回退时先固定已接受的新版本、交付和完整 schema 4 原生备份，保留其可回读入口。 [Windows 用户任务和备份恢复](administrator.md#windows-用户任务) · [迁移实际进度](https://github.com/YS-Pan/basePack/blob/v0.19.0/devDoc/tasks/20261122-memory-graph-redesign/progress.md#旧库迁移与回退演练)
 
 ### 升级到 0.18：有限任务池
 
-0.18系列维护采用有限本地任务池和两段式Terra，memory schema、行为算法、项目UUID及原证版本合同保持。实际安装与验收状态见[部署合同](../../../devDoc/system/deployment.md)，接受范围与余项见[进度](../../../devDoc/tasks/20261115-real-use-rectification/progress.md)。升级旧组织时，先固定原轮的接受／未发稿、剩余范围和发布终态，结束旧worker后由原父正确stop/release；0.18拒绝旧组织receipt／stage，不把新协议套给旧worker或用安装解除旧owner。
+0.18系列维护采用有限本地任务池和两段式Terra，memory schema、行为算法、项目UUID及原证版本合同保持。实际安装与验收状态见[部署合同](../../../devDoc/system/deployment.md)，0.18 系列当时的接受范围与余项见[整改进度](https://github.com/YS-Pan/basePack/blob/v0.19.0/devDoc/tasks/20261115-real-use-rectification/progress.md)。升级旧组织时，先固定原轮的接受／未发稿、剩余范围和发布终态，结束旧worker后由原父正确stop/release；0.18拒绝旧组织receipt／stage，不把新协议套给旧worker或用安装解除旧owner。
 
-安装后运行 `memory init` 刷新托管入口，核包版本、实际导入路径及宿主能力：父任务能确认Terra当前turn已结束而身份空闲，能封口后只发一次go，并核早到go留邮箱／晚到go唤醒事件等待，最后Luna能实际followup同一非根Terra，并将待通知与宿主受理结果分开保留。容量必须留下Terra恢复名额。最小实际宿主闭环通过后再维护真实材料；普通安装或队列状态成功不能代替该验收。流程见[有限任务池](memory.md#有限任务池与两段式-terra)，当前授权设计见[维护合同](../../../devDoc/tasks/20261115-real-use-rectification/maintenance-waves.md)。
+安装后运行 `memory init` 刷新托管入口，核包版本、实际导入路径及宿主能力：父任务能确认Terra当前turn已结束而身份空闲，能封口后只发一次go，并核早到go留邮箱／晚到go唤醒事件等待，最后Luna能实际followup同一非根Terra，并将待通知与宿主受理结果分开保留。容量必须留下Terra恢复名额。最小实际宿主闭环通过后再维护真实材料；普通安装或队列状态成功不能代替该验收。流程见[有限任务池](memory.md#有限任务池与两段式-terra)，0.18 系列的设计依据见[维护合同](https://github.com/YS-Pan/basePack/blob/v0.19.0/devDoc/tasks/20261115-real-use-rectification/maintenance-waves.md)。
 
 0.18.7 通过 `maintain-start` 先派协调者，由它处理新采集及预检。升级时先结束旧轮并释放旧 owner，再刷新托管入口，同时核自动与显式维护均指向新入口。向用户说明该环境适用的采集默认行为和 Windows Codex 审批条件。[新入口](memory.md#自动维护与手动维护)。
 
@@ -276,7 +276,7 @@ bp --config $config memory search --mode vector --text '<代表性主题>'
 
 ## 问题记录与反馈
 
-basePack 仍在开发，实际使用同时作为测试样本。外部业务项目沿自己的记录约定，无需复制本仓库 devDoc 结构；本仓库问题留在所属任务进度，无所属任务时先登记到 [重建总进度](../../../devDoc/tasks/20261106-rebuild/progress.md)。记录现象、版本、必要复现条件与处理状态，修复后补验证结果。
+basePack 已[搁置](../../../README.md#project-status)，现有项目可继续用封存版本收尾。问题沿各自项目的记录约定登记，记下现象、版本、必要复现条件与处理状态，修复后补验证结果。
 
 外部问题同时形成以下可复制草稿。证据去除密码、token 与私人材料，复现尽量使用小型公开或合成材料。由使用者提交至 [GitHub Issues](https://github.com/YS-Pan/basePack/issues)，或取得明确授权后由 agent 提交：
 

@@ -89,6 +89,8 @@ def test_conflicting_evidence_requires_explicit_original_and_reacceptance(memory
     direction, finding = old['id'], old['basis'][0]['member']
     old_original = memory.read(direction)["original"]
     old_finding = memory.read(finding)["member"]
+    expected_evidence = {key: value for key, value in old_finding.items()
+                         if key != "record_type" and not key.startswith("access_")}
     for path, text in [("charter.md", NEW_DIRECTION), ("findings.md", NEW_EVIDENCE)]:
         (memory.config.root / path).write_bytes(text.encode("utf-8"))
     # A source-only publication registers bytes without accepting either claim.
@@ -101,8 +103,9 @@ def test_conflicting_evidence_requires_explicit_original_and_reacceptance(memory
         assert [row["path"] for row in prepared["sources"]] == ["charter.md"]
         evidence = next(row for row in prepared["neighborhood"]["members"]
                         if row["id"] == finding)
-        assert evidence == {key: value for key, value in old_finding.items()
-                            if key != "record_type" and not key.startswith("access_")}
+        version = memory.knowledge(evidence["exact_id"], knowledge_revision=old_finding["knowledge_revision"])
+        assert version["id"] == finding
+        assert evidence == {**expected_evidence, "exact_id": version["exact_id"]}
         assert prepared["expected"][evidence["id"]] == old_finding["knowledge_revision"]
         draft = freeze([direction_batch(prepared, NEW_DIRECTION)])
         before = database_state(memory)

@@ -1,14 +1,22 @@
 import os
 import sys
 from time import monotonic, sleep
+from types import SimpleNamespace
+import venv
 
 import pytest
 
-from basepack.runtime.surreal_process import launch_surreal
+from basepack.runtime import surreal_process
 
 
 @pytest.mark.skipif(os.name != "nt", reason="uses Windows console process groups")
-def test_graceful_stop_signals_only_one_owned_child(tmp_path):
+def test_graceful_stop_signals_only_one_owned_child(tmp_path, monkeypatch):
+    sender_env = tmp_path / "sender-env"
+    venv.create(sender_env, with_pip=False)
+    native_python = sys._base_executable
+    monkeypatch.setattr(surreal_process, "sys", SimpleNamespace(
+        executable=str(sender_env / "Scripts" / "python.exe"), _base_executable=native_python,
+    ))
     worker = """
 from pathlib import Path
 import signal
@@ -31,7 +39,9 @@ while True:
     with (tmp_path / "children.log").open("w", encoding="utf-8") as log:
         try:
             for state in states:
-                children.append(launch_surreal([sys.executable, "-c", worker, str(state)], env=os.environ, log=log))
+                children.append(surreal_process.launch_surreal(
+                    [native_python, "-c", worker, str(state)], env=os.environ, log=log,
+                ))
             deadline = monotonic() + 10
             while not all(state.exists() for state in states):
                 assert all(child.poll() is None for child in children)

@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+import os
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -52,6 +53,26 @@ def test_attempt_claim_rejects_wrong_control(tmp_path):
     with pytest.raises(ValueError, match="control must match"):
         owner.acquire(tmp_path, "project", "parent", tmp_path / "foreign", attempt_id="a" * 32)
     assert not (tmp_path / "maintenance").exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows path resolution")
+def test_attempt_claim_when_control_parent_appears_during_resolution(tmp_path, monkeypatch):
+    import ntpath
+
+    attempt_id = "a" * 32
+    control = owner.attempt_control(tmp_path, attempt_id)
+    lookup = ntpath._getfinalpathname
+
+    def create_parent_after_missing_lookup(path):
+        try:
+            return lookup(path)
+        except FileNotFoundError as error:
+            if path == str(control) and error.winerror == 3:
+                control.parent.mkdir()
+            raise
+
+    monkeypatch.setattr(ntpath, "_getfinalpathname", create_parent_after_missing_lookup)
+    assert owner.acquire(tmp_path, "project", "parent", control, attempt_id=attempt_id)["acquired"]
 
 
 def test_cancel_attempt_after_claim_preserves_inflight_publication(tmp_path):

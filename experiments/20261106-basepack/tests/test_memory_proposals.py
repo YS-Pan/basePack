@@ -3,18 +3,18 @@ import json
 
 import pytest
 
-from basepack.memory.draft import compile_proposals, freeze_file
+from basepack.memory.draft import PrivacyUnknown, compile_proposals, freeze_file, proposal_privacy_unknown
 from basepack.memory.privacy import privacy_rules, rules_revision
 
 
-def prepared(tmp_path, *, expected=None, members=None):
+def prepared(tmp_path, *, expected=None, members=None, filename='reading.json', **extra):
     rules = privacy_rules()
     value = {'sources': [{'path': 'a.md', 'revision': 'source-rev', 'kind': 'text',
                           'members': members or []}],
              'neighborhood': {'members': [], 'nodes': [], 'edges': []},
              'expected': expected or {}, 'privacy_rules': rules,
-             'privacy_rules_revision': rules_revision(rules)}
-    path = tmp_path / 'reading.json'
+             'privacy_rules_revision': rules_revision(rules), **extra}
+    path = tmp_path / filename
     path.write_text(json.dumps(value), encoding='utf-8')
     return {'path': str(path), 'file_sha256': sha256(path.read_bytes()).hexdigest()}
 
@@ -186,6 +186,115 @@ def test_historical_endpoint_classification_uses_exact_fixed_version(tmp_path):
     proposal['edges'][0]['endpoint_versions']['out']['knowledge_revision'] = 'missing'
     with pytest.raises(ValueError, match='Pinned knowledge version absent from prepare'):
         compile_proposals([proposal])
+
+
+def test_duplicate_unknown_neighborhood_does_not_require_classification(tmp_path):
+    identity = 'member:' + 'a' * 32
+    exact = 'knowledge_version:' + 'b' * 64
+    row = {'id': identity, 'knowledge_revision': 'v1', 'exact_id': exact}
+    refs = [prepared(tmp_path, expected={identity: 'v1'}, filename=name,
+                     neighborhood={'members': [row], 'nodes': [], 'edges': []})
+            for name in ('first.json', 'second.json')]
+    proposals = [{'prepare': ref, 'sources': [], 'nodes': [{'kind': 'topic', 'text': 'Independent'}]}
+                 for ref in refs]
+    batch = freeze_file(proposals, tmp_path / 'frozen.json')
+    assert batch['expected'] == {}
+    assert batch['compiled_private'] == {node['id']: False for node in batch['nodes']}
+
+
+@pytest.mark.parametrize('reverse', [False, True])
+@pytest.mark.parametrize('marker', [False, True])
+def test_merged_exact_privacy_supplies_historical_logical_alias(tmp_path, reverse, marker):
+    member = 'member:' + 'a' * 32
+    exact = 'knowledge_version:' + 'b' * 64
+    current = {'id': member, 'knowledge_revision': 'current', 'private': False}
+    historical = {'id': member, 'knowledge_revision': 'old'}
+    unknown = prepared(tmp_path, expected={member: 'current'}, members=[current], filename='unknown.json',
+                       historical_versions=[{**historical, 'exact_id': exact, 'private': True,
+                                             'privacy_unknown': True}])
+    known = prepared(tmp_path, filename='known.json', historical_versions=[{**historical, 'private': marker}])
+    proposal = {'prepare': unknown, 'sources': ['a.md'], 'members': [
+        {'kind': 'chunk', 'path': 'a.md', 'start_line': 1, 'end_line': 1}],
+        'edges': [{'type': 'supports', 'text': 'Related older assertion', 'in': {'member': 0}, 'out': member,
+                   'endpoint_versions': {'out': {'id': member, 'knowledge_revision': 'old'}},
+                   'evidence': [{'member': 0}]}]}
+    proposals = [proposal, {'prepare': known, 'sources': []}]
+    if reverse:
+        proposals.reverse()
+    [issue] = proposal_privacy_unknown(proposal, label='fixed-proposal.json')
+    assert (issue.identity, issue.revision, issue.authored_identity) == (exact, 'old', member)
+    assert issue.prepare_refs == (unknown,)
+    assert issue.location == 'fixed-proposal.json.edges[0].out'
+    batch = compile_proposals(proposals)
+    assert batch['compiled_private'][batch['edges'][0]['id']] is marker
+
+
+@pytest.mark.parametrize('reverse', [False, True])
+def test_conflicting_historical_privacy_names_exact_id_and_both_fixed_prepares(tmp_path, reverse):
+    member = 'a' * 32
+    identity = 'member:' + member
+    alias = 'member:`' + member + '`'
+    exact = 'knowledge_version:' + 'b' * 64
+    history = {'knowledge_revision': 'v1', 'kind': 'chunk'}
+    public = prepared(tmp_path, filename='public.json', historical_versions=[{
+        **history, 'id': alias, 'exact_id': exact, 'private': False}])
+    private = prepared(tmp_path, filename='private.json', historical_versions=[{
+        **history, 'id': identity, 'private': True}])
+    proposals = [{'prepare': ref, 'sources': []} for ref in (public, private)]
+    if reverse:
+        proposals.reverse()
+    with pytest.raises(ValueError, match=f'Conflicting prepare private markers for {exact}@v1') as failure:
+        compile_proposals(proposals)
+    for ref in (public, private):
+        assert ref['path'] in str(failure.value)
+        assert ref['file_sha256'] in str(failure.value)
+
+
+@pytest.mark.parametrize('privacy', [{}, {'private': True, 'privacy_unknown': True}])
+def test_referenced_unknown_reports_exact_snapshot_and_keeps_batch_unwritten(tmp_path, privacy):
+    exact = 'source_version:' + 'a' * 64
+    snapshot = {'id': exact, 'path': 'old.md', 'revision': 'old-source-revision', 'kind': 'text', **privacy}
+    ref = prepared(tmp_path, snapshots=[snapshot])
+    proposal = {'prepare': ref, 'sources': ['a.md'], 'members': [
+        {'kind': 'chunk', 'path': 'a.md', 'start_line': 1, 'end_line': 1}],
+        'edges': [{'type': 'supports', 'text': 'Evidence in the older original', 'in': {'member': 0},
+                   'out': exact, 'evidence': [{'member': 0}]}]}
+    clean = {'prepare': ref, 'sources': [], 'nodes': [{'kind': 'topic', 'text': 'Independent'}]}
+    assert proposal_privacy_unknown(clean) == []
+    output = tmp_path / 'frozen.json'
+    with pytest.raises(PrivacyUnknown, match=r'proposals\[1\]\.edges\[0\]\.out') as failure:
+        freeze_file([clean, proposal], output)
+    issue = failure.value
+    assert (issue.identity, issue.revision, issue.prepare_refs) == (exact, 'old-source-revision', (ref,))
+    assert not output.exists()
+    batch = freeze_file([clean], output)
+    assert len(batch['nodes']) == 1
+
+
+def test_node_privacy_also_uses_evidence_members_exact_source(tmp_path):
+    member = 'member:' + 'a' * 32
+    exact = 'source_version:' + 'b' * 64
+    row = {'id': member, 'knowledge_revision': 'member-rev', 'private': False, 'source_version': exact}
+    snapshot = {'id': exact, 'path': 'old.md', 'revision': 'source-rev', 'kind': 'text', 'private': True}
+    proposal = {'prepare': prepared(tmp_path, expected={member: 'member-rev'}, members=[row], snapshots=[snapshot]),
+                'sources': [], 'nodes': [{'kind': 'topic', 'text': 'Old evidence', 'evidence': [member]}]}
+    batch = compile_proposals([proposal])
+    assert batch['compiled_private'][batch['nodes'][0]['id']] is True
+
+    snapshot['privacy_unknown'] = True
+    proposal['prepare'] = prepared(tmp_path, expected={member: 'member-rev'}, members=[row], snapshots=[snapshot])
+    [issue] = proposal_privacy_unknown(proposal)
+    assert (issue.identity, issue.authored_identity, issue.revision) == (exact, member, 'source-rev')
+    with pytest.raises(PrivacyUnknown, match=r'proposals\[0\]\.nodes\[0\]\.evidence\[0\]'):
+        compile_proposals([proposal])
+
+
+def test_same_batch_parent_can_cite_child_without_privacy_cycle(tmp_path):
+    proposal = {'prepare': prepared(tmp_path), 'sources': ['a.md'], 'members': [
+        {'kind': 'file', 'path': 'a.md', 'start_line': 1, 'end_line': 1, 'evidence': [{'member': 1}]},
+        {'kind': 'chunk', 'path': 'a.md', 'start_line': 1, 'end_line': 1, 'parent': {'member': 0}}]}
+    batch = compile_proposals([proposal])
+    assert batch['compiled_private'] == {item['id']: False for item in batch['members']}
 
 
 def test_freeze_pins_current_endpoint_and_private_original_snapshot_basis(tmp_path):

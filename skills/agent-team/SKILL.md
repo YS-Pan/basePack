@@ -15,12 +15,24 @@ Before execution, imagine the entire authorized deliverable is complete and look
 - Which sustained branches could a coordinator own through completion, including follow-up work and dependencies?
 - Would that division improve capability, result quality, and focus enough to justify handoff costs, delay, and information loss?
 
+If a branch will need sustained coordination across several rounds of delegation, follow-up, or rework, give a coordinator ownership of that branch through verification and delivery.
+
 Choose solo work, a few directly managed collaborators, clear coordinator-worker layers, or a mix across branches and phases. Direct collaboration can combine roles. Prefer a simpler structure when expected results are comparable, considering the whole delivery rather than just startup effort. Keep the choice lightweight: a brief mental decision for small tasks, a short statement of structure and reason for substantial work.
 
-Revise the choice when new scope, evidence, dependencies, or actual workload changes its basis. When uncertainty prevents a useful whole-task judgment, use bounded exploration to clarify the work before choosing its continuing organization. Run ready, independent work in parallel; sequence dependent work and leave spare capacity when useful.
+Before starting a new stage or directly assigning another round of work on the same branch, reassess the organization for the remaining delivery. If the branch now needs sustained coordination, hand its active work and ongoing coordination to a coordinator.
 
-- Resolve the project's AI level before dispatch. In a basePack project, use the Python and explicit config from `.basepack/instructions.md`. `python -m basepack --config <project-config> config ai` resolves the routine default, initially level 3. `config ai --level 3` selects that level explicitly. Choose a configured level by task difficulty and user preference. Pass the returned `model` and `reasoning_effort` explicitly through host parameters.
-- In projects without an AI mapping, select from actual host capabilities and user preferences. Use the host's delegation, nesting, context and model controls. Report unavailable mappings or capabilities and preserve original tool errors. State any model or level substitution explicitly. Report a task as dispatched after actual host creation.
+When uncertainty prevents a useful whole-task judgment, use bounded exploration to clarify the work before choosing its continuing organization. Run ready, independent work in parallel; sequence dependent work and leave spare capacity when useful.
+
+## Size a layered team
+
+Aim for four execution workers per dedicated coordinator. Size the team to the remaining work and the host's free subagent slots after accounting for active work and reservations across all branches. With 12 free slots, the default is two dedicated coordinators with four execution workers each and two workers directly under the main agent. With less room, use fewer or smaller teams, or delegate directly. Add a team when capacity allows and another branch needs sustained coordination. Give each coordinator a worker budget and leave unneeded slots free.
+
+Use the [organization diagrams](references/organization-flows.md) to review team shape, allocation, branch handoff, and model selection.
+
+## Choose models for dispatch
+
+- For ordinary task coordination and execution, use the same model as the immediate parent unless the user or the current assignment explicitly specifies a different model. With clean history, pass the parent's actual model through the host's controls if the host does not guarantee inheritance. Treat context and model selection as separate decisions. If the host cannot honor the model choice, report the limitation and any substitution. Report dispatch after actual host creation.
+- basePack memory maintenance and dedicated memory retrieval use their own dispatch instructions and configured roles, models, and budgets. When an assignment explicitly calls for a basePack AI level, use `config ai --level <n>` with that project's Python and config and apply the resolved settings.
 
 ## Delegate a complete brief
 
@@ -37,7 +49,7 @@ Let the recipient search, read broadly, and fill relevant gaps within scope. Ass
 
 ## Coordinate and execute
 
-1. **Own a layered branch.** Assign its coordinator continuing responsibility for routine delegation, follow-up, dependencies, normal fixes, verification, and integration through branch completion, including arranging the next work. The coordinator delegates further within its authority; the main agent exchanges goals, results, and issues requiring key decisions, and may inspect sources or intervene. Keep one dispatcher for that branch. When ownership changes, explicitly hand over active tasks and handles, dependencies, outputs, and open issues.
+1. **Own a layered branch.** Give a dedicated coordinator a coordination-only brief and responsibility for multiple execution workers through branch completion. The coordinator dispatches work, manages dependencies and follow-up, assigns rework, checks and integrates results, and raises issues requiring a key decision. The workers own concrete work such as edits and evidence collection. The main agent owns goals, key decisions, and overall integration, and can assign independent work to its direct workers. Keep one dispatcher per branch. When ownership changes, hand over active tasks and handles, dependencies, outputs, and open issues.
 2. **Split reading, then connect evidence.** Assign semantically related, nonoverlapping finite source groups. Each author owns the group's reading, interpretation, relationships, and ordinary repairs through a complete delivery; size groups by their connections and manageable scope. Track coverage and unread areas. Bring relevant passages into one agent's context for claims that depend on relationships across groups; arrange targeted follow-up reading where evidence is missing.
 3. **Assign output ownership.** Give shared files or artifacts one integration owner. Parallelize edits with independent ownership; run dependent checks when their inputs are ready. Arrange overlapping investigation or independent review for a stated purpose.
 4. **Finish bounded work.** Workers read, execute, and perform necessary checks, then return when their completion criteria are met. Resolve gaps within authority; escalate facts, impact, and the decision needed when goals, key tradeoffs, or permissions must change.

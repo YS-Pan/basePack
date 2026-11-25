@@ -251,6 +251,8 @@ $env:CONDOR_CONFIG = '<absolute-condor_config>'
 
 DAEMON_LIST 应包含 MASTER、COLLECTOR、NEGOTIATOR、SCHEDD、STARTD；状态能看到执行节点，空队列可正常返回。容量和队列各自必须成功。受限 sandbox 的 SSPI 错误应保留并在获准的正常用户终端复核，不能据此修改站点认证。
 
+若项目客户端的 `runtime.python` 只供登录用户使用，在机器配置的 `[htcondor]` 加入 `execute_python = '<槽账户可执行的 Python 路径>'`。该解释器运行随提交生成的标准库 worker。用正常用户通过 `jobs submit` 提交有界样例，检查槽账户可以启动解释器、读取 worker 和任务文件，并能回读作业产出。共享模式要求槽账户可访问项目作业目录；配置文件传输时由 Condor 将 worker 和任务文件一起传入 scratch。JobSpec 的应用路径及依赖仍须可用，配置字段的解析结果见 `config show`。
+
 按这台机器的 CPU 线程数、RAM 和其它常驻程序需求确定普通作业 NUM_CPUS、MEMORY（MiB），给系统和背景服务保留余量。纯 CPU 池在本地配置目录新建 `60_resources.conf`，填写下列配置；此处 MEMORY 已是扣除背景占用后的普通池大小，RESERVED_MEMORY 因而设为 0。纯 CPU 池不加载 GPU 发现和 70 转换。
 
 ```ini

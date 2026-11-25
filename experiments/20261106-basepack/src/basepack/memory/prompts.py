@@ -101,7 +101,7 @@ def _collection_paths(config, attempt_id):
     from .owner import attempt_control
 
     control = attempt_control(config.memory_dir, attempt_id)
-    registry = config.root / "tmp" / "basepack-collection" / attempt_id / "registry.json"
+    registry = control.with_name(f"collection-registry-{attempt_id}.json")
     return registry, control.with_name(f"collection-{attempt_id}.json")
 
 
@@ -124,8 +124,12 @@ def render_collection_prompt(config, attempt_id):
 def maintenance_start(config, *, holder, mode, available_subagents=None, scope=None, collection=None,
                       retained=False, allow_retained=False):
     """Prepare one early coordinator and a stop handle; ownership starts at preflight."""
+    from .codex_index_config import configured
     from .owner import attempt_control, status
 
+    indexed = configured(config)
+    if indexed and (collection is not None or retained or allow_retained):
+        raise ValueError("Dialogue indexing cannot use --collection, --retained, or --allow-retained")
     current_owner = status(config.memory_dir)
     if current_owner is not None:
         return {"status": "busy", "owner": current_owner}
@@ -142,7 +146,8 @@ def maintenance_start(config, *, holder, mode, available_subagents=None, scope=N
         preflight.extend(["--scope", *scope])
     if available_subagents is not None:
         preflight.extend(["--available-subagents", available_subagents])
-    capture = not collection and not retained and bool(config.raw["memory"].get("codex", {}).get("project_id"))
+    capture = (not indexed and not collection and not retained
+               and bool(config.raw["memory"].get("codex", {}).get("project_id")))
     if collection:
         preflight.extend(["--collection", Path(collection).resolve()])
     elif retained:
@@ -158,6 +163,11 @@ def maintenance_start(config, *, holder, mode, available_subagents=None, scope=N
             collect_prompt=memory_command(config, "collect-prompt", "--attempt", attempt_id),
             captured_command=memory_command(config, *preflight, "--collection", receipt),
             fallback=fallback)
+    elif indexed:
+        source_step = ("This project's explicit dialogue index reads authorized messages directly from Codex in memory. "
+                       "Do not run collect, collect-prompt, or use retained chat snapshots. Run the ordinary preflight "
+                       "below and report a host access failure with its original error.\n\n"
+                       f"```text\n{memory_command(config, *preflight)}\n```")
     else:
         source_step = f"Run this preflight command in the normal project sandbox:\n\n```text\n{memory_command(config, *preflight)}\n```"
     ai = team["coordinator_ai"]
@@ -201,6 +211,23 @@ def prompt_dispatch(config, receipt, control, *, role="coordinator", level=None,
             **resolved, "render_command": render_command, "spawn_arguments": spawn_arguments}
 
 
+def _codex_summary(codex):
+    """Keep capture status, counts and evidence pointers in maintenance prompts."""
+    summary = {key: codex[key] for key in
+               ("status", "project_id", "freshness", "receipt", "capture_dir", "attachment_dir") if key in codex}
+    counts = {}
+    for field, category in (("discovered", "discovered"), ("unresolved", "unresolved"),
+                            ("unresolved_threads", "unresolved"), ("excluded", "excluded"),
+                            ("gaps", "gaps"), ("discovery_gaps", "discovery_gaps"),
+                            ("selected_root_thread_ids", "selected_roots")):
+        if field in codex and category not in counts:
+            value = codex[field]
+            counts[category] = value if isinstance(value, int) else len(value)
+    if counts:
+        summary["counts"] = counts
+    return summary
+
+
 def _reader_hints(material, paths):
     """Select compact receipt hints without copying original text into a prompt."""
     selected = {PurePath(path).as_posix() for path in paths}
@@ -230,7 +257,7 @@ def _reader_hints(material, paths):
             unknown += 1
     hints = {"sources": sources, "related_pending_relations": relevant, "unresolved_pending_relations_count": unknown}
     if "codex" in material:
-        hints["codex"] = material["codex"]
+        hints["codex"] = _codex_summary(material["codex"])
     return hints
 
 
@@ -238,12 +265,16 @@ def render_prompt(config, receipt, control, *, role="coordinator", level=None, p
                   team=0, reader=0, stage=None, stage_sha256=None):
     """Render one brief from a saved receipt; no store, locks, or writes are used."""
     receipt_path = Path(receipt).resolve()
-    material = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt_bytes = receipt_path.read_bytes()
+    receipt_ref = {"path": str(receipt_path), "file_sha256": sha256(receipt_bytes).hexdigest()}
+    material = json.loads(receipt_bytes.decode("utf-8"))
     layout = _wave_layout(material["layout"])
     stage_context = None
     if stage:
         from .stages import load_stage
         stage_context = load_stage(receipt, control, stage, file_sha256=stage_sha256)
+        if stage_context["receipt"]["file_sha256"] != receipt_ref["file_sha256"]:
+            raise ValueError(f"Maintenance receipt changed during stage rendering: {receipt_path}")
         layout = _wave_layout(stage_context["layout"])
     dispatch = prompt_dispatch(config, receipt, control, role=role, level=level, paths=paths,
                                layout=layout, team=team, reader=reader, stage=stage, stage_sha256=stage_sha256)
@@ -254,9 +285,12 @@ def render_prompt(config, receipt, control, *, role="coordinator", level=None, p
             stage_context.pop("remaining")
             stage_context["assigned_paths"] = paths
     graph_candidates = material.get("graph_candidates", [])
+    outcome_candidate = material.get("outcome_candidate")
     if stage_context and dispatch["publisher"]:
         remaining = set(stage_context["remaining"]["relations"])
         graph_candidates = [item for item in graph_candidates if item["id"] in remaining]
+        if outcome_candidate and outcome_candidate["id"] not in remaining:
+            outcome_candidate = None
     work = config.root / "tmp" / "basepack-maintenance" / receipt_path.stem / uuid4().hex
     reading, batch = work / "reading.json", work / "batch.json"
     wave_create = ["wave", "create", "--receipt", str(receipt_path), "--control", str(Path(control).resolve()),
@@ -286,7 +320,7 @@ def render_prompt(config, receipt, control, *, role="coordinator", level=None, p
         "root": str(config.root),
         "python": str(config.python),
         "config": str(config.path),
-        "receipt": str(receipt_path),
+        "receipt": json.dumps(receipt_ref, ensure_ascii=False),
         "control": str(Path(control).resolve()),
         "run_id": material["owner_run_id"],
         "wave_create_command": memory_command(config, *wave_create),
@@ -295,10 +329,11 @@ def render_prompt(config, receipt, control, *, role="coordinator", level=None, p
         "semantic_count": str(len(material["semantic"])),
         "relations_count": str(len(material["pending_relations"])),
         "graph_candidates": json.dumps(graph_candidates, ensure_ascii=False),
+        "outcome_candidate": json.dumps(outcome_candidate, ensure_ascii=False),
         "feedback_count": str(len(material.get("feedback", []))),
         "paths": json.dumps(paths or [], ensure_ascii=False),
         "hints": json.dumps(_reader_hints(material, paths) if paths else {}, ensure_ascii=False),
-        "codex": json.dumps(material.get("codex", {}), ensure_ascii=False),
+        "codex": json.dumps(_codex_summary(material.get("codex", {})), ensure_ascii=False),
         "task_name": dispatch["task_name"],
         "team": str(team),
         "publisher_task_name": layout["teams"][0]["task_name"],

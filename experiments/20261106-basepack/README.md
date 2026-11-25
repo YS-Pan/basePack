@@ -1,6 +1,6 @@
 # basePack
 
-`20261106-basepack` is the only active implementation route. See [pyproject.toml](pyproject.toml) for the current development version. The route targets Windows and Python 3.13+. Each project keeps its configuration, knowledge, source evidence, and job records in its own `.basepack/`; programs and models can be shared. Start with the root [installation commands](../../README.md#install-the-lightweight-client). The 0.19 development candidate initializes new memory stores with schema 4 and member identity 2. Existing schema 3 installations require an explicit offline migration before switching to the new graph. See [redesign progress](../../devDoc/tasks/20261122-memory-graph-redesign/progress.md) and the actual installed state in the [deployment contract](../../devDoc/system/deployment.md).
+`20261106-basepack` is the implementation route retained for existing projects. See the [project status](../../README.md#project-status) for the pause decision and the [installation commands](../../README.md#install-the-lightweight-client) for continued use. The route targets Windows and Python 3.13+. Each project keeps its configuration, knowledge, source evidence, and job records in its own `.basepack/`. Programs and models can be shared. The 0.19 series initializes new memory stores with schema 4 and member identity 2. Existing schema 3 installations require an [offline migration](docs/setup-project.md#升级到-019-的统一图) before switching clients.
 
 This project's own source and documentation use the [MIT license](LICENSE), matching the root license. Third-party notices remain in the package.
 
@@ -12,7 +12,7 @@ Memory uses SurrealDB 4. Host subscription agents read originals, choose boundar
 
 Large text snapshots are split into bounded statements inside one native transaction and remain complete originals on readback and export. Optional `memory.private_scope` classifies selected files in place, without expanding discovery; the root `private/` remains private. Frozen rules and versioned markers preserve historical classification and reuse unchanged vectors. See [private sources](docs/memory.md#私有资料与分享边界).
 
-basePack is under development, and real use also serves as testing. Record problems using your project's conventions and draft an issue with the [feedback format](docs/setup-project.md#问题记录与反馈).
+Record problems during close-out using your project's conventions and the [feedback format](docs/setup-project.md#问题记录与反馈).
 
 Brief reads mandatory information, bounded cross-source overview entries and explicit gaps without search or embedding. `memory retrieve --question '...'` prepares a whole-project request with a 6000-character default budget and stable delivery identity. The worker fixes base anchors with `retrieval-start` and uses bounded multi-hop `graph-query` rounds. It reads the exact evidence, scores independently and creates a receipt with the fixed anchors and observed versions. The host confirms the actual delivery. Co-delivery KL-NMF and per-anchor Gaussian similarity supply access intervals. Low-weight knowledge stays available for base retrieval. Empty first deliveries advance fact J, nonempty ones also advance opportunity C, and retries advance neither. Recovery follows [configuration maintenance](docs/project-config-maintenance.md#按变化边界准备恢复集合).
 

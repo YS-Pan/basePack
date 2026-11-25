@@ -1,13 +1,35 @@
 """Projection and strict delivery facts against a disposable database."""
+from unittest.mock import patch
+
 import pytest
 
 from test_memory_history_access import memory
-from basepack.memory.behavior_projection import compile_behavior, train_behavior
+from basepack.memory.behavior_projection import _snapshot, compile_behavior, train_behavior
 
 
 def ctx(anchors=()):
     return {"anchors": list(anchors), "knowledge_cutoff": {}, "query": "q", "episode": "e",
             "candidates": [], "budget": 20, "policy": {}, "model": None}
+
+
+def test_incremental_snapshot_uses_both_cursor_indexes(memory):
+    memory._execute("CREATE meta:behavior SET active='test',j=2; UPDATE meta:delivery SET j=3; "
+                    "CREATE behavior_projection:test SET j=2; "
+                    "CREATE knowledge_version:older SET j_enter=1; CREATE knowledge_version:current SET j_enter=2; "
+                    "CREATE knowledge_version:newer SET j_enter=3; "
+                    "CREATE delivery:current SET j=2; CREATE delivery:newer SET j=3;")
+    with patch.object(memory, "_execute", wraps=memory._execute) as execute:
+        active, head, projections, _, _, versions, events = _snapshot(memory)
+    assert active["j"] == projections[0]["j"] == 2 and head["j"] == 3
+    assert {row["j_enter"] for row in versions} == {2, 3}
+    assert [row["j"] for row in events] == [3]
+
+    query = execute.call_args_list[0].args[0]
+    explained = query.replace("SELECT target,knowledge_revision,j_enter", "EXPLAIN SELECT target,knowledge_revision,j_enter")
+    explained = explained.replace("SELECT * FROM delivery WHERE", "EXPLAIN SELECT * FROM delivery WHERE")
+    versions_plan, events_plan = memory._execute(explained)[-3:-1]
+    assert "IndexScan" in versions_plan and "knowledge_j_enter" in versions_plan
+    assert "IndexScan" in events_plan and "delivery_j" in events_plan
 
 
 def test_delivery_projection_replay_and_version_isolation(memory, monkeypatch):

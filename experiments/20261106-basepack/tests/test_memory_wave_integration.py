@@ -16,7 +16,7 @@ from basepack.memory import owner, waves
 from basepack.memory.cli import dispatch, register_commands
 from basepack.memory.maintenance import MaintenanceStopped
 from basepack.memory.privacy import privacy_rules, rules_revision
-from basepack.memory.prompts import maintenance_layout, memory_command
+from basepack.memory.prompts import maintenance_layout, memory_command, render_prompt
 from basepack.memory.stages import fixed_reference
 from basepack.memory.store import PublicationOutcomeUnknown
 from basepack.project.config import load_project_config
@@ -84,10 +84,12 @@ def wave_project(tmp_path):
         call("seal")
         return initialized
 
-    def submit(worker, task, *, drafts=(), failed=False):
-        coverage = write_json(config.root / f"{task['id']}-coverage.json", {"paths": task["paths"], "unread": []})
+    def submit(worker, task, *, drafts=(), failed=False, coverage=None):
+        if coverage is None:
+            coverage = {"paths": task["paths"], "unread": []}
+        coverage_path = write_json(config.root / f"{task['id']}-coverage.json", coverage)
         errors = write_json(config.root / f"{task['id']}-errors.json", ["toy task failure"] if failed else [])
-        options = ["--worker", worker, "--task-id", task["id"], "--coverage", coverage, "--errors", errors,
+        options = ["--worker", worker, "--task-id", task["id"], "--coverage", coverage_path, "--errors", errors,
                    "--drafts", *drafts]
         if failed:
             options += ["--failed"]
@@ -151,6 +153,11 @@ def prompted_prepare_paths(prompt):
     command = next(line for line in prompt.splitlines() if "--paths" in line and "--output" in line)
     tokens = shlex.split(command)
     return tokens[tokens.index("--paths") + 1:tokens.index("--output")]
+
+
+def python_example(prompt, marker):
+    examples = (block.split("\n```", 1)[0] for block in prompt.split("```python\n")[1:])
+    return next(example for example in examples if marker in example)
 
 
 def owner_admitted_boundary(project, monkeypatch, *, error=None, uncertain=False, stop_at_construction=False):
@@ -324,6 +331,7 @@ def test_wave_cli_pending_callback_needs_parent_ack_before_close_or_next_wave(wa
 
 def test_wave_cli_publishes_mixed_author_contexts_with_fixed_attribution(wave_project, monkeypatch):
     project = wave_project
+    coordinator = render_prompt(project.config, project.receipt, project.control)["prompt"]
     project.create()
     project.start_and_seal()
     first, second = project.workers
@@ -333,16 +341,45 @@ def test_wave_cli_publishes_mixed_author_contexts_with_fixed_attribution(wave_pr
                             (first, None)):
         task = project.call("claim", "--worker", worker)["task"]
         path = save_proposal(project, task, context=context)
+        prompt = project.call("task-prompt", "--worker", worker, "--task-id", task["id"])["prompt"]
+        draft = json.loads(path.read_bytes())
+        prepared = draft.pop("prepare")
+        source, = json.loads(Path(prepared["path"]).read_bytes())["sources"]
+        revision = source["revision"]
+        older_revision = "".join("1" if digit == "0" else "0" for digit in revision[:2]) + revision[2:]
+        unread = {"path": source["path"], "start_line": 2, "end_line": 2, "status": "unresolved"}
+        earlier = {**unread, "status": "represented", "source_revision": older_revision}
+        graph_read = {"id": "member:previous", "knowledge_revision": "pinned-knowledge", "source_version": "pinned-source"}
+        coverage = {"coverage": [dict(earlier), dict(unread)], "graph_review": {"read": [dict(graph_read)]}}
+        script = {"draft": draft, "reading_path": prepared["path"], "approved_path": source["path"],
+                  "coverage": coverage}
+        exec(python_example(prompt, 'draft["prepare"]'), script)
+        example = python_example(prompt, "coverage_row =")
+        exec(example, script)
+        coverage["coverage"].insert(0, dict(script["coverage_row"], start_line=1, end_line=1))
+        assert draft["prepare"] == prepared
+        assert coverage["coverage"][0]["source_revision"] == revision
+        assert coverage["coverage"][1:] == [earlier, unread]
+        assert coverage["graph_review"]["read"] == [graph_read]
+        with pytest.raises(KeyError, match="other/"):
+            exec(example, dict(script, approved_path=f"other/{source['path']}"))
+        write_json(path, draft)
         draft_material.append((path, path.read_bytes()))
-        submitted = project.submit(worker, task, drafts=[path])
+        submitted = project.submit(worker, task, drafts=[path], coverage=coverage)
+        assert json.loads(Path(submitted["result"]["coverage"]["path"]).read_bytes()) == coverage
         completed.append({**submitted["result"]["drafts"][0], "assignment": task["id"]})
         task_authors[task["id"]] = worker
     assert project.call("claim", "--worker", first)["retired"]
     assert project.call("claim", "--worker", second)["notification"]["worker"] == second
     project.call("notification-pending", "--worker", second)
-    fixed = project.call("finish")["receipt"]
+    finish = project.call("finish")
+    fixed = finish["receipt"]
     calls, admissions = owner_admitted_boundary(project, monkeypatch)
-    references = write_json(project.config.root / "completed.json", completed)
+    completed.reverse()
+    selected = [(reference["assignment"], 0) for reference in completed]
+    references = project.config.root / "completed.json"
+    exec(python_example(coordinator, 'finish["receipt"]'),
+         {"finish": finish, "selected": selected, "completed_path": references})
     frozen, result = project.config.root / "frozen.json", project.config.root / "published.json"
 
     summary = project.call("publish", "--completed", references, "--frozen", frozen, "--result", result)

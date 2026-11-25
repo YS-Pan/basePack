@@ -1,12 +1,58 @@
 """Freeze scoped author drafts into one immutable publication batch."""
 
 from copy import deepcopy
+from hashlib import sha256
 import json
+from itertools import chain
 from pathlib import Path
 from uuid import uuid4
 
-from .relation_contract import EXACT_ENDPOINT_TABLES, LOGICAL_ENDPOINT_TABLES, validate_edge
+from .privacy import known_private, privacy_rules, rules_revision, source_private
+from .relation_contract import EXACT_ENDPOINT_TABLES, LOGICAL_ENDPOINT_TABLES, validate_edge, validate_image_region
 from .reviewed import SOURCE_DECISION_FIELDS, disposition_representations
+
+
+_TEXT_MEMBER_KINDS = {'file', 'section', 'chunk'}
+
+
+def read_author_draft(path, *, material=None):
+    """Decode an external author draft, optionally from already verified bytes."""
+    path = Path(path)
+    if material is None:
+        if path.is_dir():
+            raise ValueError(f'Expected a UTF-8 JSON file, got a directory: {path}')
+        material = path.read_bytes()
+    try:
+        draft = json.loads(material.decode('utf-8-sig'))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        error.add_note(f'Author draft: {path}')
+        raise
+    if not isinstance(draft, dict):
+        raise ValueError(f'{path}: Expected an author draft JSON object')
+    for index, member in enumerate(draft.get('members', [])):
+        if not isinstance(member, dict) or 'path' not in member:
+            raise ValueError(f'{path}: members[{index}].path is required')
+    _validate_author_image_regions(draft, f'{path}: ')
+    return draft
+
+
+def read_fixed_author_draft(reference):
+    from .stages import read_fixed_bytes
+
+    return read_author_draft(reference['path'], material=read_fixed_bytes(reference))
+
+
+def _validate_author_image_regions(draft, prefix):
+    edges = draft.get('edges', [])
+    if not isinstance(edges, (list, tuple)):
+        return
+    for edge_index, edge in enumerate(edges):
+        if not isinstance(edge, dict) or not isinstance(edge.get('basis'), list):
+            continue
+        for basis_index, basis in enumerate(edge['basis']):
+            if isinstance(basis, dict) and ('path' in basis or 'source_version' in basis):
+                validate_image_region(basis.get('locator'),
+                                      location=f'{prefix}edges[{edge_index}].basis[{basis_index}].locator.region')
 
 
 def _reference_position(value, location, *, edge_allowed=False):
@@ -46,12 +92,20 @@ def _reference_slots(draft, prefix, *, writable=False):
 
 
 def validate_reference_shapes(draft, *, label, separator=': '):
-    """Check reference syntax before the wave's other drafts are available."""
+    """Check reference syntax and positions that do not depend on other drafts."""
     prefix = f'{label}{separator}'
     for index, item in enumerate(draft.get('edges', [])):
         validate_edge(item, location=f'{prefix}edges[{index}]')
+    _validate_author_image_regions(draft, prefix)
     for target, key, location, edge_allowed in _reference_slots(draft, prefix):
-        _reference_position(target[key], location, edge_allowed=edge_allowed)
+        position = _reference_position(target[key], location, edge_allowed=edge_allowed)
+        if position is None:
+            continue
+        selected, kind, index = position
+        if selected is not None and selected < 0:
+            raise ValueError(f'{location}: Draft index out of range: {selected}')
+        if index < 0 or (selected is None and index >= len(draft.get(f'{kind}s', []))):
+            raise ValueError(f'{location}: {kind.title()} index out of range: {index}')
 
 
 def validate_source_decisions(proposal, *, prefix):
@@ -73,11 +127,249 @@ def validate_source_decisions(proposal, *, prefix):
             disposition_representations(entry, location=field)
 
 
+def _read_prepare(reference, location):
+    path = Path(reference['path']).resolve()
+    material = path.read_bytes()
+    digest = sha256(material).hexdigest()
+    if digest != reference['file_sha256'].lower():
+        raise ValueError(f'{location} SHA256 mismatch for {path}')
+    return json.loads(material.decode('utf-8')), {'path': str(path), 'file_sha256': digest}
+
+
+def _prepare_location(reference):
+    return f"{reference['path']} (SHA256 {reference['file_sha256']})"
+
+
+class PrivacyUnknown(ValueError):
+    """An authored reference still needs a verified exact privacy marker."""
+
+    def __init__(self, location, identity, revision, prepare_refs, *, authored_identity):
+        self.location = location
+        self.identity = identity
+        self.revision = revision
+        self.prepare_refs = tuple(prepare_refs)
+        self.authored_identity = authored_identity
+        target = f'{identity}@{revision}' if revision is not None else identity
+        if identity != authored_identity:
+            target += f' via {authored_identity}'
+        prepared = ', '.join(map(_prepare_location, self.prepare_refs))
+        super().__init__(f'{location}: Unknown exact privacy classification for {target} in prepare: {prepared}')
+
+
+class _PreparedPrivacy:
+    def __init__(self, packages, references):
+        from .store import _record
+
+        self.exact = {}
+        self.aliases = {}
+        self.observations = {}
+        self.evidence_sources = {}
+        observed = []
+
+        def observe_exact(identity, row):
+            record = _record(identity)
+            self.exact[record] = {**self.exact.get(record, {}), **row}
+            return record
+
+        for prepared, reference in zip(packages, references, strict=True):
+            members = []
+            for source in prepared['sources']:
+                members.extend(source.get('members', []))
+                previous = source.get('previous')
+                if previous and previous.get('source_version'):
+                    snapshot = {'path': source['path'], 'kind': 'text', **previous}
+                    observed.append((observe_exact(previous['source_version'], snapshot), snapshot, reference))
+            for snapshot in prepared.get('snapshots', []):
+                observed.append((observe_exact(snapshot['id'], snapshot), snapshot, reference))
+            knowledge = chain(members, *(prepared['neighborhood'][field] for field in ('members', 'nodes', 'edges')),
+                              prepared.get('historical_versions', []))
+            for row in knowledge:
+                key = (_record(row['id']), row.get('knowledge_revision'))
+                if row.get('source_version'):
+                    snapshot = _record(row['source_version'])
+                    if self.evidence_sources.setdefault(key, snapshot) != snapshot:
+                        raise ValueError(f"Conflicting prepare source versions for {row['id']}@{key[1]}")
+                if row.get('exact_id'):
+                    exact = observe_exact(row['exact_id'], row)
+                    if self.aliases.setdefault(key, exact) != exact:
+                        raise ValueError(f"Conflicting exact prepare IDs for {row['id']}@{key[1]}")
+                observed.append((key, row, reference))
+
+        for key, row, reference in observed:
+            key = self.aliases.get(key, key)
+            refs = self.observations.setdefault(key, {}).setdefault(known_private(row), {})
+            refs[reference['path'], reference['file_sha256']] = reference
+        for key, markers in self.observations.items():
+            if False in markers and True in markers:
+                identity, revision = self._identity(key)
+                target = f'{identity}@{revision}' if revision is not None else identity
+                public = markers[False][min(markers[False])]
+                private = markers[True][min(markers[True])]
+                raise ValueError(f'Conflicting prepare private markers for {target}: '
+                                 f'{_prepare_location(public)} has private=False. '
+                                 f'{_prepare_location(private)} has private=True')
+
+    def _identity(self, key):
+        if key in self.exact:
+            row = self.exact[key]
+            return f'{key.table}:{key.key}', row.get('knowledge_revision', row.get('revision'))
+        identity, revision = key
+        return f'{identity.table}:{identity.key}', revision
+
+    def marker(self, identity, revision, location, *, observed_only=False, authored_identity=None):
+        from .store import _record
+
+        record = _record(identity)
+        key = record if record.table in EXACT_ENDPOINT_TABLES else (record, revision)
+        key = self.aliases.get(key, key)
+        markers = self.observations.get(key)
+        if markers is None:
+            if observed_only:
+                return None
+            target = f'{record.table}:{record.key}'
+            raise ValueError(f'{location}: Exact private classification absent from prepare: {target}@{revision}')
+        for marker in (True, False):
+            if marker in markers:
+                return marker
+        exact_id, exact_revision = self._identity(key)
+        refs = markers[None]
+        raise PrivacyUnknown(location, exact_id, exact_revision, (refs[key] for key in sorted(refs)),
+                             authored_identity=authored_identity or identity)
+
+
+def _privacy_dependencies(field, item, location):
+    for index, identity in enumerate(item.get('evidence', [])):
+        yield identity, None, f'{location}.evidence[{index}]'
+    if field == 'edges':
+        for endpoint in ('in', 'out'):
+            pin = item.get('endpoint_versions', {}).get(endpoint)
+            yield item[endpoint], pin['knowledge_revision'] if pin else None, f'{location}.{endpoint}'
+        for index, basis in enumerate(item.get('basis', [])):
+            if 'source_version' in basis:
+                yield basis['source_version'], None, f'{location}.basis[{index}].source_version'
+            elif 'id' in basis:
+                yield basis['id'], basis.get('knowledge_revision'), f'{location}.basis[{index}].id'
+
+
+def proposal_privacy_unknown(proposal, *, label='proposals[0]') -> list[PrivacyUnknown]:
+    """Report direct unknown references that other prepares or writes may resolve."""
+    from .store import _record
+
+    if 'prepare' not in proposal:
+        return []
+    rewritten = {_record(item['id'], table)
+                 for table, field in (('member', 'members'), ('node', 'nodes'), ('semantic', 'edges'))
+                 for item in proposal.get(field, []) if 'id' in item}
+    dependencies = []
+    for field in ('members', 'nodes', 'edges'):
+        for index, item in enumerate(proposal.get(field, [])):
+            location = f'{label}.{field}[{index}]'
+            dependencies.extend((*dependency, field != 'edges')
+                                for dependency in _privacy_dependencies(field, item, location))
+            if field == 'members' and item.get('parent'):
+                dependencies.append((item['parent'], None, f'{location}.parent', False))
+    for index, source in enumerate(proposal.get('sources', [])):
+        if isinstance(source, dict):
+            for position, ref in enumerate(source.get('unavailable_gaps', [])):
+                location = f'{label}.sources[{index}].unavailable_gaps[{position}].member'
+                dependencies.append((ref['member'], ref['knowledge_revision'], location, False))
+    local = [(identity, revision, location, needs_source) for identity, revision, location, needs_source in dependencies
+             if isinstance(identity, str) and (revision is not None or _record(identity) not in rewritten)]
+    if not local:
+        return []
+
+    prepared, reference = _read_prepare(proposal['prepare'], f'{label}.prepare')
+    privacy = _PreparedPrivacy([prepared], [reference])
+    revisions = {_record(identity): revision for identity, revision in prepared['expected'].items()}
+    unknown = []
+
+    def check(identity, revision, location, *, authored_identity=None):
+        try:
+            privacy.marker(identity, revision, location, observed_only=True, authored_identity=authored_identity)
+        except PrivacyUnknown as error:
+            unknown.append(error)
+
+    for identity, revision, location, needs_source in local:
+        record = _record(identity)
+        revision = revision if revision is not None else revisions.get(record)
+        check(identity, revision, location)
+        if needs_source and (snapshot := privacy.evidence_sources.get((record, revision))) is not None:
+            check(snapshot, None, location, authored_identity=identity)
+    return unknown
+
+
+def _prepared_original(source, originals):
+    from .content import SourceContent
+
+    path, revision = source['path'], source['revision']
+    key = path, revision
+    if key not in originals:
+        lines = []
+        for number, line in enumerate(source['numbered_text'].splitlines(keepends=True), 1):
+            prefix = f'{number}: '
+            if not line.startswith(prefix):
+                raise ValueError(f'Invalid numbered original in prepare: {path}')
+            lines.append(line[len(prefix):])
+        raw = ''.join(lines)
+        data = raw.encode('utf-8')
+        if sha256(data).hexdigest() != revision:
+            raise ValueError(f'Prepared original revision mismatch: {path}')
+        originals[key] = SourceContent(path, revision, len(data), 0, raw)
+    return originals[key]
+
+
+def _validate_member_range_fields(member, location):
+    missing = [field for field in ('start_line', 'end_line') if field not in member]
+    if missing:
+        raise ValueError(f"{location} ({member.get('id', 'new member')}) "
+                         f"missing required fields: {', '.join(missing)}")
+
+
+def _validate_prepared_member_location(member, source, originals, location):
+    from .content import original_text
+
+    literal = member['kind'] == 'chunk' and 'text' in member
+    path, revision = source['path'], source['revision']
+    if source['kind'] != 'text':
+        raise ValueError(f'{location}: Image source requires an image member: {path}@{revision}')
+    if 'numbered_text' not in source and not literal:
+        return
+    try:
+        raw = original_text(_prepared_original(source, originals), member['start_line'], member['end_line'],
+                            member.get('locator'))
+    except ValueError as error:
+        raise ValueError(f'{location} ({path}@{revision}): {error}') from error
+    if literal and member['text'] != raw:
+        raise ValueError(f'{location}: Chunk text differs from its original range: {path}@{revision}')
+
+
+def validate_prepared_member_locations(draft, *, label):
+    """Check original locations for sources selected in this draft."""
+    selected = {item if isinstance(item, str) else item['path'] for item in draft['sources']}
+    local_members = []
+    for index, member in enumerate(draft.get('members', [])):
+        if member.get('kind') in _TEXT_MEMBER_KINDS:
+            location = f'{label}: members[{index}]'
+            _validate_member_range_fields(member, location)
+            if member['path'] in selected:
+                local_members.append((member, location))
+    if not local_members or 'prepare' not in draft:
+        return
+    prepared, _ = _read_prepare(draft['prepare'], f'{label}: prepare')
+    sources = {source['path']: source for source in prepared['sources']}
+    originals = {}
+    for member, location in local_members:
+        path = member['path']
+        if path not in sources:
+            raise ValueError(f'{location}.path not in prepare: {path}')
+        if not sources[path].get('deleted'):
+            _validate_prepared_member_location(member, sources[path], originals, location)
+
+
 def freeze(drafts, *, config=None):
     if not drafts:
         raise ValueError('At least one draft is required')
     from .store import _record
-    from .privacy import privacy_rules, rules_revision, source_private
 
     rules = privacy_rules(config)
     merged = {'protocol': 2, 'batch_id': uuid4().hex, 'new_members': [], 'member_mapping': [],
@@ -96,11 +388,8 @@ def freeze(drafts, *, config=None):
         validate_reference_shapes(draft, label=f'drafts[{scope}]', separator='.')
         ids = []
         for index, item in enumerate(draft.get('members', [])):
-            if item.get('kind') in {'file', 'section', 'chunk'}:
-                missing = [field for field in ('start_line', 'end_line') if field not in item]
-                if missing:
-                    raise ValueError(f"drafts[{scope}].members[{index}] ({item.get('id', 'new member')}) "
-                                     f"missing required fields: {', '.join(missing)}")
+            if item.get('kind') in _TEXT_MEMBER_KINDS:
+                _validate_member_range_fields(item, f'drafts[{scope}].members[{index}]')
             if 'id' in item:
                 ids.append(item['id'])
             else:
@@ -161,9 +450,7 @@ def compile_proposals(proposals, *, config=None):
     Prepare supplies identities and versions. The author chooses what to publish.
     Save a new frozen file for every revision.
     """
-    from hashlib import sha256
     from .store import _record
-    from .privacy import privacy_rules, rules_revision
 
     proposals = [deepcopy(proposal) for proposal in proposals]
     packages = []
@@ -172,41 +459,28 @@ def compile_proposals(proposals, *, config=None):
     identity_text = {}
     records = {}
     historical = {}
-    exact = {}
 
     def available(row):
         return not (row.get('stale', False) or row.get('retired', False))
-
-    def observe_exact(identity, row):
-        record = _record(identity)
-        if record in exact and exact[record]['private'] != row['private']:
-            raise ValueError(f'Conflicting prepare private markers for {identity}')
-        exact[record] = {**exact.get(record, {}), **row}
-
-    def observe_knowledge(row):
-        if row.get('exact_id'):
-            observe_exact(row['exact_id'], row)
 
     def observe_current(row):
         record = _record(row['id'])
         if record in records and available(records[record]) != available(row):
             raise ValueError(f"Conflicting prepare availability for {row['id']}")
         records[record] = row
-        observe_knowledge(row)
 
+    def historical_facts(row):
+        return {key: value for key, value in row.items()
+                if key not in {'id', 'exact_id', 'private', 'privacy_unknown'}}
+
+    rules = privacy_rules(config)
+    rules_hash = rules_revision(rules)
     for index, proposal in enumerate(proposals):
         validate_source_decisions(proposal, prefix=f'proposals[{index}].')
-        reference = proposal.pop('prepare')
-        path = Path(reference['path']).resolve()
-        material = path.read_bytes()
-        digest = sha256(material).hexdigest()
-        if digest != reference['file_sha256'].lower():
-            raise ValueError(f'proposals[{index}].prepare SHA256 mismatch for {path}')
-        package_refs.append({'path': str(path), 'file_sha256': digest})
-        prepared = json.loads(material.decode('utf-8'))
-        rules = privacy_rules(config)
-        if prepared['privacy_rules'] != rules or prepared['privacy_rules_revision'] != rules_revision(rules):
-            raise ValueError(f'proposals[{index}].prepare privacy rules changed: {path}')
+        prepared, reference = _read_prepare(proposal.pop('prepare'), f'proposals[{index}].prepare')
+        package_refs.append(reference)
+        if prepared['privacy_rules'] != rules or prepared['privacy_rules_revision'] != rules_hash:
+            raise ValueError(f"proposals[{index}].prepare privacy rules changed: {reference['path']}")
         if 'expected' in proposal:
             raise ValueError(f'proposals[{index}].expected is generated from prepare')
         for identity, revision in prepared['expected'].items():
@@ -218,22 +492,17 @@ def compile_proposals(proposals, *, config=None):
         for source in prepared['sources']:
             for row in source.get('members', []):
                 observe_current(row)
-            previous = source.get('previous')
-            if previous and previous.get('source_version'):
-                observe_exact(previous['source_version'], {'path': source['path'], 'kind': 'text', **previous})
-        for snapshot in prepared.get('snapshots', []):
-            observe_exact(snapshot['id'], snapshot)
         for field in ('members', 'nodes', 'edges'):
             for row in prepared['neighborhood'][field]:
                 observe_current(row)
         for row in prepared.get('historical_versions', []):
             key = (_record(row['id']), row['knowledge_revision'])
-            if key in historical and historical[key] != row:
+            if key in historical and historical_facts(historical[key]) != historical_facts(row):
                 raise ValueError(f'Conflicting historical prepare version: {row["id"]}@{row["knowledge_revision"]}')
             historical[key] = row
-            observe_knowledge(row)
         packages.append(prepared)
 
+    privacy = _PreparedPrivacy(packages, package_refs)
     for index, (proposal, prepared) in enumerate(zip(proposals, packages)):
         sources = {source['path']: source for source in prepared['sources']}
         selected = []
@@ -265,7 +534,7 @@ def compile_proposals(proposals, *, config=None):
             if 'unavailable_gaps' in compiled:
                 if not isinstance(compiled['unavailable_gaps'], list):
                     raise ValueError('unavailable_gaps must be a list')
-                for ref in compiled['unavailable_gaps']:
+                for gap, ref in enumerate(compiled['unavailable_gaps']):
                     record = _record(ref['member'])
                     row = records.get(record)
                     if (record.table != 'member' or row is None or row.get('stale') is not False
@@ -275,7 +544,8 @@ def compile_proposals(proposals, *, config=None):
                             or row.get('path') != path or row.get('source_revision') != source.get('revision')
                             or ref['gap'] not in row.get('coverage_gaps', [])):
                         raise ValueError('Unavailable gap must match a current prepared member and its coverage gap')
-                    if row.get('private') is not False and source.get('private') is not True:
+                    location = f'proposals[{index}].sources[{position}].unavailable_gaps[{gap}].member'
+                    if privacy.marker(ref['member'], ref['knowledge_revision'], location) and known_private(source) is not True:
                         raise ValueError('Unavailable gap cannot expose a private member in a public source')
                     if not isinstance(ref.get('reason'), str) or not ref['reason'].strip():
                         raise ValueError('Unavailable gap requires a reason')
@@ -304,41 +574,21 @@ def compile_proposals(proposals, *, config=None):
 
     batch = freeze(proposals, config=config)
     batch['prepare_packages'] = package_refs
-    # Explicit chunk text is a literal original, not an author summary. Check
-    # the same exact range/locator used by apply against the pinned prepare.
-    from .content import SourceContent, original_text
+    from .content import original_text
     selected_sources = {source['path']: source for source in batch['sources'] if not source.get('deleted')}
     prepared_sources = {(source['path'], source['revision']): source
                         for package in packages for source in package['sources'] if not source.get('deleted')}
     originals = {}
 
-    def prepared_original(source):
-        path, revision = source['path'], source['revision']
-        key = path, revision
-        if key not in originals:
-            lines = []
-            for number, line in enumerate(source['numbered_text'].splitlines(keepends=True), 1):
-                prefix = f'{number}: '
-                if not line.startswith(prefix):
-                    raise ValueError(f'Invalid numbered original in prepare: {path}')
-                lines.append(line[len(prefix):])
-            raw = ''.join(lines)
-            if sha256(raw.encode('utf-8')).hexdigest() != revision:
-                raise ValueError(f'Prepared original revision mismatch: {path}')
-            originals[key] = SourceContent(path, revision, len(raw.encode('utf-8')), 0, raw)
-        return originals[key]
-
-    for item in batch.get('members', []):
-        if item.get('kind') != 'chunk' or 'text' not in item:
+    for index, item in enumerate(batch.get('members', [])):
+        if item.get('kind') not in _TEXT_MEMBER_KINDS:
             continue
         path = item['path']
-        selected = selected_sources[path]
+        selected = selected_sources.get(path)
+        if selected is None:
+            raise ValueError(f'batch.members[{index}].path must be selected for publication: {path}')
         source = prepared_sources[path, selected['revision']]
-        if source['kind'] != 'text':
-            raise ValueError(f'Chunk requires a text source: {path}')
-        raw = original_text(prepared_original(source), item['start_line'], item['end_line'], item.get('locator'))
-        if item['text'] != raw:
-            raise ValueError(f"Chunk {item['id']} text differs from its original range: {path}")
+        _validate_prepared_member_location(item, source, originals, f'batch.members[{index}]')
 
     def check_snapshot_location(source, reference):
         start, end = reference.get('start_line'), reference.get('end_line')
@@ -348,19 +598,23 @@ def compile_proposals(proposals, *, config=None):
         elif start is None or end is None:
             raise ValueError(f"Text basis requires start_line and end_line: {source['path']}")
         elif 'numbered_text' in source:
-            original_text(prepared_original(source), start, end, reference.get('locator'))
+            original_text(_prepared_original(source, originals), start, end, reference.get('locator'))
 
     def require_exact(record):
-        row = exact.get(record)
+        row = privacy.exact.get(record)
         if row is None:
             raise ValueError(f'References absent from prepare: {record.table}:{record.key}')
         return row
 
     # Apply checks precisely the writes and dependencies it uses. Keep only that
     # closure and reject unknown external references before the frozen file exists.
-    writes = {_record(item['id'], table): (item['id'], item)
+    def proposal_locations(field):
+        return (f'proposals[{index}].{field}[{position}]' for index, proposal in enumerate(proposals)
+                for position in range(len(proposal.get(field, []))))
+
+    writes = {_record(item['id'], table): (item['id'], item, field, location)
               for table, field in (('member', 'members'), ('node', 'nodes'), ('semantic', 'edges'))
-              for item in batch.get(field, [])}
+              for item, location in zip(batch.get(field, []), proposal_locations(field), strict=True)}
     new = set(writes) - set(known)
     retired = {_record(value, table) for table, field in (('member', 'delete_members'),
                ('node', 'delete_nodes'), ('semantic', 'delete_edges')) for value in batch.get(field, [])}
@@ -499,61 +753,42 @@ def compile_proposals(proposals, *, config=None):
     private = {}
     resolving = set()
 
-    def exact_classification(identity, revision=None):
-        if revision is None:
-            row = require_exact(identity)
-        else:
-            row = historical.get((identity, revision))
-            if row is None and known.get(identity) == revision:
-                row = records.get(identity)
-        if row is None or type(row.get('private')) is not bool:
-            raise ValueError(f"Exact private classification absent from prepare: {identity}@{revision}")
-        return row['private']
-
-    def classification(record):
+    def classification(identity, revision, location):
+        record = _record(identity)
+        if revision is not None or record.table in EXACT_ENDPOINT_TABLES:
+            return privacy.marker(identity, revision, location)
         if record in private:
             return private[record]
         if record in resolving:
             raise ValueError(f'Private classification has cyclic evidence: {record}')
         if record not in writes:
-            row = records.get(record)
-            if row is None or type(row.get('private')) is not bool:
-                raise ValueError(f'Private classification missing from prepare: {identity_text.get(record, record)}')
-            return row['private']
+            return privacy.marker(identity, known[record], location)
         resolving.add(record)
-        _, item = writes[record]
-        markers = [classification(_record(ref)) for ref in item.get('evidence', [])]
-        if record.table == 'member':
+        _, item, field, location = writes[record]
+        markers = []
+        for identity, revision, ref_location in _privacy_dependencies(field, item, location):
+            markers.append(classification(identity, revision, ref_location))
+            if field != 'edges':
+                evidence = _record(identity)
+                if evidence not in writes:
+                    snapshot = privacy.evidence_sources.get((evidence, known[evidence]))
+                    if snapshot is not None:
+                        markers.append(privacy.marker(snapshot, None, ref_location, authored_identity=identity))
+        if field == 'members':
+            if item.get('parent') and _record(item['parent']) not in writes:
+                classification(item['parent'], None, f'{location}.parent')
             source = sources.get(item['path'])
             if source is None or type(source.get('private')) is not bool:
                 raise ValueError(f"Member source absent or deleted in proposal: {item['path']}")
             markers.append(source['private'])
-        elif record.table == 'semantic':
-            for endpoint in ('in', 'out'):
-                target = _record(item[endpoint])
-                pin = item.get('endpoint_versions', {}).get(endpoint)
-                if pin or target.table in EXACT_ENDPOINT_TABLES:
-                    markers.append(exact_classification(target, pin['knowledge_revision'] if pin else None))
-                else:
-                    markers.append(classification(target))
-            for reference in item.get('basis', []):
-                if 'path' in reference:
-                    markers.append(selected_sources[reference['path']]['private'])
-                elif 'source_version' in reference:
-                    markers.append(exact_classification(_record(reference['source_version'])))
-                else:
-                    target = _record(reference['id'])
-                    revision = reference.get('knowledge_revision')
-                    if revision or target.table == 'knowledge_version':
-                        markers.append(exact_classification(target, revision))
-                    else:
-                        markers.append(classification(target))
+        elif field == 'edges':
+            markers.extend(selected_sources[ref['path']]['private'] for ref in item.get('basis', []) if 'path' in ref)
         resolving.remove(record)
         private[record] = any(markers)
         return private[record]
 
-    batch['compiled_private'] = {identity_text.get(record, identity): classification(record)
-                                 for record, (identity, _) in writes.items()}
+    batch['compiled_private'] = {identity_text.get(record, identity): classification(record, None, location)
+                                 for record, (identity, _, _, location) in writes.items()}
     return batch
 
 

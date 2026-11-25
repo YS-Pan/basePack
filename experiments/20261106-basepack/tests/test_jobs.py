@@ -3,6 +3,7 @@ from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
 from datetime import datetime
+import shutil
 import socket
 import subprocess
 import sys
@@ -121,6 +122,7 @@ def test_cpu_submit_needs_no_gpu_attributes_and_gpu_submit_uses_official_fields(
 
 def test_submit_reuses_relative_spec_in_each_project_without_changing_it(resource_client, tmp_path):
     from basepack.jobs import JobSpec, CondorClient
+    from basepack.jobs.submit import arguments, path_field
 
     first_root = resource_client.config.root
     second_root = tmp_path / "second project 中文"
@@ -137,7 +139,11 @@ def test_submit_reuses_relative_spec_in_each_project_without_changing_it(resourc
         payload = json.loads(Path(submitted["payload"]).read_text(encoding="utf-8"))
         assert set(payload) == {"submission_id", "spec"}
         assert payload["spec"]["cwd"] == str((client.config.root / "work").resolve())
-        assert "basepack.jobs.worker" in (Path(submitted["job_dir"]) / "job.sub").read_text(encoding=client.encoding)
+        job_dir = Path(submitted["job_dir"])
+        worker, = job_dir.glob("basepack-worker-*.py")
+        description = (job_dir / "job.sub").read_text(encoding=client.encoding)
+        assert f"executable = {path_field(client.config.python)}\n" in description
+        assert "arguments = " + arguments(["-I", str(worker), submitted["payload"]]) in description
         assert spec == original
 
 
@@ -273,17 +279,60 @@ def test_uncertain_submit_recovers_from_history_by_same_token(resource_client):
     assert all(f'BasePackSubmissionId == "{submitted["submission_id"]}"' in args for _, args in queries)
 
 
-def test_worker_preserves_windows_argv_and_application_exit(tmp_path):
-    """The Condor Windows argv conversion dropped empty arguments in the real probe."""
+@pytest.mark.parametrize("transfer", [False, True])
+def test_staged_worker_preserves_windows_argv_and_application_exit(resource_client, tmp_path, transfer):
+    from basepack.jobs import CondorClient, JobSpec
+    from basepack.jobs.submit import arguments, path_field
+    from basepack.project.config import describe, load_project_config
+
+    private_python = tmp_path / "private runtime" / "python.exe"
+    config_file = resource_client.config.path
+    config_file.write_text(config_file.read_text(encoding="utf-8").replace(
+        f"python = {json.dumps(sys.executable, ensure_ascii=False)}",
+        f"python = {json.dumps(str(private_python), ensure_ascii=False)}",
+    ), encoding="utf-8")
+    with resource_client.machine.path.open("a", encoding="utf-8") as machine_file:
+        machine_file.write(f"execute_python = {json.dumps(sys.executable, ensure_ascii=False)}\n")
+    resource_client = CondorClient(load_project_config(config_file))
+    resource_client._call = lambda *args: subprocess.CompletedProcess(args, 0, stdout="123.0", stderr="")
+    resolved = describe(resource_client.config)
+    assert resolved["runtime_python"] == str(private_python)
+    assert resolved["machine_paths"]["htcondor"]["execute_python"] == str(Path(sys.executable).resolve())
+
+    # The Condor Windows argv conversion dropped empty arguments in the real probe.
     values = ["two spaces 中文", "single'quote", 'double"quote', "", "trailing\\", "$(literal)"]
-    output = tmp_path / "actual.json"
-    code = "import json,sys; from pathlib import Path; Path(sys.argv[1]).write_text(json.dumps(sys.argv[2:]),encoding='utf-8'); sys.exit(7)"
-    payload = tmp_path / "payload.json"
-    payload.write_text(json.dumps({"spec": {"executable": sys.executable,
-                                   "arguments": ["-c", code, str(output), *values]}}, ensure_ascii=False), encoding="utf-8")
-    result = subprocess.run([sys.executable, "-m", "basepack.jobs.worker", str(payload)])
+    app = resource_client.config.root / "application.py"
+    app.write_text("import json, sys\nfrom pathlib import Path\n"
+                   "Path('actual.json').write_text(json.dumps(sys.argv[1:]), encoding='utf-8')\n"
+                   "sys.exit(7)\n", encoding="utf-8")
+    submitted = resource_client.submit(JobSpec(
+        executable=sys.executable, arguments=[app.name, *values],
+        transfer_inputs=[app.name] if transfer else [],
+        transfer_outputs=["actual.json"] if transfer else [],
+    ))
+    job_dir = Path(submitted["job_dir"])
+    worker, = job_dir.glob("basepack-worker-*.py")
+    payload = Path(submitted["payload"])
+    fields = dict(line.split(" = ", 1) for line in (job_dir / "job.sub").read_text(
+        encoding=resource_client.encoding).splitlines() if " = " in line)
+    assert fields["executable"] == path_field(Path(sys.executable).resolve())
+    assert fields["transfer_executable"] == "False"
+    if transfer:
+        cwd = tmp_path / "execute scratch"
+        cwd.mkdir()
+        assert fields["should_transfer_files"] == "YES"
+        assert fields["transfer_output_files"] == "actual.json"
+        for source in map(Path, fields["transfer_input_files"].split(",")):
+            shutil.copyfile(source, cwd / source.name)
+        launcher_args = [worker.name, payload.name]
+    else:
+        cwd = resource_client.config.root
+        assert fields["should_transfer_files"] == "NO"
+        launcher_args = [str(worker), str(payload)]
+    assert fields["arguments"] == arguments(["-I", *launcher_args])
+    result = subprocess.run([fields["executable"], "-I", *launcher_args], cwd=cwd)
     assert result.returncode == 7
-    assert json.loads(output.read_text(encoding="utf-8")) == values
+    assert json.loads((cwd / "actual.json").read_text(encoding="utf-8")) == values
 
 
 @pytest.mark.parametrize("exit_code,returned,success", [(0, True, True), (7, True, False), (0, False, False)])

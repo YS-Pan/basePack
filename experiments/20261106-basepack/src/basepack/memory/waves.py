@@ -7,7 +7,8 @@ from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
 
-from . import graph_review
+from . import graph_outcomes, graph_review
+from .draft import read_author_draft, read_fixed_author_draft
 from .maintenance import _locked
 from .owner import _begin_owned, _control, _owned, _paths, _read, _write
 from .query import normalize_scope
@@ -99,8 +100,13 @@ def create(memory_dir, control, run_id, receipt, tasks, workers, *, wave_id=None
         if stage is not None:
             graph_candidates = {key: graph_candidates[key] for key in package["remaining"].get("relations", ())
                                 if key in graph_candidates}
+        outcome_candidate = material.get("outcome_candidate")
+        if stage is not None and outcome_candidate and outcome_candidate["id"] not in package["remaining"]["relations"]:
+            outcome_candidate = None
         resolved = (set(previous.get("resolved_graph_candidates", ()))
                     if previous and previous["source_receipt"] == source_receipt else set())
+        resolved_outcomes = (set(previous.get("resolved_outcome_candidates", ()))
+                             if previous and previous["source_receipt"] == source_receipt else set())
         unavailable = (resolved | graph_review.reviewed_pairs(memory_dir)
                        if any("graph_candidate" in task for task in tasks) else resolved)
         normalized_tasks = []
@@ -123,7 +129,8 @@ def create(memory_dir, control, run_id, receipt, tasks, workers, *, wave_id=None
                 if not isinstance(task["read_paths"], list):
                     raise ValueError("read_paths must be a list")
                 task["read_paths"] = [_source_path(path) for path in task["read_paths"]]
-            normalized_tasks.append(graph_review.grant(task, graph_candidates, unavailable, _path_key))
+            task = graph_review.grant(task, graph_candidates, unavailable, _path_key)
+            normalized_tasks.append(graph_outcomes.grant(task, outcome_candidate, resolved_outcomes))
         wave_id = wave_id or uuid4().hex
         if not wave_id.isascii() or not wave_id.isalnum():
             raise ValueError("Wave identifier must contain only ASCII letters and digits")
@@ -149,6 +156,10 @@ def create(memory_dir, control, run_id, receipt, tasks, workers, *, wave_id=None
                  "receipt": None, "notification": None}
         if resolved:
             state["resolved_graph_candidates"] = sorted(resolved)
+        if resolved_outcomes:
+            state["resolved_outcome_candidates"] = sorted(resolved_outcomes)
+        if previous and previous.get("outcome_reviews"):
+            state["outcome_reviews"] = previous["outcome_reviews"]
         _write(_state_path(memory_dir), state)
         return state
 
@@ -300,23 +311,41 @@ def submit(memory_dir, control, run_id, wave_id, worker, task_id, *, drafts, cov
         if draft_hashes is not None and ([ref["file_sha256"] for ref in draft_refs] !=
                                          [digest.lower() for digest in draft_hashes]):
             raise ValueError("Draft changed after source ownership validation")
-        from .draft import validate_reference_shapes, validate_source_decisions
+        from .draft import (proposal_privacy_unknown, validate_prepared_member_locations,
+                            validate_reference_shapes, validate_source_decisions)
         from .wave_scope import validate_draft
         coverage_ref = fixed_reference(coverage)
+        privacy_unknown = []
         if not failed and "graph_candidate" in task:
             graph_review.read_review(task, coverage_ref, len(draft_refs))
+        if not failed and "outcome_candidate" in task:
+            if len(draft_refs) > 1:
+                raise ValueError("An outcome task admits at most one draft with all of its new relationships")
+            graph_outcomes.read_review(task, coverage_ref)
         for ref in draft_refs:
             material = Path(ref["path"]).read_bytes()
             if sha256(material).hexdigest() != ref["file_sha256"]:
                 raise ValueError("Draft changed while fixing its source ownership")
-            draft = validate_draft(task, material)
+            draft = read_author_draft(ref["path"], material=material)
+            validate_draft(task, draft)
             if not failed:
                 validate_source_decisions(draft, prefix=f"{ref['path']}: ")
                 validate_reference_shapes(draft, label=ref["path"])
+                validate_prepared_member_locations(draft, label=ref["path"])
                 if "graph_candidate" in task:
                     graph_review.validate_draft(task, draft, ref["path"])
+                if "outcome_candidate" in task:
+                    graph_outcomes.validate_draft(task, draft, ref["path"])
+                if "prepare" in draft:
+                    privacy_unknown.extend(
+                        {"draft": {**ref, "assignment": task_id}, "location": issue.location,
+                         "id": issue.identity, "revision": issue.revision,
+                         "prepare": list(issue.prepare_refs), "reason": str(issue)}
+                        for issue in proposal_privacy_unknown(draft, label=ref["path"]))
         task["result"] = {"drafts": draft_refs,
                           "coverage": coverage_ref, "errors": fixed_reference(errors)}
+        if privacy_unknown:
+            task["result"]["privacy_unknown"] = privacy_unknown
         task["status"] = "failed" if failed else "submitted"
         task["submitted_at"] = _utc_now()
         _write(_state_path(memory_dir), state)
@@ -426,13 +455,17 @@ def publication_intent(memory_dir, control, run_id, wave_id, *, drafts, frozen, 
             raise FileExistsError("New publication destinations must not exist")
         publication = {"status": "intent", "intent": intent, "frozen": None, "result": None}
         assignments = {ref["assignment"] for ref in drafts}
+        outcome = next((task["id"] for task in state["tasks"] if task["id"] in assignments
+                        and "outcome_candidate" in task), None)
+        if outcome is not None:
+            publication["outcome_assignment"] = outcome
         graph_tasks = {task["id"]: {key: task[key] for key in
                                    ("graph_candidate", "graph_endpoints", "expected_revisions")}
                        for task in state["tasks"] if task["id"] in assignments and "graph_candidate" in task}
         if graph_tasks:
             for ref in drafts:
                 if ref["assignment"] in graph_tasks:
-                    edge, = _read_reference(ref)["edges"]
+                    edge, = read_fixed_author_draft(ref)["edges"]
                     graph_tasks[ref["assignment"]].update(graph_edge_spec=graph_review.edge_spec(edge),
                                                           graph_edge_content=graph_review.edge_content(edge))
             publication["graph_tasks"] = graph_tasks
@@ -510,21 +543,34 @@ def close(memory_dir, control, run_id, wave_id, *, no_publication=False):
         if _owned(owner_path, control)["publications"]:
             raise RuntimeError("Publication is in flight or uncertain")
         publication = state["publication"]
-        submitted = [{**ref, "assignment": task["id"]} for task in state["tasks"]
-                     if task["status"] == "submitted" for ref in task["result"]["drafts"]]
+        submitted_tasks = [task for task in state["tasks"] if task["status"] == "submitted"]
+        submitted = [{**ref, "assignment": task["id"]} for task in submitted_tasks for ref in task["result"]["drafts"]]
+        privacy_unknown = [issue for task in submitted_tasks for issue in task["result"].get("privacy_unknown", [])]
         if publication is None:
-            if not no_publication or submitted:
-                raise ValueError("Explicit no-publication requires no submitted drafts")
+            pending_drafts = [issue["draft"] for issue in privacy_unknown]
+            if not no_publication or any(ref not in pending_drafts for ref in submitted):
+                raise ValueError("Explicit no-publication requires no submitted drafts except those with unresolved privacy")
         elif no_publication or publication["status"] not in ("committed", "failed"):
             raise ValueError("Wave publication has not been resolved")
         published = publication["intent"]["drafts"] if publication and publication["status"] == "committed" else []
         state["unpublished"] = [ref for ref in submitted if ref not in published]
         path = Path(memory_dir) / "maintenance" / f"wave-{wave_id}-closure.json"
         closure = {key: state[key] for key in ("wave_id", "run_id", "receipt", "notification", "publication", "unpublished")}
+        pending = [issue for issue in privacy_unknown if issue["draft"] in state["unpublished"]]
+        if pending:
+            closure["privacy_unknown"] = pending
         reviews = graph_review.closure_reviews(state)
         if reviews:
             closure["graph_reviews"] = reviews
+        outcome_review = graph_outcomes.closure_review(state, published)
+        if outcome_review:
+            closure["outcome_review"] = outcome_review
         state["closure"] = _fixed_json(path, closure)
+        if outcome_review:
+            state.setdefault("outcome_reviews", {})[outcome_review["path"]] = graph_outcomes.checkpoint(
+                outcome_review, state["closure"])
+            if outcome_review["status"] != "retry":
+                state["resolved_outcome_candidates"] = [outcome_review["candidate"]]
         if reviews:
             graph_review.retain_reviews(memory_dir, reviews)
             resolved = set(state.get("resolved_graph_candidates", ()))

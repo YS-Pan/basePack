@@ -64,7 +64,7 @@ def check(path):
 
 
 def maintain(memory, scope, *, include_registered=False, control=None, timeout=600,
-             expected_snapshots=None, discover_graph=False):
+             expected_snapshots=None, discover_graph=False, outcome_sources=()):
     """Refresh mechanically equivalent originals and retain a semantic handoff.
 
     This is an explicit maintenance action. Query actions never call it.
@@ -78,13 +78,36 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
 
     from .content import SourceContent, comparison_text, line_changes, locate_lines, mapped_line_range, original_text
     from . import feedback
+    from .codex_index_config import legacy_capture_path, visible_threads
+    from .dialogue_query import authorized_ancestry
     from .images import ImageSource
     from .privacy import privacy_rules, source_private
     from .store import _record, _sql
 
     if control:
         check(control)
-    known = memory._rows('source')
+    allowed_dialogues = visible_threads(memory.config, allow_private=True)
+
+    def file_path(path):
+        return not legacy_capture_path(memory.config, path)
+
+    def file_rows(table):
+        return [row for row in memory._rows(table) if file_path(row['path'])]
+
+    def visible_graph():
+        all_nodes = memory._rows('node')
+        hidden = {row['id'] for row in all_nodes
+                  if (row.get('codex_thread_id') and (
+                      row['codex_thread_id'] not in allowed_dialogues or not authorized_ancestry(
+                          memory.config, row['codex_thread_id'], row.get('ancestor_thread_ids'))))
+                  or any(not file_path(path) for path in row.get('scope_paths', ()))}
+        nodes = [row for row in all_nodes if row['id'] not in hidden]
+        edges = [row for row in memory._rows('semantic') if row['in'] not in hidden and row['out'] not in hidden
+                 and all(file_path(path) for path in row.get('scope_paths', ()))]
+        return nodes, edges
+
+    scope = [path for path in scope if file_path(path)]
+    known = file_rows('source')
     all_by_path = {row['path']: row for row in known if not row.get('deleted')}
     root = memory.config.root.resolve()
     selected = [(root / path).resolve() for path in scope]
@@ -95,9 +118,8 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
     included = list(dict.fromkeys([*scope, *by_path]))
     expected_snapshots = expected_snapshots or {}
     changes = memory._check_changes(list(by_path.values()), included, deep=True, expected_snapshots=expected_snapshots)
-    members = memory._rows('member')
-    nodes = memory._rows('node')
-    edges = memory._rows('semantic')
+    members = file_rows('member')
+    nodes, edges = visible_graph()
     snapshots = {}
 
     def load_source(path, kind):
@@ -270,13 +292,14 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
         accepted_scope.extend({'path': path, 'revision': candidates[path]['source']['revision']} for path in sorted(group))
         refreshed_privacy.update(group)
         reused_chunks.extend(member for path in sorted(group) for member in candidates[path]['reused'])
-        known = memory._rows('source')
-        by_path = {row['path']: row for row in known if not row.get('deleted')
-                   and (include_registered or in_scope(row['path']))}
-        members = memory._rows('member')
+        # Later groups use the newly accepted member revisions and statuses.
+        members = file_rows('member')
 
     if receipts:
-        nodes, edges = memory._rows('node'), memory._rows('semantic')
+        known = file_rows('source')
+        by_path = {row['path']: row for row in known if not row.get('deleted')
+                   and (include_registered or in_scope(row['path']))}
+        nodes, edges = visible_graph()
     semantic = {}
     for change in changes:
         if change['kind'] in {'added', 'deleted'} and change['path'] not in completed_empty:
@@ -534,6 +557,7 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
                                      'candidate_versions': 'prepare_current_and_report_accepted_revision',
                                      'new_candidates': 'outside_this_receipt'}}
     graph_candidates = []
+    outcome_candidate = None
     if discover_graph:
         from .graph_maintenance import nominate
         from .graph_review import reviewed_pairs
@@ -545,14 +569,24 @@ def maintain(memory, scope, *, include_registered=False, control=None, timeout=6
         graph_candidates = nominate(memory, members=members, eligible_sources=eligible,
                                     reviewed=reviewed_pairs(memory.config.memory_dir))
         material['graph_candidates'] = graph_candidates
+        if outcome_sources:
+            from .graph_outcomes import nominate as nominate_outcome
+
+            outcome_candidate = nominate_outcome(memory.config.memory_dir, eligible, outcome_sources,
+                                                 lambda path: len(current_source(path, 'text').text.splitlines()))
+            if outcome_candidate:
+                material['outcome_candidate'] = outcome_candidate
     destination = memory.config.memory_dir / 'maintenance'
     destination.mkdir(parents=True, exist_ok=True)
     receipt = destination / f'{uuid4().hex}.json'
     receipt.write_text(json.dumps(material, ensure_ascii=False, indent=2), encoding='utf-8')
     result = {'mechanical_batches': len(receipts), 'reused_chunks': len(reused_chunks), 'semantic_sources': len(semantic),
               'pending_relations': len(pending_relations), 'feedback': len(pending_feedback),
-              'needs_semantic': bool(semantic or pending_relations or pending_feedback or graph_candidates),
+              'needs_semantic': bool(semantic or pending_relations or pending_feedback or graph_candidates
+                                     or outcome_candidate),
               'receipt': str(receipt)}
     if discover_graph:
         result['graph_candidates'] = len(graph_candidates)
+        if outcome_sources:
+            result['outcome_candidates'] = int(outcome_candidate is not None)
     return result

@@ -58,22 +58,23 @@ def _load(memory, metadata):
 
 
 def _snapshot(memory, *, full=False, logicals=(), read_facts=True):
-    # All components, including the fact head, are from a single DB snapshot.
+    # Bind the cutoff inside the snapshot so SurrealDB can use the range indexes.
+    bind_cutoff = "LET $compiled_j = (meta:behavior.j ?? 0); " if read_facts and not full else ""
     projection_filter = "" if full else " WHERE id=type::record('behavior_projection', meta:behavior.active)"
     state_filter = " WHERE false" if not logicals else (
         " WHERE generation=meta:behavior.active AND target IN " + _sql(list(logicals)))
     mass_filter = " WHERE generation=meta:behavior.active"
-    version_filter = "" if full else " WHERE j_enter >= (meta:behavior.j ?? 0)"
-    event_filter = "" if full else " WHERE j > (meta:behavior.j ?? 0)"
+    version_filter = "" if full else " WHERE j_enter >= $compiled_j"
+    event_filter = "" if full else " WHERE j > $compiled_j"
     if not read_facts:
         version_filter = event_filter = " WHERE false"
-    rows = memory._execute("BEGIN; SELECT * FROM ONLY meta:behavior; SELECT * FROM ONLY meta:delivery; "
+    rows = memory._execute(f"BEGIN; {bind_cutoff}SELECT * FROM ONLY meta:behavior; SELECT * FROM ONLY meta:delivery; "
                            f"SELECT * FROM behavior_projection{projection_filter}; "
                            f"SELECT * FROM behavior_version{state_filter}; "
                            f"SELECT * FROM behavior_mass{mass_filter}; "
                            "SELECT target,knowledge_revision,j_enter,observed_j,age_origin FROM knowledge_version"
                            f"{version_filter}; SELECT * FROM delivery{event_filter}; COMMIT;")
-    return rows[1:8]
+    return rows[-8:-1]
 
 
 def _j(head):
@@ -285,6 +286,9 @@ def access_hints(memory, items):
 
 
 def behavior_candidates(memory, anchors, limit=20, scope="", *, allow_private=True):
+    from .dialogue_query import graph_dialogue_test, legacy_path_tests
+    from .graph_query_store import visible_edge_records
+
     active, _, projections, _, _, _, _ = _snapshot(memory, read_facts=False)
     if not active or not active.get("active"):
         return {"model": None, "candidates": []}
@@ -299,12 +303,15 @@ def behavior_candidates(memory, anchors, limit=20, scope="", *, allow_private=Tr
     scored = [(influence_bounds(model, logical, shares, model["beta"]), logical)
               for logical in model["vectors"]]
     scored.sort(key=lambda pair: (-pair[0][0], pair[1]))
-    visible = "" if allow_private else " WHERE private=false"
+    visible = [graph_dialogue_test(memory, "", scope, allow_private), *legacy_path_tests(memory, "path")]
+    if not allow_private:
+        visible.append("private=false")
     visible_edges = "" if allow_private else " WHERE head.private=false"
     objects, relations = memory._execute(
-        f"SELECT id,knowledge_revision,stale,retired,path FROM member,node{visible}; "
-        f"SELECT id,knowledge_revision,stale,retired FROM semantic{visible_edges};")
-    rows = objects + relations
+        "SELECT id,knowledge_revision,stale,retired,path FROM member,node "
+        f"WHERE {' AND '.join(visible)}; "
+        f"SELECT id,head AS exact_id,knowledge_revision,stale,retired FROM semantic{visible_edges};")
+    rows = objects + visible_edge_records(memory, relations, scope=scope, allow_private=allow_private)
     current = {_key(row)[0]: row for row in rows if row.get("knowledge_revision")}
     candidates = []
     for interval, logical in scored:

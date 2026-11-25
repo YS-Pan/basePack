@@ -16,6 +16,23 @@ SOURCE_KINDS = ['cli', 'vscode', 'exec', 'appServer', 'subAgent', 'subAgentRevie
                 'subAgentCompact', 'subAgentThreadSpawn', 'subAgentOther', 'unknown']
 
 
+class AppServerError(RuntimeError):
+    """The requested operation could not be completed by the App Server."""
+
+    def __init__(self, message, *, code=None):
+        self.code = code
+        super().__init__(message)
+
+
+class CodexHistoryError(RuntimeError):
+    """Item pagination could not establish a complete snapshot."""
+
+    def __init__(self, thread_id, reason, identity):
+        self.reason = reason
+        self.identity = identity
+        super().__init__(f'Codex thread {thread_id}: {reason} {identity}')
+
+
 class AppServer:
     def __init__(self, executable='codex'):
         self.errors = tempfile.TemporaryFile()
@@ -45,11 +62,12 @@ class AppServer:
             line = self.process.stdout.readline()
             if not line:
                 self.errors.seek(0)
-                raise RuntimeError('Codex App Server exited: ' + self.errors.read().decode('utf-8', errors='replace'))
+                raise AppServerError('Codex App Server exited: ' + self.errors.read().decode('utf-8', errors='replace'))
             message = json.loads(line)
             if message.get('id') == request_id:
                 if 'error' in message:
-                    raise RuntimeError(f"Codex App Server {method}: {message['error']}")
+                    error = message['error']
+                    raise AppServerError(f'Codex App Server {method}: {error}', code=error.get('code'))
                 return message['result']
 
     def close(self):
@@ -98,6 +116,14 @@ def thread_parent(thread):
     return parent or spawned_by
 
 
+def message_parts(item):
+    if item['type'] == 'userMessage':
+        return 'user', item['content']
+    if item['type'] == 'agentMessage':
+        return 'assistant', [{'type': 'text', 'text': item['text']}]
+    return None, ()
+
+
 def _items(client, thread_id, control, checkpoint=None):
     # Capture a persisted endpoint first, so an active conversation cannot keep
     # extending this maintenance run indefinitely.
@@ -109,6 +135,7 @@ def _items(client, thread_id, control, checkpoint=None):
     cursor = None
     items = []
     seen = {}
+    cursors = set()
     while True:
         _check_capture(control, checkpoint)
         page = client.call('thread/items/list', {'threadId': thread_id, 'cursor': cursor,
@@ -116,7 +143,7 @@ def _items(client, thread_id, control, checkpoint=None):
         for item in page['data']:
             identity = (item['turnId'], item['item']['id'])
             if identity in seen and seen[identity] != item:
-                raise RuntimeError(f'Codex thread {thread_id}: conflicting item {identity}')
+                raise CodexHistoryError(thread_id, 'conflicting item', identity)
             if identity not in seen:
                 seen[identity] = item
                 items.append(item)
@@ -124,7 +151,10 @@ def _items(client, thread_id, control, checkpoint=None):
                 return items
         cursor = page.get('nextCursor')
         if not cursor:
-            raise RuntimeError(f'Codex thread {thread_id}: captured endpoint disappeared during pagination')
+            raise CodexHistoryError(thread_id, 'captured endpoint disappeared during pagination', endpoint)
+        if cursor in cursors:
+            raise CodexHistoryError(thread_id, 'history cursor repeated before the captured endpoint', endpoint)
+        cursors.add(cursor)
 
 
 def _local_image(part, memory_dir, control, checkpoint):
@@ -173,12 +203,7 @@ def _render(project_id, thread, items, memory_dir, control, checkpoint=None):
             referenced.add(item['agentThreadId'])
         elif item['type'] == 'collabAgentToolCall':
             referenced.update(item['receiverThreadIds'])
-        if item['type'] == 'userMessage':
-            role, parts = 'user', item['content']
-        elif item['type'] == 'agentMessage':
-            role, parts = 'assistant', [{'type': 'text', 'text': item['text']}]
-        else:
-            continue
+        role, parts = message_parts(item)
         for index, part in enumerate(parts):
             meta = {'project_id': project_id, 'thread_id': thread_id, 'turn_id': row['turnId'],
                     'item_id': item['id'], 'part': index, 'role': role, 'part_type': part['type'],

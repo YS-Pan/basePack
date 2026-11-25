@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from .draft import read_fixed_author_draft
 from .owner import _read, _write
 from .relation_contract import validate_edge
 from .stages import _read_reference
@@ -186,7 +187,7 @@ def validate_publication(publication):
     revisions = {_path_key(path): revision for task in grants.values()
                  for path, revision in task["expected_revisions"].items()}
     for ref in publication["intent"]["drafts"]:
-        draft = _read_reference(ref)
+        draft = read_fixed_author_draft(ref)
         label = ref["path"]
         if ref["assignment"] in grants:
             task = grants[ref["assignment"]]

@@ -10,6 +10,8 @@ import pytest
 from basepack.memory.prompts import (maintenance_layout, memory_command,
                                      prompt_dispatch, render_prompt)
 from basepack.memory import owner, waves
+from basepack.memory.collection import load_collection
+from basepack.memory.stages import fixed_reference, stage_layout
 from basepack.memory.wave_cli import create as create_wave, task_prompt, worker_prompt
 from basepack.memory.retrieval import retrieval_dispatch, render_retrieval_prompt
 from basepack.project.config import load_project_config
@@ -153,26 +155,112 @@ def test_reader_hints_match_windows_paths(prompt_project, tmp_path):
 @pytest.mark.parametrize("project_id", ["owned-project", None])
 def test_render_preserves_codex_provenance_pointers_without_opening_them(
         prompt_project, tmp_path, current_capture, project_id):
-    codex = {"project_id": project_id, "capture_dir": str(tmp_path / "missing 中文 captures"),
+    codex = {"status": "captured" if current_capture else "retained", "project_id": project_id,
+             "capture_dir": str(tmp_path / "missing 中文 captures"),
              "attachment_dir": str(tmp_path / "missing image's directory")}
     if current_capture:
         codex["receipt"] = str(tmp_path / "missing capture receipt.json")
+    else:
+        codex.update(freshness="unknown", gaps=[{"path": "omitted-missing-attachment.png"}])
+    expected = ({key: value for key, value in codex.items() if key != "gaps"}
+                | ({"counts": {"gaps": 1}} if not current_capture else {}))
     receipt = tmp_path / "receipt.json"
     write_receipt(prompt_project, receipt, {"semantic": [{"path": "attachment.png", "members": []}],
                                    "pending_relations": [], "codex": codex})
     coordinator = render_prompt(prompt_project, receipt, tmp_path / "control")
-    assert f"Codex provenance inputs: {json.dumps(codex, ensure_ascii=False)}" in coordinator["prompt"]
+    summary = json.loads(coordinator["prompt"].split("Codex provenance inputs: ", 1)[1].splitlines()[0])
+    assert summary == expected
     reader = render_claimed_task(prompt_project, receipt, tmp_path / "control", ["attachment.png"])
     hint_text = reader["prompt"].split("Receipt hints: ", 1)[1].splitlines()[0]
     hints = json.loads(hint_text)
-    assert hints["codex"] == codex
+    assert hints["codex"] == expected
     assert hints["sources"] == [{"path": "attachment.png", "members": []}]
+    ref_text = reader["prompt"].split("Fixed maintenance receipt: ", 1)[1].splitlines()[0]
+    reference = json.loads(ref_text)
+    assert reference == fixed_reference(receipt)
+    if not current_capture:
+        assert "omitted-missing-attachment.png" not in reader["prompt"]
+        saved = json.loads(Path(reference["path"]).read_text(encoding="utf-8"))
+        assert saved["codex"]["gaps"] == [{"path": "omitted-missing-attachment.png"}]
+    assert "When a retained or discovery gap affects the assigned work" in reader["prompt"]
     assert "verify both project ID and `managed_attachment` against the assigned image" in coordinator["prompt"]
     assert "An unavailable project ID leaves origin unresolved." in coordinator["prompt"]
     assert "match the project ID and managed attachment against the capture receipt or retained framing" in reader["prompt"]
     assert "leave an unavailable origin unresolved" in reader["prompt"]
     assert not Path(codex["capture_dir"]).exists()
     assert not Path(codex["attachment_dir"]).exists()
+
+
+@pytest.mark.parametrize("status", ["not_configured", "binding_unavailable", "failed"])
+def test_capture_summary_keeps_unavailable_status_and_omits_error_details(prompt_project, tmp_path, status):
+    receipt = tmp_path / "receipt.json"
+    saved = {"status": status, "project_id": None}
+    if status != "not_configured":
+        saved["receipt"] = str(tmp_path / "collection-outcome.json")
+    codex = {**saved, "error": {"message": "restricted diagnostic detail"}}
+    write_receipt(prompt_project, receipt, {"semantic": [], "pending_relations": [], "codex": codex})
+    rendered = render_prompt(prompt_project, receipt, tmp_path / "control")["prompt"]
+    assert json.loads(rendered.split("Codex provenance inputs: ", 1)[1].splitlines()[0]) == saved
+    assert "restricted diagnostic detail" not in rendered
+
+
+def test_large_capture_lists_stay_in_receipts_for_initial_stage_and_reader_prompts(prompt_project, tmp_path):
+    receipt = tmp_path / "preflight.json"
+    stage = tmp_path / "stage.json"
+    control = tmp_path / "control"
+    handoff = tmp_path / "handoff.json"
+    handoff.write_text("{}", encoding="utf-8")
+    collection = prompt_project.root / "collection.json"
+    layout = maintenance_layout(prompt_project, run_id="prompt-test-run")
+    provenance = {"status": "captured", "project_id": "capture-project", "receipt": str(collection),
+                  "capture_dir": str(prompt_project.memory_dir / "codex"),
+                  "attachment_dir": str(prompt_project.memory_dir / "codex-attachments")}
+    lengths = {"initial": [], "stage": []}
+    for size in (0, 2000, 4000):
+        excluded = [{"thread_id": f"excluded-thread-{i:04}", "reason": "outside_project_roots"}
+                    for i in range(size // 2)]
+        unresolved = [{"thread_id": f"unresolved-thread-{i:04}", "reason": "cwd_unavailable"}
+                      for i in range(size // 2)]
+        gaps = [{"path": f"unavailable-root-{i:04}", "reason": "worktree_unavailable"}
+                for i in range(size // 4)]
+        codex = {**provenance, "discovered": 2, "unresolved": len(unresolved), "gaps": len(gaps) + 1,
+                 "excluded": excluded, "unresolved_threads": unresolved, "discovery_gaps": gaps,
+                 "selected_root_thread_ids": ["explicitly-selected-thread"]}
+        collection.write_text(json.dumps({**codex, "root": str(prompt_project.root), "paths": [], "snapshots": [],
+                                          "capture": {"gaps": [{"reason": "unavailable_part"}]}}),
+                              encoding="utf-8")
+        write_receipt(prompt_project, receipt, {"semantic": [{"path": "image.png", "members": []}],
+                                               "pending_relations": [], "codex": codex}, layout=layout)
+        receipt_ref = fixed_reference(receipt)
+        stage.write_text(json.dumps({"index": 1, "receipt": receipt_ref, "control": str(control),
+                                     "owner_run_id": "prompt-test-run", "previous_stage": None,
+                                     "handoff": fixed_reference(handoff), "remaining": {"relations": []},
+                                     "completion": {}, "layout": stage_layout(layout, 1, "prompt-test-run")}),
+                         encoding="utf-8")
+        expected = {**provenance, "counts": {"discovered": 2, "unresolved": len(unresolved),
+                                             "excluded": len(excluded), "gaps": len(gaps) + 1,
+                                             "discovery_gaps": len(gaps), "selected_roots": 1}}
+        stage_options = {"stage": stage, "stage_sha256": fixed_reference(stage)["file_sha256"]}
+        for phase, options in (("initial", {}), ("stage", stage_options)):
+            prompt = render_prompt(prompt_project, receipt, control, **options)["prompt"]
+            summary = json.loads(prompt.split("Codex provenance inputs: ", 1)[1].splitlines()[0])
+            assert summary == expected
+            assert json.dumps(receipt_ref, ensure_ascii=False) in prompt
+            assert all(text not in prompt for text in ("excluded-thread-", "unresolved-thread-",
+                                                       "unavailable-root-", "explicitly-selected-thread"))
+            lengths[phase].append(len(prompt))
+        assert fixed_reference(receipt) == receipt_ref
+        full_collection = load_collection(prompt_project, expected["receipt"])
+        assert (full_collection["excluded"], full_collection["unresolved_threads"],
+                full_collection["discovery_gaps"]) == (excluded, unresolved, gaps)
+        assert json.loads(receipt.read_text(encoding="utf-8"))["codex"] == codex
+
+    for samples in lengths.values():
+        assert max(samples) - min(samples) < 32
+    reader = render_claimed_task(prompt_project, receipt, control, ["image.png"])["prompt"]
+    hints = json.loads(reader.split("Receipt hints: ", 1)[1].splitlines()[0])
+    assert hints["codex"] == expected
+    assert "excluded-thread-" not in reader and "unavailable-root-" not in reader
 
 
 def test_render_preserves_input_errors(prompt_project, tmp_path):

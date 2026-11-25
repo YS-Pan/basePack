@@ -4,6 +4,7 @@ from bisect import bisect_left
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from difflib import SequenceMatcher
+from functools import cached_property
 from hashlib import sha256
 from itertools import accumulate
 from os import scandir, stat_result
@@ -19,6 +20,10 @@ class SourceContent:
     size: int
     mtime_ns: int
     text: str
+
+    @cached_property
+    def lines(self) -> tuple[str, ...]:
+        return tuple(self.text.splitlines(keepends=True))
 
 
 @dataclass(frozen=True)
@@ -112,7 +117,7 @@ def original_text(source: SourceContent, start_line: int, end_line: int,
     Columns are Unicode code-point offsets within the first and last original
     lines, zero-based and half-open. Original line endings are part of a line.
     """
-    lines = source.text.splitlines(keepends=True)
+    lines = source.lines
     if not 1 <= start_line <= end_line <= len(lines):
         raise ValueError(f"Invalid line range {start_line}:{end_line} for {source.path}")
     selected = lines[start_line - 1:end_line]

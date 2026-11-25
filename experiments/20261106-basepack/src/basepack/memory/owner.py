@@ -96,8 +96,11 @@ def acquire(memory_dir, project_id, holder, control, *, attempt_id=None):
     A control path is a capability and is created exclusively. Never reuse or
     remove it: old workers must not acquire authority over a later run.
     """
-    if attempt_id is not None and _control(control) != str(attempt_control(memory_dir, attempt_id)):
-        raise ValueError("Maintenance control must match the attempt ID")
+    if attempt_id is not None:
+        expected = str(attempt_control(memory_dir, attempt_id))
+        # Windows may change the resolved prefix of a missing file as its parent appears.
+        if str(Path(control)) != expected and _control(control) != expected:
+            raise ValueError("Maintenance control must match the attempt ID")
     lock, state = _paths(memory_dir)
     with _locked(lock, timeout=5):
         if attempt_id is not None:

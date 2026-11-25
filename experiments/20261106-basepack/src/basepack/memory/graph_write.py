@@ -6,6 +6,8 @@ import json
 from uuid import uuid4
 
 from .content import SourceContent, original_text
+from .privacy import derive_private
+from .relation_contract import validate_image_region
 from .store import _Record, _digest, _record, _sql
 
 
@@ -89,7 +91,15 @@ class Publication:
                 raise ValueError(f"An exact graph vertex is required: {_sql(target)}")
             if row is None or target.table == "knowledge_version" and "state" not in row:
                 raise ValueError(f"Graph endpoint does not exist: {_sql(target)}")
-            self.exact[target] = Vertex(target, row["private"], tuple(
+            if target.table == "knowledge_version":
+                from .history import _effective_privacy
+                classified = _effective_privacy(row["record"], row, verify_promotion=True)
+            else:
+                classified = row
+            marker = derive_private(classified, source_version=self.snapshot, knowledge_version=self.knowledge)
+            if marker is None:
+                raise ValueError(f"Exact private classification unknown at publication: {target.table}:{target.key}")
+            self.exact[target] = Vertex(target, marker, tuple(
                 [row["path"]] if target.table == "source_version" else row["scope_paths"]))
         return self.exact[target]
 
@@ -104,10 +114,7 @@ class Publication:
                 revision = current["knowledge_revision"]
             else:
                 revision = submitted["knowledge_revision"]
-        key = (target, revision)
-        if key not in self.versions:
-            self.versions.update(knowledge_ids(self.memory, [key]))
-        exact = self.versions[key]
+        exact = self._version_id(target, revision)
         if submitted is None or submitted["knowledge_revision"] != revision:
             return self.vertex(exact)
         if exact not in self.exact:
@@ -118,6 +125,21 @@ class Publication:
                 paths.add(member["path"])
             self.exact[exact] = Vertex(exact, row["private"], tuple(sorted(paths)))
         return self.exact[exact]
+
+    def _version_id(self, target, revision):
+        key = (_record(target), revision)
+        if key not in self.versions:
+            self.versions.update(knowledge_ids(self.memory, [key]))
+        return self.versions[key]
+
+    def retained_version_id(self, target, revision):
+        """Resolve an existing graph version for a status transition."""
+        exact = self._version_id(target, revision)
+        if exact not in self.exact:
+            state = self.memory._execute(f"SELECT VALUE state FROM ONLY {_sql(exact)};")[0]
+            if state is None:
+                raise ValueError(f"Graph endpoint does not exist: {_sql(exact)}")
+        return exact
 
     def source(self, record, row, previous):
         snapshot = Vertex(record, row["private"], (row["path"],))
@@ -136,7 +158,7 @@ class Publication:
         version = self.version(record, row["knowledge_revision"])
         statements = []
         if previous_revision and not invalidated:
-            previous = self.version(record, previous_revision).record
+            previous = self.retained_version_id(record, previous_revision)
             if previous != version.record:
                 statements.append(supersede(previous))
         statements.extend([set_state(version.record, "current"),
@@ -178,13 +200,7 @@ class Publication:
                 raise ValueError(f"Image snapshot revision mismatch for {original['path']}")
             if "start_line" in locator or "end_line" in locator:
                 raise ValueError("Image snapshot basis uses an image locator")
-            image_locator = locator.get("locator", {})
-            if "region" in image_locator:
-                region = image_locator["region"]
-                if (not isinstance(region, list) or len(region) != 4
-                        or any(type(coord) not in (int, float) or not 0 <= coord < float("inf") for coord in region)
-                        or region[0] >= region[2] or region[1] >= region[3]):
-                    raise ValueError("Image locator region requires ordered nonnegative coordinates")
+            validate_image_region(locator.get("locator"))
         return target, locator or None
 
     def endpoint(self, identity, pin):

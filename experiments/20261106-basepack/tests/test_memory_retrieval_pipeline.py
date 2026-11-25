@@ -1,5 +1,7 @@
 import json
+from pathlib import Path
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
@@ -68,6 +70,38 @@ def test_empty_base_keeps_unknown_anchor_and_behavior_model(config, monkeypatch)
     result = start_retrieval(memory, prepared['request'])
     assert result['frozen']['anchors'] == []
     assert make_delivery_receipt(config, prepared['request'], {'items': []}, [])['context']['model'] is None
+
+
+def test_frozen_dialogue_retrieval_rechecks_authorization(config, monkeypatch):
+    thread_id = str(uuid4())
+    manifest_path = config.root / '.basepack/dialogue-test.json'
+    config.raw['memory']['chat_index'] = {'manifest': '.basepack/dialogue-test.json'}
+    manifest = {'schema_version': 1, 'bindings': {'test': {'project_id': 'test', 'root': '.',
+                                                          'other_project_roots': []}},
+                'threads': [{'thread_id': thread_id, 'binding': 'test', 'path': 'dialogues/old', 'private': False}]}
+    manifest_path.write_text(json.dumps(manifest), encoding='utf-8')
+    hit = {'id': 'node:codex-abcdef', 'dialogue_chunk': 'codex_chunk:abc',
+           'knowledge_revision': 'v1', 'distance': 0.1, 'path': 'dialogues/old'}
+    memory = SimpleNamespace(config=config, access_hints=lambda items: items,
+                             vector_search=lambda *args, **kwargs: {'matches': [hit], 'vector_coverage': {}})
+    monkeypatch.setattr(behavior_projection, 'behavior_candidates', lambda *args, **kwargs: {'model': None, 'candidates': []})
+    prepared = prepare_retrieval(config, question='Find the selected point')
+    assert start_retrieval(memory, prepared['request'])['frozen']['base']['matches'] == [hit]
+    assert start_retrieval(memory, prepared['request'])['frozen']['base']['matches'] == [hit]
+
+    manifest_path.write_text(json.dumps(dict(manifest, excluded_thread_ids=[thread_id])), encoding='utf-8')
+    with pytest.raises(ValueError, match='authorization changed'):
+        start_retrieval(memory, prepared['request'])
+    with pytest.raises(ValueError, match='authorization changed'):
+        make_delivery_receipt(config, prepared['request'], {'items': [hit]}, [hit])
+
+    config.raw['memory'].pop('chat_index')
+    anchor_path = Path(prepared['work']) / 'anchors.json'
+    frozen = json.loads(anchor_path.read_text(encoding='utf-8'))
+    frozen.pop('dialogue_authorization')
+    anchor_path.write_text(json.dumps(frozen), encoding='utf-8')
+    with pytest.raises(ValueError, match='authorization changed'):
+        start_retrieval(memory, prepared['request'])
 
 
 

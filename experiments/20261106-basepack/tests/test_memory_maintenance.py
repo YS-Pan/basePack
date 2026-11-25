@@ -1,6 +1,7 @@
 from hashlib import sha256
 import json
 import os
+from unittest.mock import call, patch
 
 import pytest
 
@@ -273,6 +274,30 @@ def test_empty_text_source_registration_finishes_until_body_appears(memory):
     assert not memory.maintain([])['needs_semantic']
     path.write_bytes(b'New requirement.\n')
     assert memory.maintain([])['needs_semantic']
+
+
+def test_independent_mechanical_batches_refresh_registered_sources_once(memory, monkeypatch):
+    paths = ['first.md', 'second.md']
+    for path in paths:
+        (memory.config.root / path).write_bytes(b'')
+
+    read_rows, apply = memory._rows, memory.apply
+
+    def publish(batch, **kwargs):
+        with patch.object(memory, '_rows', read_rows):
+            return apply(batch, **kwargs)
+
+    monkeypatch.setattr(memory, 'apply', publish)
+    with patch.object(memory, '_rows', wraps=read_rows) as preflight_reads:
+        result = memory.maintain(paths)
+
+    assert result['mechanical_batches'] == 2
+    assert not result['needs_semantic']
+    assert preflight_reads.call_args_list.count(call('source')) <= 2
+    material = json.loads(open(result['receipt'], encoding='utf-8').read())
+    assert material['workset']['accepted'] == [
+        {'path': path, 'revision': sha256(b'').hexdigest()} for path in paths]
+    assert [row['path'] for row in memory.sources()] == paths
 
 
 def test_cleared_source_requires_old_knowledge_retirement_before_empty_completion(memory):

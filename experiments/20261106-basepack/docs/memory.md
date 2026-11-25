@@ -78,6 +78,10 @@ apply 核对来源版本，以及本批改写、退役、更正目标、实际�
 
 作者在日常阅读、分块和摘要时推理并核证关系。未限域的手动维护也可补查未变来源。程序用实际共同交付和少量有界共读提名精确版本，读者按实际原证判断方向、条件和用途。`has_basis` 已保存实际引用，建立其它类型需要独立证据。关闭回执的 `graph_reviews` 记录实际接受、核无边和待核结果。用 `memory graph-coverage` 观察当前图覆盖，选择下一批应核的材料。 [边类型和作者约定](../src/basepack/memory/SKILL.md#select-a-graph-edge-type)
 
+普通未限域手动维护还可在一次预检中选一个已接受的受管聊天版本，交一名读者定位一件实际采用或执行的成果。读者共读交付件、编辑或生成来源、实际输入及采用或执行记录，按准确的当前或历史端点版本和原证位置，把有依据的新跳合进一稿。原有固定双端提名继续按单边核查。自动维护和指定 `--scope` 的维护继续在各自范围内做日常阅读和核证。
+
+成果任务在固定关闭回执中记录连续查到哪一行、已查范围的结论和需要返回的缺证位置。新预检可从下一行接续，或在已指明的缺证来源出现新实收版本后返回断点。重复的当前关系在新冻结前拒绝，已有冻结批按原文件和批次身份幂等恢复。真实读者成效与同范围耗时另按实际回执验收。[维护入口和证据约定](../src/basepack/memory/SKILL.md#maintain-sources)
+
 原父用自己的宿主 thread 身份启动。若已知本轮剩余 subagent 容量，传 `--available-subagents <A>`。此数扣除检索等实际占用，程序再从中预留协调者恢复席位：
 
 ```powershell
@@ -108,7 +112,7 @@ memory maintain-start --mode automatic --holder '<原父 thread 身份>'
 
 ### 有限任务池与两段式 Terra
 
-本节描述0.18系列的有限任务池维护。实际安装与验收状态见[部署合同](../../../devDoc/system/deployment.md)，接受范围与余项见[进度](../../../devDoc/tasks/20261115-real-use-rectification/progress.md)。旧组织仍须按原固定回执收口，不能把任务池协议套给旧worker。详细设计维护源为[有限任务池合同](../../../devDoc/tasks/20261115-real-use-rectification/maintenance-waves.md)；安装后以 `memory guide` 返回的随包流程和CLI生成的命令、prompt与身份执行。新入口为 `memory wave`：create不传wave-id并返回该标识，其余动作均显式传 `--control <同一control> --run-id <owner run_id> --wave-id <wave_id>`。各动作字段以 `memory wave <action> --help` 为准，reader直接执行生成prompt中的命令。
+本节描述0.18系列的有限任务池维护。实际安装与验收状态见[部署合同](../../../devDoc/system/deployment.md)，0.18 系列当时的接受范围与余项见[整改进度](https://github.com/YS-Pan/basePack/blob/v0.19.0/devDoc/tasks/20261115-real-use-rectification/progress.md)。旧组织仍须按原固定回执收口，不能把任务池协议套给旧worker。0.18 系列的详细设计见[有限任务池合同](https://github.com/YS-Pan/basePack/blob/v0.19.0/devDoc/tasks/20261115-real-use-rectification/maintenance-waves.md)；安装后以 `memory guide` 返回的随包流程和CLI生成的命令、prompt与身份执行。新入口为 `memory wave`：create不传wave-id并返回该标识，其余动作均显式传 `--control <同一control> --run-id <owner run_id> --wave-id <wave_id>`。各动作字段以 `memory wave <action> --help` 为准，reader直接执行生成prompt中的命令。
 
 1. 原父按 `maintain-start` 的派工参数启动 Terra，保留 stop 权限和实际句柄。Terra 首 turn 处理来源和预检，在预检取得 owner 且 `needs_semantic=true` 时初始化 reader 波次。无语义工作、所有权冲突或预检失败时将实际结果交原父。
 2. Terra第一turn规划有限、可独立阅读写稿的语义任务，将每项的 `id/goal/paths/write_targets/outputs` 写入tasks JSON数组，用 `memory wave create --receipt <固定receipt> --control <control> --run-id <owner run_id> --tasks <tasks.json> --coordinator <实际非根Terra规范路径> --readers <N>` 建波；长组先发，工作量差异明显的任务分组。依赖前一波新发布知识的任务留下一波。N必须在1至min(任务数,固定reader上限)内，由规划者按工作量选择较小固定池，供多轮领取，不以容量满编为目标。程序预登记worker，保留Terra第二turn恢复名额；余量不再默认补无reader协调者。
@@ -170,6 +174,8 @@ Windows Codex 沙箱已知会拦截 Codex 状态库访问，或检查实际遇�
 
 独立 Codex 采集保留真实用户消息与可取得的助手文字，以及 thread/turn/item/part 身份和角色；系统、AGENTS、hook 与工具元数据不冒充用户 prompt。同一线程分页内重复的 turn/item 按身份去重，内容冲突保留错误；人类有意重复发送仍是不同消息。跨线程不按文字去重，完整继承身份尚未证实。每次以已捕获的持久化消息截点分页，当前任务中新增长度下次接续。采集只更新受管原件，不表示已经阅读、总结或发布知识。
 
+协调者按 `collect-prompt` 给出的路径将项目归属注册表写入 `memory.data_dir/maintenance/`。正在进行的尝试继续使用已经发出的采集命令及其注册表路径。
+
 受管聊天原文保存在 `memory.data_dir/codex/<thread>.txt`，版本 hash 属于该导出的真实 UTF-8 字节。接受后沿现有 source_version 保存快照；`read` 的 `original.chat_locations` 从所选已核快照返回聊天链接、thread/turn/item/part、UTF-8 字节范围及本次读取的正文交集，生成头与分隔符不当作人类原文。旧已发布版本可在原聊天续写或修订后继续核实。
 
 可读取且格式受支持的 `localImage` 按内容 hash 复制到 `memory.data_dir/codex-attachments/`，作为独立图片原件进入同一维护范围。语义回执的 `codex` 及 reader 提示提供项目 ID、本轮采集回执（如有）和保留聊天/附件目录；worker 按随包 skill 从采集记录或历史 framed 原件核对同项目及同附件的 chat part 身份，实际打开图片，再将原记录身份作为 locator 接受。附件缺失、身份不可核或格式不支持时留 gap；真实聊天附件仍未验，不能据模拟 PNG 回归宣称全部附件可用。
@@ -181,6 +187,47 @@ Windows Codex 沙箱已知会拦截 Codex 状态库访问，或检查实际遇�
 试验配置使用独立的记忆目录、物理库、UUID 和凭据，沿用实际 Codex 项目绑定。用 `memory init --no-project-entry` 初始化，随后只采本批固定聊天并使用该配置的采集回执。
 
 当前宿主列表中的部分项目/父子字段缺失时依项目根与 worktree 证据归属；显式 subagent 引用须以直接 thread/read 返回的父级身份核对且无项目冲突，才递归采集。无法确认的范围明确留 gap。附件不可取时、引用的 subagent 未能列出或读取时也保留缺口，不按不存在退役旧知识。完整分叉/继承身份、附件原件及全部聊天覆盖仍未完成真实验收；采集回执、语义待核与向量覆盖分别检查，`pending=0` 不等于全部聊天已接受。
+
+### 显式对话向量索引
+
+用支持此模式的客户端接入独立项目库。旧项目和当前项目按宿主核实的归属共用一份允许清单。原正式 0.19.0 客户端继续连接其原库。
+
+在隔离项目的配置中加入：
+
+```toml
+[memory.chat_index]
+manifest = ".basepack/chat-index.json"
+```
+
+清单使用 UTF-8 JSON。为每个绑定填写宿主登记的 `project_id`、绝对项目根和其它已登记的项目根。当前项目根可用 `"."`。每条获准对话填写原 thread UUID、绑定键、项目相对逻辑路径和隐私分类。
+
+```json
+{
+  "schema_version": 1,
+  "bindings": {
+    "current": {"root": ".", "project_id": "<host project ID>", "other_project_roots": []}
+  },
+  "threads": [
+    {"thread_id": "01a10000-0000-7000-8000-000000000001", "binding": "current",
+     "path": "dialogues/current/01a10000-0000-7000-8000-000000000001", "private": true}
+  ],
+  "excluded_thread_ids": []
+}
+```
+
+把当前项目一条普通顶层 Codex 对话的原 UUID 交给 `memory dialogue-register <thread-uuid>`。项目有多个当前绑定键时附 `--binding <key>`。命令核对宿主元数据和工作目录，以私有身份登记在 `dialogues/current/<thread-uuid>`，返回登记状态及路径。重复登记同一条返回 `already_registered`。经过另行授权的旧项目对话导入同一清单，评测试验根列入 `excluded_thread_ids`。
+
+登记后走普通 `memory maintain-start` 和 `memory maintain`。宿主读取和逐片编码在维护进程中执行，程序发布向量与稳定对话节点。宿主拒绝访问时保留原错。旧采集、`--collection` 和 `--retained` 在此模式下会报冲突。
+
+用 `memory dialogue-coverage` 核对本轮截止消息、实际观察到的用户与助手发言、编码身份和缺口。`message_census` 保存消息位置、角色和可读状态。宿主返回了消息位置但正文不完整时，该消息仍计入已观察分母。缺正文的消息保留为未知，非文本部分和编码失败各有记录。
+
+宿主本轮不可用时，覆盖报告显示 `capture_unavailable`。已有索引继续保留，`last_successful_cutoff` 和 `retained_index_coverage` 分别报告可证实的上轮成功截点及覆盖。缺少消息清单的旧记录将分母标为未知，下一次成功维护补记实际观察到的消息。重新维护还能补算旧长文中的空白尾段。
+
+维护期间更改允许清单或试验状态会终止本轮。程序在宿主分页、编码请求和数据库提交前复核授权。已提交的索引保留，读取资格按当前授权决定。新的维护从当前清单接续。
+
+普通 `memory search` 保留原有文件检索，并返回对话命中的 `dialogue_chunk` 和消息定位。用 `memory graph-query` 追关系。已知对话节点时可用 `memory dialogue-locations <node-id>` 取消息位置，再用 `memory read <codex_chunk-id>` 即时回宿主核对原话、字节区间和版本。所有步骤沿用同一 `--scope`。公有搜索使用 `search --public-only`。经授权读取私有对话时，在图查询、位置列表和回读时加 `--include-private`，并保留观察到的隐私标记。
+
+原话留在宿主。项目保留 thread、turn、item、part、UTF-8 半开字节区间、哈希、向量和图。对话回读只在标准输出显示。检索评分与交付记录保存定位和自己的判断，引用时提供定位。
 
 ## 最小闭环示例
 

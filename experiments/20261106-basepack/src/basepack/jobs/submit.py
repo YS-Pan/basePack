@@ -69,8 +69,11 @@ def prepare_submission(config, spec: JobSpec, encoding: str):
     folder.mkdir(parents=True)
     transfer = bool(spec.transfer_inputs or spec.transfer_outputs)
     payload = folder / "basepack-job.json"
+    worker = folder / f"basepack-worker-{token}.py"
     metadata = {"submission_id": token, "spec": asdict(spec)}
     payload.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+    worker.write_bytes(Path(__file__).with_name("worker.py").read_bytes())
+    launcher_paths = [path.name if transfer else str(path) for path in (worker, payload)]
     env = {"OMP_NUM_THREADS": str(spec.cpus), "MKL_NUM_THREADS": str(spec.cpus),
            "OPENBLAS_NUM_THREADS": str(spec.cpus), "NUMEXPR_NUM_THREADS": str(spec.cpus),
            **spec.environment}
@@ -78,9 +81,9 @@ def prepare_submission(config, spec: JobSpec, encoding: str):
         raise ValueError("CUDA_VISIBLE_DEVICES belongs to Condor's device allocation")
     requirement = f'TARGET.Machine == {json.dumps(socket.gethostname())}'
     lines = [
-        "universe = vanilla", f"executable = {path_field(config.python)}",
+        "universe = vanilla", f"executable = {path_field(config.jobs_execute_python)}",
         "transfer_executable = False", "getenv = False",
-        "arguments = " + arguments(["-I", "-m", "basepack.jobs.worker", payload.name if transfer else str(payload)]),
+        "arguments = " + arguments(["-I", *launcher_paths]),
         f"environment = {environment(env)}", f"initialdir = {path_field(cwd)}",
         f"output = {path_field(folder/'stdout.txt')}", f"error = {path_field(folder/'stderr.txt')}",
         f"log = {path_field(folder/'events.log')}", f"request_cpus = {spec.cpus}",
@@ -98,7 +101,7 @@ def prepare_submission(config, spec: JobSpec, encoding: str):
     if spec.gpu_memory_mib:
         lines.append(f"gpus_minimum_memory = {spec.gpu_memory_mib} MB")
     if transfer:
-        inputs = [str(payload), *[str((cwd / path).resolve()) for path in spec.transfer_inputs]]
+        inputs = [str(worker), str(payload), *[str((cwd / path).resolve()) for path in spec.transfer_inputs]]
         for output in spec.transfer_outputs:
             if Path(output).is_absolute() or ".." in Path(output).parts:
                 raise ValueError(f"Transfer output must be relative to scratch: {output}")

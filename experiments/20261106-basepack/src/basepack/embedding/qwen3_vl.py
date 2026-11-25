@@ -109,7 +109,7 @@ class Qwen3VLEmbedder:
         if not 1 <= len(values) <= MAX_REQUEST_INPUTS:
             raise EmbeddingInputError("embedding request must contain 1 to 8 inputs")
         values = [normalize_input(value) for value in values]
-        for value in values:
+        for index, value in enumerate(values):
             if "image" in value:
                 path = Path(value["image"])
                 if path.stat().st_size > MAX_IMAGE_BYTES:
@@ -117,7 +117,13 @@ class Qwen3VLEmbedder:
                 with self.Image.open(path) as image:
                     if image.width * image.height > MAX_SOURCE_PIXELS or getattr(image, "n_frames", 1) != 1:
                         raise EmbeddingInputError("image must be a static frame with at most 40 million source pixels")
-                    image.verify()
+                    if image.format == "TIFF":
+                        from PIL import ImageOps
+
+                        # The processor's path decoder does not read TIFF. Supply its RGB view.
+                        values[index] = value | {"image": ImageOps.exif_transpose(image).convert("RGB")}
+                    else:
+                        image.verify()
         batch_size = 1 if any("image" in value for value in values) else self.options["batch_size"]
         try:
             with (torch.nn.attention.sdpa_kernel(torch.nn.attention.SDPBackend.CUDNN_ATTENTION)

@@ -26,6 +26,7 @@ LOCATOR_FIELDS = ("start_line", "end_line", "locator")
 ITEM_FIELDS = (
     "id", "exact_id", "knowledge_revision", "record_type", "kind", "type", "title", "text", "label", "private",
     "path", "revision", "source_revision", "source_version", *LOCATOR_FIELDS, "conditions", "status",
+    "codex_thread_id", "dialogue_chunk", "bookmark",
 )
 EDGE_FIELDS = ("id", "in", "out", "type", "conditions", "label", "locator", "private", "status")
 _RECORD_MENTION = re.compile(r"(?<![\w:])(?:member|node|semantic|source|knowledge_version|source_version|graph_edge):(?:⟨[^⟩]+⟩|`[^`]+`|[A-Za-z0-9_-]+)")
@@ -168,14 +169,17 @@ def graph_query(memory, text="", *, seeds=(), branches=(), scope="", allow_priva
             vertices[exact] = row
         return vertices[exact]
 
-    def add_seed(identifier, revision, origin, rank):
+    def add_seed(identifier, revision, origin, rank, hit=None):
         exact = graph.resolve_seed(memory, identifier, knowledge_revision=revision)
         if exact is None or exact in seed_ids or vertex(exact) is None:
             return False
         if len(seed_rows) == MAX_SEEDS:
             return True
         seed_ids.add(exact)
-        seed_rows.append({**_short_item(vertex(exact)), "origin": origin, "input_rank": rank})
+        current = vertex(exact)
+        if hit and "dialogue_chunk" in hit and hit["thread_id"] == current.get("codex_thread_id"):
+            current.update(dialogue_chunk=hit["dialogue_chunk"], bookmark=hit["bookmark"])
+        seed_rows.append({**_short_item(current), "origin": origin, "input_rank": rank})
         return False
 
     named = [*seeds, *_RECORD_MENTION.findall(text)]
@@ -186,12 +190,15 @@ def graph_query(memory, text="", *, seeds=(), branches=(), scope="", allow_priva
             break
     named_count = len(seed_rows)
     search_coverage = None
+    dialogue_coverage = {}
     if len(seed_rows) < MAX_SEEDS and text.strip():
         if base is None:
             base = base_search(memory, text, scope=scope, allow_private=allow_private, literal=literal, access=False)
         search_coverage = base["vector_coverage"]
+        if "dialogue_vector_coverage" in base:
+            dialogue_coverage = {"dialogue_vector_coverage": base["dialogue_vector_coverage"]}
         for index, row in enumerate(base["matches"]):
-            add_seed(row["id"], row["knowledge_revision"], "base", index)
+            add_seed(row["id"], row["knowledge_revision"], "base", index, hit=row)
             if len(seed_rows) == MAX_SEEDS:
                 break
 
@@ -285,7 +292,7 @@ def graph_query(memory, text="", *, seeds=(), branches=(), scope="", allow_priva
             "conditions": conditions, "branches": list(branches), "seeds": seed_rows, "scanned": scanned,
             "limits": {"seeds": MAX_SEEDS, "hops": MAX_HOPS, "adjacency": MAX_ADJACENCY,
                        "scanned": MAX_SCANNED, "candidates": MAX_CANDIDATES},
-            "truncation": list(truncation.values()), "vector_coverage": search_coverage}
+            "truncation": list(truncation.values()), "vector_coverage": search_coverage, **dialogue_coverage}
 
 
 def _rank(memory, candidates, seeds, named_count, terms):
@@ -333,7 +340,8 @@ def _rank(memory, candidates, seeds, named_count, terms):
         keep.add(index)
     snapshot = next(iter(snapshots), None)
     observation_fields = ("id", "knowledge_revision", "exact_id", "record_type", "private", "revision", "path", "status",
-                          *LOCATOR_FIELDS, "base_score", "initial_score", "roles", *ACCESS_FIELDS)
+                          *LOCATOR_FIELDS, "codex_thread_id", "dialogue_chunk", "bookmark",
+                          "base_score", "initial_score", "roles", *ACCESS_FIELDS)
     return {"candidates": [row for index, row in enumerate(rows) if index in keep],
             "observations": [{key: row[key] for key in observation_fields if key in row} | {"returned": index in keep}
                              for index, row in enumerate(rows)],

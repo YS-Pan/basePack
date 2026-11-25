@@ -1,6 +1,7 @@
 import json
 import os
 from datetime import datetime, timedelta
+from hashlib import sha256
 from pathlib import Path
 import subprocess
 import sys
@@ -373,6 +374,56 @@ def test_definite_publication_failure_preserves_original_error_and_unpublished(t
     assert record["publication"]["status"] == "failed" and record["publication"]["error"] == "version conflict"
 
 
+@pytest.mark.parametrize("publish_subset", [False, True])
+def test_wave_retains_unresolved_exact_privacy(tmp_path, publish_subset):
+    control, run, wave, (worker,) = setup_wave(tmp_path)
+    waves.started(tmp_path, control, run, wave, worker, "host")
+    seal_wave(tmp_path, control, run, wave)
+    task = waves.claim(tmp_path, control, run, wave, worker)["task"]
+    draft, coverage, errors = result_files(tmp_path)
+    snapshot = "source_version:" + "a" * 64
+    revision = "b" * 64
+    prepare = tmp_path / "reading.json"
+    prepare.write_text(json.dumps({
+        "sources": [], "expected": {}, "neighborhood": {"members": [], "nodes": [], "edges": []},
+        "snapshots": [{"id": snapshot, "revision": revision, "private": True, "privacy_unknown": True}],
+    }), encoding="utf-8")
+    prepare_ref = waves.fixed_reference(prepare)
+    anchor = "member:" + "c" * 32
+    draft.write_text(json.dumps({
+        "sources": [], "prepare": prepare_ref,
+        "edges": [{"in": anchor, "out": snapshot, "type": "uses", "text": "Fixture relation", "evidence": [anchor]}],
+    }), encoding="utf-8")
+    draft_ref = {**waves.fixed_reference(draft), "assignment": task["id"]}
+    independent = tmp_path / "independent.json"
+    independent.write_text('{"sources": []}', encoding="utf-8")
+    drafts = [draft, independent] if publish_subset else [draft]
+    submitted = waves.submit(tmp_path, control, run, wave, worker, task["id"],
+                             drafts=drafts, coverage=coverage, errors=errors)
+    [pending] = submitted["result"]["privacy_unknown"]
+    assert pending["draft"] == draft_ref
+    assert pending["id"] == snapshot and pending["revision"] == revision
+    assert pending["prepare"] == [prepare_ref] and pending["location"].endswith(".edges[0].out")
+    assert "Unknown exact privacy classification" in pending["reason"]
+    waves.claim(tmp_path, control, run, wave, worker)
+    waves.notification_pending(tmp_path, control, run, wave, worker)
+    waves.notification_result(tmp_path, control, run, wave, worker, accepted=True, result="accepted")
+    waves.finish(tmp_path, control, run, wave)
+    if publish_subset:
+        valid = {**waves.fixed_reference(independent), "assignment": task["id"]}
+        frozen, result = tmp_path / "frozen.json", tmp_path / "publication.json"
+        waves.publication_intent(tmp_path, control, run, wave, drafts=[valid], frozen=frozen, result=result)
+        frozen.write_text(json.dumps({"batch_id": "test-batch"}), encoding="utf-8")
+        frozen_ref = waves.fixed_reference(frozen)
+        result.write_text(json.dumps({"batch_id": "test-batch", "frozen": frozen_ref["path"],
+                                      "frozen_file_sha256": frozen_ref["file_sha256"]}), encoding="utf-8")
+        waves.publication_committed(tmp_path, control, run, wave)
+    closed = waves.close(tmp_path, control, run, wave, no_publication=not publish_subset)
+    assert closed["unpublished"] == [draft_ref]
+    closure = json.loads(Path(closed["closure"]["path"]).read_text(encoding="utf-8"))
+    assert closure["privacy_unknown"] == [pending]
+
+
 def test_write_scope_includes_authorized_stable_sources_but_not_read_only_sources(tmp_path):
     control = tmp_path / "control"
     run = owner.acquire(tmp_path, "project", "parent", control)["owner"]["run_id"]
@@ -441,12 +492,96 @@ def test_submit_reports_bad_reference_on_the_original_claim(tmp_path, failed):
     with pytest.raises(ValueError, match=r"members\[0\]\.evidence: Expected an array"):
         waves.submit(tmp_path, control, run, wave, worker, task["id"], **args)
 
+    proposal["members"][0]["evidence"] = [{"member": 1}]
+    draft.write_text(json.dumps(proposal), encoding="utf-8")
+    with pytest.raises(ValueError, match=r"members\[0\]\.evidence\[0\]: Member index out of range: 1"):
+        waves.submit(tmp_path, control, run, wave, worker, task["id"], **args)
+    assert waves.inspect(tmp_path, control, run, wave)["tasks"][0]["status"] == "claimed"
+
     proposal["members"][0]["evidence"] = ["member:already_known", {"draft": 1, "member": 2}]
     draft.write_text(json.dumps(proposal), encoding="utf-8")
     task = waves.submit(tmp_path, control, run, wave, worker, task["id"], **args)
     assert task["status"] == "submitted"
     batch = freeze([proposal, {"sources": [], "members": [{}, {}, {}]}])
     assert batch["members"][0]["evidence"] == ["member:already_known", batch["members"][3]["id"]]
+
+
+def test_submit_reports_missing_member_path_on_the_original_claim(tmp_path):
+    control, run, wave, (worker,) = setup_wave(tmp_path)
+    waves.started(tmp_path, control, run, wave, worker, "host")
+    seal_wave(tmp_path, control, run, wave)
+    task = waves.claim(tmp_path, control, run, wave, worker)["task"]
+    draft, coverage, errors = result_files(tmp_path)
+    draft.write_bytes(b'{"sources": [], "members": [{}]}')
+    with pytest.raises(ValueError, match=r"result-0\.json: members\[0\]\.path"):
+        waves.submit(tmp_path, control, run, wave, worker, task["id"],
+                     drafts=[draft], coverage=coverage, errors=errors)
+    claimed = waves.inspect(tmp_path, control, run, wave)["tasks"][0]
+    assert claimed["status"] == "claimed" and claimed["result"] is None
+
+
+def test_submit_rejects_bad_image_basis_before_affecting_a_sibling(tmp_path):
+    control, run, wave, workers = setup_wave(tmp_path, task_count=2, worker_count=2)
+    args = (tmp_path, control, run, wave)
+    for worker in workers:
+        waves.started(*args, worker, "host-" + worker)
+    seal_wave(*args)
+    first, second = [waves.claim(*args, worker)["task"] for worker in workers]
+    bad, coverage, errors = result_files(tmp_path)
+
+    def submit(task, worker, draft, region):
+        path, = task["paths"]
+        proposal = {"sources": [path], "members": [{"kind": "image", "path": path,
+                     "locator": {"region": "legacy descriptive member area"}}],
+                    "edges": [{"in": {"member": 0}, "out": {"member": 0}, "type": "uses",
+                               "text": "Evidence", "basis": [{"path": path, "locator": {"region": region}}]}]}
+        draft.write_bytes(json.dumps(proposal).encode("utf-8"))
+        return waves.submit(*args, worker, task["id"], drafts=[draft], coverage=coverage, errors=errors)
+
+    with pytest.raises(ValueError, match=r"result-0\.json: edges\[0\]\.basis\[0\]\.locator\.region: .*ordered"):
+        submit(first, workers[0], bad, "whole plot")
+    good = tmp_path / "good.json"
+    assert submit(second, workers[1], good, [0, 0, 1, 1])["status"] == "submitted"
+    bad_task, good_task = waves.inspect(*args)["tasks"]
+    assert bad_task["status"] == "claimed" and bad_task["result"] is None
+    assert good_task["result"]["drafts"] == [waves.fixed_reference(good)]
+
+
+@pytest.mark.parametrize("kind,text,selection,error", [
+    ("chunk", None, {"end_line": 3}, r"Invalid line range 1:3"),
+    ("chunk", "αbeta\r\n尾行\n", {"end_line": 3}, r"Invalid line range 1:3"),
+    ("section", "Author summary", {"end_line": 0}, r"Invalid line range 1:0"),
+    ("file", "Author summary", {"locator": {"start_col": 0, "end_col": 20}}, r"Invalid text locator"),
+])
+def test_submit_checks_fixed_original_before_accepting_a_draft(tmp_path, kind, text, selection, error):
+    control, run, wave, (worker,) = setup_wave(tmp_path)
+    waves.started(tmp_path, control, run, wave, worker, "host")
+    seal_wave(tmp_path, control, run, wave)
+    task = waves.claim(tmp_path, control, run, wave, worker)["task"]
+    draft, coverage, errors = result_files(tmp_path)
+    path = task["paths"][0]
+    revision = sha256("αbeta\r\n尾行\n".encode("utf-8")).hexdigest()
+    prepare = tmp_path / "reading.json"
+    prepare.write_text(json.dumps({"sources": [{"path": path, "revision": revision, "kind": "text",
+                                                "numbered_text": "1: αbeta\r\n2: 尾行\n"}]}), encoding="utf-8")
+    member = {"path": path, "kind": kind, "start_line": 1, "end_line": 2}
+    if text is not None:
+        member["text"] = text
+    proposal = {"prepare": waves.fixed_reference(prepare), "sources": [path], "members": [{**member, **selection}]}
+    draft.write_text(json.dumps(proposal), encoding="utf-8")
+    args = {"drafts": [draft], "coverage": coverage, "errors": errors}
+    with pytest.raises(ValueError, match=rf"result-0\.json: members\[0\].*{path}@{revision}.*{error}"):
+        waves.submit(tmp_path, control, run, wave, worker, task["id"], **args)
+    claimed = waves.inspect(tmp_path, control, run, wave)["tasks"][0]
+    assert claimed["status"] == "claimed" and claimed["result"] is None
+
+    proposal["members"] = [member]
+    corrected = tmp_path / "corrected.json"
+    corrected.write_text(json.dumps(proposal), encoding="utf-8")
+    submitted = waves.submit(tmp_path, control, run, wave, worker, task["id"],
+                             **{**args, "drafts": [corrected]})
+    assert submitted["status"] == "submitted"
+    assert submitted["result"]["drafts"] == [waves.fixed_reference(corrected)]
 
 
 @pytest.mark.parametrize("source_fields,error", [

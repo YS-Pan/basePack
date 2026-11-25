@@ -1,5 +1,6 @@
 """Read exact vertices and the single published graph."""
 
+from .dialogue_query import graph_dialogue_test, legacy_path_tests, require_original_path
 from .relation_contract import SYSTEM_EDGE_TYPES
 from .store import _read_original, _record, _sql
 
@@ -9,7 +10,7 @@ _EXACT_TABLES = {"knowledge_version", "source_version", "graph_edge"}
 _EDGE_FIELDS = ("id, in, out, type, private, logical_id, knowledge_revision, "
                 "conditions, text, label, locator, state.status AS status")
 _KNOWLEDGE_FIELDS = ("kind", "title", "text", "path", "source_version", "start_line", "end_line",
-                     "locator", "claim_type", "conditions", "stale", "retired")
+                     "locator", "claim_type", "conditions", "stale", "retired", "codex_thread_id")
 _HISTORICAL_EVIDENCE = "['part_of','from_snapshot','has_basis']"
 _SYSTEM_EDGES = _sql(sorted(SYSTEM_EDGE_TYPES))
 
@@ -58,18 +59,36 @@ def _within_scope(prefix, scope):
     return f"({direct} OR ({path}=NONE AND {provenance}))"
 
 
-def _visibility(prefix, scope, allow_private, *, path=False):
+def _visibility(memory, prefix, scope, allow_private, *, path=False):
     tests = [] if allow_private else [f"{prefix}private=false"]
     if scope:
         if path:
             tests.append(f"string::starts_with(({prefix}path ?? ''), {_sql(scope)})")
         else:
             tests.append(_within_scope(prefix, scope))
+    tests.extend(_protected_visibility(memory, prefix, scope, allow_private))
     return tests
+
+
+def _protected_visibility(memory, prefix, scope, allow_private):
+    return [graph_dialogue_test(memory, prefix.rstrip("."), scope, allow_private),
+            *legacy_path_tests(memory, f"({prefix}path ?? {prefix}record.path)")]
 
 
 def _present(row):
     return {key: value for key, value in row.items() if value is not None}
+
+
+def require_dialogue_visibility(memory, row):
+    """Protect direct knowledge/history lookups, which normally include private records."""
+    require_original_path(memory, row.get("path"))
+    if row.get("codex_thread_id") is not None:
+        exact = row.get("exact_id") or resolve_seed(memory, row["id"], row["knowledge_revision"])
+        if exact is None or get_vertex(memory, exact, scope="", allow_private=True) is None:
+            raise ValueError("Dialogue node unavailable within the requested scope and visibility")
+    exact = row.get("exact_id", row["id"])
+    if _record(exact).table == "graph_edge" and get_vertex(memory, exact, scope="", allow_private=True) is None:
+        raise ValueError("Graph edge unavailable within the requested scope and visibility")
 
 
 def get_vertex(memory, exact, *, scope, allow_private):
@@ -83,11 +102,11 @@ def get_vertex(memory, exact, *, scope, allow_private):
                 "identity": True, "private": links[0]["private"]} if links else None
     if target.table not in _EXACT_TABLES:
         return None
-    tests = _visibility("", scope, allow_private, path=target.table == "source_version")
+    tests = _visibility(memory, "", scope, allow_private, path=target.table == "source_version")
     if target.table == "knowledge_version":
         tests.append("state != NONE")
     if target.table == "graph_edge":
-        tests.extend(_edge_endpoint_tests(scope, allow_private))
+        tests.extend(_edge_endpoint_tests(memory, scope, allow_private))
     where = " WHERE " + " AND ".join(tests) if tests else ""
     if target.table == "knowledge_version":
         fields = ("id, target, knowledge_revision, private, state.status AS status, "
@@ -115,14 +134,31 @@ def get_vertex(memory, exact, *, scope, allow_private):
     return item
 
 
-def _endpoint_filter(field, scope, allow_private):
-    tests = [f"{field}.id != NONE", *_visibility(f"{field}.", scope, allow_private)]
+def _endpoint_filter(memory, field, scope, allow_private):
+    tests = [f"{field}.id != NONE", *_visibility(memory, f"{field}.", scope, allow_private)]
     return " AND ".join(tests)
 
 
-def _edge_endpoint_tests(scope, allow_private):
-    return [f"({_endpoint_filter('in', scope, allow_private)})",
-            f"(type='version_of' AND out.id!=NONE OR {_endpoint_filter('out', scope, allow_private)})"]
+def _edge_endpoint_tests(memory, scope, allow_private):
+    identity = " AND ".join(["type='version_of'", "out.id!=NONE",
+                             *_protected_visibility(memory, "out.", scope, allow_private)])
+    usable_basis = " AND ".join(_protected_visibility(memory, "out.", scope, allow_private))
+    basis_gap = ("SELECT VALUE id FROM graph_edge WHERE in=$parent.id AND type='has_basis' "
+                 f"AND !({usable_basis}) LIMIT 1")
+    return [f"({_endpoint_filter(memory, 'in', scope, allow_private)})",
+            f"(({identity}) OR {_endpoint_filter(memory, 'out', scope, allow_private)})",
+            f"array::len(({basis_gap}))=0"]
+
+
+def visible_edge_records(memory, rows, *, scope="", allow_private=True):
+    """Filter already selected relationship metadata using native edge visibility."""
+    records = {_record(row["exact_id"]) for row in rows if row.get("exact_id")}
+    if not records:
+        return rows
+    tests = " AND ".join(_edge_endpoint_tests(memory, scope, allow_private))
+    rows_by_id, = memory._execute(f"SELECT VALUE id FROM {_sql(sorted(records, key=_sql))} WHERE {tests};")
+    allowed = {_record(value) for value in rows_by_id}
+    return [row for row in rows if not row.get("exact_id") or _record(row["exact_id"]) in allowed]
 
 
 def adjacent(memory, exact, *, direction, types, scope, allow_private, include_stale, limit,
@@ -140,8 +176,8 @@ def adjacent(memory, exact, *, direction, types, scope, allow_private, include_s
     for key, expected in (conditions or {}).items():
         field = f"conditions[{_sql(key)}]"
         tests.append(f"({field}=NONE OR {field}={_sql(expected)})")
-    tests.extend(_visibility("", scope, allow_private))
-    tests.extend(_edge_endpoint_tests(scope, allow_private))
+    tests.extend(_visibility(memory, "", scope, allow_private))
+    tests.extend(_edge_endpoint_tests(memory, scope, allow_private))
     if not include_stale:
         historical = ("true" if include_historical else
                       f"(type='version_of' OR (in={ref} AND type IN {_HISTORICAL_EVIDENCE}))")
@@ -171,35 +207,47 @@ def _entry_refs(entry):
 
 def _visible_references(memory, refs, scope, allow_private):
     queries = {}
+    visible = set()
     for target, revision in dict.fromkeys(refs):
         ref = _sql(target)
-        tests = _visibility("", scope, allow_private, path=target.table == "source_version")
+        address = []
+        tests = _visibility(memory, "", scope, allow_private, path=target.table == "source_version")
+        # Old unrestricted projections include unpinned or no-longer retained
+        # file provenance. Keep these links unless a retained record is hidden.
+        fresh_dialogue = target.table == "node" and str(target.key).startswith("codex-")
+        require_match = bool(scope) or not allow_private or fresh_dialogue
         if target.table in {"member", "node"} and revision is not None:
             selection = f"ONLY (fn::knowledge_id({ref}, {_sql(revision)}))"
-        elif target.table == "semantic" and revision is not None:
-            selection = "graph_edge"
-            tests.extend([f"logical_id={ref}", f"knowledge_revision={_sql(revision)}"])
-            tests.extend(_edge_endpoint_tests(scope, allow_private))
-        elif target.table in _EXACT_TABLES:
+        elif target.table == "semantic":
+            if revision is None:
+                selection = f"ONLY ({ref}.head)"
+            else:
+                selection = "graph_edge"
+                address.extend([f"logical_id={ref}", f"knowledge_revision={_sql(revision)}"])
+            tests.extend(_edge_endpoint_tests(memory, scope, allow_private))
+        elif target.table in _EXACT_TABLES or target.table in {"member", "node"} and not require_match:
             selection = f"ONLY {ref}"
             if revision is not None:
-                tests.append(f"knowledge_revision={_sql(revision)}")
+                address.append(f"knowledge_revision={_sql(revision)}")
             if target.table == "graph_edge":
-                tests.extend(_edge_endpoint_tests(scope, allow_private))
+                tests.extend(_edge_endpoint_tests(memory, scope, allow_private))
         else:
+            if not require_match:
+                visible.add((target, revision))
             continue
-        queries[target, revision] = f"SELECT VALUE id FROM {selection} WHERE {' AND '.join(tests)};"
+        policy = " AND ".join(tests)
+        address.append(f"({policy})" if require_match else f"!({policy})")
+        queries[target, revision] = f"SELECT VALUE id FROM {selection} WHERE {' AND '.join(address)};", require_match
     if not queries:
-        return set()
-    rows = memory._execute(" ".join(queries.values()))
-    return {ref for ref, result in zip(queries, rows, strict=True) if result}
+        return visible
+    rows = memory._execute(" ".join(query for query, _ in queries.values()))
+    visible.update(ref for (ref, (_, require_match)), result in zip(queries.items(), rows, strict=True)
+                   if bool(result) == require_match)
+    return visible
 
 
 def filter_record_details(memory, row, *, scope, allow_private):
     """Filter the nested provenance returned by compatibility projections."""
-    if not scope and allow_private:
-        return row
-
     citations = {field: [(entry, _entry_refs(entry)) for entry in (row[field] or ())]
                  for field in ("basis", "direct_basis") if field in row}
     endpoints = {}
@@ -218,14 +266,15 @@ def filter_record_details(memory, row, *, scope, allow_private):
     result = dict(row)
     if scope and "scope_paths" in result:
         result["scope_paths"] = [path for path in result["scope_paths"] if path.startswith(scope)]
+    unrestricted = not scope and allow_private
     for field, entries in citations.items():
-        result[field] = [entry for entry, keys in entries if keys and visible.issuperset(keys)]
+        result[field] = [entry for entry, keys in entries if (keys or unrestricted) and visible.issuperset(keys)]
     allowed_sides = {side for side, keys in endpoints.items() if keys and visible.issuperset(keys)}
     if "endpoint_versions" in row:
         result["endpoint_versions"] = {side: pin for side, pin in pins.items() if side in allowed_sides}
     for side in endpoints.keys() - allowed_sides:
         result.pop(side, None)
-    if "parent" in result and not (parent and visible.issuperset(parent)):
+    if "parent" in result and not ((parent or unrestricted) and visible.issuperset(parent)):
         result.pop("parent", None)
         result.pop("parent_version", None)
     if original and not visible.issuperset(original):
@@ -246,7 +295,7 @@ def _unpinned(memory, vertex, scope, allow_private):
     if vertex["record_type"] not in {"member", "node"}:
         return [], []
     ref = _sql(_record(vertex["id"]))
-    visible = _visibility("record.", scope, allow_private, path=True)
+    visible = _visibility(memory, "record.", scope, allow_private, path=True)
     suffix = " AND " + " AND ".join(visible) if visible else ""
     return memory._execute(
         f"SELECT VALUE record FROM knowledge_version WHERE record.parent={ref} AND record.parent_version=NONE{suffix}; "
@@ -274,6 +323,7 @@ def neighbors(memory, record_id, *, include_stale, knowledge_revision, direction
             result.update(unpinned_children=[], unpinned_edges=[])
         if explicit and exact is None and allow_private and not scope and _record(record_id).table in {"member", "node", "semantic"}:
             current = knowledge(memory, record_id, knowledge_revision=knowledge_revision)
+            require_dialogue_visibility(memory, current)
             children, edges = _unpinned(memory, {**current, "record_type": _record(current["id"]).table}, scope, allow_private)
             result.update(record=memory.access_hints([current])[0], unpinned_children=children, unpinned_edges=edges)
         return result
@@ -311,14 +361,13 @@ def neighbors(memory, record_id, *, include_stale, knowledge_revision, direction
         children, edges = _unpinned(memory, vertex, scope, allow_private)
         result.update(unpinned_children=memory.access_hints(children), unpinned_edges=memory.access_hints(edges),
                       coverage={"complete": False, "note": "Only retained, version-pinned neighbors are traversable."})
-    if scope or not allow_private:
-        visibility = {"scope": scope, "allow_private": allow_private}
-        for field in ("record", "parent"):
-            if result[field] is not None:
-                result[field] = filter_record_details(memory, result[field], **visibility)
-        for field in ("children", "edges", "unpinned_children", "unpinned_edges"):
-            if field in result:
-                result[field] = [filter_record_details(memory, row, **visibility) for row in result[field]]
+    visibility = {"scope": scope, "allow_private": allow_private}
+    for field in ("record", "parent"):
+        if result[field] is not None:
+            result[field] = filter_record_details(memory, result[field], **visibility)
+    for field in ("children", "edges", "unpinned_children", "unpinned_edges"):
+        if field in result:
+            result[field] = [filter_record_details(memory, row, **visibility) for row in result[field]]
     return result
 
 
@@ -332,11 +381,10 @@ def basis_dependents(memory, observed, *, scope, allow_private):
 
     requested = dict.fromkeys((member, revision) for member, revision, _ in observed)
     refs = ", ".join(f"fn::knowledge_id({_sql(member)}, {_sql(revision)})" for member, revision in requested)
-    anchor_tests = []
+    anchor_tests = _visibility(memory, "", scope, allow_private)
+    anchor_tests.extend(_visibility(memory, "record.source_version.", scope, allow_private, path=True))
     if restricted:
-        anchor_tests.extend(_visibility("", scope, allow_private))
         anchor_tests.append("record.source_version.id!=NONE")
-        anchor_tests.extend(_visibility("record.source_version.", scope, allow_private, path=True))
     anchor_filter = " WHERE " + " AND ".join(anchor_tests) if anchor_tests else ""
     rows = memory._execute("SELECT id, target, knowledge_revision, record.source_version AS source_version "
                            f"FROM [{refs}]{anchor_filter};")[0]
@@ -349,10 +397,8 @@ def basis_dependents(memory, observed, *, scope, allow_private):
     if not anchors:
         return []
     cited = _sql([_record(exact) for exact in anchors])
-    edge_filter = ""
-    if restricted:
-        edge_tests = [*_visibility("", scope, allow_private), *_edge_endpoint_tests(scope, allow_private)]
-        edge_filter = " AND " + " AND ".join(edge_tests)
+    edge_tests = [*_visibility(memory, "", scope, allow_private), *_edge_endpoint_tests(memory, scope, allow_private)]
+    edge_filter = " AND " + " AND ".join(edge_tests)
     rows = memory._execute(
         "SELECT id, in, out, in.target AS target, in.logical_id AS logical_id, "
         "in.knowledge_revision AS knowledge_revision FROM graph_edge "
@@ -367,7 +413,7 @@ def basis_dependents(memory, observed, *, scope, allow_private):
     matches = []
     for exact, edges in dependents.items():
         first = edges[0]
-        if restricted and first.get("logical_id") and get_vertex(
+        if first.get("logical_id") and get_vertex(
                 memory, exact, scope=scope, allow_private=allow_private) is None:
             continue
         identifier = first.get("logical_id") or first["target"]
@@ -390,7 +436,7 @@ def read_source_version(memory, identifier, *, start_line=None, end_line=None, l
     target = _record(identifier, "source_version")
     if target.table != "source_version":
         raise ValueError("read-source requires a source_version ID")
-    visibility = _visibility("", normalize_scope(scope), allow_private, path=True)
+    visibility = _visibility(memory, "", normalize_scope(scope), allow_private, path=True)
     where = " WHERE " + " AND ".join(visibility) if visibility else ""
     snapshot = memory._execute(f"SELECT * FROM ONLY {_sql(target)}{where};")[0]
     if snapshot is None:

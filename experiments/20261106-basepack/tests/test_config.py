@@ -34,7 +34,8 @@ def test_two_projects_and_subdirectory_config(tmp_path, monkeypatch):
     assert "memory retrieve --question" in instructions
     assert "`--scope` 仅为项目相对路径前缀" in instructions
     assert "业务限制写入问题" in instructions
-    assert "config ai --level 3" in instructions
+    assert "`config ai` 解析项目日常档位" in instructions
+    assert "`config ai --level <n>` 选择指定档位" in instructions
     assert "gpt-6" not in instructions
     assert (projects[0] / ".gitignore").read_text(encoding="utf-8") == "/.basepack/\n"
     assert not (projects[0] / ".basepack/memory").exists()

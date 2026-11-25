@@ -4,7 +4,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 
-from .draft import freeze_file, validate_batch
+from .draft import freeze_file, read_author_draft, validate_batch
 
 
 def publish(memory, *, completed=None, output=None, frozen=None, control, result, timeout=600,
@@ -45,7 +45,7 @@ def publish(memory, *, completed=None, output=None, frozen=None, control, result
             if file_sha256 != reference['file_sha256'].lower():
                 raise ValueError(f'completed[{index}] file SHA256 mismatch for {draft_path}: '
                                  f"expected {reference['file_sha256']}, found {file_sha256}")
-            draft = json.loads(material.decode('utf-8'))
+            draft = read_author_draft(draft_path, material=material)
             if not use_draft_context:
                 # A wave keeps author provenance with each fixed draft and task.
                 draft.pop('context', None)

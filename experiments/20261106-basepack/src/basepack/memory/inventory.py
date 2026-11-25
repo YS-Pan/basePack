@@ -16,6 +16,12 @@ _CAPTURE_GAP_FIELDS = ("path", "project_id", "thread_id", "turn_id", "item_id", 
 
 
 def _codex_sources(config, collection):
+    from .codex_index_config import configured
+
+    if configured(config):
+        if collection is not None:
+            raise ValueError("Dialogue indexing cannot use a legacy collection receipt")
+        return {"paths": [], "gaps": [], "expected": {}, "thread_ids": {}, "observation": {"status": "indexed"}}
     project_id = config.raw["memory"].get("codex", {}).get("project_id")
     if collection is None:
         retained = retained_codex_paths(config, project_id, include_threads=True)
@@ -90,12 +96,14 @@ def inventory(config, memory, *, collection=None, group_map=None) -> dict:
     for an unregistered path. Its hashes and privacy need not match the live
     observation. Neither registration nor grouping establishes acceptance.
     """
+    from .codex_index_config import configured, legacy_capture_path
     from .inventory_groups import group_sources
 
     root = Path(config.root).resolve()
     candidates, mode = source_candidates(config, include_missing=True)
+    indexed = configured(config)
     registered = {_project_path(root, row["path"]): {key: row[key] for key in row if key != "path"}
-                  for row in memory.sources()}
+                  for row in memory.sources() if not indexed or not legacy_capture_path(config, row["path"])}
     for target in registered:
         candidates.setdefault(target, set()).add("registered")
 

@@ -10,7 +10,7 @@ from test_memory_store import deterministic_vector, memory
 
 class FakeMemory:
     def __init__(self, compatible):
-        self.config = SimpleNamespace(machine=object())
+        self.config = SimpleNamespace(machine=object(), raw={"memory": {}})
         self.compatible = compatible
         self.queries = []
 

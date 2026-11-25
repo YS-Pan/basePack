@@ -20,7 +20,7 @@ from basepack.runtime.recovery import managed, raise_if_managed_refusal
 from .content import (SourceContent, _check_collection_revision, _project_path, detect_changes,
                       numbered_text, read_source, reading_units, original_text, line_slices)
 from .images import IMAGE_SUFFIXES, ImageSource, read_image, retain_image
-from .privacy import derive_private, privacy_rules, rules_revision, source_private
+from .privacy import derive_private, privacy_fields, privacy_rules, rules_revision, source_private
 
 
 _CANDIDATE_OMIT = "embedding,basis,raw_revision"
@@ -234,12 +234,12 @@ class Memory:
             raise SqlResponseError("\n".join(str(error) for error in errors))
         return [statement["result"] for statement in statements]
 
-    def _publish(self, statements: list[str], *, control: str | None = None) -> None:
+    def _publish(self, statements: list[str], *, control: str | None = None, checkpoint=None) -> None:
         """Send complete SQL statements in bounded messages in one native transaction."""
         with memory_operation(self.config) as lease:
-            self._publish_admitted(statements, control, lease)
+            self._publish_admitted(statements, control, lease, checkpoint=checkpoint)
 
-    def _publish_admitted(self, statements, control, lease) -> None:
+    def _publish_admitted(self, statements, control, lease, *, checkpoint=None) -> None:
         from websocket import create_connection
 
         limit = _MESSAGE_LIMIT
@@ -249,6 +249,8 @@ class Memory:
                       f"CREATE {_sql(marker)} SET committed=true RETURN NONE;"]
         groups = _publication_groups(statements, limit)
 
+        if checkpoint is not None:
+            checkpoint()
         publication = None
         if control:
             from .owner import begin_publication, finish_publication
@@ -285,6 +287,8 @@ class Memory:
             rpc("use", [self.connection["namespace"], self.connection["database"]])
             transaction = rpc("begin")
             for group in groups:
+                if checkpoint is not None:
+                    checkpoint()
                 results = rpc("query", [group], transaction)
                 errors = [result["result"] for result in results if result["status"] != "OK"]
                 if errors:
@@ -293,6 +297,8 @@ class Memory:
                 # A disconnected client can leave an unconfirmed commit even without a maintenance owner.
                 lease.hold(marker.key)
                 held = True
+            if checkpoint is not None:
+                checkpoint()
             committing = True
             try:
                 rpc("commit", [transaction])
@@ -381,12 +387,17 @@ class Memory:
 
     def knowledge(self, record_id: str, *, knowledge_revision: str | None = None) -> dict:
         from .history import knowledge
+        from .graph_query_store import require_dialogue_visibility
         row = knowledge(self, record_id, knowledge_revision=knowledge_revision)
+        require_dialogue_visibility(self, row)
         return self.access_hints([row])[0] if _record(row["id"]).table in {"member", "node", "semantic"} else row
 
     def history(self, record_id: str) -> dict:
         from .history import history
+        from .graph_query_store import require_dialogue_visibility
         result = history(self, record_id)
+        for row in result["versions"]:
+            require_dialogue_visibility(self, row)
         result["versions"] = self.access_hints(result["versions"])
         return result
 
@@ -425,7 +436,11 @@ class Memory:
     def prepare(self, paths: list[str], *, historical_versions: list[dict] | None = None,
                 expected_revisions: dict[str, str | None] | None = None) -> dict:
         """Supply explicit new/old originals and existing knowledge for one reading."""
+        from .dialogue_query import graph_dialogue_test, require_original_path
+        from .graph_query_store import require_dialogue_visibility, visible_edge_records
+
         for path in paths:
+            require_original_path(self, path)
             if _project_path(self.config.root.resolve(), path).is_dir():
                 raise ValueError(f"prepare --paths accepts files, not directories: {path}. "
                                  "Enumerate and select files first (PowerShell: Get-ChildItem -File); "
@@ -493,14 +508,15 @@ class Memory:
                     item["previous"] = {"revision": old.revision, "numbered_text": numbered_text(old)}
                 item["previous"].update({key: snapshot[key] for key in ("dispositions", "deferred_refinement", "unavailable_gaps")
                                          if key in snapshot})
-                item["previous"]["private"] = snapshot.get("private", source_private(snapshot.get("path", previous["path"])))
                 item["previous"]["source_version"] = snapshot["id"]
             prepared.append(item)
             ids.extend(member["id"] for member in item["members"])
         selected = set(ids)
-        from .history import knowledge, semantic_rows
+        from .history import _effective_privacy, knowledge, semantic_rows
         edges = semantic_rows(self, members=ids) if ids else []
-        nodes = self._rows("node")
+        edges = visible_edge_records(self, edges)
+        visibility = graph_dialogue_test(self, "")
+        nodes = self._execute(f"SELECT * FROM node WHERE {visibility};")[0]
         related = set(selected)
         related.update(value for edge in edges for value in (edge["in"], edge["out"])
                        if _record(value).table == "member")
@@ -517,6 +533,8 @@ class Memory:
         current = {_record(row["id"]): row for row in [*members, *nodes, *edges]}
         explicit = [knowledge(self, item["id"], knowledge_revision=item["knowledge_revision"])
                     for item in historical_versions or []]
+        for row in explicit:
+            require_dialogue_visibility(self, row)
         if any(row.get("legacy_history_only") for row in explicit):
             raise ValueError("A history-only relationship cannot be prepared as a graph endpoint")
         explicit_keys = {(_record(row["id"]), row["knowledge_revision"]) for row in explicit}
@@ -585,12 +603,42 @@ class Memory:
                 row["exact_id"] = f"{exact.table}:{exact.key}"
             if row.get("source_version"):
                 snapshot_ids.add(_record(row["source_version"]))
-        for row in neighborhood_edges.values():
+        version_rows.extend(neighborhood_edges.values())
+        for row in version_rows:
             snapshot_ids.update(_record(entry["source_version"]) for entry in row.get("direct_basis", [])
                                 if "source_version" in entry)
+            snapshot_ids.update(_record(entry["source_version"]) for entry in row.get("basis", [])
+                                if entry.get("source_version"))
         snapshots = self._execute(
-            f"SELECT id,private,kind,path,revision FROM source_version WHERE id IN "
+            f"SELECT id,private,privacy_unknown,kind,path,revision FROM source_version WHERE id IN "
             f"{_sql(sorted(snapshot_ids, key=_sql))};")[0] if snapshot_ids else []
+        snapshot_rows = {_record(row["id"]): row for row in snapshots}
+        exact_records = {_record(row["exact_id"]) for row in version_rows}
+        retained = self._execute(
+            "SELECT id,private,privacy_unknown,record.private AS original_private FROM knowledge_version WHERE id IN "
+            f"{_sql(sorted((record for record in exact_records if record.table == 'knowledge_version'), key=_sql))};"
+        )[0] if exact_records else []
+        retained = {_record(row["id"]): row for row in retained}
+        fixed = {(_record(row["id"]), row["knowledge_revision"]):
+                 _effective_privacy(row, retained.get(_record(row["exact_id"]), {}), verify_promotion=True)
+                 for row in version_rows}
+
+        def classify(row):
+            return derive_private(row, source_version=lambda ref: snapshot_rows.get(_record(ref)),
+                                  knowledge_version=lambda ref, rev: fixed.get((_record(ref), rev)))
+
+        for row in version_rows:
+            marker = classify(fixed[_record(row["id"]), row["knowledge_revision"]])
+            row.pop("privacy_unknown", None)
+            row.update(privacy_fields(marker))
+        for row in snapshots:
+            marker = classify(row)
+            row.pop("privacy_unknown", None)
+            row.update(privacy_fields(marker))
+        for source in prepared:
+            if previous := source.get("previous"):
+                snapshot = snapshot_rows[_record(previous["source_version"])]
+                previous.update({key: snapshot[key] for key in ("private", "privacy_unknown") if key in snapshot})
         return {"sources": prepared, "historical_versions": historical,
                 "snapshots": snapshots,
                 "privacy_rules": rules, "privacy_rules_revision": rules_hash,
@@ -984,7 +1032,7 @@ class Memory:
             target = _record(record)
             key = (target, revision)
             if key not in accepted:
-                accepted[key] = read_knowledge(self, target, knowledge_revision=revision)
+                accepted[key] = read_knowledge(self, target, knowledge_revision=revision, verify_promotion=True)
             return {**accepted[key], "id": target}
 
         frozen_private = batch.get("compiled_private")
@@ -1036,7 +1084,7 @@ class Memory:
             if record.table == "semantic":
                 row = self._execute(f"SELECT * FROM ONLY {_sql(record)};")[0]
                 return _record(row["head"])
-            return graph.version(record, expected_heads[record]).record
+            return graph.retained_version_id(record, expected_heads[record])
 
         for table, key in [("member", "delete_members"), ("node", "delete_nodes"), ("semantic", "delete_edges")]:
             for value in batch.get(key, []):
@@ -1098,6 +1146,7 @@ class Memory:
     def search(self, text: str, *, scope: str = "", limit: int = 10, literal: bool = False,
                allow_private: bool = True, access: bool = True) -> list[dict]:
         """Return lexical candidates for hybrid retrieval."""
+        from .dialogue_query import legacy_path_tests
         from .query import normalize_scope
         scope = normalize_scope(scope)
         if literal:
@@ -1108,15 +1157,18 @@ class Memory:
             match = f"(text @1@ {_sql(text)} OR title @2@ {_sql(text)})"
             score = "search::score(1) + search::score(2)"
         privacy = "" if allow_private else "AND private=false "
+        legacy = "".join(f"AND {test} " for test in legacy_path_tests(self, "path"))
         rows = self._execute(f"SELECT *, source_revision AS revision, {score} AS lexical_score OMIT {_CANDIDATE_OMIT} FROM member "
                              f"WHERE stale=false AND retired!=true AND {match} "
-                             f"AND string::starts_with(path, {_sql(scope)}) {privacy}"
+                             f"AND string::starts_with(path, {_sql(scope)}) {privacy}{legacy}"
                              f"ORDER BY lexical_score DESC, id ASC LIMIT {int(limit)};")[0]
         return self.access_hints(rows) if access else rows
 
     def read(self, member_id: str, *, source_version: str | None = None,
              start_line: int | None = None, end_line: int | None = None,
              locator: dict | None = None, knowledge_revision: str | None = None) -> dict:
+        from .dialogue_query import require_original_path
+
         if _record(member_id).table != "member":
             raise ValueError("read requires a member ID; inspect node/edge evidence via neighbors")
         if knowledge_revision is None:
@@ -1125,6 +1177,7 @@ class Memory:
                 raise ValueError(f"Member not found: {member_id}")
         else:
             member = self.knowledge(member_id, knowledge_revision=knowledge_revision)
+        require_original_path(self, member["path"])
         version = source_version or member["source_version"]
         snapshot = self._execute(f"SELECT * FROM ONLY {_sql(_record(version, 'source_version'))};")[0]
         if snapshot is None:
@@ -1154,6 +1207,7 @@ class Memory:
             if len(accepted_paths) != 1:
                 raise ValueError(f"Source snapshot has ambiguous historical paths for member {member_id}: {version}")
             path = accepted_paths.pop()
+        require_original_path(self, path)
         if snapshot["kind"] == "image":
             if locator is None and source_version is None:
                 locator = member.get("locator")
@@ -1197,15 +1251,23 @@ class Memory:
 
     def brief(self, task: str = "", *, limit: int = 6) -> dict:
         """Read published startup material without searching or inspecting originals."""
+        from .dialogue_query import graph_dialogue_test, legacy_path_tests
+        from .graph_query_store import visible_edge_records
+
         sources = self.sources()
+        dialogue = graph_dialogue_test(self, "")
+        legacy = "".join(f"AND {test} " for test in legacy_path_tests(self, "path"))
         mandatory, stale_members, stale_nodes, stale_edges, gaps, overview, overview_nodes = self._execute(
-            "SELECT * OMIT embedding FROM member WHERE mandatory=true AND retired!=true; "
-            "SELECT id,path,kind,private FROM member WHERE stale=true AND retired!=true; "
-            "SELECT id,kind,private FROM node WHERE stale=true AND retired!=true; "
-            "SELECT id,head.type AS kind,head.private AS private FROM semantic WHERE stale=true AND retired!=true; "
-            "SELECT id,path,private,coverage_gaps AS gaps FROM member WHERE retired!=true AND array::len(coverage_gaps)>0; "
-            "SELECT * OMIT embedding FROM member WHERE stale=false AND retired!=true AND mandatory=false AND kind IN ['file','section','image']; "
-            "SELECT * FROM node WHERE stale=false AND retired!=true;")
+            f"SELECT * OMIT embedding FROM member WHERE mandatory=true AND retired!=true {legacy}; "
+            f"SELECT id,path,kind,private FROM member WHERE stale=true AND retired!=true {legacy}; "
+            f"SELECT id,kind,private FROM node WHERE stale=true AND retired!=true AND {dialogue}; "
+            "SELECT id,head AS exact_id,head.type AS kind,head.private AS private FROM semantic WHERE stale=true AND retired!=true; "
+            f"SELECT id,path,private,coverage_gaps AS gaps FROM member WHERE retired!=true AND array::len(coverage_gaps)>0 {legacy}; "
+            "SELECT * OMIT embedding FROM member WHERE stale=false AND retired!=true AND mandatory=false "
+            f"AND kind IN ['file','section','image'] {legacy}; "
+            f"SELECT * FROM node WHERE stale=false AND retired!=true AND {dialogue};")
+        stale_edges = [{key: value for key, value in row.items() if key != "exact_id"}
+                       for row in visible_edge_records(self, stale_edges)]
         registered = {_record(row["id"]): row for row in sources}
         basis_versions = {_record(basis["source_version"], "source_version")
                           for row in mandatory for basis in row.get("basis", [])}
@@ -1277,14 +1339,19 @@ class Memory:
 
     def sources(self) -> list[dict]:
         """List source metadata for explicit inventory or deep-maintenance sampling."""
-        return self._execute("SELECT id,path,revision,size,mtime_ns,deleted,kind,private,privacy_rules_revision FROM source ORDER BY path;")[0]
+        from .dialogue_query import legacy_path_tests
+
+        tests = legacy_path_tests(self, "path")
+        where = " WHERE " + " AND ".join(tests) if tests else ""
+        return self._execute("SELECT id,path,revision,size,mtime_ns,deleted,kind,private,privacy_rules_revision "
+                             f"FROM source{where} ORDER BY path;")[0]
 
     def changes(self, scope: list[str], *, deep: bool = False) -> list[dict]:
         return self._check_changes(self.sources(), scope, deep=deep)
 
     def maintain(self, scope: list[str], *, include_registered: bool = False, control: str | None = None,
                  timeout: float = 600, expected_snapshots: dict[str, str] | None = None,
-                 discover_graph: bool = False) -> dict:
+                 discover_graph: bool = False, outcome_sources: tuple[str, ...] = ()) -> dict:
         """Run deterministic maintenance and retain the semantic handoff."""
         from .maintenance import maintain
         from .owner import check_owned
@@ -1292,7 +1359,8 @@ class Memory:
             raise ValueError("Maintenance requires the project owner's control")
         check_owned(self.config.memory_dir, control)
         return maintain(self, scope, include_registered=include_registered, control=control, timeout=timeout,
-                        expected_snapshots=expected_snapshots, discover_graph=discover_graph)
+                        expected_snapshots=expected_snapshots, discover_graph=discover_graph,
+                        outcome_sources=outcome_sources)
 
     def _check_changes(self, known: list[dict], scope: list[str], *, deep: bool,
                        expected_snapshots: dict[str, str] | None = None) -> list[dict]:

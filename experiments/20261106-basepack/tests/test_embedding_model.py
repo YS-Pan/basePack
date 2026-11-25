@@ -136,18 +136,46 @@ def test_oversized_token_batch_fails_before_torch_module_forward():
     assert inference.calls == 1
 
 
-def test_animated_image_is_rejected_before_encode(tmp_path):
+@pytest.mark.parametrize("suffix", ["gif", "tiff"])
+def test_multiframe_image_is_rejected_before_encode(tmp_path, suffix):
     from PIL import Image
 
-    image = tmp_path / "animated.gif"
+    image = tmp_path / f"multiframe.{suffix}"
     Image.new("RGB", (16, 16), "red").save(image, save_all=True,
-        append_images=[Image.new("RGB", (16, 16), "blue")], duration=100, loop=0)
+        append_images=[Image.new("RGB", (16, 16), "blue")])
     model = Qwen3VLEmbedder.__new__(Qwen3VLEmbedder)
     model.Image = Image
     model.model = Mock()
     with pytest.raises(ValueError, match="static frame"):
         model.embed([{"image": str(image)}])
     model.model.encode.assert_not_called()
+
+
+def test_single_frame_tiff_reaches_encode_as_png_equivalent_rgb(tmp_path):
+    import torch
+    from PIL import Image
+    from transformers.image_utils import load_image_as_tensor
+
+    tiff, png = tmp_path / "original.tif", tmp_path / "control.png"
+    gray = Image.new("L", (2, 2))
+    gray.putdata([0, 21, 140, 255])
+    gray.save(tiff)
+    gray.convert("RGB").save(png)
+    original = tiff.read_bytes()
+    source = {"text": "caption", "image": str(tiff)}
+    model = Qwen3VLEmbedder.__new__(Qwen3VLEmbedder)
+    model.Image = Image
+    model.device = "cpu"
+    model.identity = "same-identity"
+    model.model = Mock()
+    model.model.encode.return_value = torch.tensor([[1.0]])
+
+    assert model.embed([source])["embedding_identity"] == "same-identity"
+
+    (prepared,) = model.model.encode.call_args.args[0]
+    assert source == {"text": "caption", "image": str(tiff)} and tiff.read_bytes() == original
+    assert prepared["text"] == "caption" and prepared["image"].mode == "RGB"
+    assert torch.equal(load_image_as_tensor(prepared["image"]), load_image_as_tensor(str(png)))
 
 
 def test_token_error_identifies_original_request_indices_without_retry():
@@ -216,6 +244,7 @@ def test_cuda_selects_only_cudnn_and_keeps_request_batching(tmp_path, monkeypatc
 
     def encode(values, **kwargs):
         assert selected == [torch.nn.attention.SDPBackend.CUDNN_ATTENTION]
+        assert values == [value]
         assert kwargs["batch_size"] == expected_batch
         return torch.tensor([[1.0]])
 

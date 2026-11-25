@@ -1,6 +1,7 @@
 """Completed-assignment publication and recovery of its local projection."""
 
 import argparse
+from codecs import BOM_UTF8
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -106,6 +107,147 @@ def test_hash_mismatch_keeps_affected_position_and_publishes_nothing(tmp_path):
         publish(SimpleNamespace(apply=lambda *a, **kw: pytest.fail('applied changed draft')),
                 completed=completed, **files)
     assert not files['output'].exists() and not files['result'].exists()
+
+
+def dispatch_author_draft(tmp_path, entry, reference, monkeypatch, apply):
+    files = paths(tmp_path)
+    parser = argparse.ArgumentParser()
+    register_commands(parser.add_subparsers(dest='command'))
+    if entry == 'freeze':
+        argv = ['freeze', '--drafts', reference['path'], '--output', str(files['output'])]
+    else:
+        manifest = tmp_path / 'completed.json'
+        manifest.write_bytes(json.dumps([reference]).encode('utf-8'))
+        argv = ['publish', '--completed', str(manifest), '--output', str(files['output']),
+                '--result', str(files['result']), '--control', files['control']]
+    config = SimpleNamespace(raw={'memory': {}})
+    monkeypatch.setattr('basepack.memory.store.Memory', lambda config: SimpleNamespace(config=config, apply=apply))
+    return dispatch(parser.parse_args(['memory', *argv]), config)
+
+
+@pytest.mark.parametrize('entry', ['freeze', 'publish'])
+@pytest.mark.parametrize('case', ['array', 'member-path', 'json', 'utf8'])
+def test_author_draft_format_errors_locate_the_input(tmp_path, monkeypatch, entry, case):
+    reference = completed_file(tmp_path, {'sources': [], 'members': [{'kind': 'chunk', 'start_line': 1, 'end_line': 1}]})
+    draft_path = Path(reference['path'])
+    draft = json.loads(draft_path.read_bytes())
+    if case == 'array':
+        material = json.dumps([draft]).encode('utf-8')
+    elif case == 'member-path':
+        del draft['members'][0]['path']
+        material = json.dumps(draft).encode('utf-8')
+    elif case == 'json':
+        material = b'{\n  "sources": [}\n'
+    else:
+        material = b'\xff'
+    draft_path.write_bytes(material)
+    reference['file_sha256'] = sha256(material).hexdigest()
+    error_type = {'json': json.JSONDecodeError, 'utf8': UnicodeDecodeError}.get(case, ValueError)
+    with pytest.raises(error_type) as raised:
+        dispatch_author_draft(tmp_path, entry, reference, monkeypatch, lambda *a, **kw: pytest.fail('applied invalid draft'))
+    error = raised.value
+    if case == 'json':
+        assert (error.lineno, error.colno) == (2, 15)
+    if case in {'json', 'utf8'}:
+        assert any(str(draft_path) in note for note in getattr(error, '__notes__', []))
+    else:
+        detail = {'array': 'JSON object', 'member-path': 'members[0].path'}[case]
+        assert str(draft_path) in str(error) and detail in str(error)
+    assert not paths(tmp_path)['output'].exists() and not paths(tmp_path)['result'].exists()
+
+
+@pytest.mark.parametrize('entry', ['freeze', 'publish'])
+def test_author_draft_accepts_bom_and_keeps_original_hash(tmp_path, monkeypatch, entry):
+    reference = completed_file(tmp_path, {'sources': []})
+    draft_path = Path(reference['path'])
+    material = BOM_UTF8 + draft_path.read_bytes()
+    draft_path.write_bytes(material)
+    calls = []
+
+    def apply(batch, **_):
+        calls.append(batch)
+        return {'sources': 0, 'members': 0, 'nodes': 0, 'edges': 0, 'invalidated': []}
+
+    if entry == 'publish':
+        with pytest.raises(ValueError, match='SHA256 mismatch'):
+            dispatch_author_draft(tmp_path, entry, reference, monkeypatch, apply)
+        assert calls == [] and not paths(tmp_path)['output'].exists()
+    digest = sha256(material).hexdigest()
+    reference['file_sha256'] = digest.upper()
+    summary, status = dispatch_author_draft(tmp_path, entry, reference, monkeypatch, apply)
+    assert status == 0 and draft_path.read_bytes() == material
+    files = paths(tmp_path)
+    frozen = files['output'].read_bytes()
+    assert json.loads(frozen)['batch_id'] == summary['batch_id']
+    if entry == 'publish':
+        receipt = files['result'].read_bytes()
+        saved = json.loads(receipt)
+        assert saved['completed'][0]['file_sha256'] == digest
+        assert saved['frozen_file_sha256'] == sha256(frozen).hexdigest()
+    with pytest.raises(FileExistsError):
+        dispatch_author_draft(tmp_path, entry, reference, monkeypatch, apply)
+    assert files['output'].read_bytes() == frozen
+    if entry == 'publish':
+        assert files['result'].read_bytes() == receipt and len(calls) == 1
+
+
+def image_basis_draft(tmp_path, locators):
+    image = 'graph.png'
+    edges = [{'in': {'member': 0}, 'out': {'member': 0}, 'type': kind, 'text': 'Image evidence',
+              'basis': [{'path': image, 'locator': locator}]}
+             for kind, locator in zip(('uses', 'supports'), locators)]
+    return completed_file(tmp_path, {'sources': [{'path': image, 'revision': 'r1', 'kind': 'image'}],
+                                    'members': [{'kind': 'image', 'path': image,
+                                                 'locator': {'region': 'legacy image member'}}],
+                                    'edges': edges})
+
+
+@pytest.mark.parametrize('entry', ['freeze', 'publish'])
+def test_author_image_basis_locates_bad_region_before_freeze(tmp_path, monkeypatch, entry):
+    reference = image_basis_draft(tmp_path, [{'region': 'whole plot'}])
+    with pytest.raises(ValueError, match=r'draft\.json: edges\[0\]\.basis\[0\]\.locator\.region: .*ordered'):
+        dispatch_author_draft(tmp_path, entry, reference, monkeypatch, lambda *a, **kw: pytest.fail('applied bad region'))
+    assert not paths(tmp_path)['output'].exists() and not paths(tmp_path)['result'].exists()
+
+
+def test_image_basis_accepts_ordered_region_and_whole_image_with_legacy_member_locator(tmp_path, monkeypatch):
+    locators = [{'region': [0, 0.5, 1, 2]}, None]
+    reference = image_basis_draft(tmp_path, locators)
+    dispatch_author_draft(tmp_path, 'freeze', reference, monkeypatch, None)
+    batch = json.loads(paths(tmp_path)['output'].read_bytes())
+    assert [edge['basis'][0]['locator'] for edge in batch['edges']] == locators
+    assert batch['members'][0]['locator'] == {'region': 'legacy image member'}
+
+
+def test_old_frozen_image_basis_reaches_apply_and_checks_source_bytes(tmp_path):
+    from basepack.memory.graph_write import Publication
+    from basepack.memory.store import _record
+
+    reference = image_basis_draft(tmp_path, [{'region': [0, 0, 1, 1]}])
+    files = paths(tmp_path)
+    frozen = files['output']
+    batch = freeze_file([json.loads(Path(reference['path']).read_bytes())], frozen)
+    batch['edges'][0]['basis'][0]['locator'] = {'region': 'whole plot'}
+    old_bytes = json.dumps(batch, indent=2).encode('utf-8')
+    frozen.write_bytes(old_bytes)
+    asset = tmp_path / 'graph.png'
+    asset.write_bytes(b'original image bytes')
+    snapshot = {'path': asset.name, 'asset': asset.name, 'kind': 'image', 'private': False,
+                'revision': sha256(asset.read_bytes()).hexdigest()}
+    graph = Publication(SimpleNamespace(config=SimpleNamespace(memory_dir=tmp_path)), [],
+                        {asset.name: _record('source_version:original')}, lambda _: snapshot, None)
+
+    def apply(batch, **_):
+        graph.direct_basis(batch['edges'][0]['basis'][0])
+        pytest.fail('accepted the malformed old frozen region')
+
+    memory = SimpleNamespace(apply=apply)
+    with pytest.raises(ValueError, match='^Image locator region requires ordered nonnegative coordinates$'):
+        publish(memory, frozen=frozen, control=files['control'], result=files['result'])
+    asset.write_bytes(b'changed image bytes')
+    with pytest.raises(ValueError, match='^Image snapshot revision mismatch for graph.png$'):
+        publish(memory, frozen=frozen, control=files['control'], result=files['result'])
+    assert frozen.read_bytes() == old_bytes and not files['result'].exists()
 
 
 def test_existing_scope_validation_runs_before_save_or_apply(tmp_path):

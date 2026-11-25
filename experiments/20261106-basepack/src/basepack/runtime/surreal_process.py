@@ -21,9 +21,9 @@ class SurrealProcess(subprocess.Popen[bytes]):
         """Send one Ctrl-Break to the ready child and wait for its successful exit."""
         if self.poll() is None:
             # AttachConsole changes process-wide state. Use a detached sender so the launcher
-            # keeps its own console, and target only the child's process group.
+            # keeps its own console. The Windows venv redirector drops detached creation flags.
             subprocess.run(
-                [sys.executable, "-I", "-B", "-X", "utf8", __file__, str(self.pid)],
+                [sys._base_executable, "-I", "-B", "-X", "utf8", __file__, str(self.pid)],
                 stdin=subprocess.DEVNULL, stdout=self._log, stderr=subprocess.STDOUT,
                 creationflags=subprocess.DETACHED_PROCESS, check=True, timeout=10,
             )

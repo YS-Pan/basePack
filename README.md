@@ -2,17 +2,28 @@
 
 basePack gives agents project-local memory, shared compute coordination, and independent skills for collaboration, file organization, and engineering decisions.
 
+## Project status
+
+On 25 November 2026, the maintainer decided to put this project on hold and start a separate project. This repository and the existing local installation remain available to projects that use basePack for close-out. `v0.19.1` is the snapshot of the current implementation for that work. Keep each project's configuration, database, evidence, and recovery materials with the project that owns them. The [latest release](https://github.com/YS-Pan/basePack/releases/latest) provides the Windows client wheel and checksum.
+
+The project aimed to help an agent recover evidence it knows to look for and surface important clues it had yet to consider, at a cost that fits ordinary project work. Real trials included slide production, engineering research, and a dissertation migration. Published knowledge could be searched, traced to exact source versions, and recovered from a backup in tested workflows. A slide trial also showed that a verified graph path could recover the image actually used in a finished result. The trials exposed four problems behind the decision to pause.
+
+- **Coverage and useful relations diverged.** A library could hold thousands of members while yielding few links between an adopted output, its editable source, and its underlying data. Workers often read the two endpoints in different batches. Targeted co-reading could recover some relationships. Ordinary maintenance still struggled to pick the right outputs and sources on its own. In the dissertation trials, independent maintenance recovered 0 of 26 held-out relations under the strict criteria, including 0 of the 16 whose evidence was available in the test material. The legacy reference library remains available separately.
+- **The benefit varied by task.** Direct file search and exact source reads answered some text questions with little setup. A later equal-budget comparison found an additional relationship in one run, with no demonstrated use of that relationship in the final business answer. The limited chat-index trial did verify retrieval and exact host readback for the admitted messages. Broader coverage and a repeatable gain on unseen work remain open.
+- **End-to-end maintenance was expensive.** Waiting for agents, encoding, publishing, recovering failed batches, and checking source readback all added time. One engineering case took roughly seven hours to do the original work. Follow-on maintenance for the same results had a recorded lower bound above 26 hours across attempts, with coverage still incomplete. That elapsed time includes mixed work and waits. Reduced file-summary counts alone did not establish a speedup.
+- **Deployment and follow-through required hands-on attention.** Windows database startup and embedding readiness could time out. Host sandbox and approval boundaries could interrupt chat collection or cross-chat follow-up. Publication sometimes needed repairs to source ranges, version references, or privacy metadata. Some trial failures went unretested until a coordinator assigned the repair and checked it from the normal entry point. Keeping the growing implementation, tests, and agent instructions aligned added maintenance work while the gains on ordinary tasks remained uneven.
+
+The last trials point to smaller tests drawn from real maintenance backlogs. Each test can start from a concrete output, compare directory search and direct reading with the indexed workflow on a held-out question, and keep verified results for later use. Measure the time through successful readback. The [project setup](experiments/20261106-basepack/docs/setup-project.md) and [memory guide](experiments/20261106-basepack/docs/memory.md) remain the entry points for existing projects.
+
 | Capability | Purpose | Requirements |
 | --- | --- | --- |
 | Project memory | Store summaries, source excerpts, images, and relations; query published knowledge and maintain it separately | Python 3.13+ client, a separate SurrealDB 4 instance per project, and a shared CPU/CUDA embedding service |
 | Resource coordination | Reuse text/image embedding across projects and submit ordinary heavy jobs | CPU/CUDA embedding service; HTCondor for jobs |
 | agent-team | Choose solo work, direct collaboration, or layered teams for each task | A host with skills and subscription-based agents |
 | file-structure | Organize project files by purpose and lifecycle | A host with skills |
-| engineering-judgment | Judge contracts, responsibilities, compatibility, and the work passed to users | A host with skills |
+| engineering-judgment | Design data models, module boundaries, and failure handling around explicit contracts | A host with skills |
 
-The [latest release](https://github.com/YS-Pan/basePack/releases/latest) provides a client wheel for Windows and Python 3.13+. The [deployment contract](devDoc/system/deployment.md) records this project's installation and validation, and [task progress](devDoc/tasks/20261115-real-use-rectification/progress.md) records accepted coverage and remaining work. Completed versions use plain numeric versions. Intermediate builds use `.devN`. The host's subscription-based agents understand material, build relations, and score results. basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability.
-
-**basePack is under development. Real use also serves as testing; record problems so they can inform subsequent fixes.**
+The client supports Python 3.13+ on Windows. The [deployment contract](devDoc/system/deployment.md) describes facility requirements. The host's subscription-based agents understand material, build relations, and score results. basePack requires no separate LLM API. Prepare the facilities needed by your chosen capability.
 
 ## Install the lightweight client
 
@@ -29,7 +40,7 @@ $python = (Resolve-Path '.venv/Scripts/python.exe').Path
 
 The Python package lives in `experiments/20261106-basepack`; include that directory when installing from the repository root. These commands install the lightweight client. Project memory connects to a shared model service whose dependencies belong in its service environment. General skills can be used independently. This virtual environment belongs to the current clone; after moving or deleting it, recreate the client and update project instructions.
 
-To build a wheel from source, see the [route README](experiments/20261106-basepack/README.md#development-checks-and-builds). In 0.19, new memory libraries use schema 4. Existing schema 3 libraries use the [offline graph migration](experiments/20261106-basepack/docs/setup-project.md#升级到-019-的统一图) before switching clients. To upgrade a 0.16 memory project to 0.18, preserve the old client and recovery set, complete the [offline schema migration](experiments/20261106-basepack/docs/setup-project.md#升级到-017), then follow the [0.18 maintenance upgrade](experiments/20261106-basepack/docs/setup-project.md#升级到-018有限任务池). The optional `behavior` extra installs the KL-NMF training dependencies. Basic retrieval can use the lightweight client.
+To build a wheel from source, see the [route README](experiments/20261106-basepack/README.md#development-checks-and-builds). The 0.19 series uses memory schema 4. Existing schema 3 libraries require the [offline graph migration](experiments/20261106-basepack/docs/setup-project.md#升级到-019-的统一图) before switching clients. The optional `behavior` extra installs the KL-NMF training dependencies. Basic retrieval can use the lightweight client.
 
 ## Enable project memory
 
@@ -46,7 +57,7 @@ Each project's configuration, password file, knowledge, database, and local entr
 
 Collect Codex originals independently with `memory collect`. A bound project then chooses `memory maintain --collection <receipt>` or explicitly `--retained`; retained originals leave current chat freshness unknown. Explicit `--scope` restricts the actual workset, including registered and missing sources. Authors own finite related source groups and shared graph targets. Finite waves retain the same receipt/owner/control, fixed references and explicit notification outcomes; pool execution does not establish publication or full maintenance completion. Optional `memory.private_scope` classifies files in place without expanding discovery; large source snapshots retain complete text through bounded transactional messages. See the [memory guide](experiments/20261106-basepack/docs/memory.md).
 
-`memory brief` reads mandatory information, bounded overview entries and known gaps without searching or contacting the model. `memory retrieve --question '...'` prepares a whole-project request and host dispatch. The worker fixes independent base anchors, follows bounded graph paths across exact versions, checks the original evidence, and scores the final result. The host records delivery after the result reaches the user. Pure co-delivery KL-NMF and per-anchor Gaussian similarity provide access intervals with no calendar decay. Low-weight knowledge remains retrievable and retained; `rank` only sorts, deduplicates and applies the budget. See the [memory guide](experiments/20261106-basepack/docs/memory.md).
+`memory brief` reads mandatory information, bounded overview entries and known gaps without searching or contacting the model. `memory retrieve --question '...'` prepares a whole-project request and host dispatch. The worker fixes independent base anchors before behavioral candidates, reads evidence, scores once and saves a generated receipt; the host records it after actual delivery. Pure co-delivery KL-NMF and per-anchor Gaussian similarity provide access intervals with no calendar decay. Low-weight knowledge remains retrievable and retained; `rank` only sorts, deduplicates and applies the budget. See the [memory guide](experiments/20261106-basepack/docs/memory.md).
 
 Confidential development context can live in a project-root `private/` with its own local Git repository, excluded from public Git and releases. Memory automatically discovers that repository's tracked and nonignored files within the same project and carries a `private` boolean through version-pinned provenance. Public documents remain self-contained with optional private references. Full recovery backups remain private; the marker does not make a raw database export safe to publish. See the [private-context pattern](skills/file-structure/references/private-context.md).
 
@@ -65,7 +76,6 @@ The wheel includes the program, configuration and entry templates, memory schema
 | Entry | Contents |
 | --- | --- |
 | [Route README](experiments/20261106-basepack/README.md) | Capabilities, development, builds, and tests |
-| [Maintenance trial history](devDoc/tasks/20261106-memory-system/maintenance-implementation-result.md) | Implementation, isolation checks, consolidation and retirement record |
 | [Project setup](experiments/20261106-basepack/docs/setup-project.md) | Configuration, new shells, upgrades, relocation, and skill discovery |
 | [Configuration maintenance](experiments/20261106-basepack/docs/project-config-maintenance.md) | Changes to host capacity, paths, models, services, and project state |
 | [Memory guide](experiments/20261106-basepack/docs/memory.md) | Initial knowledge, retrieval, small-batch maintenance, and backup |
